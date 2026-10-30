@@ -1,0 +1,11 @@
+{
+  "name": "sstc",
+  "private": true,
+  "description": "SSTC (Serve & Smash Tennis Club) 모임 앱",
+  "scripts": {
+    "build": "node tools/build.js"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.23.5"
+  }
+}
