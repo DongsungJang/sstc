@@ -30,6 +30,7 @@ fs.writeFileSync(path.join(ROOT,'index.html'),page([
   '<!-- 공유 저장: 파이어베이스 Realtime Database (club/ 경로) -->',
   cdn('firebase/10.12.2/firebase-app-compat.min.js'),
   cdn('firebase/10.12.2/firebase-database-compat.min.js'),
+  cdn('firebase/10.12.2/firebase-auth-compat.min.js'),
   '<script src="firebase-config.js"></script>',
   cdn('react/18.3.1/umd/react.production.min.js'),
   cdn('react-dom/18.3.1/umd/react-dom.production.min.js')].join('\n')));

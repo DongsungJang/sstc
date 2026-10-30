@@ -107,7 +107,7 @@ const LAST_MEETING = {date:"2025.06.14 (토)",place:"올림픽공원",myResult:"
 //  ② 이달 참석이 2회 이하인 회원 (이번이 1~2번째)
 //  ③ 이달 이미 2회 참석해서 이번이 3번째 이상인 회원 (2회 초과자)
 // 순서로 줄을 세우고, 같은 그룹 안에서는 투표 시각 순이에요. 정원 밖은 같은 순서로 대기.
-const ME = "동토리";
+let ME = "동토리";   // 로그인하면 그 회원의 닉네임으로 바뀜 (setMe)
 const MONTHLY_PRIORITY_LIMIT = 2;
 const dayKey = m => m.date.slice(0,10);
 const monthKey = m => m.date.slice(0,7);
@@ -225,12 +225,16 @@ function LoginScreen({onSignup,onForgot,onLogin}) {
   const [vis,setVis]=useState(false);
   const [err,setErr]=useState("");
 
+  const [busy,setBusy]=useState(false);
   const handle = () => {
-    // 관리자 계정: 빈칸으로도 통과
-    if (email==="" && pw==="") { onLogin(); return; }
+    if (!FB) {   // 데모: 빈칸으로도 통과
+      if (email==="" && pw==="") { onLogin(); return; }
+      if (!email||!pw){setErr("이메일과 비밀번호를 입력해주세요");return;}
+      onLogin(); return;
+    }
     if (!email||!pw){setErr("이메일과 비밀번호를 입력해주세요");return;}
-    // TODO: supabase 로그인
-    onLogin();
+    setBusy(true);setErr("");
+    FB.auth.signInWithEmailAndPassword(email.trim(),pw).catch(e=>{setErr(authMsg(e));setBusy(false);});
   };
 
   return (
@@ -245,13 +249,13 @@ function LoginScreen({onSignup,onForgot,onLogin}) {
         </div>
       </FieldWrap>
       {err&&<p style={{fontSize:13,color:"#ef4444",margin:0}}>{err}</p>}
-      <button type="button" onClick={handle} style={{...btnPrimary,marginTop:4}}>로그인</button>
+      <button type="button" onClick={handle} disabled={busy} style={{...btnPrimary,marginTop:4,opacity:busy?0.6:1}}>{busy?"로그인 중…":"로그인"}</button>
       <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:4}}>
         <button type="button" onClick={onSignup} style={{background:"none",border:"none",fontSize:13,color:BLUE,fontWeight:600,cursor:"pointer"}}>회원가입</button>
         <span style={{color:"#D6DEF7",fontSize:13}}>|</span>
         <button type="button" onClick={onForgot} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer"}}>비밀번호 찾기</button>
       </div>
-      <p style={{margin:0,fontSize:11,color:"#D6DEF7",textAlign:"center"}}>관리자: 빈칸으로 로그인</p>
+      {!FB&&<p style={{margin:0,fontSize:11,color:"#D6DEF7",textAlign:"center"}}>데모: 빈칸으로 로그인</p>}
     </div>
   );
 }
@@ -263,12 +267,25 @@ function ForgotScreen({onBack}) {
   const [sent,setSent]=useState(false);
   const [err,setErr]=useState("");
   const fmt=v=>{const d=v.replace(/\D/g,"").slice(0,11);if(d.length<=3)return d;if(d.length<=7)return`${d.slice(0,3)}-${d.slice(3)}`;return`${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;};
-  const handle=()=>{if(!name||!phone){setErr("모두 입력해주세요");return;}setSent(true);};
+  const [email,setEmail]=useState("");
+  const handle=()=>{
+    if(FB){ if(!email){setErr("가입한 이메일을 입력해주세요");return;}
+      FB.auth.sendPasswordResetEmail(email.trim()).then(()=>setSent(true)).catch(e=>setErr(authMsg(e))); return; }
+    if(!name||!phone){setErr("모두 입력해주세요");return;}setSent(true);};
+  if(FB&&!sent) return(
+    <div style={{display:"flex",flexDirection:"column",gap:18}}>
+      <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>가입한 이메일로 비밀번호를 다시 정하는 링크를 보내드려요.</p>
+      <FieldWrap label="이메일" required><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="example@email.com" style={inputStyle}/></FieldWrap>
+      {err&&<p style={{fontSize:13,color:"#ef4444",margin:0}}>{err}</p>}
+      <button type="button" onClick={handle} style={{...btnPrimary,marginTop:4}}>재설정 링크 받기</button>
+      <button type="button" onClick={onBack} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer",textAlign:"center"}}>← 로그인으로 돌아가기</button>
+    </div>
+  );
   if(sent) return(
     <div style={{textAlign:"center",padding:"24px 0",display:"flex",flexDirection:"column",gap:16}}>
       <div style={{fontSize:48}}>📧</div>
-      <h3 style={{margin:0,color:BLUE,fontSize:18}}>임시 비밀번호 발송 완료</h3>
-      <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>가입 시 등록한 이메일로<br/>임시 비밀번호를 보내드렸어요.</p>
+      <h3 style={{margin:0,color:BLUE,fontSize:18}}>{FB?"재설정 메일을 보냈어요":"임시 비밀번호 발송 완료"}</h3>
+      <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>{FB?<>메일함(스팸함 포함)에서 링크를 눌러<br/>새 비밀번호를 정해 주세요.</>:<>가입 시 등록한 이메일로<br/>임시 비밀번호를 보내드렸어요.</>}</p>
       <button type="button" onClick={onBack} style={{...btnPrimary,marginTop:8}}>로그인으로 돌아가기</button>
     </div>
   );
@@ -293,7 +310,7 @@ function Step1({data,onChange,onNext,isAdmin}) {
 
   const checkEmail=()=>{
     if(!data.email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)){setErrors(p=>({...p,email:"올바른 이메일을 먼저 입력해주세요"}));return;}
-    setEmailChecked(true);setErrors(p=>({...p,email:undefined}));setEmailMsg("✓ 사용 가능한 이메일이에요");
+    setEmailChecked(true);setErrors(p=>({...p,email:undefined}));setEmailMsg(FB?"✓ 쓸 수 있는 형식이에요 (이미 가입된 이메일이면 가입 완료 때 알려드려요)":"✓ 사용 가능한 이메일이에요");
   };
   const validate=()=>{
     if(isAdmin) return true;
@@ -345,7 +362,11 @@ function Step2({data,onChange,onNext,onBack,isAdmin}) {
   const fileRef=useRef();
   const [preview,setPreview]=useState(null);
   const handlePhoto=e=>{const f=e.target.files[0];if(!f)return;onChange("photo",f);setPreview(URL.createObjectURL(f));};
-  const checkNick=()=>{if(!data.nickname){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("✓ 사용 가능한 닉네임이에요");};
+  const checkNick=async()=>{
+    if(!data.nickname.trim()){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}
+    if(FB){ try{ if(await once(FB.club.child("nicknames/"+nickKey(data.nickname)))){setNickChecked(false);setNickMsg("");setErrors(p=>({...p,nickname:"이미 쓰는 닉네임이에요"}));return;} }
+      catch(e){ setErrors(p=>({...p,nickname:authMsg(e)})); return; } }
+    setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("✓ 사용 가능한 닉네임이에요");};
   const fmt=v=>{const d=v.replace(/\D/g,"").slice(0,11);if(d.length<=3)return d;if(d.length<=7)return`${d.slice(0,3)}-${d.slice(3)}`;return`${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;};
   const validate=()=>{
     if(isAdmin) return true;
@@ -509,7 +530,7 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin}) {
 function HomeTab({onGoBooking,onOpenMeeting}) {
   const lastMeeting=MEETINGS.find(m=>m.status==="past"&&m.attendees.some(a=>a.isMe));
   const {rec:lastRec}=useMeetingRecord(lastMeeting?lastMeeting.id:0);
-  const mine=lastRec&&lastRec.bracket?myRecord(lastRec.bracket,lastRec.scores,"동토리"):null;
+  const mine=lastRec&&lastRec.bracket?myRecord(lastRec.bracket,lastRec.scores,ME):null;
   const [exp,setExp]=useState(null);
   const next=MEETINGS.find(m=>m.status==="upcoming");
   const nextNext=MEETINGS.filter(m=>m.status==="upcoming")[1];
@@ -1040,6 +1061,135 @@ function useMeetingRecord(meetingId) {
   return {rec,mode,saveBracket,clearBracket,saveScore,saveRsvp};
 }
 
+// ─── 회원 계정 (파이어베이스 Authentication) ───────────────────────────────────
+// firebase-config.js와 auth 라이브러리가 있으면 진짜 가입·로그인, 없으면(아티팩트 등) 예전처럼 데모 로그인.
+// 데이터 위치: club/members/<uid> 프로필, club/nicknames/<닉네임> = uid, club/approved/<uid> = true (관리자가 승인),
+//             club/admins/<uid> = true (파이어베이스 콘솔에서 직접 넣음)
+const FB = (()=>{
+  try{
+    const cfg=typeof window!=="undefined"&&window.FIREBASE_CONFIG;
+    if(!cfg||!cfg.databaseURL||!window.firebase||!window.firebase.auth) return null;
+    if(!window.firebase.apps.length) window.firebase.initializeApp(cfg);
+    const club=window.firebase.database().ref(FIREBASE_ROOT);
+    return {auth:window.firebase.auth(),club};
+  }catch(e){ return null; }
+})();
+// RTDB 키에 못 쓰는 문자(. # $ [ ] /)를 피해서 닉네임을 키로 씀
+const nickKey = n => encodeURIComponent(n.trim()).replace(/\./g,"%2E");
+const AUTH_ERRORS = {
+  "auth/invalid-email":"이메일 형식이 올바르지 않아요",
+  "auth/user-not-found":"이메일 또는 비밀번호가 맞지 않아요",
+  "auth/wrong-password":"이메일 또는 비밀번호가 맞지 않아요",
+  "auth/invalid-credential":"이메일 또는 비밀번호가 맞지 않아요",
+  "auth/invalid-login-credentials":"이메일 또는 비밀번호가 맞지 않아요",
+  "auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인하거나 비밀번호 찾기를 해 주세요",
+  "auth/weak-password":"비밀번호는 6자 이상이어야 해요",
+  "auth/too-many-requests":"시도가 너무 많아요. 잠시 후 다시 해 주세요",
+  "auth/network-request-failed":"인터넷 연결을 확인해 주세요",
+  "auth/operation-not-allowed":"파이어베이스에서 이메일/비밀번호 로그인이 꺼져 있어요",
+};
+const authMsg = e => AUTH_ERRORS[e&&e.code] || (/PERMISSION_DENIED|permission/i.test(String(e&&(e.code||e.message)))
+  ? "저장 권한이 없어요. 파이어베이스 규칙을 확인해 주세요" : "문제가 생겼어요: "+((e&&e.message)||e));
+const once = ref => ref.once("value").then(s=>s.val());
+
+// 로그인한 사람이 바뀌면 '나' 기준 표시(투표, 대진표, 홈)를 그 사람으로 맞춤
+function setMe(profile){
+  if(!profile||!profile.nickname) return;
+  ME=profile.nickname;
+  if(profile.ntrp) MEMBER_NTRP[ME]=profile.ntrp;
+  MEETINGS.forEach(m=>{const r=resolveVotes(m,m.votes);m.attendees=r.confirmed;m.waitlist=r.waitlist;});
+}
+
+// 회원가입: 계정 생성 → 프로필·닉네임 저장. 승인은 관리자가 따로 함
+async function signUpMember(form){
+  const nick=form.nickname.trim();
+  const taken=await once(FB.club.child("nicknames/"+nickKey(nick)));
+  if(taken) throw {code:"nick-taken",message:"이미 쓰는 닉네임이에요. 다른 닉네임으로 바꿔 주세요"};
+  const cred=await FB.auth.createUserWithEmailAndPassword(form.email.trim(),form.password);
+  const uid=cred.user.uid;
+  const {password,passwordConfirm,photo,...rest}=form;
+  const profile={...JSON.parse(JSON.stringify(rest)),email:form.email.trim(),nickname:nick,
+    region:form.region==="타지역"?(form.regionCustom||"타지역"):form.region,createdAt:Date.now()};
+  await FB.club.child("members/"+uid).set(profile);
+  await FB.club.child("nicknames/"+nickKey(nick)).set(uid);
+  return {uid,profile};
+}
+
+// 승인 대기 화면
+function PendingScreen({profile,onRefresh,onLogout}){
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center",padding:"12px 0"}}>
+      <div style={{fontSize:44}}>⏳</div>
+      <h2 style={{margin:0,fontSize:19,color:BLUE}}>가입 승인 대기 중이에요</h2>
+      <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>{profile&&profile.nickname?`${profile.nickname} 님, `:""}관리자가 승인하면<br/>모임 예약과 대진표를 쓸 수 있어요.</p>
+      <button type="button" onClick={onRefresh} style={{...btnPrimary,marginTop:6}}>승인됐는지 다시 확인</button>
+      <button type="button" onClick={onLogout} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer"}}>로그아웃</button>
+    </div>
+  );
+}
+
+// 관리자 탭: 가입 승인, 회원 목록
+function AdminTab(){
+  const [members,setMembers]=useState(null);
+  const [approved,setApproved]=useState({});
+  const [admins,setAdmins]=useState({});
+  const [err,setErr]=useState("");
+  const [open,setOpen]=useState(null);
+  useEffect(()=>{
+    const refs=[["members",v=>setMembers(v||{})],["approved",v=>setApproved(v||{})],["admins",v=>setAdmins(v||{})]]
+      .map(([p,fn])=>{const r=FB.club.child(p);const h=s=>fn(s.val());r.on("value",h,e=>setErr(authMsg(e)));return ()=>r.off("value",h);});
+    return ()=>refs.forEach(f=>f());
+  },[]);
+  if(err) return <Card><p style={{margin:0,color:"#ef4444",fontSize:14}}>{err}</p></Card>;
+  if(!members) return <Card><p style={{margin:0,color:"#6B7493",fontSize:14}}>회원 목록을 불러오는 중이에요…</p></Card>;
+  const list=Object.entries(members).map(([uid,p])=>({uid,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const pending=list.filter(m=>!approved[m.uid]&&!admins[m.uid]);
+  const active=list.filter(m=>approved[m.uid]||admins[m.uid]);
+  const approve=uid=>FB.club.child("approved/"+uid).set(true).catch(e=>setErr(authMsg(e)));
+  const revoke=uid=>FB.club.child("approved/"+uid).remove().catch(e=>setErr(authMsg(e)));
+  const row=(m,act)=>(
+    <div key={m.uid} style={{borderRadius:14,background:"#F5F7FE",padding:"10px 12px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div style={{flex:1,minWidth:0}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
+            {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
+            {admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:999,background:GRAD,color:"#fff"}}>관리자</span>}
+          </div>
+          <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.inviteCode?` · 가입 코드 ${m.inviteCode}`:""}</span>
+        </div>
+        {act}
+      </div>
+      {open===m.uid&&(
+        <div style={{marginTop:8,fontSize:12,color:"#4A5578",lineHeight:1.7}}>
+          {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
+            ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo]]
+            .filter(([,v])=>v).map(([k,v])=><div key={k}><span style={{color:"#A3AAC2",display:"inline-block",width:84}}>{k}</span>{v}</div>)}
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
+      <Card>
+        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
+        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {pending.map(m=>row(m,<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>승인</button>))}
+          </div>
+        )}
+      </Card>
+      <Card>
+        <SectionTitle>회원 ({active.length}명)</SectionTitle>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {active.map(m=>row(m,admins[m.uid]?null:<button type="button" onClick={()=>revoke(m.uid)} style={{...btnSmall,background:"#fff",color:"#6B7493",border:"1.5px solid #D6DEF7"}}>승인 취소</button>))}
+        </div>
+        <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
+      </Card>
+    </div>
+  );
+}
+
 // ─── 대진표 만들기 ───────────────────────────────────────────────────────────
 const NTRP_NUM = v => { const x=parseFloat(v); return isNaN(x)?(v==="선출"?6:0):x; };
 const toMin = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m?(+m[1])*60+(+m[2]):8*60; };
@@ -1252,7 +1402,6 @@ function MeetingBracket({meeting,participants,store}) {
   const [confirm,setConfirm]=useState(false);
   const [show,setShow]=useState("games");
   const bracket=rec&&rec.bracket, scores=(rec&&rec.scores)||{};
-  const ME="동토리";
   const modeNote={shared:"모임 멤버 모두에게 실시간으로 저장돼요",local:"이 기기에 저장돼요",readonly:"저장 권한이 없어 이 기기에서만 보여요"}[mode];
   const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>{mode==="shared"?"☁️ ":"📱 "}{modeNote}</p>;
   if(!bracket) return (
@@ -1628,7 +1777,46 @@ export default function App() {
     window.addEventListener("hashchange",onHash);
     return ()=>window.removeEventListener("hashchange",onHash);
   },[]);
-  const IS_ADMIN=true; // 관리자 모드
+  const IS_ADMIN=!FB; // 데모(파이어베이스 없음)에서만 필수 입력 건너뛰기 허용
+
+  // ── 회원 계정 ──
+  const [account,setAccount]=useState(FB?{loading:true}:null); // {user, profile, admin, approved}
+  const [signupErr,setSignupErr]=useState("");
+  const [signupBusy,setSignupBusy]=useState(false);
+  const signingUp=useRef(false);
+  const loadAccount=async user=>{
+    const [profile,admin,approved]=await Promise.all(["members/","admins/","approved/"].map(p=>once(FB.club.child(p+user.uid)).catch(()=>null)));
+    setMe(profile);
+    setAccount({user,profile:profile||null,admin:!!admin,approved:!!approved});
+    return profile;
+  };
+  useEffect(()=>{
+    if(!FB) return;
+    return FB.auth.onAuthStateChanged(user=>{
+      if(!user){ setAccount(null); setScreen(s=>s==="main"?"login":s); return; }
+      if(signingUp.current) return;   // 가입 중에는 가입 완료 화면을 먼저 보여줌
+      loadAccount(user).then(()=>setScreen("main"));
+    });
+  },[]);
+  const logout=()=>{ if(FB) FB.auth.signOut(); setScreen("login"); setTab("home"); setOpenMeeting(null); };
+  const submitSignup=async()=>{
+    if(!FB){ setSignupDone(true); return; }
+    setSignupErr(""); setSignupBusy(true); signingUp.current=true;
+    try{
+      const {profile}=await signUpMember(form);
+      setMe(profile); setSignupDone(true);
+    }catch(e){
+      signingUp.current=false;
+      setSignupErr(e&&e.code==="nick-taken"?e.message:authMsg(e));
+      if(e&&e.code==="nick-taken") setStep(2);
+      else if(e&&/email|password/.test(e.code||"")) setStep(1);
+    }finally{ setSignupBusy(false); }
+  };
+  const finishSignup=()=>{
+    signingUp.current=false; setSignupDone(false); setStep(1);
+    if(FB&&FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(()=>setScreen("main"));
+    else setScreen("main");
+  };
 
   const [form,setForm]=useState({
     email:"",password:"",passwordConfirm:"",inviteCode:"",referrer:"",
@@ -1639,8 +1827,10 @@ export default function App() {
   });
   const onChange=(key,val)=>setForm(p=>({...p,[key]:val}));
 
-  // ── 로그인/회원가입 화면 ──
-  if(screen!=="main") {
+  // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
+  const pending=FB&&screen==="main"&&account&&account.user&&!account.admin&&!account.approved;
+  const loading=FB&&account&&account.loading;
+  if(screen!=="main"||pending||loading) {
     const titles={login:"로그인",forgot:"비밀번호 찾기",signup:"회원가입"};
     return(
       <div style={{minHeight:"100vh",background:"#F3F5FB",maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
@@ -1652,31 +1842,35 @@ export default function App() {
           <div style={{width:screen==="login"?92:68,height:screen==="login"?92:68,margin:"0 auto 14px",borderRadius:"50%",border:"2px solid rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:screen==="login"?42:30,background:"rgba(255,255,255,0.12)",cursor:"pointer",userSelect:"none"}} onClick={()=>setWink(w=>!w)}>{wink?"😜":"🎾"}</div>
           <h1 style={{fontSize:30,fontWeight:700,margin:"0 0 2px",letterSpacing:"0.08em"}}>SSTC</h1>
           <p style={{fontSize:12,margin:"0 0 10px",opacity:0.8,letterSpacing:"0.04em"}}>{wink?"Sorry, not sorry":"Serve & Smash Tennis Club"}</p>
-          <p style={{fontSize:14,margin:0,opacity:0.85}}>{titles[screen]}</p>
+          <p style={{fontSize:14,margin:0,opacity:0.85}}>{loading?"불러오는 중":pending?"승인 대기":titles[screen]}</p>
         </div>
         <div style={{padding:"0 16px 48px",marginTop:-48,position:"relative"}}>
           <div style={{background:"#fff",borderRadius:28,boxShadow:"0 12px 40px rgba(40,70,180,0.12)",padding:"28px 22px"}}>
-            {screen==="login"&&<LoginScreen onSignup={()=>setScreen("signup")} onForgot={()=>setScreen("forgot")} onLogin={()=>setScreen("main")}/>}
-            {screen==="forgot"&&<ForgotScreen onBack={()=>setScreen("login")}/>}
-            {screen==="signup"&&(
+            {loading&&<p style={{margin:0,textAlign:"center",color:"#6B7493",fontSize:14}}>잠시만요…</p>}
+            {!loading&&pending&&<PendingScreen profile={account.profile} onRefresh={()=>loadAccount(account.user)} onLogout={logout}/>}
+            {!loading&&!pending&&screen==="login"&&<LoginScreen onSignup={()=>setScreen("signup")} onForgot={()=>setScreen("forgot")} onLogin={()=>setScreen("main")}/>}
+            {!loading&&!pending&&screen==="forgot"&&<ForgotScreen onBack={()=>setScreen("login")}/>}
+            {!loading&&!pending&&screen==="signup"&&(
               signupDone?(
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 0",gap:16,textAlign:"center"}}>
                   <div style={{width:96,height:96,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:46,boxShadow:SHADOW_BTN}}>🎾</div>
                   <h2 style={{fontSize:20,fontWeight:700,color:BLUE,margin:0}}>가입 완료!</h2>
                   <p style={{color:"#6B7493",fontSize:14,margin:0,lineHeight:1.6}}>모임에 오신 걸 환영해요.<br/>관리자 승인 후 이용 가능합니다.</p>
-                  <button onClick={()=>{setScreen("main");setSignupDone(false);setStep(1);}} style={{...btnPrimary,width:"auto",padding:"13px 36px",marginTop:8}}>홈으로 이동</button>
+                  <button onClick={finishSignup} style={{...btnPrimary,width:"auto",padding:"13px 36px",marginTop:8}}>{FB?"확인":"홈으로 이동"}</button>
                 </div>
               ):(
                 <>
                   <StepIndicator current={step}/>
+                  {signupErr&&<div style={{background:"#FEF2F2",color:"#B91C1C",borderRadius:14,padding:"10px 14px",fontSize:13,marginBottom:16,lineHeight:1.5}}>{signupErr}</div>}
+                  {signupBusy&&<div style={{background:BLUE_LIGHT,color:BLUE,borderRadius:14,padding:"10px 14px",fontSize:13,marginBottom:16}}>가입하는 중이에요…</div>}
                   {step===1&&<Step1 data={form} onChange={onChange} onNext={()=>setStep(2)} isAdmin={IS_ADMIN}/>}
                   {step===2&&<Step2 data={form} onChange={onChange} onNext={()=>setStep(3)} onBack={()=>setStep(1)} isAdmin={IS_ADMIN}/>}
-                  {step===3&&<Step3 data={form} onChange={onChange} onSubmit={()=>setSignupDone(true)} onBack={()=>setStep(2)} isAdmin={IS_ADMIN}/>}
+                  {step===3&&<Step3 data={form} onChange={onChange} onSubmit={submitSignup} onBack={()=>setStep(2)} isAdmin={IS_ADMIN}/>}
                 </>
               )
             )}
           </div>
-          {screen==="signup"&&!signupDone&&(
+          {!loading&&!pending&&screen==="signup"&&!signupDone&&(
             <p style={{textAlign:"center",fontSize:13,color:"#6B7493",marginTop:18}}>
               이미 계정이 있으신가요?{" "}
               <button type="button" onClick={()=>setScreen("login")} style={{background:"none",border:"none",color:BLUE,fontWeight:700,fontSize:13,cursor:"pointer",textDecoration:"underline",textUnderlineOffset:3}}>로그인</button>
@@ -1688,7 +1882,8 @@ export default function App() {
   }
 
   // ── 메인 앱 화면 ──
-  const tabTitles={home:"SSTC",booking:"정모 예약",stats:"통계"};
+  const tabTitles={home:"SSTC",booking:"정모 예약",stats:"통계",admin:"관리"};
+  const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
   return(
@@ -1703,13 +1898,13 @@ export default function App() {
             :<span style={{fontSize:14,fontWeight:600,opacity:0.9}}>🎾 SSTC</span>}
           <div style={{display:"flex",gap:8}}>
             <button type="button" style={iconBtn} title="알림"><Icon name="bell" size={19}/></button>
-            <button type="button" onClick={()=>setScreen("login")} style={iconBtn} title="로그아웃"><Icon name="user" size={19}/></button>
+            <button type="button" onClick={logout} style={iconBtn} title="로그아웃" aria-label="로그아웃"><Icon name="user" size={19}/></button>
           </div>
         </div>
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
             <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요 👋</p>
-            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>동토리 님</p>
+            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{account&&account.admin&&<span style={{fontSize:11,fontWeight:700,marginLeft:8,padding:"3px 9px",borderRadius:999,background:"rgba(255,255,255,0.22)",verticalAlign:"middle"}}>관리자</span>}</p>
           </div>
         ):(
           curMeeting?(
@@ -1724,7 +1919,8 @@ export default function App() {
       {isHome&&(
         <div style={{margin:"-38px 16px 0",position:"relative",zIndex:2}}>
           <Card style={{padding:"16px 8px",display:"flex"}}>
-            {[{label:"NTRP",value:"3.5"},{label:"구력",value:"3년 2개월"},{label:"올해(누적)",value:"3회 (12회)"}].map((s,i)=>(
+            {[{label:"NTRP",value:(account&&account.profile&&account.profile.ntrp)||MEMBER_NTRP[ME]||"-"},
+              {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"3년 2개월"},{label:"올해(누적)",value:"3회 (12회)"}].map((s,i)=>(
               <div key={s.label} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",borderLeft:i>0?"1px solid #EEF1FA":"none"}}>
                 <p style={{margin:"0 0 4px",fontSize:11,color:"#A3AAC2",letterSpacing:"0.04em"}}>{s.label}</p>
                 <p style={{margin:0,fontSize:15,fontWeight:700,color:BLUE}}>{s.value}</p>
@@ -1737,10 +1933,11 @@ export default function App() {
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")}/>}
         {tab==="stats"&&<StatsTab/>}
+        {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
       </div>
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {TABS.map(t=>{const on=tab===t.key;return(
+        {tabs.map(t=>{const on=tab===t.key;return(
           <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"12px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff",opacity:on?1:0.6}}>
             <Icon name={t.icon} size={22} stroke={on?2.2:1.8}/>
             <span style={{fontSize:11,fontWeight:on?700:500}}>{t.label}</span>

@@ -12,6 +12,7 @@
 <!-- 공유 저장: 파이어베이스 Realtime Database (club/ 경로) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-database-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-auth-compat.min.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -263,7 +264,7 @@ const LAST_MEETING = {
 //  ② 이달 참석이 2회 이하인 회원 (이번이 1~2번째)
 //  ③ 이달 이미 2회 참석해서 이번이 3번째 이상인 회원 (2회 초과자)
 // 순서로 줄을 세우고, 같은 그룹 안에서는 투표 시각 순이에요. 정원 밖은 같은 순서로 대기.
-const ME = "동토리";
+let ME = "동토리"; // 로그인하면 그 회원의 닉네임으로 바뀜 (setMe)
 const MONTHLY_PRIORITY_LIMIT = 2;
 const dayKey = m => m.date.slice(0, 10);
 const monthKey = m => m.date.slice(0, 7);
@@ -553,9 +554,18 @@ function LoginScreen({
   const [pw, setPw] = useState("");
   const [vis, setVis] = useState(false);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const handle = () => {
-    // 관리자 계정: 빈칸으로도 통과
-    if (email === "" && pw === "") {
+    if (!FB) {
+      // 데모: 빈칸으로도 통과
+      if (email === "" && pw === "") {
+        onLogin();
+        return;
+      }
+      if (!email || !pw) {
+        setErr("이메일과 비밀번호를 입력해주세요");
+        return;
+      }
       onLogin();
       return;
     }
@@ -563,8 +573,12 @@ function LoginScreen({
       setErr("이메일과 비밀번호를 입력해주세요");
       return;
     }
-    // TODO: supabase 로그인
-    onLogin();
+    setBusy(true);
+    setErr("");
+    FB.auth.signInWithEmailAndPassword(email.trim(), pw).catch(e => {
+      setErr(authMsg(e));
+      setBusy(false);
+    });
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -618,11 +632,13 @@ function LoginScreen({
   }, err), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handle,
+    disabled: busy,
     style: {
       ...btnPrimary,
-      marginTop: 4
+      marginTop: 4,
+      opacity: busy ? 0.6 : 1
     }
-  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("div", {
+  }, busy ? "로그인 중…" : "로그인"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "center",
@@ -655,14 +671,14 @@ function LoginScreen({
       color: "#6B7493",
       cursor: "pointer"
     }
-  }, "\uBE44\uBC00\uBC88\uD638 \uCC3E\uAE30")), /*#__PURE__*/React.createElement("p", {
+  }, "\uBE44\uBC00\uBC88\uD638 \uCC3E\uAE30")), !FB && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
       color: "#D6DEF7",
       textAlign: "center"
     }
-  }, "\uAD00\uB9AC\uC790: \uBE48\uCE78\uC73C\uB85C \uB85C\uADF8\uC778"));
+  }, "\uB370\uBAA8: \uBE48\uCE78\uC73C\uB85C \uB85C\uADF8\uC778"));
 }
 
 // ─── 비밀번호 찾기 ────────────────────────────────────────────────────────────
@@ -679,13 +695,69 @@ function ForgotScreen({
     if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   };
+  const [email, setEmail] = useState("");
   const handle = () => {
+    if (FB) {
+      if (!email) {
+        setErr("가입한 이메일을 입력해주세요");
+        return;
+      }
+      FB.auth.sendPasswordResetEmail(email.trim()).then(() => setSent(true)).catch(e => setErr(authMsg(e)));
+      return;
+    }
     if (!name || !phone) {
       setErr("모두 입력해주세요");
       return;
     }
     setSent(true);
   };
+  if (FB && !sent) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 18
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, "\uAC00\uC785\uD55C \uC774\uBA54\uC77C\uB85C \uBE44\uBC00\uBC88\uD638\uB97C \uB2E4\uC2DC \uC815\uD558\uB294 \uB9C1\uD06C\uB97C \uBCF4\uB0B4\uB4DC\uB824\uC694."), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC774\uBA54\uC77C",
+    required: true
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: email,
+    onChange: e => setEmail(e.target.value),
+    placeholder: "example@email.com",
+    style: inputStyle
+  })), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#ef4444",
+      margin: 0
+    }
+  }, err), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handle,
+    style: {
+      ...btnPrimary,
+      marginTop: 4
+    }
+  }, "\uC7AC\uC124\uC815 \uB9C1\uD06C \uBC1B\uAE30"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onBack,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 13,
+      color: "#6B7493",
+      cursor: "pointer",
+      textAlign: "center"
+    }
+  }, "\u2190 \uB85C\uADF8\uC778\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"));
   if (sent) return /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
@@ -704,14 +776,14 @@ function ForgotScreen({
       color: BLUE,
       fontSize: 18
     }
-  }, "\uC784\uC2DC \uBE44\uBC00\uBC88\uD638 \uBC1C\uC1A1 \uC644\uB8CC"), /*#__PURE__*/React.createElement("p", {
+  }, FB ? "재설정 메일을 보냈어요" : "임시 비밀번호 발송 완료"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
       color: "#6B7493",
       lineHeight: 1.6
     }
-  }, "\uAC00\uC785 \uC2DC \uB4F1\uB85D\uD55C \uC774\uBA54\uC77C\uB85C", /*#__PURE__*/React.createElement("br", null), "\uC784\uC2DC \uBE44\uBC00\uBC88\uD638\uB97C \uBCF4\uB0B4\uB4DC\uB838\uC5B4\uC694."), /*#__PURE__*/React.createElement("button", {
+  }, FB ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uBA54\uC77C\uD568(\uC2A4\uD338\uD568 \uD3EC\uD568)\uC5D0\uC11C \uB9C1\uD06C\uB97C \uB20C\uB7EC", /*#__PURE__*/React.createElement("br", null), "\uC0C8 \uBE44\uBC00\uBC88\uD638\uB97C \uC815\uD574 \uC8FC\uC138\uC694.") : /*#__PURE__*/React.createElement(React.Fragment, null, "\uAC00\uC785 \uC2DC \uB4F1\uB85D\uD55C \uC774\uBA54\uC77C\uB85C", /*#__PURE__*/React.createElement("br", null), "\uC784\uC2DC \uBE44\uBC00\uBC88\uD638\uB97C \uBCF4\uB0B4\uB4DC\uB838\uC5B4\uC694.")), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onBack,
     style: {
@@ -801,7 +873,7 @@ function Step1({
       ...p,
       email: undefined
     }));
-    setEmailMsg("✓ 사용 가능한 이메일이에요");
+    setEmailMsg(FB ? "✓ 쓸 수 있는 형식이에요 (이미 가입된 이메일이면 가입 완료 때 알려드려요)" : "✓ 사용 가능한 이메일이에요");
   };
   const validate = () => {
     if (isAdmin) return true;
@@ -946,13 +1018,32 @@ function Step2({
     onChange("photo", f);
     setPreview(URL.createObjectURL(f));
   };
-  const checkNick = () => {
-    if (!data.nickname) {
+  const checkNick = async () => {
+    if (!data.nickname.trim()) {
       setErrors(p => ({
         ...p,
         nickname: "닉네임을 먼저 입력해주세요"
       }));
       return;
+    }
+    if (FB) {
+      try {
+        if (await once(FB.club.child("nicknames/" + nickKey(data.nickname)))) {
+          setNickChecked(false);
+          setNickMsg("");
+          setErrors(p => ({
+            ...p,
+            nickname: "이미 쓰는 닉네임이에요"
+          }));
+          return;
+        }
+      } catch (e) {
+        setErrors(p => ({
+          ...p,
+          nickname: authMsg(e)
+        }));
+        return;
+      }
     }
     setNickChecked(true);
     setErrors(p => ({
@@ -1583,7 +1674,7 @@ function HomeTab({
   const {
     rec: lastRec
   } = useMeetingRecord(lastMeeting ? lastMeeting.id : 0);
-  const mine = lastRec && lastRec.bracket ? myRecord(lastRec.bracket, lastRec.scores, "동토리") : null;
+  const mine = lastRec && lastRec.bracket ? myRecord(lastRec.bracket, lastRec.scores, ME) : null;
   const [exp, setExp] = useState(null);
   const next = MEETINGS.find(m => m.status === "upcoming");
   const nextNext = MEETINGS.filter(m => m.status === "upcoming")[1];
@@ -2769,6 +2860,292 @@ function useMeetingRecord(meetingId) {
   };
 }
 
+// ─── 회원 계정 (파이어베이스 Authentication) ───────────────────────────────────
+// firebase-config.js와 auth 라이브러리가 있으면 진짜 가입·로그인, 없으면(아티팩트 등) 예전처럼 데모 로그인.
+// 데이터 위치: club/members/<uid> 프로필, club/nicknames/<닉네임> = uid, club/approved/<uid> = true (관리자가 승인),
+//             club/admins/<uid> = true (파이어베이스 콘솔에서 직접 넣음)
+const FB = (() => {
+  try {
+    const cfg = typeof window !== "undefined" && window.FIREBASE_CONFIG;
+    if (!cfg || !cfg.databaseURL || !window.firebase || !window.firebase.auth) return null;
+    if (!window.firebase.apps.length) window.firebase.initializeApp(cfg);
+    const club = window.firebase.database().ref(FIREBASE_ROOT);
+    return {
+      auth: window.firebase.auth(),
+      club
+    };
+  } catch (e) {
+    return null;
+  }
+})();
+// RTDB 키에 못 쓰는 문자(. # $ [ ] /)를 피해서 닉네임을 키로 씀
+const nickKey = n => encodeURIComponent(n.trim()).replace(/\./g, "%2E");
+const AUTH_ERRORS = {
+  "auth/invalid-email": "이메일 형식이 올바르지 않아요",
+  "auth/user-not-found": "이메일 또는 비밀번호가 맞지 않아요",
+  "auth/wrong-password": "이메일 또는 비밀번호가 맞지 않아요",
+  "auth/invalid-credential": "이메일 또는 비밀번호가 맞지 않아요",
+  "auth/invalid-login-credentials": "이메일 또는 비밀번호가 맞지 않아요",
+  "auth/email-already-in-use": "이미 가입된 이메일이에요. 로그인하거나 비밀번호 찾기를 해 주세요",
+  "auth/weak-password": "비밀번호는 6자 이상이어야 해요",
+  "auth/too-many-requests": "시도가 너무 많아요. 잠시 후 다시 해 주세요",
+  "auth/network-request-failed": "인터넷 연결을 확인해 주세요",
+  "auth/operation-not-allowed": "파이어베이스에서 이메일/비밀번호 로그인이 꺼져 있어요"
+};
+const authMsg = e => AUTH_ERRORS[e && e.code] || (/PERMISSION_DENIED|permission/i.test(String(e && (e.code || e.message))) ? "저장 권한이 없어요. 파이어베이스 규칙을 확인해 주세요" : "문제가 생겼어요: " + (e && e.message || e));
+const once = ref => ref.once("value").then(s => s.val());
+
+// 로그인한 사람이 바뀌면 '나' 기준 표시(투표, 대진표, 홈)를 그 사람으로 맞춤
+function setMe(profile) {
+  if (!profile || !profile.nickname) return;
+  ME = profile.nickname;
+  if (profile.ntrp) MEMBER_NTRP[ME] = profile.ntrp;
+  MEETINGS.forEach(m => {
+    const r = resolveVotes(m, m.votes);
+    m.attendees = r.confirmed;
+    m.waitlist = r.waitlist;
+  });
+}
+
+// 회원가입: 계정 생성 → 프로필·닉네임 저장. 승인은 관리자가 따로 함
+async function signUpMember(form) {
+  const nick = form.nickname.trim();
+  const taken = await once(FB.club.child("nicknames/" + nickKey(nick)));
+  if (taken) throw {
+    code: "nick-taken",
+    message: "이미 쓰는 닉네임이에요. 다른 닉네임으로 바꿔 주세요"
+  };
+  const cred = await FB.auth.createUserWithEmailAndPassword(form.email.trim(), form.password);
+  const uid = cred.user.uid;
+  const {
+    password,
+    passwordConfirm,
+    photo,
+    ...rest
+  } = form;
+  const profile = {
+    ...JSON.parse(JSON.stringify(rest)),
+    email: form.email.trim(),
+    nickname: nick,
+    region: form.region === "타지역" ? form.regionCustom || "타지역" : form.region,
+    createdAt: Date.now()
+  };
+  await FB.club.child("members/" + uid).set(profile);
+  await FB.club.child("nicknames/" + nickKey(nick)).set(uid);
+  return {
+    uid,
+    profile
+  };
+}
+
+// 승인 대기 화면
+function PendingScreen({
+  profile,
+  onRefresh,
+  onLogout
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 14,
+      textAlign: "center",
+      padding: "12px 0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 44
+    }
+  }, "\u23F3"), /*#__PURE__*/React.createElement("h2", {
+    style: {
+      margin: 0,
+      fontSize: 19,
+      color: BLUE
+    }
+  }, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 \uC911\uC774\uC5D0\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, profile && profile.nickname ? `${profile.nickname} 님, ` : "", "\uAD00\uB9AC\uC790\uAC00 \uC2B9\uC778\uD558\uBA74", /*#__PURE__*/React.createElement("br", null), "\uBAA8\uC784 \uC608\uC57D\uACFC \uB300\uC9C4\uD45C\uB97C \uC4F8 \uC218 \uC788\uC5B4\uC694."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onRefresh,
+    style: {
+      ...btnPrimary,
+      marginTop: 6
+    }
+  }, "\uC2B9\uC778\uB410\uB294\uC9C0 \uB2E4\uC2DC \uD655\uC778"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onLogout,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 13,
+      color: "#6B7493",
+      cursor: "pointer"
+    }
+  }, "\uB85C\uADF8\uC544\uC6C3"));
+}
+
+// 관리자 탭: 가입 승인, 회원 목록
+function AdminTab() {
+  const [members, setMembers] = useState(null);
+  const [approved, setApproved] = useState({});
+  const [admins, setAdmins] = useState({});
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null);
+  useEffect(() => {
+    const refs = [["members", v => setMembers(v || {})], ["approved", v => setApproved(v || {})], ["admins", v => setAdmins(v || {})]].map(([p, fn]) => {
+      const r = FB.club.child(p);
+      const h = s => fn(s.val());
+      r.on("value", h, e => setErr(authMsg(e)));
+      return () => r.off("value", h);
+    });
+    return () => refs.forEach(f => f());
+  }, []);
+  if (err) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      color: "#ef4444",
+      fontSize: 14
+    }
+  }, err));
+  if (!members) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      color: "#6B7493",
+      fontSize: 14
+    }
+  }, "\uD68C\uC6D0 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC774\uC5D0\uC694\u2026"));
+  const list = Object.entries(members).map(([uid, p]) => ({
+    uid,
+    ...p
+  })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pending = list.filter(m => !approved[m.uid] && !admins[m.uid]);
+  const active = list.filter(m => approved[m.uid] || admins[m.uid]);
+  const approve = uid => FB.club.child("approved/" + uid).set(true).catch(e => setErr(authMsg(e)));
+  const revoke = uid => FB.club.child("approved/" + uid).remove().catch(e => setErr(authMsg(e)));
+  const row = (m, act) => /*#__PURE__*/React.createElement("div", {
+    key: m.uid,
+    style: {
+      borderRadius: 14,
+      background: "#F5F7FE",
+      padding: "10px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    },
+    onClick: () => setOpen(open === m.uid ? null : m.uid)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#1B2559"
+    }
+  }, m.nickname || "(닉네임 없음)"), m.ntrp && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "NTRP ", m.ntrp), admins[m.uid] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 7px",
+      borderRadius: 999,
+      background: GRAD,
+      color: "#fff"
+    }
+  }, "\uAD00\uB9AC\uC790")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, m.email, m.inviteCode ? ` · 가입 코드 ${m.inviteCode}` : "")), act), open === m.uid && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 12,
+      color: "#4A5578",
+      lineHeight: 1.7
+    }
+  }, [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo]].filter(([, v]) => v).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+    key: k
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      display: "inline-block",
+      width: 84
+    }
+  }, k), v))));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+      paddingBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uAE30\uB2E4\uB9AC\uB294 \uC0AC\uB78C\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, pending.map(m => row(m, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => approve(m.uid),
+    style: {
+      ...btnSmall,
+      background: GRAD
+    }
+  }, "\uC2B9\uC778"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD68C\uC6D0 (", active.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, active.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => revoke(m.uid),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: "#6B7493",
+      border: "1.5px solid #D6DEF7"
+    }
+  }, "\uC2B9\uC778 \uCDE8\uC18C")))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.6
+    }
+  }, "\uC774\uB984\uC744 \uB204\uB974\uBA74 \uAC00\uC785 \uC815\uBCF4\uB97C \uBCFC \uC218 \uC788\uC5B4\uC694. \uAD00\uB9AC\uC790 \uC9C0\uC815\uC740 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194\uC758 club/admins\uC5D0\uC11C \uD574\uC694.")));
+}
+
 // ─── 대진표 만들기 ───────────────────────────────────────────────────────────
 const NTRP_NUM = v => {
   const x = parseFloat(v);
@@ -3429,7 +3806,6 @@ function MeetingBracket({
   const [show, setShow] = useState("games");
   const bracket = rec && rec.bracket,
     scores = rec && rec.scores || {};
-  const ME = "동토리";
   const modeNote = {
     shared: "모임 멤버 모두에게 실시간으로 저장돼요",
     local: "이 기기에 저장돼요",
@@ -4756,8 +5132,72 @@ function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
-  const IS_ADMIN = true; // 관리자 모드
+  const IS_ADMIN = !FB; // 데모(파이어베이스 없음)에서만 필수 입력 건너뛰기 허용
 
+  // ── 회원 계정 ──
+  const [account, setAccount] = useState(FB ? {
+    loading: true
+  } : null); // {user, profile, admin, approved}
+  const [signupErr, setSignupErr] = useState("");
+  const [signupBusy, setSignupBusy] = useState(false);
+  const signingUp = useRef(false);
+  const loadAccount = async user => {
+    const [profile, admin, approved] = await Promise.all(["members/", "admins/", "approved/"].map(p => once(FB.club.child(p + user.uid)).catch(() => null)));
+    setMe(profile);
+    setAccount({
+      user,
+      profile: profile || null,
+      admin: !!admin,
+      approved: !!approved
+    });
+    return profile;
+  };
+  useEffect(() => {
+    if (!FB) return;
+    return FB.auth.onAuthStateChanged(user => {
+      if (!user) {
+        setAccount(null);
+        setScreen(s => s === "main" ? "login" : s);
+        return;
+      }
+      if (signingUp.current) return; // 가입 중에는 가입 완료 화면을 먼저 보여줌
+      loadAccount(user).then(() => setScreen("main"));
+    });
+  }, []);
+  const logout = () => {
+    if (FB) FB.auth.signOut();
+    setScreen("login");
+    setTab("home");
+    setOpenMeeting(null);
+  };
+  const submitSignup = async () => {
+    if (!FB) {
+      setSignupDone(true);
+      return;
+    }
+    setSignupErr("");
+    setSignupBusy(true);
+    signingUp.current = true;
+    try {
+      const {
+        profile
+      } = await signUpMember(form);
+      setMe(profile);
+      setSignupDone(true);
+    } catch (e) {
+      signingUp.current = false;
+      setSignupErr(e && e.code === "nick-taken" ? e.message : authMsg(e));
+      if (e && e.code === "nick-taken") setStep(2);else if (e && /email|password/.test(e.code || "")) setStep(1);
+    } finally {
+      setSignupBusy(false);
+    }
+  };
+  const finishSignup = () => {
+    signingUp.current = false;
+    setSignupDone(false);
+    setStep(1);
+    if (FB && FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(() => setScreen("main"));else setScreen("main");
+  };
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -4788,8 +5228,10 @@ function App() {
     [key]: val
   }));
 
-  // ── 로그인/회원가입 화면 ──
-  if (screen !== "main") {
+  // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
+  const pending = FB && screen === "main" && account && account.user && !account.admin && !account.approved;
+  const loading = FB && account && account.loading;
+  if (screen !== "main" || pending || loading) {
     const titles = {
       login: "로그인",
       forgot: "비밀번호 찾기",
@@ -4869,7 +5311,7 @@ function App() {
         margin: 0,
         opacity: 0.85
       }
-    }, titles[screen])), /*#__PURE__*/React.createElement("div", {
+    }, loading ? "불러오는 중" : pending ? "승인 대기" : titles[screen])), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "0 16px 48px",
         marginTop: -48,
@@ -4882,13 +5324,24 @@ function App() {
         boxShadow: "0 12px 40px rgba(40,70,180,0.12)",
         padding: "28px 22px"
       }
-    }, screen === "login" && /*#__PURE__*/React.createElement(LoginScreen, {
+    }, loading && /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        textAlign: "center",
+        color: "#6B7493",
+        fontSize: 14
+      }
+    }, "\uC7A0\uC2DC\uB9CC\uC694\u2026"), !loading && pending && /*#__PURE__*/React.createElement(PendingScreen, {
+      profile: account.profile,
+      onRefresh: () => loadAccount(account.user),
+      onLogout: logout
+    }), !loading && !pending && screen === "login" && /*#__PURE__*/React.createElement(LoginScreen, {
       onSignup: () => setScreen("signup"),
       onForgot: () => setScreen("forgot"),
       onLogin: () => setScreen("main")
-    }), screen === "forgot" && /*#__PURE__*/React.createElement(ForgotScreen, {
+    }), !loading && !pending && screen === "forgot" && /*#__PURE__*/React.createElement(ForgotScreen, {
       onBack: () => setScreen("login")
-    }), screen === "signup" && (signupDone ? /*#__PURE__*/React.createElement("div", {
+    }), !loading && !pending && screen === "signup" && (signupDone ? /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -4924,20 +5377,35 @@ function App() {
         lineHeight: 1.6
       }
     }, "\uBAA8\uC784\uC5D0 \uC624\uC2E0 \uAC78 \uD658\uC601\uD574\uC694.", /*#__PURE__*/React.createElement("br", null), "\uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uC774\uC6A9 \uAC00\uB2A5\uD569\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        setScreen("main");
-        setSignupDone(false);
-        setStep(1);
-      },
+      onClick: finishSignup,
       style: {
         ...btnPrimary,
         width: "auto",
         padding: "13px 36px",
         marginTop: 8
       }
-    }, "\uD648\uC73C\uB85C \uC774\uB3D9")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(StepIndicator, {
+    }, FB ? "확인" : "홈으로 이동")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(StepIndicator, {
       current: step
-    }), step === 1 && /*#__PURE__*/React.createElement(Step1, {
+    }), signupErr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#FEF2F2",
+        color: "#B91C1C",
+        borderRadius: 14,
+        padding: "10px 14px",
+        fontSize: 13,
+        marginBottom: 16,
+        lineHeight: 1.5
+      }
+    }, signupErr), signupBusy && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: BLUE_LIGHT,
+        color: BLUE,
+        borderRadius: 14,
+        padding: "10px 14px",
+        fontSize: 13,
+        marginBottom: 16
+      }
+    }, "\uAC00\uC785\uD558\uB294 \uC911\uC774\uC5D0\uC694\u2026"), step === 1 && /*#__PURE__*/React.createElement(Step1, {
       data: form,
       onChange: onChange,
       onNext: () => setStep(2),
@@ -4951,10 +5419,10 @@ function App() {
     }), step === 3 && /*#__PURE__*/React.createElement(Step3, {
       data: form,
       onChange: onChange,
-      onSubmit: () => setSignupDone(true),
+      onSubmit: submitSignup,
       onBack: () => setStep(2),
       isAdmin: IS_ADMIN
-    })))), screen === "signup" && !signupDone && /*#__PURE__*/React.createElement("p", {
+    })))), !loading && !pending && screen === "signup" && !signupDone && /*#__PURE__*/React.createElement("p", {
       style: {
         textAlign: "center",
         fontSize: 13,
@@ -4981,8 +5449,14 @@ function App() {
   const tabTitles = {
     home: "SSTC",
     booking: "정모 예약",
-    stats: "통계"
+    stats: "통계",
+    admin: "관리"
   };
+  const tabs = account && account.admin ? [...TABS, {
+    key: "admin",
+    label: "관리",
+    icon: "user"
+  }] : TABS;
   const isHome = tab === "home";
   const curMeeting = tab === "booking" && openMeeting ? MEETINGS.find(m => m.id === openMeeting.id) : null;
   return /*#__PURE__*/React.createElement("div", {
@@ -5058,9 +5532,10 @@ function App() {
     size: 19
   })), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setScreen("login"),
+    onClick: logout,
     style: iconBtn,
-    title: "\uB85C\uADF8\uC544\uC6C3"
+    title: "\uB85C\uADF8\uC544\uC6C3",
+    "aria-label": "\uB85C\uADF8\uC544\uC6C3"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "user",
     size: 19
@@ -5082,7 +5557,17 @@ function App() {
       fontWeight: 700,
       letterSpacing: "-0.01em"
     }
-  }, "\uB3D9\uD1A0\uB9AC \uB2D8")) : curMeeting ? /*#__PURE__*/React.createElement("div", {
+  }, ME, " \uB2D8", account && account.admin && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      marginLeft: 8,
+      padding: "3px 9px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.22)",
+      verticalAlign: "middle"
+    }
+  }, "\uAD00\uB9AC\uC790"))) : curMeeting ? /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       marginTop: 18
@@ -5121,10 +5606,10 @@ function App() {
     }
   }, [{
     label: "NTRP",
-    value: "3.5"
+    value: account && account.profile && account.profile.ntrp || MEMBER_NTRP[ME] || "-"
   }, {
     label: "구력",
-    value: "3년 2개월"
+    value: account && account.profile ? calcCareer(account.profile.tennisStart) || "-" : "3년 2개월"
   }, {
     label: "올해(누적)",
     value: "3회 (12회)"
@@ -5165,7 +5650,7 @@ function App() {
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
     open: openMeeting,
     onOpen: (id, view) => openM(id, view, "booking")
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null)), /*#__PURE__*/React.createElement("div", {
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && account && account.admin && /*#__PURE__*/React.createElement(AdminTab, null)), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       bottom: 0,
@@ -5180,7 +5665,7 @@ function App() {
       zIndex: 20,
       paddingBottom: "env(safe-area-inset-bottom,0px)"
     }
-  }, TABS.map(t => {
+  }, tabs.map(t => {
     const on = tab === t.key;
     return /*#__PURE__*/React.createElement("button", {
       key: t.key,
