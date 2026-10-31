@@ -247,7 +247,7 @@ const lsSet=(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStor
 const extendLogin=()=>{ if(lsGet(LS.keep)!=="0") lsSet(LS.until,String(Date.now()+KEEP_DAYS*86400000)); };
 const loginExpired=()=>{ const u=+lsGet(LS.until); return lsGet(LS.keep)!=="0"&&u>0&&Date.now()>u; };
 
-function LoginScreen({onSignup,onForgot,onLogin}) {
+function LoginScreen({notice,onSignup,onForgot,onLogin}) {
   const [email,setEmail]=useState(()=>lsGet(LS.email)||"");
   const [remember,setRemember]=useState(()=>!!lsGet(LS.email));
   const [keep,setKeep]=useState(()=>lsGet(LS.keep)!=="0");
@@ -256,6 +256,7 @@ function LoginScreen({onSignup,onForgot,onLogin}) {
   const [err,setErr]=useState("");
 
   const [busy,setBusy]=useState(false);
+  useEffect(()=>{ if(notice){ setBusy(false); setErr(notice.t); } },[notice&&notice.at]);
   const handle = () => {
     if (!FB) {   // 데모: 빈칸으로도 통과
       if (email==="" && pw==="") { onLogin(); return; }
@@ -1204,7 +1205,7 @@ const once = ref => ref.once("value").then(s=>s.val());
 const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 const postFeed = item => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:ME,byUid:myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {member:"👋",meeting:"📅",notice:"📢",approved:"✅"};
+const NOTI_ICON = {member:"👋",meeting:"📅",notice:"📢",approved:"✅",admin:"📣"};
 const ago = t => { const m=Math.floor((Date.now()-t)/60000); if(m<1) return "방금"; if(m<60) return m+"분 전"; const h=Math.floor(m/60); if(h<24) return h+"시간 전";
   const d=Math.floor(h/24); if(d<7) return d+"일 전"; const x=new Date(t); return `${x.getMonth()+1}/${x.getDate()}`; };
 const toList = (obj,extra={}) => Object.keys(obj||{}).map(id=>({id,...extra,...obj[id]}));
@@ -1255,7 +1256,7 @@ function PendingScreen({profile,onRefresh,onLogout}){
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center",padding:"12px 0"}}>
       <div style={{fontSize:44}}>⏳</div>
-      <h2 style={{margin:0,fontSize:19,color:BLUE}}>가입 승인 대기 중이에요</h2>
+      <h2 style={{margin:0,fontSize:19,color:BLUE}}>준회원이에요 · 정회원 승인 대기 중</h2>
       <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>{profile&&profile.nickname?`${profile.nickname} 님, `:""}관리자가 승인하면<br/>모임 예약과 대진표를 쓸 수 있어요.</p>
       <button type="button" onClick={onRefresh} style={{...btnPrimary,marginTop:6}}>승인됐는지 다시 확인</button>
       <button type="button" onClick={onLogout} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer"}}>로그아웃</button>
@@ -1263,13 +1264,29 @@ function PendingScreen({profile,onRefresh,onLogout}){
   );
 }
 
-// 관리자 탭: 가입 승인, 회원 목록
+// 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
+// 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
+const ADMIN_MSG=[
+  ["vote","모임 투표 독려",m=>m?`${m.date} ${m.place} 모임 참석 투표해 주세요! 🎾`:"다가오는 모임 참석 투표해 주세요! 🎾"],
+  ["profile","정보 수정 요청",()=>"프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
+  ["realName","본명 입력 요청",()=>"본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."],
+  ["career","구력 확인 요청",()=>"구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
+  ["custom","직접 쓰기",()=>""],
+];
 function AdminTab(){
   const [members,setMembers]=useState(null);
   const [approved,setApproved]=useState({});
   const [admins,setAdmins]=useState({});
   const [err,setErr]=useState("");
   const [open,setOpen]=useState(null);
+  const [sel,setSel]=useState({});
+  const [kind,setKind]=useState("vote");
+  const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
+  const [mid,setMid]=useState(()=>upcoming[0]?String(upcoming[0].id):"");
+  const [text,setText]=useState(()=>ADMIN_MSG[0][2](upcoming[0]));
+  const [sent,setSent]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [showGone,setShowGone]=useState(false);
   useEffect(()=>{
     const refs=[["members",v=>setMembers(v||{})],["approved",v=>setApproved(v||{})],["admins",v=>setAdmins(v||{})]]
       .map(([p,fn])=>{const r=FB.club.child(p);const h=s=>fn(s.val());r.on("value",h,e=>setErr(authMsg(e)));return ()=>r.off("value",h);});
@@ -1278,30 +1295,58 @@ function AdminTab(){
   if(err) return <Card><p style={{margin:0,color:"#ef4444",fontSize:14}}>{err}</p></Card>;
   if(!members) return <Card><p style={{margin:0,color:"#6B7493",fontSize:14}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const list=Object.entries(members).map(([uid,p])=>({uid,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const pending=list.filter(m=>!approved[m.uid]&&!admins[m.uid]);
-  const active=list.filter(m=>approved[m.uid]||admins[m.uid]);
+  const gone=list.filter(m=>m.withdrawn&&!admins[m.uid]);
+  const live=list.filter(m=>!m.withdrawn||admins[m.uid]);
+  const pending=live.filter(m=>!approved[m.uid]&&!admins[m.uid]);
+  const active=live.filter(m=>approved[m.uid]||admins[m.uid]);
+  const fail=e=>setErr(authMsg(e));
+  const inbox=(uid,msg)=>FB.club.child("inbox/"+uid+"/"+newId()).set({...msg,at:Date.now()});
   const approve=uid=>FB.club.child("approved/"+uid).set(true)
-    .then(()=>FB.club.child("inbox/"+uid+"/"+newId()).set({type:"approved",text:"가입이 승인됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾",at:Date.now()}))
-    .catch(e=>setErr(authMsg(e)));
-  const revoke=uid=>FB.club.child("approved/"+uid).remove().catch(e=>setErr(authMsg(e)));
-  const row=(m,act)=>(
-    <div key={m.uid} style={{borderRadius:14,background:"#F5F7FE",padding:"10px 12px"}}>
+    .then(()=>inbox(uid,{type:"approved",text:"정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾"})).catch(fail);
+  const demote=m=>{ if(!window.confirm(`${m.nickname} 님을 준회원으로 바꿀까요? 모임 투표를 못 하게 돼요.`)) return;
+    FB.club.child("approved/"+m.uid).remove().catch(fail); };
+  const withdraw=m=>{ if(!window.confirm(`${m.nickname} 님을 탈퇴시킬까요? 다음에 앱을 열면 로그아웃되고 다시 들어올 수 없어요.`)) return;
+    FB.club.child("approved/"+m.uid).remove()
+      .then(()=>FB.club.child("members/"+m.uid).update({withdrawn:true,withdrawnAt:Date.now()})).catch(fail);
+    setSel(s=>{const n={...s};delete n[m.uid];return n;}); };
+  const restore=m=>FB.club.child("members/"+m.uid).update({withdrawn:null,withdrawnAt:null}).catch(fail);
+  // 알림 보내기
+  const pick=list=>setSel(Object.fromEntries(list.map(m=>[m.uid,true])));
+  const chosen=live.filter(m=>sel[m.uid]);
+  const meeting=upcoming.find(m=>String(m.id)===mid);
+  const setMsgKind=k=>{ setKind(k); setSent(""); setText(ADMIN_MSG.find(x=>x[0]===k)[2](k==="vote"?meeting:null)); };
+  const setMeeting=v=>{ setMid(v); if(kind==="vote") setText(ADMIN_MSG[0][2](upcoming.find(m=>String(m.id)===v))); };
+  const send=()=>{
+    const t=text.trim(); if(!t||chosen.length===0) return;
+    const msg={type:"admin",text:t,by:ME,byUid:(FB.auth.currentUser&&FB.auth.currentUser.uid)||"",
+      ...(kind==="vote"&&meeting?{meetingId:meeting.id}:{}),...(kind==="profile"||kind==="realName"||kind==="career"?{action:"profile"}:{})};
+    setBusy(true); setSent("");
+    Promise.all(chosen.map(m=>inbox(m.uid,msg))).then(()=>{setSent(`${chosen.length}명에게 보냈어요`);setSel({});})
+      .catch(fail).finally(()=>setBusy(false));
+  };
+  const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:999,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
+  const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:999,background:bg,color:c}}>{t}</span>;
+  const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,background:"#fff",color:danger?"#ef4444":"#6B7493",border:`1.5px solid ${danger?"#FBD5D5":"#D6DEF7"}`}}>{label}</button>;
+  const row=(m,acts,checkable=true)=>(
+    <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F5F7FE",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
-        <div style={{flex:1,minWidth:0}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
+        {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
+        <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
             <span style={{fontSize:12,color:m.realName?"#4A5578":"#C2610C"}}>{m.realName?`(${m.realName})`:"(본명 미입력)"}</span>
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
-            {admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:999,background:GRAD,color:"#fff"}}>관리자</span>}
+            {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
           </div>
-          <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.inviteCode?` · 가입 코드 ${m.inviteCode}`:""}</span>
+          <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.tennisStart?` · 구력 ${calcCareer(m.tennisStart)||"-"}`:" · 구력 미입력"}</span>
         </div>
-        {act}
       </div>
+      {acts&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>{acts}</div>}
       {open===m.uid&&(
         <div style={{marginTop:8,fontSize:12,color:"#4A5578",lineHeight:1.7}}>
           {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
-            ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo]]
+            ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo],
+            ["탈퇴일",m.withdrawnAt&&new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]]
             .filter(([,v])=>v).map(([k,v])=><div key={k}><span style={{color:"#A3AAC2",display:"inline-block",width:84}}>{k}</span>{v}</div>)}
         </div>
       )}
@@ -1310,20 +1355,46 @@ function AdminTab(){
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <Card>
-        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
+        <SectionTitle>알림 보내기 📣</SectionTitle>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+          {chip("전체",()=>pick(live))}{chip("정회원 전체",()=>pick(active))}{chip("준회원 전체",()=>pick(pending))}
+          {chip("본명 미입력",()=>pick(live.filter(m=>!m.realName)))}{chip("구력 미입력",()=>pick(live.filter(m=>!m.tennisStart)))}
+          {chosen.length>0&&chip("선택 해제",()=>setSel({}))}
+        </div>
+        <p style={{margin:"0 0 10px",fontSize:13,fontWeight:600,color:chosen.length?BLUE:"#A3AAC2"}}>{chosen.length?`${chosen.length}명 선택됨 · ${chosen.slice(0,5).map(m=>m.nickname).join(", ")}${chosen.length>5?" 외":""}`:"아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"}</p>
+        <select aria-label="알림 종류" value={kind} onChange={e=>setMsgKind(e.target.value)} style={{...inputStyle,marginBottom:8}}>
+          {ADMIN_MSG.map(([k,l])=><option key={k} value={k}>{l}</option>)}
+        </select>
+        {kind==="vote"&&(upcoming.length?<select aria-label="모임" value={mid} onChange={e=>setMeeting(e.target.value)} style={{...inputStyle,marginBottom:8}}>
+          {upcoming.map(m=><option key={m.id} value={String(m.id)}>{m.date} · {m.place}</option>)}
+        </select>:<p style={{margin:"0 0 8px",fontSize:12,color:"#A3AAC2"}}>다가오는 모임이 없어요.</p>)}
+        <textarea aria-label="알림 내용" value={text} onChange={e=>{setText(e.target.value);setSent("");}} rows={3} placeholder="보낼 내용을 써 주세요" style={{...inputStyle,borderRadius:18,resize:"none",marginBottom:10}}/>
+        <button type="button" disabled={busy||!chosen.length||!text.trim()} onClick={send} style={{...btnPrimary,opacity:busy||!chosen.length||!text.trim()?0.5:1}}>{busy?"보내는 중…":`${chosen.length||""}${chosen.length?"명에게 ":""}알림 보내기`}</button>
+        {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}>✅ {sent}</p>}
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 🔔 알림에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
+      </Card>
+      <Card>
+        <SectionTitle>준회원 · 승인 대기 ({pending.length}명)</SectionTitle>
         {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pending.map(m=>row(m,<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>승인</button>))}
+            {pending.map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
           </div>
         )}
       </Card>
       <Card>
-        <SectionTitle>회원 ({active.length}명)</SectionTitle>
+        <SectionTitle>정회원 ({active.length}명)</SectionTitle>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {active.map(m=>row(m,admins[m.uid]?null:<button type="button" onClick={()=>revoke(m.uid)} style={{...btnSmall,background:"#fff",color:"#6B7493",border:"1.5px solid #D6DEF7"}}>승인 취소</button>))}
+          {active.map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
+      {gone.length>0&&<Card>
+        <SectionTitle action={showGone?"접기":"펼치기"} onAction={()=>setShowGone(v=>!v)}>탈퇴 회원 ({gone.length}명)</SectionTitle>
+        {showGone&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {gone.map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
+        </div>}
+        {showGone&&<p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>}
+      </Card>}
     </div>
   );
 }
@@ -1968,7 +2039,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
             <p style={{margin:"0 0 6px",fontSize:12,color:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.email||(account&&account.user&&account.user.email)||""}</p>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {account&&account.admin&&badge("관리자",BLUE,"#fff")}
-              {account&&(account.admin||account.approved)?badge("승인된 회원",BLUE_LIGHT,BLUE):FB&&badge("승인 대기","#FFF4E5","#C2610C")}
+              {account&&(account.admin||account.approved)?badge("정회원",BLUE_LIGHT,BLUE):FB&&badge("준회원","#FFF4E5","#C2610C")}
             </div>
           </div>
         </Card>
@@ -2057,7 +2128,7 @@ function NotiSheet({items,onClose,onPick,isAdmin}) {
       {items.length===0?<Empty>새 알림이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {items.map(n=>{
-            const go=n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin);
+            const go=n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action));
             return(
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
                 <span style={{fontSize:20,lineHeight:1.2}}>{NOTI_ICON[n.type]||"🔔"}</span>
@@ -2390,7 +2461,8 @@ function SplashScreen({onStart}) {
 
 export default function App() {
   // screen: "login" | "forgot" | "signup" | "main"
-  const [splash,setSplash]=useState(true);   // 앱을 열 때마다 스플래시부터
+  const [splash,setSplash]=useState(true);
+  const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
   const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
@@ -2428,6 +2500,8 @@ export default function App() {
   const signingUp=useRef(false);
   const loadAccount=async user=>{
     const [profile,admin,approved]=await Promise.all(["members/","admins/","approved/"].map(p=>once(FB.club.child(p+user.uid)).catch(()=>null)));
+    if(profile&&profile.withdrawn&&!admin){ setLoginNote({t:"탈퇴 처리된 계정이에요. 다시 들어오려면 관리자에게 문의해 주세요.",at:Date.now()}); lsSet(LS.until,null); FB.auth.signOut(); return "withdrawn"; }
+    setLoginNote(null);
     setMe(profile);
     setAccount({user,profile:profile||null,admin:!!admin,approved:!!approved});
     return profile;
@@ -2439,7 +2513,7 @@ export default function App() {
       if(loginExpired()){ lsSet(LS.until,null); FB.auth.signOut(); return; }   // 30일 넘게 안 열었으면 다시 로그인
       extendLogin();
       if(signingUp.current) return;   // 가입 중에는 가입 완료 화면을 먼저 보여줌
-      loadAccount(user).then(()=>setScreen("main"));
+      loadAccount(user).then(p=>{ if(p!=="withdrawn") setScreen("main"); });
     });
   },[]);
   const logout=()=>{ lsSet(LS.until,null); if(FB) FB.auth.signOut(); setScreen("login"); setTab("home"); setOpenMeeting(null); };
@@ -2458,7 +2532,7 @@ export default function App() {
   };
   const finishSignup=()=>{
     signingUp.current=false; setSignupDone(false); setStep(1);
-    if(FB&&FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(()=>setScreen("main"));
+    if(FB&&FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(p=>{ if(p!=="withdrawn") setScreen("main"); });
     else setScreen("main");
   };
 
@@ -2503,7 +2577,7 @@ export default function App() {
           <div style={{background:"#fff",borderRadius:28,boxShadow:"0 12px 40px rgba(40,70,180,0.12)",padding:"28px 22px"}}>
             {loading&&<p style={{margin:0,textAlign:"center",color:"#6B7493",fontSize:14}}>잠시만요…</p>}
             {!loading&&pending&&<PendingScreen profile={account.profile} onRefresh={()=>loadAccount(account.user)} onLogout={logout}/>}
-            {!loading&&!pending&&screen==="login"&&<LoginScreen onSignup={()=>setScreen("signup")} onForgot={()=>setScreen("forgot")} onLogin={()=>setScreen("main")}/>}
+            {!loading&&!pending&&screen==="login"&&<LoginScreen notice={loginNote} onSignup={()=>setScreen("signup")} onForgot={()=>setScreen("forgot")} onLogin={()=>setScreen("main")}/>}
             {!loading&&!pending&&screen==="forgot"&&<ForgotScreen onBack={()=>setScreen("login")}/>}
             {!loading&&!pending&&screen==="signup"&&(
               signupDone?(
@@ -2626,7 +2700,8 @@ export default function App() {
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={!!(account&&account.admin)} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
-        if(n.type==="meeting"&&n.meetingId) openM(+n.meetingId,"info","home");
+        if((n.type==="meeting"||n.type==="admin")&&n.meetingId) openM(+n.meetingId,"info","home");
+        else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
         else if(n.type==="member"&&account&&account.admin){ setOpenMeeting(null); setTab("admin"); }
       }}/>}
