@@ -23,6 +23,7 @@
 
 ## 회원 계정 (Firebase Authentication)
 - 회원가입하면 파이어베이스 계정이 만들어지고 프로필이 `club/members/<uid>`에, 닉네임이 `club/nicknames`에 저장돼요.
+- 가입하려면 가입 코드(`src/app.jsx`의 `JOIN_CODE`, 지금은 SSTC2027)를 맞게 넣어야 해요.
 - 가입한 사람은 관리자가 승인해야(`club/approved/<uid>`) 예약·대진표를 쓸 수 있어요.
 - 관리자는 `club/admins/<uid>: true`로 정해요. 앱에서는 못 바꾸고, 파이어베이스 콘솔에서 직접 넣어요.
   1. 앱에서 회원가입을 해요.

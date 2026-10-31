@@ -270,6 +270,8 @@ const LAST_MEETING = {
 // 순서로 줄을 세우고, 같은 그룹 안에서는 투표 시각 순이에요. 정원 밖은 같은 순서로 대기.
 let ME = "동토리"; // 로그인하면 그 회원의 닉네임으로 바뀜 (setMe)
 const MONTHLY_PRIORITY_LIMIT = 2;
+// 회원가입 때 맞게 넣어야 하는 가입 코드 (대소문자·앞뒤 공백 무시)
+const JOIN_CODE = "SSTC2027";
 const dayKey = m => m.date.slice(0, 10);
 const monthKey = m => m.date.slice(0, 7);
 const byTime = (a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0;
@@ -885,7 +887,7 @@ function Step1({
     if (!data.email) e.email = "이메일을 입력해주세요";else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "올바른 이메일 형식이 아니에요";else if (!emailChecked) e.email = "이메일 중복 확인을 해주세요";
     if (!data.password) e.password = "비밀번호를 입력해주세요";else if (data.password.length < 8) e.password = "8자 이상 입력해주세요";
     if (data.password !== data.passwordConfirm) e.passwordConfirm = "비밀번호가 일치하지 않아요";
-    if (!data.inviteCode) e.inviteCode = "가입 코드를 입력해주세요";
+    if (!data.inviteCode) e.inviteCode = "가입 코드를 입력해주세요";else if (data.inviteCode.trim().toUpperCase() !== JOIN_CODE) e.inviteCode = "가입 코드가 맞지 않아요";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
