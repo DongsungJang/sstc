@@ -7,7 +7,9 @@
 ## 기능
 - 로그인 · 회원가입 (3단계: 계정, 프로필, 운동 정보), 비밀번호 재설정 메일, 관리자 가입 승인
 - 로그인 화면: 아이디 저장, 로그인 상태 유지(마지막으로 연 날부터 30일, `KEEP_DAYS`). 유지를 끄면 브라우저를 닫을 때 로그아웃
-- 오른쪽 위 사람 아이콘: 내 정보 보기(참석 횟수, 다가오는 모임 내 투표, 프로필), 로그아웃
+- 오른쪽 위 사람 아이콘: 내 정보 보기(참석 횟수, 다가오는 모임 내 투표, 프로필, 정보 수정하기), 로그아웃
+- 종 버튼 알림: 새 회원 가입, 새 모임, 새 공지, 내 가입 승인. 안 읽은 개수를 보여 주고, 누르면 그 모임·공지로 가요(`club/feed`, `club/inbox/<uid>`, 읽은 시각은 `members/<uid>/notiSeenAt`)
+- 공지사항: 관리자가 홈의 "+ 공지 쓰기"로 올리고 지울 수 있어요(`club/notices`)
 - 홈: 다가오는 모임, 마지막 참석 모임 결과, 참여 랭킹, 공지
 - 모임 만들기: 모든 탭 오른쪽 아래 + 버튼으로 날짜·시간·장소·정원·예약 오픈·설명을 넣어 모임을 만들어요. 만든 사람과 관리자는 수정·삭제할 수 있어요.
 - 정모 예약: 예약 오픈 시각부터 참석 투표와 게스트 초대, 우선순위 규칙에 따른 참석 확정·대기
@@ -71,6 +73,15 @@
         "$uid": { ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()" }
       },
       "admins": { ".write": false },
+      "feed": {
+        "$id": { ".write": "auth != null && !data.exists()" }
+      },
+      "inbox": {
+        "$uid": { ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()" }
+      },
+      "notices": {
+        ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
+      },
       "meetings": {
         ".write": "auth != null && (root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())"
       }
@@ -82,6 +93,7 @@
 - 로그인한 사람만 읽을 수 있어요. 닉네임 목록은 가입 전 중복 확인 때문에 누구나 읽을 수 있어요.
 - 자기 프로필은 본인과 관리자만, 승인은 관리자만, 모임 기록(투표·대진·점수)은 승인된 회원과 관리자만 써요.
 - 관리자 목록은 앱에서 아무도 못 바꿔요(콘솔에서만).
+- 알림(`feed`)은 로그인한 사람이 새로 쓰기만 하고 고치거나 지울 수 없어요. 개인 알림(`inbox`)과 공지(`notices`)는 관리자만 써요.
 
 ## 고치는 법
 앱 코드는 `src/app.jsx` 한 파일이에요. 고친 뒤 아래 명령으로 `index.html`을 다시 만들어요.
