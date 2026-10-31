@@ -1791,7 +1791,7 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
         {!isPast&&open&&(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"flex",gap:8}}>
-              {[{label:"✓ 참석",val:"attend"},{label:"△ 미정",val:"maybe"},{label:"✕ 불참",val:"absent"}].map(btn=>{
+              {[{label:"✓ 참석",val:"attend"},{label:"✕ 불참",val:"absent"}].map(btn=>{
                 const active=myStatus===btn.val;const s=active?C[btn.val]:I;
                 return <button key={btn.val} type="button" onClick={()=>setMyStatus(btn.val)} style={{flex:1,padding:"9px 0",borderRadius:999,fontSize:13,cursor:"pointer",fontWeight:600,border:`1.5px solid ${s.border}`,background:s.bg,color:s.color}}>{btn.label}</button>;
               })}
