@@ -1684,7 +1684,8 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:"#1B2559"}}>{meeting.date}</p><KindBadge m={meeting}/></div>
           {isPast?<span style={{background:"#EEF1FA",color:"#A3AAC2",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20}}>종료된 모임</span>
-            :<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20}}>예약 진행 중</span>}
+            :open?<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>예약 진행 중</span>
+            :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
           {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},{icon:"🗓️",label:"예약 오픈",value:meeting.openDate},
