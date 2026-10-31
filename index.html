@@ -174,9 +174,6 @@ const NTRP_LEVELS = [{
   desc: "중·고·대학교 테니스부 등 학교 선수 출신이에요."
 }];
 
-// 공지사항 (아직 작성 기능 없음)
-const NOTICES = [];
-
 // 회원 NTRP (투표에 같이 저장된 값으로 채움)
 const MEMBER_NTRP = {};
 
@@ -1088,7 +1085,8 @@ function Step2({
   onChange,
   onNext,
   onBack,
-  isAdmin
+  isAdmin,
+  editing
 }) {
   const [errors, setErrors] = useState({});
   const [nickChecked, setNickChecked] = useState(false);
@@ -1166,7 +1164,7 @@ function Step2({
       fontSize: 12,
       color: "#a16207"
     }
-  }, "\uD83D\uDC51 \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDC51 \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), !editing && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -1213,7 +1211,24 @@ function Step2({
       display: "none"
     },
     onChange: handlePhoto
-  })), /*#__PURE__*/React.createElement(FieldWrap, {
+  })), editing ? /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uB2C9\uB124\uC784"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: data.nickname,
+    readOnly: true,
+    style: {
+      ...inputStyle,
+      background: "#F5F7FE",
+      color: "#6B7493"
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2",
+      margin: 0
+    }
+  }, "\uB2C9\uB124\uC784\uC740 \uD22C\uD45C\xB7\uB300\uC9C4 \uAE30\uB85D\uACFC \uC774\uC5B4\uC838 \uC788\uC5B4\uC11C \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694")) : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB2C9\uB124\uC784",
     required: !isAdmin,
     error: errors.nickname
@@ -1309,7 +1324,7 @@ function Step2({
     type: "button",
     onClick: onBack,
     style: btnSecondary
-  }, "\u2190 \uC774\uC804"), /*#__PURE__*/React.createElement("button", {
+  }, editing ? "취소" : "← 이전"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => validate() && onNext(),
     style: {
@@ -1325,7 +1340,8 @@ function Step3({
   onChange,
   onSubmit,
   onBack,
-  isAdmin
+  isAdmin,
+  submitLabel = "가입 완료 🎾"
 }) {
   const [errors, setErrors] = useState({});
   const [ntrpPopup, setNtrpPopup] = useState(null);
@@ -1745,7 +1761,7 @@ function Step3({
       ...btnPrimary,
       flex: 2
     }
-  }, "\uAC00\uC785 \uC644\uB8CC \uD83C\uDFBE")));
+  }, submitLabel)));
 }
 
 // ─── 홈 탭 ────────────────────────────────────────────────────────────────────
@@ -1788,12 +1804,34 @@ function Empty({
 function HomeTab({
   onGoBooking,
   onOpenMeeting,
-  onCreate
+  onCreate,
+  notices = [],
+  isAdmin,
+  onWriteNotice,
+  focusNotice
 }) {
   const lastMeeting = myHeld()[0] || null;
   const lastRec = lastMeeting && lastMeeting.rec;
   const mine = lastRec && lastRec.bracket ? myRecord(lastRec.bracket, lastRec.scores || {}, ME) : null;
-  const [exp, setExp] = useState(null);
+  const focusId = focusNotice ? focusNotice.split("#")[0] : null;
+  const [exp, setExp] = useState(focusId);
+  const noticeRef = useRef(null);
+  useEffect(() => {
+    if (focusId) {
+      setExp(focusId);
+      setTimeout(() => {
+        try {
+          noticeRef.current && noticeRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+          });
+        } catch (e) {}
+      }, 50);
+    }
+  }, [focusNotice]);
+  const delNotice = n => {
+    if (window.confirm(`"${n.title}" 공지를 지울까요?`)) FB.club.child("notices/" + n.id).remove().catch(e => alert(authMsg(e)));
+  };
   const upcoming = MEETINGS.filter(m => m.status === "upcoming");
   const next = upcoming[0],
     nextNext = upcoming[1];
@@ -2061,13 +2099,17 @@ function HomeTab({
       fontWeight: 700,
       color: BLUE
     }
-  }, r.count, "\uD68C"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uACF5\uC9C0\uC0AC\uD56D \uD83D\uDCE2"), NOTICES.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, r.count, "\uD68C"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    action: isAdmin ? "+ 공지 쓰기" : null,
+    onAction: onWriteNotice
+  }, "\uACF5\uC9C0\uC0AC\uD56D \uD83D\uDCE2"), notices.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column"
     }
-  }, NOTICES.map((n, i) => /*#__PURE__*/React.createElement("div", {
-    key: n.id
+  }, notices.map((n, i) => /*#__PURE__*/React.createElement("div", {
+    key: n.id,
+    ref: exp === n.id ? noticeRef : null
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => setExp(exp === n.id ? null : n.id),
     style: {
@@ -2075,7 +2117,7 @@ function HomeTab({
       alignItems: "center",
       gap: 8,
       padding: "11px 0",
-      borderBottom: i < NOTICES.length - 1 ? "1px solid #EEF1FA" : "none",
+      borderBottom: i < notices.length - 1 ? "1px solid #EEF1FA" : "none",
       cursor: "pointer"
     }
   }, n.important && /*#__PURE__*/React.createElement("span", {
@@ -2101,7 +2143,7 @@ function HomeTab({
       color: "#A3AAC2",
       whiteSpace: "nowrap"
     }
-  }, n.date), /*#__PURE__*/React.createElement("span", {
+  }, fmtDate(ymd(new Date(n.at))).slice(2, 10)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2",
@@ -2115,9 +2157,33 @@ function HomeTab({
       lineHeight: 1.65,
       background: BLUE_LIGHT,
       borderRadius: 14,
-      marginBottom: 6
+      marginBottom: 6,
+      whiteSpace: "pre-wrap"
     }
-  }, n.content))))));
+  }, n.content, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, n.by ? `${n.by} · ` : "", ago(n.at)), isAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => delNotice(n),
+    style: {
+      background: "none",
+      border: "none",
+      color: "#ef4444",
+      fontSize: 12,
+      cursor: "pointer",
+      padding: 0
+    }
+  }, "\uC0AD\uC81C"))))))));
 }
 
 // ─── 대진 편성 엔진 ───────────────────────────────────────────────────────────
@@ -3118,6 +3184,85 @@ const AUTH_ERRORS = {
 const authMsg = e => AUTH_ERRORS[e && e.code] || (/PERMISSION_DENIED|permission/i.test(String(e && (e.code || e.message))) ? "저장 권한이 없어요. 파이어베이스 규칙을 확인해 주세요" : "문제가 생겼어요: " + (e && e.message || e));
 const once = ref => ref.once("value").then(s => s.val());
 
+// ─── 알림 ─────────────────────────────────────────────────────────────────────
+// club/feed/<id>: 모두에게 (member 새 회원 가입, meeting 새 모임, notice 새 공지). 한 번 쓰면 못 고침
+// club/inbox/<uid>/<id>: 나에게만 (approved 가입 승인, 관리자가 씀)
+// 읽은 시각은 club/members/<uid>/notiSeenAt — 그보다 나중에 온 알림이 '안 읽음'
+const newId = () => Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+const myUid = () => FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
+const postFeed = item => FB ? FB.club.child("feed/" + newId()).set({
+  ...item,
+  at: Date.now(),
+  by: ME,
+  byUid: myUid()
+}).catch(() => {}) : Promise.resolve();
+const NOTI_ICON = {
+  member: "👋",
+  meeting: "📅",
+  notice: "📢",
+  approved: "✅"
+};
+const ago = t => {
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return "방금";
+  if (m < 60) return m + "분 전";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "시간 전";
+  const d = Math.floor(h / 24);
+  if (d < 7) return d + "일 전";
+  const x = new Date(t);
+  return `${x.getMonth() + 1}/${x.getDate()}`;
+};
+const toList = (obj, extra = {}) => Object.keys(obj || {}).map(id => ({
+  id,
+  ...extra,
+  ...obj[id]
+}));
+// 로그인한 사람의 알림·공지를 실시간으로
+function useClubFeed(uid) {
+  const [st, setSt] = useState({
+    feed: {},
+    inbox: {},
+    seen: 0,
+    notices: {}
+  });
+  useEffect(() => {
+    if (!FB || !uid) {
+      setSt({
+        feed: {},
+        inbox: {},
+        seen: 0,
+        notices: {}
+      });
+      return;
+    }
+    const subs = [["feed", "feed"], ["inbox/" + uid, "inbox"], ["members/" + uid + "/notiSeenAt", "seen"], ["notices", "notices"]].map(([path, key]) => {
+      const ref = FB.club.child(path),
+        h = snap => setSt(p => ({
+          ...p,
+          [key]: snap.val() || (key === "seen" ? 0 : {})
+        }));
+      ref.on("value", h, () => {});
+      return () => ref.off("value", h);
+    });
+    return () => subs.forEach(f => f());
+  }, [uid]);
+  const items = [...toList(st.feed), ...toList(st.inbox, {
+    mine: true
+  })].filter(n => n && n.at).sort((a, b) => b.at - a.at).slice(0, 50).map(n => ({
+    ...n,
+    unread: n.at > (+st.seen || 0) && n.byUid !== uid
+  }));
+  const notices = toList(st.notices).filter(n => n.title).sort((a, b) => b.at - a.at);
+  const markSeen = () => FB && uid && FB.club.child("members/" + uid + "/notiSeenAt").set(Date.now()).catch(() => {});
+  return {
+    items,
+    unread: items.filter(n => n.unread).length,
+    notices,
+    markSeen
+  };
+}
+
 // 로그인한 사람이 바뀌면 '나' 기준 표시(투표, 대진표, 홈)를 그 사람으로 맞춤
 function setMe(profile) {
   if (!profile || !profile.nickname) return;
@@ -3151,6 +3296,11 @@ async function signUpMember(form) {
   };
   await FB.club.child("members/" + uid).set(profile);
   await FB.club.child("nicknames/" + nickKey(nick)).set(uid);
+  postFeed({
+    type: "member",
+    name: nick,
+    text: `${nick} 님이 새로 가입했어요`
+  });
   return {
     uid,
     profile
@@ -3245,7 +3395,11 @@ function AdminTab() {
   })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const pending = list.filter(m => !approved[m.uid] && !admins[m.uid]);
   const active = list.filter(m => approved[m.uid] || admins[m.uid]);
-  const approve = uid => FB.club.child("approved/" + uid).set(true).catch(e => setErr(authMsg(e)));
+  const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => FB.club.child("inbox/" + uid + "/" + newId()).set({
+    type: "approved",
+    text: "가입이 승인됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾",
+    at: Date.now()
+  })).catch(e => setErr(authMsg(e)));
   const revoke = uid => FB.club.child("approved/" + uid).remove().catch(e => setErr(authMsg(e)));
   const row = (m, act) => /*#__PURE__*/React.createElement("div", {
     key: m.uid,
@@ -5346,12 +5500,98 @@ function StatsTab() {
   }, r.count))))));
 }
 
+// ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 닉네임·이메일은 고정) ─────────
+const PROFILE_FIELDS = ["birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
+function ProfileEdit({
+  account,
+  onDone,
+  onCancel
+}) {
+  const pr = account && account.profile || {};
+  const [data, setData] = useState(() => {
+    const d = {
+      nickname: pr.nickname || ME,
+      regionCustom: "",
+      lessonMemo: "",
+      hand: [],
+      awardList: [""],
+      otherClubName: ""
+    };
+    PROFILE_FIELDS.forEach(k => {
+      if (pr[k] !== undefined) d[k] = pr[k];else if (d[k] === undefined) d[k] = "";
+    });
+    if (d.region && !REGIONS.includes(d.region)) {
+      d.regionCustom = d.region;
+      d.region = "타지역";
+    }
+    return d;
+  });
+  const [step, setStep] = useState(2);
+  const [err, setErr] = useState(""),
+    [saving, setSaving] = useState(false);
+  const onChange = (k, v) => setData(p => ({
+    ...p,
+    [k]: v
+  }));
+  const save = () => {
+    const patch = {};
+    PROFILE_FIELDS.forEach(k => {
+      patch[k] = data[k] === undefined ? null : data[k];
+    });
+    patch.region = data.region === "타지역" ? data.regionCustom || "타지역" : data.region;
+    patch.updatedAt = Date.now();
+    setSaving(true);
+    setErr("");
+    const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid;
+    (uid ? FB.club.child("members/" + uid).update(JSON.parse(JSON.stringify(patch))) : Promise.resolve()).then(() => onDone({
+      ...pr,
+      ...patch
+    })).catch(e => {
+      setSaving(false);
+      setErr(authMsg(e));
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#6B7493"
+    }
+  }, step === 2 ? "1/2 · 기본 정보" : "2/2 · 테니스 정보"), step === 2 ? /*#__PURE__*/React.createElement(Step2, {
+    data: data,
+    onChange: onChange,
+    onNext: () => setStep(3),
+    onBack: onCancel,
+    editing: true
+  }) : /*#__PURE__*/React.createElement(Step3, {
+    data: data,
+    onChange: onChange,
+    onSubmit: save,
+    onBack: () => setStep(2),
+    submitLabel: saving ? "저장 중…" : "저장"
+  }), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#ef4444"
+    }
+  }, err));
+}
+
 // ─── 내 정보 ──────────────────────────────────────────────────────────────────
 function MyInfoSheet({
   account,
   onClose,
-  onLogout
+  onLogout,
+  onProfileSaved
 }) {
+  const [edit, setEdit] = useState(false);
   const pr = account && account.profile || {};
   const held = myHeld(),
     ym = todayYmd().slice(0, 7),
@@ -5447,7 +5687,7 @@ function MyInfoSheet({
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, "\uB0B4 \uC815\uBCF4"), /*#__PURE__*/React.createElement("button", {
+  }, edit ? "정보 수정" : "내 정보"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onClose,
     "aria-label": "\uB2EB\uAE30",
@@ -5461,7 +5701,14 @@ function MyInfoSheet({
       color: "#6B7493",
       cursor: "pointer"
     }
-  }, "\u2715")), /*#__PURE__*/React.createElement(Card, {
+  }, "\u2715")), edit ? /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(ProfileEdit, {
+    account: account,
+    onCancel: () => setEdit(false),
+    onDone: p => {
+      onProfileSaved(p);
+      setEdit(false);
+    }
+  })) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Card, {
     style: {
       display: "flex",
       alignItems: "center",
@@ -5606,7 +5853,13 @@ function MyInfoSheet({
       color: "#8A93B2",
       textAlign: "center"
     }
-  }, keepLeft == null ? "이 브라우저를 닫으면 로그아웃돼요" : `로그인 상태 유지 중 · ${keepLeft}일 동안 안 열면 로그아웃돼요`), /*#__PURE__*/React.createElement("button", {
+  }, keepLeft == null ? "이 브라우저를 닫으면 로그아웃돼요" : `로그인 상태 유지 중 · ${keepLeft}일 동안 안 열면 로그아웃돼요`), FB && account && account.user && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setEdit(true),
+    style: {
+      ...btnPrimary
+    }
+  }, "\uC815\uBCF4 \uC218\uC815\uD558\uAE30"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onLogout,
     style: {
@@ -5614,7 +5867,251 @@ function MyInfoSheet({
       color: "#ef4444",
       borderColor: "#FBD5D5"
     }
-  }, "\uB85C\uADF8\uC544\uC6C3")));
+  }, "\uB85C\uADF8\uC544\uC6C3"))));
+}
+
+// ─── 공지 쓰기 (관리자) ────────────────────────────────────────────────────────
+function NoticeForm({
+  onClose
+}) {
+  const [f, setF] = useState({
+    title: "",
+    content: "",
+    important: false
+  });
+  const [err, setErr] = useState(""),
+    [saving, setSaving] = useState(false);
+  const submit = () => {
+    if (!f.title.trim()) {
+      setErr("제목을 입력해 주세요");
+      return;
+    }
+    const id = newId(),
+      n = {
+        title: f.title.trim(),
+        content: f.content.trim(),
+        important: f.important,
+        at: Date.now(),
+        by: ME,
+        byUid: myUid()
+      };
+    setSaving(true);
+    setErr("");
+    FB.club.child("notices/" + id).set(n).then(() => postFeed({
+      type: "notice",
+      noticeId: id,
+      text: `${f.important ? "[중요] " : ""}공지: ${n.title}`
+    })).then(onClose).catch(e => {
+      setSaving(false);
+      setErr(authMsg(e));
+    });
+  };
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: "\uACF5\uC9C0 \uC4F0\uAE30 \uD83D\uDCE2",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC81C\uBAA9",
+    required: true
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: f.title,
+    onChange: e => setF({
+      ...f,
+      title: e.target.value
+    }),
+    placeholder: "\uC608: 11\uC6D4 \uC815\uBAA8 \uC7A5\uC18C \uBCC0\uACBD",
+    style: inputStyle
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uB0B4\uC6A9"
+  }, /*#__PURE__*/React.createElement("textarea", {
+    value: f.content,
+    onChange: e => setF({
+      ...f,
+      content: e.target.value
+    }),
+    rows: 5,
+    style: {
+      ...inputStyle,
+      borderRadius: 18,
+      resize: "none"
+    }
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      color: "#4A5578",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: f.important,
+    onChange: e => setF({
+      ...f,
+      important: e.target.checked
+    }),
+    style: {
+      width: 18,
+      height: 18,
+      accentColor: BLUE,
+      margin: 0
+    }
+  }), "\uC911\uC694 \uACF5\uC9C0\uB85C \uD45C\uC2DC"), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#ef4444"
+    }
+  }, err), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: saving,
+    onClick: submit,
+    style: {
+      ...btnPrimary,
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "올리는 중…" : "공지 올리기"));
+}
+
+// 아래에서 올라오는 창 (공지 쓰기·알림함)
+function Sheet({
+  title,
+  onClose,
+  children
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(16,24,64,0.45)",
+      zIndex: 60,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-label": title,
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: "100%",
+      maxWidth: 440,
+      maxHeight: "88vh",
+      overflowY: "auto",
+      background: "#F3F5FB",
+      borderRadius: "28px 28px 0 0",
+      padding: "20px 18px calc(20px + env(safe-area-inset-bottom,0px))",
+      boxSizing: "border-box",
+      fontFamily: FONT,
+      display: "flex",
+      flexDirection: "column",
+      gap: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 19,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, title), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    "aria-label": "\uB2EB\uAE30",
+    style: {
+      background: "#E4E9F7",
+      border: "none",
+      borderRadius: "50%",
+      width: 34,
+      height: 34,
+      fontSize: 16,
+      color: "#6B7493",
+      cursor: "pointer"
+    }
+  }, "\u2715")), children));
+}
+
+// ─── 알림함 ───────────────────────────────────────────────────────────────────
+function NotiSheet({
+  items,
+  onClose,
+  onPick,
+  isAdmin
+}) {
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: "\uC54C\uB9BC \uD83D\uDD14",
+    onClose: onClose
+  }, items.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC0C8 \uC54C\uB9BC\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, items.map(n => {
+    const go = n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin;
+    return /*#__PURE__*/React.createElement("button", {
+      key: n.id,
+      type: "button",
+      onClick: () => onPick(n),
+      style: {
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        textAlign: "left",
+        width: "100%",
+        padding: "12px 14px",
+        background: n.unread ? "#fff" : "#F8F9FD",
+        border: n.unread ? `1.5px solid ${BLUE_LIGHT}` : "1px solid #EEF1FA",
+        borderRadius: 18,
+        cursor: "pointer",
+        fontFamily: FONT,
+        boxShadow: n.unread ? SHADOW : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20,
+        lineHeight: 1.2
+      }
+    }, NOTI_ICON[n.type] || "🔔"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 14,
+        fontWeight: n.unread ? 700 : 500,
+        color: "#1B2559",
+        lineHeight: 1.45,
+        wordBreak: "keep-all"
+      }
+    }, n.text), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: "#A3AAC2",
+        marginTop: 3
+      }
+    }, ago(n.at), n.type === "member" && isAdmin ? " · 눌러서 승인하기" : go ? " · 눌러서 보기" : "")), n.unread && /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: "#ef4444",
+        marginTop: 6,
+        flexShrink: 0
+      }
+    }));
+  })));
 }
 
 // ─── 모임 만들기·수정 ─────────────────────────────────────────────────────────
@@ -5690,7 +6187,14 @@ function MeetingForm({
     };
     setSaving(true);
     setErr("");
-    saveMeetingPath("m" + id + "/info", info).then(() => onSaved(id)).catch(e => {
+    saveMeetingPath("m" + id + "/info", info).then(() => {
+      if (!editing) postFeed({
+        type: "meeting",
+        meetingId: id,
+        text: `새 모임: ${fmtDate(info.date)} ${info.start} · ${info.place}`
+      });
+      onSaved(id);
+    }).catch(e => {
       setSaving(false);
       setErr(authMsg(e));
     });
@@ -6585,6 +7089,10 @@ function App() {
     ...p,
     [key]: val
   }));
+  const club = useClubFeed(account && account.user ? account.user.uid : null); // 알림·공지
+  const [noti, setNoti] = useState(null); // 알림함 (열 때의 목록)
+  const [noticeForm, setNoticeForm] = useState(false);
+  const [focusNotice, setFocusNotice] = useState(null);
   if (splash) return /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
   });
@@ -6900,12 +7408,38 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    style: iconBtn,
-    title: "\uC54C\uB9BC"
+    onClick: () => {
+      setNoti(club.items);
+      club.markSeen();
+    },
+    style: {
+      ...iconBtn,
+      position: "relative"
+    },
+    title: "\uC54C\uB9BC",
+    "aria-label": `알림${club.unread ? ` ${club.unread}개 안 읽음` : ""}`
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "bell",
     size: 19
-  })), /*#__PURE__*/React.createElement("div", {
+  }), club.unread > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: -3,
+      right: -3,
+      minWidth: 18,
+      height: 18,
+      padding: "0 5px",
+      boxSizing: "border-box",
+      borderRadius: 999,
+      background: "#ef4444",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      lineHeight: "18px",
+      textAlign: "center",
+      border: "2px solid #3B63F3"
+    }
+  }, club.unread > 9 ? "9+" : club.unread)), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -7037,7 +7571,11 @@ function App() {
       setTab("booking");
     },
     onOpenMeeting: (id, view) => openM(id, view, "home"),
-    onCreate: openCreate
+    onCreate: openCreate,
+    notices: club.notices,
+    isAdmin: !!(account && account.admin),
+    onWriteNotice: () => setNoticeForm(true),
+    focusNotice: focusNotice
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
     open: openMeeting,
     onOpen: (id, view) => openM(id, view, "booking"),
@@ -7127,8 +7665,37 @@ function App() {
       cursor: "pointer",
       fontFamily: FONT
     }
-  }, l)))), myInfo && /*#__PURE__*/React.createElement(MyInfoSheet, {
+  }, l)))), noti && /*#__PURE__*/React.createElement(NotiSheet, {
+    items: noti,
+    isAdmin: !!(account && account.admin),
+    onClose: () => setNoti(null),
+    onPick: n => {
+      setNoti(null);
+      if (n.type === "meeting" && n.meetingId) openM(+n.meetingId, "info", "home");else if (n.type === "notice") {
+        if (openMeeting) {
+          try {
+            if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+          } catch (e) {}
+          setOpenMeeting(null);
+        }
+        setTab("home");
+        setFocusNotice(n.noticeId + "#" + Date.now());
+      } else if (n.type === "member" && account && account.admin) {
+        setOpenMeeting(null);
+        setTab("admin");
+      }
+    }
+  }), noticeForm && /*#__PURE__*/React.createElement(NoticeForm, {
+    onClose: () => setNoticeForm(false)
+  }), myInfo && /*#__PURE__*/React.createElement(MyInfoSheet, {
     account: account,
+    onProfileSaved: p => {
+      setMe(p);
+      setAccount(a => ({
+        ...a,
+        profile: p
+      }));
+    },
     onClose: () => setMyInfo(false),
     onLogout: () => {
       setMyInfo(false);
