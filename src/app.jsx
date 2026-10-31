@@ -80,10 +80,14 @@ function votesFromRec(rec){
 }
 // 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
 const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
+// 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
+const courtLabel=v=>{ v=String(v||"").trim(); return /^[\d\s,·~\-]+$/.test(v)?`${v.replace(/\s+/g,"")}번 코트`:v; };
+const mapUrl=addr=>"https://map.kakao.com/?q="+encodeURIComponent(addr);
 const kindOf=info=>info&&info.kind==="flash"?"flash":"regular";
 function toMeeting(id,rec,series){
   const info=rec.info, today=todayYmd(), capacity=+info.capacity||0, guestCap=+info.guestCap||0;
-  return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`, place:info.place,
+  return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`,
+    place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:""), placeName:info.place, courtNo:info.courtNo||"", address:info.address||"",
     kind:kindOf(info), capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
     status:info.date<today?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
@@ -1767,7 +1771,7 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-          {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"🗓️",label:"예약 오픈",value:meeting.openDate}]),
+          {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},...(meeting.address?[{icon:"🗺️",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"🗓️",label:"예약 오픈",value:meeting.openDate}]),
             ...(ser?[{icon:"🔁",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
             <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:15,width:22,textAlign:"center"}}>{r.icon}</span>
@@ -2181,7 +2185,7 @@ const SERIES_AHEAD=3;   // 반복 모임은 앞으로 3회분을 미리 만들�
 const occDate=(ser,i)=>addDays(ser.startDate,7*(+ser.every||1)*i);
 function occInfo(sid,ser,i){
   const date=occDate(ser,i);
-  return {kind:"regular",date,start:ser.start,end:ser.end,place:ser.place,capacity:+ser.capacity,guestCap:+ser.guestCap||0,desc:ser.desc||"",
+  return {kind:"regular",date,start:ser.start,end:ser.end,place:ser.place,courtNo:ser.courtNo||"",address:ser.address||"",capacity:+ser.capacity,guestCap:+ser.guestCap||0,desc:ser.desc||"",
     openAt:openFor(date,ser.openRule),seriesId:sid,createdBy:ser.createdBy||"",createdByUid:ser.createdByUid||"",createdAt:Date.now()};
 }
 // 다가오는 반복 모임이 SERIES_AHEAD개가 되도록 빠진 것만 만들어요. 지운 날짜(skip)는 다시 안 만들어요.
@@ -2218,6 +2222,27 @@ function Pills({value,options,onChange,label}){
     </div>
   );
 }
+// 도로명 주소 검색: 카카오(다음) 우편번호 서비스를 폼 안에 띄워요 (키 없이 무료). 못 불러오면 직접 입력.
+let postcodeLoad=null;
+function loadPostcode(){
+  if(window.daum&&window.daum.Postcode) return Promise.resolve();
+  if(!postcodeLoad) postcodeLoad=new Promise((ok,no)=>{ const sc=document.createElement("script");
+    sc.src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"; sc.onload=ok; sc.onerror=()=>{postcodeLoad=null;no();}; document.head.appendChild(sc); });
+  return postcodeLoad;
+}
+function AddressSearch({onPick}){
+  const box=useRef(null);
+  const [fail,setFail]=useState(false);
+  useEffect(()=>{
+    let alive=true;
+    loadPostcode().then(()=>{ if(!alive||!box.current) return;
+      new window.daum.Postcode({width:"100%",height:"100%",oncomplete:d=>onPick((d.roadAddress||d.jibunAddress||d.address)+(d.buildingName?` (${d.buildingName})`:""))}).embed(box.current);
+    }).catch(()=>alive&&setFail(true));
+    return ()=>{alive=false;};
+  },[]);
+  return fail?<p style={{margin:"8px 0 0",fontSize:12,color:"#ef4444"}}>주소 검색을 불러오지 못했어요. 주소를 직접 입력해 주세요.</p>
+    :<div ref={box} style={{marginTop:8,height:420,border:"1px solid #E4E9F7",borderRadius:14,overflow:"hidden",background:"#fff"}}/>;
+}
 function MeetingForm({initial,onClose,onSaved}) {
   const editing=!!initial;
   const [f,setF]=useState(()=>initial
@@ -2227,6 +2252,7 @@ function MeetingForm({initial,onClose,onSaved}) {
   const [errors,setErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
+  const [addrOpen,setAddrOpen]=useState(false);
   const set=(k,v)=>setF(p=>{const n={...p,[k]:v}; if(k==="date"&&!editing&&v) n.openAt=weekBefore(v); if(k==="kind"&&v==="flash") n.repeat="none"; return n;});
   const repeating=!editing&&f.kind==="regular"&&f.repeat!=="none";
   const rule={dow:+f.openDow,time:f.openTime};
@@ -2235,14 +2261,15 @@ function MeetingForm({initial,onClose,onSaved}) {
     const e={};
     if(!f.date) e.date="날짜를 골라 주세요";
     if(!f.start||!f.end) e.time="시작·종료 시간을 넣어 주세요"; else if(f.end<=f.start) e.time="종료 시간이 시작보다 늦어야 해요";
-    if(!f.place.trim()) e.place="장소를 입력해 주세요";
+    if(!f.place.trim()) e.place="테니스장 이름을 입력해 주세요";
+    if(!String(f.courtNo||"").trim()) e.courtNo="코트 번호를 입력해 주세요";
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
     const gcap=f.guestCap===""?0:parseInt(f.guestCap,10); if(!(gcap>=0&&gcap<=50)) e.guestCap="게스트는 0~50명이에요";
     if(repeating){ if(!f.openTime) e.openAt="예약 오픈 시각을 넣어 주세요"; if(f.endDate&&f.date&&f.endDate<f.date) e.endDate="종료일은 첫 모임 날짜 뒤여야 해요"; }
     else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,start:f.start,end:f.end,place:f.place.trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
+    const base={kind:f.kind,start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),address:(f.address||"").trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -2300,8 +2327,20 @@ function MeetingForm({initial,onClose,onSaved}) {
               <input type="time" aria-label="종료 시간" value={f.end} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1}}/>
             </div>
           </FieldWrap>
-          <FieldWrap label="장소" required error={errors.place}>
+          <FieldWrap label="테니스장 이름" required error={errors.place}>
             <input type="text" value={f.place} onChange={e=>set("place",e.target.value)} placeholder="예: 올림픽공원 테니스장" style={inputStyle}/>
+          </FieldWrap>
+          <FieldWrap label="코트 번호" required error={errors.courtNo}>
+            <input type="text" aria-label="코트 번호" value={f.courtNo||""} onChange={e=>set("courtNo",e.target.value)} placeholder="예: 3 또는 5, 6" style={inputStyle}/>
+            {String(f.courtNo||"").trim()&&hint(`모임 화면에는 "${courtLabel(f.courtNo)}"로 보여요`)}
+          </FieldWrap>
+          <FieldWrap label="테니스장 주소">
+            <div style={row}>
+              <input type="text" aria-label="테니스장 주소" value={f.address||""} onChange={e=>set("address",e.target.value)} placeholder="주소 검색을 눌러 찾아요" style={{...inputStyle,flex:1}}/>
+              <button type="button" onClick={()=>setAddrOpen(v=>!v)} style={{...btnSmall,background:addrOpen?"#fff":GRAD,color:addrOpen?"#6B7493":"#fff",border:addrOpen?"1.5px solid #D6DEF7":"none",flexShrink:0}}>{addrOpen?"닫기":"주소 검색"}</button>
+            </div>
+            {addrOpen&&<AddressSearch onPick={a=>{set("address",a);setAddrOpen(false);}}/>}
+            {hint("선택이에요. 넣으면 모임 화면에서 눌러서 지도로 볼 수 있어요.")}
           </FieldWrap>
           <div style={row}>
             <div style={{flex:1}}><FieldWrap label="정원 (회원)" required error={errors.capacity}>

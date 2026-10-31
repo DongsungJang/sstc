@@ -224,6 +224,12 @@ const KIND_LABEL = {
   regular: "정기 모임",
   flash: "번개 모임"
 };
+// 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
+const courtLabel = v => {
+  v = String(v || "").trim();
+  return /^[\d\s,·~\-]+$/.test(v) ? `${v.replace(/\s+/g, "")}번 코트` : v;
+};
+const mapUrl = addr => "https://map.kakao.com/?q=" + encodeURIComponent(addr);
 const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
 function toMeeting(id, rec, series) {
   const info = rec.info,
@@ -237,7 +243,10 @@ function toMeeting(id, rec, series) {
     date: fmtDate(info.date),
     iso: info.date,
     time: `${info.start} ~ ${info.end}`,
-    place: info.place,
+    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : ""),
+    placeName: info.place,
+    courtNo: info.courtNo || "",
+    address: info.address || "",
     kind: kindOf(info),
     capacity,
     guestCap,
@@ -5066,7 +5075,20 @@ function MeetingDetail({
     icon: "📍",
     label: "장소",
     value: meeting.place
-  }, {
+  }, ...(meeting.address ? [{
+    icon: "🗺️",
+    label: "주소",
+    value: /*#__PURE__*/React.createElement("a", {
+      href: mapUrl(meeting.address),
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: {
+        color: BLUE,
+        textDecoration: "underline",
+        textUnderlineOffset: 3
+      }
+    }, meeting.address)
+  }] : []), {
     icon: "👥",
     label: "제한 인원",
     value: `${meeting.capacity}명${meeting.guestCap ? ` + 게스트 ${meeting.guestCap}명` : ""}`
@@ -6571,6 +6593,8 @@ function occInfo(sid, ser, i) {
     start: ser.start,
     end: ser.end,
     place: ser.place,
+    courtNo: ser.courtNo || "",
+    address: ser.address || "",
     capacity: +ser.capacity,
     guestCap: +ser.guestCap || 0,
     desc: ser.desc || "",
@@ -6658,6 +6682,59 @@ function Pills({
     }, l);
   }));
 }
+// 도로명 주소 검색: 카카오(다음) 우편번호 서비스를 폼 안에 띄워요 (키 없이 무료). 못 불러오면 직접 입력.
+let postcodeLoad = null;
+function loadPostcode() {
+  if (window.daum && window.daum.Postcode) return Promise.resolve();
+  if (!postcodeLoad) postcodeLoad = new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+    sc.onload = ok;
+    sc.onerror = () => {
+      postcodeLoad = null;
+      no();
+    };
+    document.head.appendChild(sc);
+  });
+  return postcodeLoad;
+}
+function AddressSearch({
+  onPick
+}) {
+  const box = useRef(null);
+  const [fail, setFail] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadPostcode().then(() => {
+      if (!alive || !box.current) return;
+      new window.daum.Postcode({
+        width: "100%",
+        height: "100%",
+        oncomplete: d => onPick((d.roadAddress || d.jibunAddress || d.address) + (d.buildingName ? ` (${d.buildingName})` : ""))
+      }).embed(box.current);
+    }).catch(() => alive && setFail(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return fail ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 12,
+      color: "#ef4444"
+    }
+  }, "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC8FC\uC18C\uB97C \uC9C1\uC811 \uC785\uB825\uD574 \uC8FC\uC138\uC694.") : /*#__PURE__*/React.createElement("div", {
+    ref: box,
+    style: {
+      marginTop: 8,
+      height: 420,
+      border: "1px solid #E4E9F7",
+      borderRadius: 14,
+      overflow: "hidden",
+      background: "#fff"
+    }
+  });
+}
 function MeetingForm({
   initial,
   onClose,
@@ -6693,6 +6770,7 @@ function MeetingForm({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [addrOpen, setAddrOpen] = useState(false);
   const set = (k, v) => setF(p => {
     const n = {
       ...p,
@@ -6712,7 +6790,8 @@ function MeetingForm({
     const e = {};
     if (!f.date) e.date = "날짜를 골라 주세요";
     if (!f.start || !f.end) e.time = "시작·종료 시간을 넣어 주세요";else if (f.end <= f.start) e.time = "종료 시간이 시작보다 늦어야 해요";
-    if (!f.place.trim()) e.place = "장소를 입력해 주세요";
+    if (!f.place.trim()) e.place = "테니스장 이름을 입력해 주세요";
+    if (!String(f.courtNo || "").trim()) e.courtNo = "코트 번호를 입력해 주세요";
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
     const gcap = f.guestCap === "" ? 0 : parseInt(f.guestCap, 10);
@@ -6729,6 +6808,8 @@ function MeetingForm({
       start: f.start,
       end: f.end,
       place: f.place.trim(),
+      courtNo: String(f.courtNo || "").trim(),
+      address: (f.address || "").trim(),
       capacity: cap,
       guestCap: gcap,
       desc: (f.desc || "").trim()
@@ -6935,7 +7016,7 @@ function MeetingForm({
       flex: 1
     }
   }))), /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uC7A5\uC18C",
+    label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
     required: true,
     error: errors.place
   }, /*#__PURE__*/React.createElement("input", {
@@ -6944,7 +7025,47 @@ function MeetingForm({
     onChange: e => set("place", e.target.value),
     placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
     style: inputStyle
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uCF54\uD2B8 \uBC88\uD638",
+    required: true,
+    error: errors.courtNo
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uCF54\uD2B8 \uBC88\uD638",
+    value: f.courtNo || "",
+    onChange: e => set("courtNo", e.target.value),
+    placeholder: "\uC608: 3 \uB610\uB294 5, 6",
+    style: inputStyle
+  }), String(f.courtNo || "").trim() && hint(`모임 화면에는 "${courtLabel(f.courtNo)}"로 보여요`)), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: row
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C",
+    value: f.address || "",
+    onChange: e => set("address", e.target.value),
+    placeholder: "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uB20C\uB7EC \uCC3E\uC544\uC694",
+    style: {
+      ...inputStyle,
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setAddrOpen(v => !v),
+    style: {
+      ...btnSmall,
+      background: addrOpen ? "#fff" : GRAD,
+      color: addrOpen ? "#6B7493" : "#fff",
+      border: addrOpen ? "1.5px solid #D6DEF7" : "none",
+      flexShrink: 0
+    }
+  }, addrOpen ? "닫기" : "주소 검색")), addrOpen && /*#__PURE__*/React.createElement(AddressSearch, {
+    onPick: a => {
+      set("address", a);
+      setAddrOpen(false);
+    }
+  }), hint("선택이에요. 넣으면 모임 화면에서 눌러서 지도로 볼 수 있어요.")), /*#__PURE__*/React.createElement("div", {
     style: row
   }, /*#__PURE__*/React.createElement("div", {
     style: {
