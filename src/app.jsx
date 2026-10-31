@@ -403,6 +403,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
   const validate=()=>{
     if(isAdmin) return true;
     const e={};
+    if(!(data.realName||"").trim()) e.realName="본명을 입력해주세요";
     if(!data.nickname) e.nickname="닉네임을 입력해주세요";
     if(!data.birthdate) e.birthdate="생년월일을 입력해주세요";
     if(!data.phone) e.phone="연락처를 입력해주세요";
@@ -420,6 +421,10 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>클릭해서 프로필 사진 추가 (선택)</p>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
       </div>}
+      <FieldWrap label="본명" required error={errors.realName}>
+        <input type="text" value={data.realName||""} style={inputStyle} onChange={e=>onChange("realName",e.target.value)} placeholder="실명" autoComplete="name"/>
+        <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>회원 확인용이에요. 모임 화면에는 닉네임만 보여요</p>
+      </FieldWrap>
       {editing?<FieldWrap label="닉네임">
         <input type="text" value={data.nickname} readOnly style={{...inputStyle,background:"#F5F7FE",color:"#6B7493"}}/>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>닉네임은 투표·대진 기록과 이어져 있어서 바꿀 수 없어요</p>
@@ -1227,7 +1232,7 @@ async function signUpMember(form){
   const cred=await FB.auth.createUserWithEmailAndPassword(form.email.trim(),form.password);
   const uid=cred.user.uid;
   const {password,passwordConfirm,photo,...rest}=form;
-  const profile={...JSON.parse(JSON.stringify(rest)),email:form.email.trim(),nickname:nick,
+  const profile={...JSON.parse(JSON.stringify(rest)),email:form.email.trim(),nickname:nick,realName:(form.realName||"").trim(),
     region:form.region==="타지역"?(form.regionCustom||"타지역"):form.region,createdAt:Date.now()};
   await FB.club.child("members/"+uid).set(profile);
   await FB.club.child("nicknames/"+nickKey(nick)).set(uid);
@@ -1275,6 +1280,7 @@ function AdminTab(){
         <div style={{flex:1,minWidth:0}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
+            <span style={{fontSize:12,color:m.realName?"#4A5578":"#C2610C"}}>{m.realName?`(${m.realName})`:"(본명 미입력)"}</span>
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
             {admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:999,background:GRAD,color:"#fff"}}>관리자</span>}
           </div>
@@ -1882,7 +1888,7 @@ function StatsTab() {
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 닉네임·이메일은 고정) ─────────
-const PROFILE_FIELDS=["birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
+const PROFILE_FIELDS=["realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
 function ProfileEdit({account,onDone,onCancel}) {
   const pr=(account&&account.profile)||{};
   const [data,setData]=useState(()=>{
@@ -1898,6 +1904,7 @@ function ProfileEdit({account,onDone,onCancel}) {
     const patch={};
     PROFILE_FIELDS.forEach(k=>{ patch[k]=data[k]===undefined?null:data[k]; });
     patch.region=data.region==="타지역"?(data.regionCustom||"타지역"):data.region;
+    patch.realName=(data.realName||"").trim();
     patch.updatedAt=Date.now();
     setSaving(true); setErr("");
     const uid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
@@ -1915,8 +1922,8 @@ function ProfileEdit({account,onDone,onCancel}) {
 }
 
 // ─── 내 정보 ──────────────────────────────────────────────────────────────────
-function MyInfoSheet({account,onClose,onLogout,onProfileSaved}) {
-  const [edit,setEdit]=useState(false);
+function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
+  const [edit,setEdit]=useState(!!startEdit);
   const pr=(account&&account.profile)||{};
   const held=myHeld(), ym=todayYmd().slice(0,7), y=ym.slice(0,4);
   const mine=MEETINGS.filter(m=>m.status==="upcoming").map(m=>{
@@ -1940,7 +1947,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved}) {
         <Card style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:56,height:56,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><MascotSvg size={44}/></div>
           <div style={{flex:1,minWidth:0}}>
-            <p style={{margin:"0 0 3px",fontSize:18,fontWeight:700,color:"#1B2559"}}>{pr.nickname||ME}</p>
+            <p style={{margin:"0 0 3px",fontSize:18,fontWeight:700,color:"#1B2559"}}>{pr.nickname||ME}{pr.realName&&<span style={{fontSize:13,fontWeight:500,color:"#6B7493",marginLeft:6}}>{pr.realName}</span>}</p>
             <p style={{margin:"0 0 6px",fontSize:12,color:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.email||(account&&account.user&&account.user.email)||""}</p>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {account&&account.admin&&badge("관리자",BLUE,"#fff")}
@@ -1967,6 +1974,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved}) {
         </Card>
         <Card>
           <SectionTitle>프로필</SectionTitle>
+          <Row k="본명" v={pr.realName||(FB?"입력 안 됨 · 정보 수정하기에서 넣어 주세요":"")}/>
           <Row k="NTRP" v={pr.ntrp||MEMBER_NTRP[ME]}/>
           <Row k="구력" v={calcCareer(pr.tennisStart)}/>
           <Row k="손·백핸드" v={Array.isArray(pr.hand)?pr.hand.join(", "):pr.hand}/>
@@ -2258,7 +2266,7 @@ export default function App() {
   const [splash,setSplash]=useState(true);   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
-  const [myInfo,setMyInfo]=useState(false);   // 내 정보 창
+  const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
   const [mForm,setForm2]=useState(null);      // 모임 만들기·수정 창: {initial} | null
   const [screen,setScreen]=useState("login");
   const [step,setStep]=useState(1);
@@ -2329,7 +2337,7 @@ export default function App() {
 
   const [form,setForm]=useState({
     email:"",password:"",passwordConfirm:"",inviteCode:"",referrer:"",
-    photo:null,nickname:"",birthdate:"",phone:"",region:"",regionCustom:"",court:"",
+    photo:null,realName:"",nickname:"",birthdate:"",phone:"",region:"",regionCustom:"",court:"",
     tennisStart:"",lessonStatus:"",lessonMemo:"",ntrp:"",
     hand:[],weeklyFreq:"",otherClub:"",otherClubName:"",
     award:"",awardList:[""],memo:"",
@@ -2457,6 +2465,12 @@ export default function App() {
         </div>
       )}
       <div style={{flex:1,padding:"16px 16px 96px"}}>
+        {FB&&account&&account.profile&&!account.profile.realName&&(
+          <Card style={{marginBottom:12,display:"flex",alignItems:"center",gap:10,background:"#FFF8EC",border:"1px solid #FDE2B8"}}>
+            <span style={{flex:1,fontSize:13,color:"#8A5A12",lineHeight:1.5}}>본명이 아직 없어요. 회원 확인을 위해 본명을 넣어 주세요.</span>
+            <button type="button" onClick={()=>setMyInfo("edit")} style={{padding:"8px 14px",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>입력하기</button>
+          </Card>
+        )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
           notices={club.notices} isAdmin={!!(account&&account.admin)} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
@@ -2487,7 +2501,7 @@ export default function App() {
         else if(n.type==="member"&&account&&account.admin){ setOpenMeeting(null); setTab("admin"); }
       }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
-      {myInfo&&<MyInfoSheet account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
+      {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
       {mForm&&<MeetingForm initial={mForm.initial} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
