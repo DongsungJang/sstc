@@ -32,6 +32,9 @@
 100%{transform:scale(1.16,.82)}
 }
 .sp-shadow{animation:sp-shadow 1.2s infinite}
+/* 로그인 화면 원 안: 크게 뛰지 않고 제자리에서 통통 */
+.sp-hop{animation:sp-hop 1.2s infinite}
+@keyframes sp-hop{0%,100%{transform:translateY(3px);animation-timing-function:cubic-bezier(.2,.7,.4,1)}50%{transform:translateY(-7px);animation-timing-function:cubic-bezier(.6,0,.8,.3)}}
 @keyframes sp-shadow{0%,100%{transform:scaleX(1);opacity:.35}50%{transform:scaleX(.45);opacity:.12}}
 .sp-wink{transform-box:fill-box;transform-origin:center;animation:sp-wink 3.6s infinite}
 @keyframes sp-wink{0%,82%,100%{transform:scaleY(1)}87%{transform:scaleY(.12)}93%{transform:scaleY(1)}}
@@ -57,7 +60,7 @@
 .sp-cta{transition:transform .15s ease}
 .sp-cta:hover{transform:translateY(-2px)}
 .sp-cta:active{transform:scale(.97)}
-@media (prefers-reduced-motion:reduce){.sp-move,.sp-bounce,.sp-shadow,.sp-wink,.sp-bubble,.sp-spark,.sp-dot,.sp-title{animation:none}.sp-bubble{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.sp-hop,.sp-move,.sp-bounce,.sp-shadow,.sp-wink,.sp-bubble,.sp-spark,.sp-dot,.sp-title{animation:none}.sp-bubble{opacity:1;transform:none}}
 .sp-sorry{animation:sp-a 4.8s infinite}
 .sp-smug{animation:sp-b 4.8s infinite}
 @keyframes sp-a{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
@@ -562,12 +565,42 @@ function StepIndicator({
 }
 
 // ─── 로그인 ───────────────────────────────────────────────────────────────────
+// ─── 아이디 저장 · 로그인 상태 유지 ───────────────────────────────────────────
+// 아이디 저장: 이메일을 이 기기에 기억. 로그인 상태 유지: 마지막으로 앱을 연 날부터 30일 동안 유지(열 때마다 연장).
+// 유지를 끄면 브라우저(탭)를 닫을 때 로그아웃돼요.
+const KEEP_DAYS = 30;
+const LS = {
+  email: "sstc-saved-email",
+  keep: "sstc-keep-login",
+  until: "sstc-login-until"
+};
+const lsGet = k => {
+  try {
+    return localStorage.getItem(k);
+  } catch (e) {
+    return null;
+  }
+};
+const lsSet = (k, v) => {
+  try {
+    if (v == null) localStorage.removeItem(k);else localStorage.setItem(k, v);
+  } catch (e) {}
+};
+const extendLogin = () => {
+  if (lsGet(LS.keep) !== "0") lsSet(LS.until, String(Date.now() + KEEP_DAYS * 86400000));
+};
+const loginExpired = () => {
+  const u = +lsGet(LS.until);
+  return lsGet(LS.keep) !== "0" && u > 0 && Date.now() > u;
+};
 function LoginScreen({
   onSignup,
   onForgot,
   onLogin
 }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => lsGet(LS.email) || "");
+  const [remember, setRemember] = useState(() => !!lsGet(LS.email));
+  const [keep, setKeep] = useState(() => lsGet(LS.keep) !== "0");
   const [pw, setPw] = useState("");
   const [vis, setVis] = useState(false);
   const [err, setErr] = useState("");
@@ -592,7 +625,11 @@ function LoginScreen({
     }
     setBusy(true);
     setErr("");
-    FB.auth.signInWithEmailAndPassword(email.trim(), pw).catch(e => {
+    lsSet(LS.email, remember ? email.trim() : null);
+    lsSet(LS.keep, keep ? "1" : "0");
+    lsSet(LS.until, null);
+    if (keep) extendLogin();
+    Promise.resolve(FB.auth.setPersistence ? FB.auth.setPersistence(keep ? "local" : "session") : null).then(() => FB.auth.signInWithEmailAndPassword(email.trim(), pw)).catch(e => {
       setErr(authMsg(e));
       setBusy(false);
     });
@@ -640,7 +677,36 @@ function LoginScreen({
       color: "#A3AAC2",
       cursor: "pointer"
     }
-  }, vis ? "숨김" : "보기"))), err && /*#__PURE__*/React.createElement("p", {
+  }, vis ? "숨김" : "보기"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 18,
+      marginTop: -4,
+      paddingLeft: 4
+    }
+  }, [["아이디 저장", remember, setRemember], [`로그인 상태 유지 (${KEEP_DAYS}일)`, keep, setKeep]].map(([label, on, set]) => /*#__PURE__*/React.createElement("label", {
+    key: label,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 13,
+      color: "#4A5578",
+      cursor: "pointer",
+      userSelect: "none"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: on,
+    onChange: e => set(e.target.checked),
+    style: {
+      width: 17,
+      height: 17,
+      accentColor: BLUE,
+      margin: 0,
+      cursor: "pointer"
+    }
+  }), label))), err && /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
       color: "#ef4444",
@@ -5280,6 +5346,277 @@ function StatsTab() {
   }, r.count))))));
 }
 
+// ─── 내 정보 ──────────────────────────────────────────────────────────────────
+function MyInfoSheet({
+  account,
+  onClose,
+  onLogout
+}) {
+  const pr = account && account.profile || {};
+  const held = myHeld(),
+    ym = todayYmd().slice(0, 7),
+    y = ym.slice(0, 4);
+  const mine = MEETINGS.filter(m => m.status === "upcoming").map(m => {
+    const v = m.rec && m.rec.votes && m.rec.votes[myVoteKey()];
+    if (!v || !v.status) return null;
+    const ci = (m.attendees || []).findIndex(a => a.isMe),
+      wi = (m.waitlist || []).findIndex(a => a.isMe);
+    const label = v.status === "attend" ? ci >= 0 ? "참석 확정" : `대기 ${wi + 1}번` : v.status === "absent" ? "불참" : "미정";
+    return {
+      m,
+      label,
+      color: v.status === "attend" && ci >= 0 ? BLUE : v.status === "attend" ? "#C2610C" : "#8A93B2"
+    };
+  }).filter(Boolean);
+  const until = +lsGet(LS.until),
+    keepLeft = lsGet(LS.keep) === "0" ? null : until ? Math.max(0, Math.ceil((until - Date.now()) / 86400000)) : null;
+  const badge = (text, bg, color) => /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "3px 9px",
+      borderRadius: 999,
+      background: bg,
+      color
+    }
+  }, text);
+  const Row = ({
+    k,
+    v
+  }) => v ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      padding: "9px 0",
+      borderBottom: "1px solid #EEF1FA"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 84,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, k), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: 500,
+      color: "#1B2559",
+      wordBreak: "keep-all"
+    }
+  }, v)) : null;
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(16,24,64,0.45)",
+      zIndex: 60,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-label": "\uB0B4 \uC815\uBCF4",
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: "100%",
+      maxWidth: 440,
+      maxHeight: "92vh",
+      overflowY: "auto",
+      background: "#F3F5FB",
+      borderRadius: "28px 28px 0 0",
+      padding: "20px 16px calc(20px + env(safe-area-inset-bottom,0px))",
+      boxSizing: "border-box",
+      fontFamily: FONT,
+      display: "flex",
+      flexDirection: "column",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 19,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, "\uB0B4 \uC815\uBCF4"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    "aria-label": "\uB2EB\uAE30",
+    style: {
+      background: "#E4E9F7",
+      border: "none",
+      borderRadius: "50%",
+      width: 34,
+      height: 34,
+      fontSize: 16,
+      color: "#6B7493",
+      cursor: "pointer"
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 56,
+      height: 56,
+      borderRadius: "50%",
+      background: GRAD,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(MascotSvg, {
+    size: 44
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 3px",
+      fontSize: 18,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, pr.nickname || ME), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 6px",
+      fontSize: 12,
+      color: "#8A93B2",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, pr.email || account && account.user && account.user.email || ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, account && account.admin && badge("관리자", BLUE, "#fff"), account && (account.admin || account.approved) ? badge("승인된 회원", BLUE_LIGHT, BLUE) : FB && badge("승인 대기", "#FFF4E5", "#C2610C")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, [["이번 달", held.filter(m => m.iso.slice(0, 7) === ym).length], ["올해", held.filter(m => m.iso.slice(0, 4) === y).length], ["누적", held.length]].map(([k, v]) => /*#__PURE__*/React.createElement(Card, {
+    key: k,
+    style: {
+      flex: 1,
+      textAlign: "center",
+      padding: 14
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 6px",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, k, " \uCC38\uC11D"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 700,
+      color: BLUE
+    }
+  }, v, "\uD68C")))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784 \uB0B4 \uD22C\uD45C"), mine.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uD22C\uD45C\uD55C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : mine.map(({
+    m,
+    label,
+    color
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "8px 0",
+      borderBottom: "1px solid #EEF1FA"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#1B2559"
+    }
+  }, m.date), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, "\uD83D\uDCCD ", m.place)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color
+    }
+  }, label)))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD504\uB85C\uD544"), /*#__PURE__*/React.createElement(Row, {
+    k: "NTRP",
+    v: pr.ntrp || MEMBER_NTRP[ME]
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uAD6C\uB825",
+    v: calcCareer(pr.tennisStart)
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uC190\xB7\uBC31\uD578\uB4DC",
+    v: Array.isArray(pr.hand) ? pr.hand.join(", ") : pr.hand
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uC6B4\uB3D9 \uD69F\uC218",
+    v: pr.weeklyFreq
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uB808\uC2A8",
+    v: pr.lessonStatus
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uC9C0\uC5ED",
+    v: pr.region
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8",
+    v: pr.court
+  }), /*#__PURE__*/React.createElement(Row, {
+    k: "\uC5F0\uB77D\uCC98",
+    v: pr.phone
+  }), !pr.ntrp && !pr.region && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uC800\uC7A5\uB41C \uD504\uB85C\uD544\uC774 \uC5C6\uC5B4\uC694.")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#8A93B2",
+      textAlign: "center"
+    }
+  }, keepLeft == null ? "이 브라우저를 닫으면 로그아웃돼요" : `로그인 상태 유지 중 · ${keepLeft}일 동안 안 열면 로그아웃돼요`), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onLogout,
+    style: {
+      ...btnSecondary,
+      color: "#ef4444",
+      borderColor: "#FBD5D5"
+    }
+  }, "\uB85C\uADF8\uC544\uC6C3")));
+}
+
 // ─── 모임 만들기·수정 ─────────────────────────────────────────────────────────
 // 기본값: 다음 토요일 08:00~12:00, 정원 12명, 예약 오픈은 모임 7일 전 00:00
 function nextSaturday() {
@@ -5562,6 +5899,214 @@ const iconBtn = {
   cursor: "pointer"
 };
 
+// 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
+function MascotSvg({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    role: "img",
+    "aria-label": "Tennis ball mascot hiding a smug grin behind its hand",
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "60",
+    cy: "60",
+    r: "56",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 32 C 40 44, 40 76, 12 88",
+    stroke: "#FFFFFF",
+    strokeWidth: "5",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M108 32 C 80 44, 80 76, 108 88",
+    stroke: "#FFFFFF",
+    strokeWidth: "5",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-sorry",
+    transform: "rotate(4 60 60)"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M33 47 Q 42 46 50 39",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M70 39 Q 78 46 87 47",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "43",
+    cy: "60",
+    rx: "6.5",
+    ry: "7.5",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "45.5",
+    cy: "57",
+    r: "2.6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "41",
+    cy: "63.5",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "77",
+    cy: "60",
+    rx: "6.5",
+    ry: "7.5",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "79.5",
+    cy: "57",
+    r: "2.6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "75",
+    cy: "63.5",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M94 38 Q 98 45 94 48 Q 90 45 94 38 Z",
+    fill: "#9CD3FF"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "sp-smug",
+    transform: "rotate(-7 60 60)"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M36 46 Q 44 43.5 52 46",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M68 43 Q 76 36 86 41",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-wink"
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "44",
+    cy: "58",
+    rx: "8",
+    ry: "6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "48",
+    cy: "59.5",
+    r: "4.2",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "49.5",
+    cy: "58",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M35 57 Q 44 48 53 57 Z",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M35 57 Q 44 54.5 53 57",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "sp-wink"
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "76",
+    cy: "58",
+    rx: "8",
+    ry: "6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "80",
+    cy: "59.5",
+    r: "4.2",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "81.5",
+    cy: "58",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M67 57 Q 76 48 85 57 Z",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M67 57 Q 76 54.5 85 57",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("path", {
+    d: "M45 72 Q 62 87 77 70 Q 62 79 45 72 Z",
+    fill: "#FF4F8B",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    strokeLinejoin: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M76 70.5 Q 80 69.5 80 66",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "32",
+    cy: "71",
+    rx: "8",
+    ry: "4.5",
+    fill: "#FF8FB1",
+    opacity: "0.75"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "88",
+    cy: "71",
+    rx: "8",
+    ry: "4.5",
+    fill: "#FF8FB1",
+    opacity: "0.75"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-hand"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M60 99 V117",
+    stroke: "#0B1E5B",
+    strokeWidth: "7.5",
+    strokeLinecap: "round",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M60 105 V110",
+    stroke: "#FF8FB1",
+    strokeWidth: "7.5",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M54 91 L60 100 L66 91",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    strokeLinejoin: "round",
+    strokeLinecap: "round",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "60",
+    cy: "78",
+    rx: "13",
+    ry: "15",
+    fill: "#FFFFFF",
+    stroke: "#0B1E5B",
+    strokeWidth: "3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M54 65 V91 M60 63.5 V92.5 M66 65 V91 M49 70 H71 M47 78 H73 M49 86 H71",
+    stroke: "#8FA2D9",
+    strokeWidth: "1.4",
+    fill: "none"
+  })));
+}
+
 // ── 스플래시 화면 (SSTC_app_assets/splash.html) ──
 // 원본은 390×844 고정 크기라 비율 그대로 화면에 맞게 키우거나 줄여서 가운데 놓아요. 애니메이션 CSS는 src/splash.css.
 const SPLASH_W = 390,
@@ -5816,208 +6361,9 @@ function SplashScreen({
       width: "200px",
       height: "200px"
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    role: "img",
-    "aria-label": "Tennis ball mascot hiding a smug grin behind its hand",
-    width: "200",
-    height: "200",
-    viewBox: "0 0 120 120"
-  }, /*#__PURE__*/React.createElement("circle", {
-    cx: "60",
-    cy: "60",
-    r: "56",
-    fill: "#D7F24A"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 32 C 40 44, 40 76, 12 88",
-    stroke: "#FFFFFF",
-    strokeWidth: "5",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M108 32 C 80 44, 80 76, 108 88",
-    stroke: "#FFFFFF",
-    strokeWidth: "5",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("g", {
-    className: "sp-sorry",
-    transform: "rotate(4 60 60)"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M33 47 Q 42 46 50 39",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M70 39 Q 78 46 87 47",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "43",
-    cy: "60",
-    rx: "6.5",
-    ry: "7.5",
-    fill: "#0B1E5B"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "45.5",
-    cy: "57",
-    r: "2.6",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "41",
-    cy: "63.5",
-    r: "1.3",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "77",
-    cy: "60",
-    rx: "6.5",
-    ry: "7.5",
-    fill: "#0B1E5B"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "79.5",
-    cy: "57",
-    r: "2.6",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "75",
-    cy: "63.5",
-    r: "1.3",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M94 38 Q 98 45 94 48 Q 90 45 94 38 Z",
-    fill: "#9CD3FF"
-  })), /*#__PURE__*/React.createElement("g", {
-    className: "sp-smug",
-    transform: "rotate(-7 60 60)"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M36 46 Q 44 43.5 52 46",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M68 43 Q 76 36 86 41",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("g", {
-    className: "sp-wink"
-  }, /*#__PURE__*/React.createElement("ellipse", {
-    cx: "44",
-    cy: "58",
-    rx: "8",
-    ry: "6",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "48",
-    cy: "59.5",
-    r: "4.2",
-    fill: "#0B1E5B"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "49.5",
-    cy: "58",
-    r: "1.3",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M35 57 Q 44 48 53 57 Z",
-    fill: "#D7F24A"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M35 57 Q 44 54.5 53 57",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("g", {
-    className: "sp-wink"
-  }, /*#__PURE__*/React.createElement("ellipse", {
-    cx: "76",
-    cy: "58",
-    rx: "8",
-    ry: "6",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "80",
-    cy: "59.5",
-    r: "4.2",
-    fill: "#0B1E5B"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "81.5",
-    cy: "58",
-    r: "1.3",
-    fill: "#FFFFFF"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M67 57 Q 76 48 85 57 Z",
-    fill: "#D7F24A"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M67 57 Q 76 54.5 85 57",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    fill: "none",
-    strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("path", {
-    d: "M45 72 Q 62 87 77 70 Q 62 79 45 72 Z",
-    fill: "#FF4F8B",
-    stroke: "#0B1E5B",
-    strokeWidth: "2.5",
-    strokeLinejoin: "round"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M76 70.5 Q 80 69.5 80 66",
-    stroke: "#0B1E5B",
-    strokeWidth: "2.5",
-    fill: "none",
-    strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "32",
-    cy: "71",
-    rx: "8",
-    ry: "4.5",
-    fill: "#FF8FB1",
-    opacity: "0.75"
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "88",
-    cy: "71",
-    rx: "8",
-    ry: "4.5",
-    fill: "#FF8FB1",
-    opacity: "0.75"
-  }), /*#__PURE__*/React.createElement("g", {
-    className: "sp-hand"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M60 99 V117",
-    stroke: "#0B1E5B",
-    strokeWidth: "7.5",
-    strokeLinecap: "round",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M60 105 V110",
-    stroke: "#FF8FB1",
-    strokeWidth: "7.5",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M54 91 L60 100 L66 91",
-    stroke: "#0B1E5B",
-    strokeWidth: "3",
-    strokeLinejoin: "round",
-    strokeLinecap: "round",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "60",
-    cy: "78",
-    rx: "13",
-    ry: "15",
-    fill: "#FFFFFF",
-    stroke: "#0B1E5B",
-    strokeWidth: "3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M54 65 V91 M60 63.5 V92.5 M66 65 V91 M49 70 H71 M47 78 H73 M49 86 H71",
-    stroke: "#8FA2D9",
-    strokeWidth: "1.4",
-    fill: "none"
-  }))))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(MascotSvg, {
+    size: 200
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "sp-shadow",
     "aria-hidden": "true",
     style: {
@@ -6090,6 +6436,8 @@ function App() {
   // screen: "login" | "forgot" | "signup" | "main"
   const [splash, setSplash] = useState(true); // 앱을 열 때마다 스플래시부터
   const list = useMeetingList(); // 모든 모임 (실시간)
+  const [menu, setMenu] = useState(false); // 우측 상단 내 메뉴
+  const [myInfo, setMyInfo] = useState(false); // 내 정보 창
   const [mForm, setForm2] = useState(null); // 모임 만들기·수정 창: {initial} | null
   const [screen, setScreen] = useState("login");
   const [step, setStep] = useState(1);
@@ -6163,11 +6511,18 @@ function App() {
         setScreen(s => s === "main" ? "login" : s);
         return;
       }
+      if (loginExpired()) {
+        lsSet(LS.until, null);
+        FB.auth.signOut();
+        return;
+      } // 30일 넘게 안 열었으면 다시 로그인
+      extendLogin();
       if (signingUp.current) return; // 가입 중에는 가입 완료 화면을 먼저 보여줌
       loadAccount(user).then(() => setScreen("main"));
     });
   }, []);
   const logout = () => {
+    lsSet(LS.until, null);
     if (FB) FB.auth.signOut();
     setScreen("login");
     setTab("home");
@@ -6282,22 +6637,28 @@ function App() {
         left: -40
       }
     }), /*#__PURE__*/React.createElement("div", {
+      title: "Sorry, not sorry",
       style: {
-        width: screen === "login" ? 92 : 68,
-        height: screen === "login" ? 92 : 68,
+        width: screen === "login" ? 112 : 76,
+        height: screen === "login" ? 112 : 76,
         margin: "0 auto 14px",
         borderRadius: "50%",
         border: "2px solid rgba(255,255,255,0.85)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: screen === "login" ? 42 : 30,
         background: "rgba(255,255,255,0.12)",
         cursor: "pointer",
         userSelect: "none"
       },
       onClick: () => setWink(w => !w)
-    }, wink ? "😜" : "🎾"), /*#__PURE__*/React.createElement("h1", {
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "sp-hop"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "sp-bounce"
+    }, /*#__PURE__*/React.createElement(MascotSvg, {
+      size: screen === "login" ? 80 : 54
+    })))), /*#__PURE__*/React.createElement("h1", {
       style: {
         fontSize: 30,
         fontWeight: 700,
@@ -6544,16 +6905,21 @@ function App() {
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "bell",
     size: 19
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: logout,
+    onClick: () => setMenu(v => !v),
     style: iconBtn,
-    title: "\uB85C\uADF8\uC544\uC6C3",
-    "aria-label": "\uB85C\uADF8\uC544\uC6C3"
+    title: "\uB0B4 \uBA54\uB274",
+    "aria-label": "\uB0B4 \uBA54\uB274",
+    "aria-expanded": menu
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "user",
     size: 19
-  })))), isHome ? /*#__PURE__*/React.createElement("div", {
+  }))))), isHome ? /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       marginTop: 18
@@ -6716,7 +7082,59 @@ function App() {
     "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M12 5v14M5 12h14"
-  }))), mForm && /*#__PURE__*/React.createElement(MeetingForm, {
+  }))), menu && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMenu(false),
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 40
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    role: "menu",
+    style: {
+      position: "fixed",
+      right: "max(20px, calc(50% - 200px))",
+      top: 62,
+      zIndex: 41,
+      background: "#fff",
+      borderRadius: 18,
+      boxShadow: "0 12px 32px rgba(20,40,120,0.22)",
+      padding: 6,
+      minWidth: 150
+    }
+  }, [["내 정보 보기", () => {
+    setMenu(false);
+    setMyInfo(true);
+  }, "#1B2559"], ["로그아웃", () => {
+    setMenu(false);
+    logout();
+  }, "#ef4444"]].map(([l, f, c]) => /*#__PURE__*/React.createElement("button", {
+    key: l,
+    type: "button",
+    role: "menuitem",
+    onClick: f,
+    style: {
+      display: "block",
+      width: "100%",
+      textAlign: "left",
+      padding: "11px 14px",
+      background: "none",
+      border: "none",
+      borderRadius: 12,
+      fontSize: 14,
+      fontWeight: 600,
+      color: c,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, l)))), myInfo && /*#__PURE__*/React.createElement(MyInfoSheet, {
+    account: account,
+    onClose: () => setMyInfo(false),
+    onLogout: () => {
+      setMyInfo(false);
+      logout();
+    }
+  }), mForm && /*#__PURE__*/React.createElement(MeetingForm, {
     initial: mForm.initial,
     onClose: () => setForm2(null),
     onSaved: id => {
