@@ -618,6 +618,7 @@ const loginExpired = () => {
   return lsGet(LS.keep) !== "0" && u > 0 && Date.now() > u;
 };
 function LoginScreen({
+  notice,
   onSignup,
   onForgot,
   onLogin
@@ -629,6 +630,12 @@ function LoginScreen({
   const [vis, setVis] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (notice) {
+      setBusy(false);
+      setErr(notice.t);
+    }
+  }, [notice && notice.at]);
   const handle = () => {
     if (!FB) {
       // 데모: 빈칸으로도 통과
@@ -3251,7 +3258,8 @@ const NOTI_ICON = {
   member: "👋",
   meeting: "📅",
   notice: "📢",
-  approved: "✅"
+  approved: "✅",
+  admin: "📣"
 };
 const ago = t => {
   const m = Math.floor((Date.now() - t) / 60000);
@@ -3384,7 +3392,7 @@ function PendingScreen({
       fontSize: 19,
       color: BLUE
     }
-  }, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 \uC911\uC774\uC5D0\uC694"), /*#__PURE__*/React.createElement("p", {
+  }, "\uC900\uD68C\uC6D0\uC774\uC5D0\uC694 \xB7 \uC815\uD68C\uC6D0 \uC2B9\uC778 \uB300\uAE30 \uC911"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
@@ -3411,13 +3419,23 @@ function PendingScreen({
   }, "\uB85C\uADF8\uC544\uC6C3"));
 }
 
-// 관리자 탭: 가입 승인, 회원 목록
+// 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
+// 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
+const ADMIN_MSG = [["vote", "모임 투표 독려", m => m ? `${m.date} ${m.place} 모임 참석 투표해 주세요! 🎾` : "다가오는 모임 참석 투표해 주세요! 🎾"], ["profile", "정보 수정 요청", () => "프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["realName", "본명 입력 요청", () => "본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."], ["career", "구력 확인 요청", () => "구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["custom", "직접 쓰기", () => ""]];
 function AdminTab() {
   const [members, setMembers] = useState(null);
   const [approved, setApproved] = useState({});
   const [admins, setAdmins] = useState({});
   const [err, setErr] = useState("");
   const [open, setOpen] = useState(null);
+  const [sel, setSel] = useState({});
+  const [kind, setKind] = useState("vote");
+  const upcoming = MEETINGS.filter(m => m.status === "upcoming");
+  const [mid, setMid] = useState(() => upcoming[0] ? String(upcoming[0].id) : "");
+  const [text, setText] = useState(() => ADMIN_MSG[0][2](upcoming[0]));
+  const [sent, setSent] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showGone, setShowGone] = useState(false);
   useEffect(() => {
     const refs = [["members", v => setMembers(v || {})], ["approved", v => setApproved(v || {})], ["admins", v => setAdmins(v || {})]].map(([p, fn]) => {
       const r = FB.club.child(p);
@@ -3445,20 +3463,118 @@ function AdminTab() {
     uid,
     ...p
   })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  const pending = list.filter(m => !approved[m.uid] && !admins[m.uid]);
-  const active = list.filter(m => approved[m.uid] || admins[m.uid]);
-  const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => FB.club.child("inbox/" + uid + "/" + newId()).set({
-    type: "approved",
-    text: "가입이 승인됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾",
+  const gone = list.filter(m => m.withdrawn && !admins[m.uid]);
+  const live = list.filter(m => !m.withdrawn || admins[m.uid]);
+  const pending = live.filter(m => !approved[m.uid] && !admins[m.uid]);
+  const active = live.filter(m => approved[m.uid] || admins[m.uid]);
+  const fail = e => setErr(authMsg(e));
+  const inbox = (uid, msg) => FB.club.child("inbox/" + uid + "/" + newId()).set({
+    ...msg,
     at: Date.now()
-  })).catch(e => setErr(authMsg(e)));
-  const revoke = uid => FB.club.child("approved/" + uid).remove().catch(e => setErr(authMsg(e)));
-  const row = (m, act) => /*#__PURE__*/React.createElement("div", {
+  });
+  const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => inbox(uid, {
+    type: "approved",
+    text: "정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾"
+  })).catch(fail);
+  const demote = m => {
+    if (!window.confirm(`${m.nickname} 님을 준회원으로 바꿀까요? 모임 투표를 못 하게 돼요.`)) return;
+    FB.club.child("approved/" + m.uid).remove().catch(fail);
+  };
+  const withdraw = m => {
+    if (!window.confirm(`${m.nickname} 님을 탈퇴시킬까요? 다음에 앱을 열면 로그아웃되고 다시 들어올 수 없어요.`)) return;
+    FB.club.child("approved/" + m.uid).remove().then(() => FB.club.child("members/" + m.uid).update({
+      withdrawn: true,
+      withdrawnAt: Date.now()
+    })).catch(fail);
+    setSel(s => {
+      const n = {
+        ...s
+      };
+      delete n[m.uid];
+      return n;
+    });
+  };
+  const restore = m => FB.club.child("members/" + m.uid).update({
+    withdrawn: null,
+    withdrawnAt: null
+  }).catch(fail);
+  // 알림 보내기
+  const pick = list => setSel(Object.fromEntries(list.map(m => [m.uid, true])));
+  const chosen = live.filter(m => sel[m.uid]);
+  const meeting = upcoming.find(m => String(m.id) === mid);
+  const setMsgKind = k => {
+    setKind(k);
+    setSent("");
+    setText(ADMIN_MSG.find(x => x[0] === k)[2](k === "vote" ? meeting : null));
+  };
+  const setMeeting = v => {
+    setMid(v);
+    if (kind === "vote") setText(ADMIN_MSG[0][2](upcoming.find(m => String(m.id) === v)));
+  };
+  const send = () => {
+    const t = text.trim();
+    if (!t || chosen.length === 0) return;
+    const msg = {
+      type: "admin",
+      text: t,
+      by: ME,
+      byUid: FB.auth.currentUser && FB.auth.currentUser.uid || "",
+      ...(kind === "vote" && meeting ? {
+        meetingId: meeting.id
+      } : {}),
+      ...(kind === "profile" || kind === "realName" || kind === "career" ? {
+        action: "profile"
+      } : {})
+    };
+    setBusy(true);
+    setSent("");
+    Promise.all(chosen.map(m => inbox(m.uid, msg))).then(() => {
+      setSent(`${chosen.length}명에게 보냈어요`);
+      setSel({});
+    }).catch(fail).finally(() => setBusy(false));
+  };
+  const chip = (label, on) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: on,
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      padding: "6px 11px",
+      borderRadius: 999,
+      border: "1.5px solid #D6DEF7",
+      background: "#fff",
+      color: "#4A5578",
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, label);
+  const tag = (t, bg, c) => /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 7px",
+      borderRadius: 999,
+      background: bg,
+      color: c
+    }
+  }, t);
+  const small = (label, onClick, danger) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClick,
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: danger ? "#ef4444" : "#6B7493",
+      border: `1.5px solid ${danger ? "#FBD5D5" : "#D6DEF7"}`
+    }
+  }, label);
+  const row = (m, acts, checkable = true) => /*#__PURE__*/React.createElement("div", {
     key: m.uid,
     style: {
       borderRadius: 14,
-      background: "#F5F7FE",
-      padding: "10px 12px"
+      background: sel[m.uid] ? BLUE_LIGHT : "#F5F7FE",
+      padding: "10px 12px",
+      border: sel[m.uid] ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3466,10 +3582,27 @@ function AdminTab() {
       alignItems: "center",
       gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, checkable && /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    "aria-label": `${m.nickname} 선택`,
+    checked: !!sel[m.uid],
+    onChange: e => setSel(s => ({
+      ...s,
+      [m.uid]: e.target.checked
+    })),
+    style: {
+      width: 18,
+      height: 18,
+      accentColor: BLUE,
+      margin: 0,
+      flexShrink: 0,
+      cursor: "pointer"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
-      minWidth: 0
+      minWidth: 0,
+      cursor: "pointer"
     },
     onClick: () => setOpen(open === m.uid ? null : m.uid)
   }, /*#__PURE__*/React.createElement("div", {
@@ -3495,28 +3628,26 @@ function AdminTab() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "NTRP ", m.ntrp), admins[m.uid] && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      padding: "2px 7px",
-      borderRadius: 999,
-      background: GRAD,
-      color: "#fff"
-    }
-  }, "\uAD00\uB9AC\uC790")), /*#__PURE__*/React.createElement("span", {
+  }, "NTRP ", m.ntrp), admins[m.uid] && tag("관리자", GRAD, "#fff")), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, m.email, m.inviteCode ? ` · 가입 코드 ${m.inviteCode}` : "")), act), open === m.uid && /*#__PURE__*/React.createElement("div", {
+  }, m.email, m.tennisStart ? ` · 구력 ${calcCareer(m.tennisStart) || "-"}` : " · 구력 미입력"))), acts && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      justifyContent: "flex-end",
+      marginTop: 8
+    }
+  }, acts), open === m.uid && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
       fontSize: 12,
       color: "#4A5578",
       lineHeight: 1.7
     }
-  }, [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo]].filter(([, v]) => v).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+  }, [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["탈퇴일", m.withdrawnAt && new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]].filter(([, v]) => v).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
     key: k
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -3532,7 +3663,86 @@ function AdminTab() {
       gap: 16,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC54C\uB9BC \uBCF4\uB0B4\uAE30 \uD83D\uDCE3"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 10
+    }
+  }, chip("전체", () => pick(live)), chip("정회원 전체", () => pick(active)), chip("준회원 전체", () => pick(pending)), chip("본명 미입력", () => pick(live.filter(m => !m.realName))), chip("구력 미입력", () => pick(live.filter(m => !m.tennisStart))), chosen.length > 0 && chip("선택 해제", () => setSel({}))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 13,
+      fontWeight: 600,
+      color: chosen.length ? BLUE : "#A3AAC2"
+    }
+  }, chosen.length ? `${chosen.length}명 선택됨 · ${chosen.slice(0, 5).map(m => m.nickname).join(", ")}${chosen.length > 5 ? " 외" : ""}` : "아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"), /*#__PURE__*/React.createElement("select", {
+    "aria-label": "\uC54C\uB9BC \uC885\uB958",
+    value: kind,
+    onChange: e => setMsgKind(e.target.value),
+    style: {
+      ...inputStyle,
+      marginBottom: 8
+    }
+  }, ADMIN_MSG.map(([k, l]) => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, l))), kind === "vote" && (upcoming.length ? /*#__PURE__*/React.createElement("select", {
+    "aria-label": "\uBAA8\uC784",
+    value: mid,
+    onChange: e => setMeeting(e.target.value),
+    style: {
+      ...inputStyle,
+      marginBottom: 8
+    }
+  }, upcoming.map(m => /*#__PURE__*/React.createElement("option", {
+    key: m.id,
+    value: String(m.id)
+  }, m.date, " \xB7 ", m.place))) : /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, "\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.")), /*#__PURE__*/React.createElement("textarea", {
+    "aria-label": "\uC54C\uB9BC \uB0B4\uC6A9",
+    value: text,
+    onChange: e => {
+      setText(e.target.value);
+      setSent("");
+    },
+    rows: 3,
+    placeholder: "\uBCF4\uB0BC \uB0B4\uC6A9\uC744 \uC368 \uC8FC\uC138\uC694",
+    style: {
+      ...inputStyle,
+      borderRadius: 18,
+      resize: "none",
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: busy || !chosen.length || !text.trim(),
+    onClick: send,
+    style: {
+      ...btnPrimary,
+      opacity: busy || !chosen.length || !text.trim() ? 0.5 : 1
+    }
+  }, busy ? "보내는 중…" : `${chosen.length || ""}${chosen.length ? "명에게 " : ""}알림 보내기`), sent && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 13,
+      color: BLUE,
+      textAlign: "center"
+    }
+  }, "\u2705 ", sent), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.6
+    }
+  }, "\uBC1B\uC740 \uC0AC\uB78C\uC758 \uD83D\uDD14 \uC54C\uB9BC\uC5D0 \uB5A0\uC694. \uD22C\uD45C \uB3C5\uB824\uB294 \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784\uC73C\uB85C, \uC815\uBCF4 \uC218\uC815 \uC694\uCCAD\uC740 \uB204\uB974\uBA74 \uC815\uBCF4 \uC218\uC815 \uD654\uBA74\uC73C\uB85C \uAC00\uC694.")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC900\uD68C\uC6D0 \xB7 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -3544,36 +3754,43 @@ function AdminTab() {
       flexDirection: "column",
       gap: 6
     }
-  }, pending.map(m => row(m, /*#__PURE__*/React.createElement("button", {
+  }, pending.map(m => row(m, /*#__PURE__*/React.createElement(React.Fragment, null, small("탈퇴", () => withdraw(m), true), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => approve(m.uid),
     style: {
       ...btnSmall,
       background: GRAD
     }
-  }, "\uC2B9\uC778"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD68C\uC6D0 (", active.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778")))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC815\uD68C\uC6D0 (", active.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 6
     }
-  }, active.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => revoke(m.uid),
-    style: {
-      ...btnSmall,
-      background: "#fff",
-      color: "#6B7493",
-      border: "1.5px solid #D6DEF7"
-    }
-  }, "\uC2B9\uC778 \uCDE8\uC18C")))), /*#__PURE__*/React.createElement("p", {
+  }, active.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uC774\uB984\uC744 \uB204\uB974\uBA74 \uAC00\uC785 \uC815\uBCF4\uB97C \uBCFC \uC218 \uC788\uC5B4\uC694. \uAD00\uB9AC\uC790 \uC9C0\uC815\uC740 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194\uC758 club/admins\uC5D0\uC11C \uD574\uC694.")));
+  }, "\uC774\uB984\uC744 \uB204\uB974\uBA74 \uAC00\uC785 \uC815\uBCF4\uB97C \uBCFC \uC218 \uC788\uC5B4\uC694. \uAD00\uB9AC\uC790 \uC9C0\uC815\uC740 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194\uC758 club/admins\uC5D0\uC11C \uD574\uC694.")), gone.length > 0 && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    action: showGone ? "접기" : "펼치기",
+    onAction: () => setShowGone(v => !v)
+  }, "\uD0C8\uD1F4 \uD68C\uC6D0 (", gone.length, "\uBA85)"), showGone && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, gone.map(m => row(m, small("되돌리기 (준회원)", () => restore(m)), false))), showGone && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.6
+    }
+  }, "\uACC4\uC815 \uC790\uCCB4\uB97C \uC644\uC804\uD788 \uC9C0\uC6B0\uB824\uBA74 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194 Authentication\uC5D0\uC11C \uC0AD\uC81C\uD574\uC694.")));
 }
 
 // ─── 대진표 만들기 ───────────────────────────────────────────────────────────
@@ -5861,7 +6078,7 @@ function MyInfoSheet({
       gap: 6,
       flexWrap: "wrap"
     }
-  }, account && account.admin && badge("관리자", BLUE, "#fff"), account && (account.admin || account.approved) ? badge("승인된 회원", BLUE_LIGHT, BLUE) : FB && badge("승인 대기", "#FFF4E5", "#C2610C")))), /*#__PURE__*/React.createElement("div", {
+  }, account && account.admin && badge("관리자", BLUE, "#fff"), account && (account.admin || account.approved) ? badge("정회원", BLUE_LIGHT, BLUE) : FB && badge("준회원", "#FFF4E5", "#C2610C")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -6159,7 +6376,7 @@ function NotiSheet({
       gap: 8
     }
   }, items.map(n => {
-    const go = n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin;
+    const go = n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin || n.type === "admin" && (n.meetingId || n.action);
     return /*#__PURE__*/React.createElement("button", {
       key: n.id,
       type: "button",
@@ -7338,7 +7555,8 @@ function SplashScreen({
 }
 function App() {
   // screen: "login" | "forgot" | "signup" | "main"
-  const [splash, setSplash] = useState(true); // 앱을 열 때마다 스플래시부터
+  const [splash, setSplash] = useState(true);
+  const [loginNote, setLoginNote] = useState(null); // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list = useMeetingList(); // 모든 모임 (실시간)
   const [menu, setMenu] = useState(false); // 우측 상단 내 메뉴
   const [myInfo, setMyInfo] = useState(false); // 내 정보 창 (false | true | "edit")
@@ -7398,6 +7616,16 @@ function App() {
   const signingUp = useRef(false);
   const loadAccount = async user => {
     const [profile, admin, approved] = await Promise.all(["members/", "admins/", "approved/"].map(p => once(FB.club.child(p + user.uid)).catch(() => null)));
+    if (profile && profile.withdrawn && !admin) {
+      setLoginNote({
+        t: "탈퇴 처리된 계정이에요. 다시 들어오려면 관리자에게 문의해 주세요.",
+        at: Date.now()
+      });
+      lsSet(LS.until, null);
+      FB.auth.signOut();
+      return "withdrawn";
+    }
+    setLoginNote(null);
     setMe(profile);
     setAccount({
       user,
@@ -7422,7 +7650,9 @@ function App() {
       } // 30일 넘게 안 열었으면 다시 로그인
       extendLogin();
       if (signingUp.current) return; // 가입 중에는 가입 완료 화면을 먼저 보여줌
-      loadAccount(user).then(() => setScreen("main"));
+      loadAccount(user).then(p => {
+        if (p !== "withdrawn") setScreen("main");
+      });
     });
   }, []);
   const logout = () => {
@@ -7458,7 +7688,9 @@ function App() {
     signingUp.current = false;
     setSignupDone(false);
     setStep(1);
-    if (FB && FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(() => setScreen("main"));else setScreen("main");
+    if (FB && FB.auth.currentUser) loadAccount(FB.auth.currentUser).then(p => {
+      if (p !== "withdrawn") setScreen("main");
+    });else setScreen("main");
   };
   const [form, setForm] = useState({
     email: "",
@@ -7617,6 +7849,7 @@ function App() {
       onRefresh: () => loadAccount(account.user),
       onLogout: logout
     }), !loading && !pending && screen === "login" && /*#__PURE__*/React.createElement(LoginScreen, {
+      notice: loginNote,
       onSignup: () => setScreen("signup"),
       onForgot: () => setScreen("forgot"),
       onLogin: () => setScreen("main")
@@ -8107,7 +8340,7 @@ function App() {
     onClose: () => setNoti(null),
     onPick: n => {
       setNoti(null);
-      if (n.type === "meeting" && n.meetingId) openM(+n.meetingId, "info", "home");else if (n.type === "notice") {
+      if ((n.type === "meeting" || n.type === "admin") && n.meetingId) openM(+n.meetingId, "info", "home");else if (n.type === "admin" && n.action === "profile") setMyInfo("edit");else if (n.type === "notice") {
         if (openMeeting) {
           try {
             if (location.hash) history.replaceState(null, "", location.pathname + location.search);
