@@ -181,6 +181,7 @@ const MEMBER_NTRP = {};
 // 모임은 club/meetings/m<id>에 저장해요: info(날짜·시간·장소·정원·예약 오픈·설명), votes(<회원 키>: 참석 투표), bracket, scores.
 // MEETINGS는 그 기록을 화면에서 쓰기 좋게 바꾼 목록이고, App이 실시간으로 다시 채워요.
 let MEETINGS = [];
+let RAW_MEETINGS = {}; // club/meetings 원본 (반복 모임 series 포함)
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const pad0 = n => String(n).padStart(2, "0");
 const ymd = d => `${d.getFullYear()}-${pad0(d.getMonth() + 1)}-${pad0(d.getDate())}`;
@@ -216,9 +217,17 @@ function votesFromRec(rec) {
   });
   return out;
 }
-function toMeeting(id, rec) {
+// 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
+const KIND_LABEL = {
+  regular: "정기 모임",
+  flash: "번개 모임"
+};
+const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
+function toMeeting(id, rec, series) {
   const info = rec.info,
-    today = todayYmd();
+    today = todayYmd(),
+    capacity = +info.capacity || 0,
+    guestCap = +info.guestCap || 0;
   return {
     id,
     rec,
@@ -227,7 +236,12 @@ function toMeeting(id, rec) {
     iso: info.date,
     time: `${info.start} ~ ${info.end}`,
     place: info.place,
-    capacity: +info.capacity || 0,
+    kind: kindOf(info),
+    capacity,
+    guestCap,
+    total: capacity + guestCap,
+    seriesId: info.seriesId || null,
+    series: series || null,
     desc: info.desc || "",
     openAt: info.openAt || "",
     openDate: fmtOpen(info.openAt),
@@ -239,7 +253,11 @@ function toMeeting(id, rec) {
 }
 // 다가오는 모임은 가까운 날짜부터, 지난 모임은 최근 것부터
 function buildMeetings(all) {
-  const list = Object.keys(all || {}).filter(k => /^m\d+$/.test(k) && all[k] && all[k].info && all[k].info.date).map(k => toMeeting(+k.slice(1), all[k]));
+  const list = Object.keys(all || {}).filter(k => /^m\d+$/.test(k) && all[k] && all[k].info && all[k].info.date).map(k => {
+    const sid = all[k].info.seriesId;
+    return toMeeting(+k.slice(1), all[k], sid && all.series ? all.series["s" + sid] : null);
+  });
+  RAW_MEETINGS = all || {};
   const up = list.filter(m => m.status === "upcoming").sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0);
   const past = list.filter(m => m.status === "past").sort((a, b) => a.iso < b.iso ? 1 : a.iso > b.iso ? -1 : 0);
   MEETINGS = [...up, ...past];
@@ -280,29 +298,31 @@ const dDay = iso => {
 const isOpen = m => !m.openAt || nowAt().slice(0, 16) >= m.openAt;
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
-// 참석 횟수는 달마다 새로 셈. 정원 안에서는 선착순이 기본이지만,
-//  ① 게스트는 최우선
-//  ② 이달 참석이 2회 이하인 회원 (이번이 1~2번째)
-//  ③ 이달 이미 2회 참석해서 이번이 3번째 이상인 회원 (2회 초과자)
-// 순서로 줄을 세우고, 같은 그룹 안에서는 투표 시각 순이에요. 정원 밖은 같은 순서로 대기.
+// 정기 모임: 이 모임 전까지 그 달 정기 모임에 덜 참석한 회원이 항상 먼저, 같은 횟수면 투표 시각 순.
+//   (참석 횟수는 달마다 새로 세고, 번개 모임 참석은 세지 않아요)
+// 번개 모임: 회원은 선착순.
+// 게스트: 정원과 별도로 "정원 외 게스트" 자리만큼 선착순. 회원 자리가 남으면 남은 게스트가 그 자리도 써요.
+// 자리에 못 든 사람은 같은 순서로 대기.
 let ME = "동토리"; // 로그인하면 그 회원의 닉네임으로 바뀜 (setMe)
-const MONTHLY_PRIORITY_LIMIT = 2;
 // 회원가입 때 맞게 넣어야 하는 가입 코드 (대소문자·앞뒤 공백 무시)
 const JOIN_CODE = "SSTC2027";
 const dayKey = m => m.date.slice(0, 10);
 const monthKey = m => m.date.slice(0, 7);
 const byTime = (a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0;
-// 이 모임 전에 같은 달 모임에서 참석 확정된 횟수 (게스트 제외)
+// 이 모임 전에 같은 달 정기 모임에서 참석 확정된 횟수 (게스트 제외)
 function monthCountsBefore(meeting) {
   const counts = {};
-  MEETINGS.filter(m => monthKey(m) === monthKey(meeting) && dayKey(m) < dayKey(meeting)).sort((a, b) => dayKey(a) < dayKey(b) ? -1 : 1).forEach(m => resolveVotes(m, m.votes).confirmed.forEach(v => {
+  MEETINGS.filter(m => m.kind !== "flash" && monthKey(m) === monthKey(meeting) && dayKey(m) < dayKey(meeting)).sort((a, b) => dayKey(a) < dayKey(b) ? -1 : 1).forEach(m => resolveVotes(m, m.votes).confirmed.forEach(v => {
     if (!v.isGuest) counts[v.name] = (counts[v.name] || 0) + 1;
   }));
   return counts;
 }
 function resolveVotes(meeting, votes) {
-  const counts = monthCountsBefore(meeting);
-  const ranked = votes.map(v => {
+  const counts = monthCountsBefore(meeting),
+    prio = meeting.kind !== "flash";
+  const cap = meeting.capacity || 0,
+    gcap = meeting.guestCap || 0;
+  const all = votes.map(v => {
     const isGuest = !!v.guestOf,
       count = isGuest ? 0 : counts[v.name] || 0;
     return {
@@ -310,15 +330,22 @@ function resolveVotes(meeting, votes) {
       isGuest,
       isMe: v.name === ME && !isGuest,
       count,
-      tier: isGuest ? 0 : count >= MONTHLY_PRIORITY_LIMIT ? 2 : 1
+      prio: prio && !isGuest
     };
-  }).sort((a, b) => a.tier - b.tier || byTime(a, b));
-  const confirmed = ranked.slice(0, meeting.capacity),
-    waitlist = ranked.slice(meeting.capacity);
-  // 순수 선착순이었다면 정원 안에 들었을 대기자 = 우선순위 때문에 밀린 사람
-  const fcfs = new Set(votes.slice().sort(byTime).slice(0, meeting.capacity).map(v => v.name + "|" + (v.guestOf || "")));
-  waitlist.forEach(v => {
-    v.bumped = fcfs.has(v.name + "|" + (v.guestOf || ""));
+  });
+  const members = all.filter(v => !v.isGuest).sort((a, b) => (prio ? a.count - b.count : 0) || byTime(a, b));
+  const guests = all.filter(v => v.isGuest).sort(byTime);
+  const memIn = members.slice(0, cap),
+    memOut = members.slice(cap);
+  const gIn = guests.slice(0, gcap),
+    gRest = guests.slice(gcap),
+    free = Math.max(0, cap - memIn.length);
+  const confirmed = [...memIn, ...gIn, ...gRest.slice(0, free)],
+    waitlist = [...memOut, ...gRest.slice(free)];
+  // 순수 선착순이었다면 정원 안에 들었을 회원 = 참석 횟수 때문에 밀린 사람
+  const fcfs = new Set(members.slice().sort(byTime).slice(0, cap).map(v => v.name));
+  memOut.forEach(v => {
+    v.bumped = fcfs.has(v.name);
   });
   return {
     confirmed,
@@ -1858,7 +1885,7 @@ function HomeTab({
   const myVote = next && next.rec && next.rec.votes && next.rec.votes[myVoteKey()];
   const myStatus = myVote && myVote.status;
   const vote = status => saveMeetingPath("m" + next.id + "/votes/" + myVoteKey(), voteValue(status, myVote)).catch(e => alert(authMsg(e)));
-  const fill = next ? Math.min(100, Math.round(next.attendees.length / Math.max(1, next.capacity) * 100)) : 0;
+  const fill = next ? Math.min(100, Math.round(next.attendees.length / Math.max(1, next.total) * 100)) : 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1892,9 +1919,15 @@ function HomeTab({
       margin: "0 0 3px",
       fontWeight: 700,
       fontSize: 15,
-      color: "#1B2559"
+      color: "#1B2559",
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap"
     }
-  }, next.date), /*#__PURE__*/React.createElement("p", {
+  }, next.date, /*#__PURE__*/React.createElement(KindBadge, {
+    m: next
+  })), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 2px",
       fontSize: 13,
@@ -1937,7 +1970,7 @@ function HomeTab({
       fontWeight: 600,
       color: BLUE
     }
-  }, next.attendees.length, " / ", next.capacity, "\uBA85")), /*#__PURE__*/React.createElement("div", {
+  }, next.attendees.length, " / ", next.total, "\uBA85")), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 6,
       background: "#DCE4FF",
@@ -4524,8 +4557,8 @@ function VoteRow({
     t: `게스트 · ${v.guestOf} 초대`,
     bg: "#FFF4E5",
     c: "#C2610C"
-  } : v.tier === 2 ? {
-    t: `이달 ${v.count + 1}번째 · 후순위`,
+  } : v.prio && v.count > 0 ? {
+    t: `이달 ${v.count}회 참석`,
     bg: "#EEF1FA",
     c: "#6B7493"
   } : null;
@@ -4589,7 +4622,7 @@ function VoteRow({
       background: "#FEF2F2",
       color: "#ef4444"
     }
-  }, "\uC6B0\uC120\uC21C\uC704\uB85C \uBC00\uB9BC")), /*#__PURE__*/React.createElement("span", {
+  }, "\uCC38\uC11D \uC801\uC740 \uD68C\uC6D0\uC5D0\uAC8C \uBC00\uB9BC")), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2",
@@ -4620,7 +4653,8 @@ function MeetingDetail({
     counts
   } = resolveVotes(meeting, meeting.votes);
   const total = confirmed.length;
-  const fill = Math.round(total / Math.max(1, meeting.capacity) * 100);
+  const fill = Math.round(total / Math.max(1, meeting.total) * 100),
+    prio = meeting.kind !== "flash";
   const setMyStatus = val => store.saveRsvp(voteValue(val, mine));
   const addGuest = () => {
     const n = guestInput.trim();
@@ -4640,13 +4674,19 @@ function MeetingDetail({
     guests: guests.filter((_, idx) => idx !== i)
   });
   const remove = () => {
-    if (!window.confirm(`${meeting.date} 모임을 지울까요? 투표·대진표·점수도 함께 지워져요.`)) return;
-    saveMeetingPath("m" + meeting.id, null).then(onDeleted).catch(e => alert(authMsg(e)));
+    if (!window.confirm(`${meeting.date} 모임을 지울까요? 투표·대진표·점수도 함께 지워져요.${meeting.seriesId ? "\n반복 모임은 이 날짜만 빠지고 다음 모임은 계속 만들어져요." : ""}`)) return;
+    (meeting.seriesId ? saveMeetingPath(`series/s${meeting.seriesId}/skip/${meeting.iso}`, true) : Promise.resolve()).then(() => saveMeetingPath("m" + meeting.id, null)).then(onDeleted).catch(e => alert(authMsg(e)));
+  };
+  const ser = meeting.series,
+    serActive = !!(ser && ser.active !== false);
+  const stopSeries = () => {
+    if (!window.confirm("이 반복 모임을 멈출까요? 이미 만들어진 모임은 그대로 남아요.")) return;
+    saveMeetingPath(`series/s${meeting.seriesId}/active`, false).catch(e => alert(authMsg(e)));
   };
   const myCount = counts[ME] || 0;
   const myConfirmIdx = confirmed.findIndex(v => v.isMe),
     myWaitIdx = waitlist.findIndex(v => v.isMe);
-  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `✅ 참석 확정 · ${myConfirmIdx + 1}번째` : `⏳ 대기 ${myWaitIdx + 1}번${myCount >= MONTHLY_PRIORITY_LIMIT ? ` · 이달 ${myCount}회 참석해서 후순위예요` : ""}` : myStatus === "absent" ? "❌ 불참으로 등록되었어요" : myStatus === "maybe" ? "⏳ 미정으로 등록되었어요" : "";
+  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `✅ 참석 확정 · ${myConfirmIdx + 1}번째` : `⏳ 대기 ${myWaitIdx + 1}번${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "❌ 불참으로 등록되었어요" : myStatus === "maybe" ? "⏳ 미정으로 등록되었어요" : "";
   // 대진표 참가자 = 참석 확정자
   const participants = confirmed.map(v => ({
     name: v.name,
@@ -4717,14 +4757,16 @@ function MeetingDetail({
       alignItems: "flex-start",
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: 0,
+      margin: "0 0 6px",
       fontSize: 17,
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, meeting.date), isPast ? /*#__PURE__*/React.createElement("span", {
+  }, meeting.date), /*#__PURE__*/React.createElement(KindBadge, {
+    m: meeting
+  })), isPast ? /*#__PURE__*/React.createElement("span", {
     style: {
       background: "#EEF1FA",
       color: "#A3AAC2",
@@ -4760,12 +4802,16 @@ function MeetingDetail({
   }, {
     icon: "👥",
     label: "제한 인원",
-    value: `${meeting.capacity}명`
+    value: `${meeting.capacity}명${meeting.guestCap ? ` + 게스트 ${meeting.guestCap}명` : ""}`
   }, {
     icon: "🗓️",
     label: "예약 오픈",
     value: meeting.openDate
-  }].map(r => /*#__PURE__*/React.createElement("div", {
+  }, ...(ser ? [{
+    icon: "🔁",
+    label: "반복",
+    value: serActive ? seriesText(ser) : "반복 멈춤"
+  }] : [])].map(r => /*#__PURE__*/React.createElement("div", {
     key: r.label,
     style: {
       display: "flex",
@@ -4811,7 +4857,7 @@ function MeetingDetail({
       fontWeight: 700,
       color: fill >= 100 ? "#ef4444" : BLUE
     }
-  }, total, " / ", meeting.capacity, "\uBA85", fill >= 100 ? " · 마감" : "")), /*#__PURE__*/React.createElement("div", {
+  }, total, " / ", meeting.total, "\uBA85", fill >= 100 ? " · 마감" : "")), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 7,
       background: "#E4E9F7",
@@ -4880,14 +4926,14 @@ function MeetingDetail({
       textAlign: "center",
       color: myStatus === "attend" && myConfirmIdx < 0 ? "#C2610C" : "#6B7493"
     }
-  }, myMsg), /*#__PURE__*/React.createElement("p", {
+  }, myMsg), prio && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
       textAlign: "center",
       color: "#A3AAC2"
     }
-  }, "\uC774\uBC88 \uB2EC \uCC38\uC11D \uD655\uC815 ", myCount, "\uD68C (\uC774 \uBAA8\uC784 \uC804\uAE4C\uC9C0)"), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
+  }, "\uC774\uBC88 \uB2EC \uC815\uAE30 \uBAA8\uC784 \uCC38\uC11D ", myCount, "\uD68C (\uC774 \uBAA8\uC784 \uC804\uAE4C\uC9C0)"), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#F5F7FE",
       borderRadius: 12,
@@ -5007,7 +5053,7 @@ function MeetingDetail({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, "\uAC8C\uC2A4\uD2B8\uB97C \uD568\uAED8 \uC2E0\uCCAD\uD560 \uC218 \uC788\uC5B4\uC694")))), meeting.desc && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uC124\uBA85 \uD83D\uDCCB"), /*#__PURE__*/React.createElement("p", {
+  }, meeting.guestCap ? `정원 외 게스트 ${meeting.guestCap}명까지 선착순으로 받아요` : "게스트 자리는 따로 없어요. 회원 자리가 남으면 참석할 수 있어요")))), meeting.desc && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uC124\uBA85 \uD83D\uDCCB"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
@@ -5015,15 +5061,15 @@ function MeetingDetail({
       lineHeight: 1.7,
       whiteSpace: "pre-wrap"
     }
-  }, meeting.desc)), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uCC38\uC11D \uD655\uC815 (", total, "/", meeting.capacity, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+  }, meeting.desc)), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uCC38\uC11D \uD655\uC815 (", total, "/", meeting.total, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
       gap: 6,
       marginBottom: 12
     }
-  }, [["1", "게스트", `최우선`], ["2", `이달 ${MONTHLY_PRIORITY_LIMIT}회 이하`, "선착순"], ["3", `${MONTHLY_PRIORITY_LIMIT}회 초과`, "후순위"]].map(([n, a, b]) => /*#__PURE__*/React.createElement("span", {
-    key: n,
+  }, (prio ? [["1", "이달 덜 참석한 회원", "먼저"], ["2", "같은 횟수면", "투표 빠른 순"]] : [["⚡", "번개 모임", "선착순"]]).concat([["👥", "게스트", meeting.guestCap ? `정원 외 ${meeting.guestCap}명 · 선착순` : "빈자리만"]]).map(([n, a, b]) => /*#__PURE__*/React.createElement("span", {
+    key: a,
     style: {
       fontSize: 11,
       padding: "4px 10px",
@@ -5060,7 +5106,7 @@ function MeetingDetail({
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uCC38\uC11D \uD69F\uC218\uB294 \uB2EC\uB9C8\uB2E4 \uC0C8\uB85C \uC138\uC694. \uAC19\uC740 \uC21C\uC704 \uC548\uC5D0\uC11C\uB294 \uD22C\uD45C \uC2DC\uAC01\uC774 \uBE60\uB978 \uC21C\uC774\uC5D0\uC694.")), waitlist.length > 0 && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC608\uC57D \uB300\uAE30 (", waitlist.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+  }, prio ? "정기 모임 참석 횟수는 달마다 새로 세요. 투표를 빨리 해도 이달 더 많이 참석했으면 덜 참석한 회원 뒤로 가요." : "번개 모임은 투표한 순서대로 확정돼요.")), waitlist.length > 0 && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC608\uC57D \uB300\uAE30 (", waitlist.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5098,7 +5144,19 @@ function MeetingDetail({
       color: "#ef4444",
       borderColor: "#FBD5D5"
     }
-  }, "\uBAA8\uC784 \uC0AD\uC81C")), meeting.createdBy && /*#__PURE__*/React.createElement("p", {
+  }, "\uBAA8\uC784 \uC0AD\uC81C")), canManage && serActive && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: stopSeries,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 13,
+      color: "#6B7493",
+      cursor: "pointer",
+      textDecoration: "underline",
+      textUnderlineOffset: 3
+    }
+  }, "\uBC18\uBCF5 \uBA48\uCD94\uAE30"), meeting.createdBy && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
@@ -5161,7 +5219,7 @@ function BookingTab({
       gap: 10
     }
   }, upcoming.map(m => {
-    const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.capacity) * 100));
+    const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.total) * 100));
     const isAtt = m.attendees.some(a => a.isMe);
     return /*#__PURE__*/React.createElement("div", {
       key: m.id,
@@ -5185,9 +5243,15 @@ function BookingTab({
         margin: "0 0 4px",
         fontWeight: 700,
         fontSize: 15,
-        color: "#1B2559"
+        color: "#1B2559",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
       }
-    }, m.date), /*#__PURE__*/React.createElement("p", {
+    }, m.date, /*#__PURE__*/React.createElement(KindBadge, {
+      m: m
+    })), /*#__PURE__*/React.createElement("p", {
       style: {
         margin: "0 0 2px",
         fontSize: 13,
@@ -5215,7 +5279,7 @@ function BookingTab({
         padding: "3px 10px",
         borderRadius: 20
       }
-    }, m.attendees.length, "/", m.capacity, "\uBA85"), isAtt && /*#__PURE__*/React.createElement("span", {
+    }, m.attendees.length, "/", m.total, "\uBA85"), isAtt && /*#__PURE__*/React.createElement("span", {
       style: {
         background: GRAD,
         color: "#fff",
@@ -6154,6 +6218,116 @@ const weekBefore = iso => {
   d.setDate(d.getDate() - 7);
   return ymd(d) + "T00:00";
 };
+const addDays = (iso, n) => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+};
+const dowOf = iso => new Date(iso + "T00:00:00").getDay();
+// 반복 모임 예약 오픈: 모임 날짜 바로 전의 그 요일(같은 요일이면 1주 전) 그 시각. 예) 토요일 모임 + 일요일 21:00 → 6일 전 일요일 21:00
+function openFor(iso, rule) {
+  const back = (dowOf(iso) - +rule.dow + 7) % 7 || 7;
+  return addDays(iso, -back) + "T" + (rule.time || "00:00");
+}
+const seriesText = ser => `${+ser.every === 2 ? "격주" : "매주"} ${WEEK[dowOf(ser.startDate)]}요일 · 오픈은 전 ${WEEK[+ser.openRule.dow]}요일 ${ser.openRule.time}${ser.endDate ? ` · ${fmtDate(ser.endDate)}까지` : ""}`;
+const SERIES_AHEAD = 3; // 반복 모임은 앞으로 3회분을 미리 만들어 둬요
+// 반복 모임 n번째 날짜·id (id는 series id + 순번이라 여러 기기가 동시에 만들어도 같은 모임)
+const occDate = (ser, i) => addDays(ser.startDate, 7 * (+ser.every || 1) * i);
+function occInfo(sid, ser, i) {
+  const date = occDate(ser, i);
+  return {
+    kind: "regular",
+    date,
+    start: ser.start,
+    end: ser.end,
+    place: ser.place,
+    capacity: +ser.capacity,
+    guestCap: +ser.guestCap || 0,
+    desc: ser.desc || "",
+    openAt: openFor(date, ser.openRule),
+    seriesId: sid,
+    createdBy: ser.createdBy || "",
+    createdByUid: ser.createdByUid || "",
+    createdAt: Date.now()
+  };
+}
+// 다가오는 반복 모임이 SERIES_AHEAD개가 되도록 빠진 것만 만들어요. 지운 날짜(skip)는 다시 안 만들어요.
+const seriesMade = new Set();
+function ensureSeries(all) {
+  const series = all && all.series || {},
+    today = todayYmd(),
+    jobs = [];
+  Object.keys(series).forEach(k => {
+    const ser = series[k],
+      sid = +k.slice(1);
+    if (!ser || ser.active === false || !ser.startDate || !ser.openRule) return;
+    let ahead = 0;
+    for (let i = 0; i < 1000 && ahead < SERIES_AHEAD; i++) {
+      const date = occDate(ser, i);
+      if (ser.endDate && date > ser.endDate) break;
+      if (date < today) continue;
+      ahead++;
+      const key = "m" + (sid + i);
+      if (all[key] || ser.skip && ser.skip[date] || seriesMade.has(key)) continue;
+      seriesMade.add(key);
+      jobs.push(saveMeetingPath(key + "/info", occInfo(sid, ser, i)).catch(() => seriesMade.delete(key)));
+    }
+  });
+  return Promise.all(jobs);
+}
+function KindBadge({
+  m
+}) {
+  const flash = m.kind === "flash";
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 999,
+      background: flash ? "#FFF4E5" : BLUE_LIGHT,
+      color: flash ? "#C2610C" : BLUE,
+      whiteSpace: "nowrap"
+    }
+  }, flash ? "⚡ 번개" : m.seriesId ? "🔁 정기" : "정기");
+}
+function Pills({
+  value,
+  options,
+  onChange,
+  label
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": label,
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, options.map(([v, l]) => {
+    const on = value === v;
+    return /*#__PURE__*/React.createElement("button", {
+      key: v,
+      type: "button",
+      role: "radio",
+      "aria-checked": on,
+      onClick: () => onChange(v),
+      style: {
+        flex: 1,
+        padding: "10px 0",
+        borderRadius: 999,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: FONT,
+        border: on ? "none" : "1.5px solid #D6DEF7",
+        background: on ? GRAD : "#fff",
+        color: on ? "#fff" : "#6B7493",
+        boxShadow: on ? SHADOW_BTN : "none"
+      }
+    }, l);
+  }));
+}
 function MeetingForm({
   initial,
   onClose,
@@ -6162,18 +6336,28 @@ function MeetingForm({
   const editing = !!initial;
   const [f, setF] = useState(() => initial ? {
     ...initial.info,
+    kind: kindOf(initial.info),
     capacity: String(initial.info.capacity),
-    openAt: initial.info.openAt || ""
+    guestCap: String(initial.info.guestCap || 0),
+    openAt: initial.info.openAt || "",
+    repeat: "none",
+    applyFuture: false
   } : (() => {
     const date = nextSaturday();
     return {
+      kind: "regular",
       date,
       start: "08:00",
       end: "12:00",
       place: "",
       capacity: "12",
+      guestCap: "0",
       openAt: weekBefore(date),
-      desc: ""
+      desc: "",
+      repeat: "none",
+      openDow: "0",
+      openTime: "21:00",
+      endDate: ""
     };
   })());
   const [errors, setErrors] = useState({});
@@ -6185,8 +6369,15 @@ function MeetingForm({
       [k]: v
     };
     if (k === "date" && !editing && v) n.openAt = weekBefore(v);
+    if (k === "kind" && v === "flash") n.repeat = "none";
     return n;
   });
+  const repeating = !editing && f.kind === "regular" && f.repeat !== "none";
+  const rule = {
+    dow: +f.openDow,
+    time: f.openTime
+  };
+  const preview = repeating && f.date && f.openTime ? [0, 1, 2].map(i => addDays(f.date, 7 * +f.repeat * i)).filter(d => !f.endDate || d <= f.endDate) : [];
   const submit = () => {
     const e = {};
     if (!f.date) e.date = "날짜를 골라 주세요";
@@ -6194,35 +6385,96 @@ function MeetingForm({
     if (!f.place.trim()) e.place = "장소를 입력해 주세요";
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
-    if (f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
+    const gcap = f.guestCap === "" ? 0 : parseInt(f.guestCap, 10);
+    if (!(gcap >= 0 && gcap <= 50)) e.guestCap = "게스트는 0~50명이에요";
+    if (repeating) {
+      if (!f.openTime) e.openAt = "예약 오픈 시각을 넣어 주세요";
+      if (f.endDate && f.date && f.endDate < f.date) e.endDate = "종료일은 첫 모임 날짜 뒤여야 해요";
+    } else if (f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e);
     if (Object.keys(e).length) return;
-    const id = editing ? initial.id : Date.now();
-    const info = {
-      date: f.date,
+    const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
+    const base = {
+      kind: f.kind,
       start: f.start,
       end: f.end,
       place: f.place.trim(),
       capacity: cap,
-      openAt: f.openAt || "",
-      desc: (f.desc || "").trim(),
-      createdBy: editing ? initial.info.createdBy || "" : ME,
-      createdByUid: editing ? initial.info.createdByUid || "" : FB && FB.auth.currentUser && FB.auth.currentUser.uid || "",
-      createdAt: editing ? initial.info.createdAt || Date.now() : Date.now(),
-      ...(editing ? {
-        updatedAt: Date.now()
-      } : {})
+      guestCap: gcap,
+      desc: (f.desc || "").trim()
     };
     setSaving(true);
     setErr("");
-    saveMeetingPath("m" + id + "/info", info).then(() => {
-      if (!editing) postFeed({
-        type: "meeting",
-        meetingId: id,
-        text: `새 모임: ${fmtDate(info.date)} ${info.start} · ${info.place}`
+    let job;
+    if (repeating) {
+      const sid = Date.now();
+      const ser = {
+        ...base,
+        kind: "regular",
+        startDate: f.date,
+        every: +f.repeat,
+        openRule: rule,
+        endDate: f.endDate || "",
+        active: true,
+        createdBy: ME,
+        createdByUid: uid,
+        createdAt: sid
+      };
+      job = saveMeetingPath("series/s" + sid, ser).then(() => ensureSeries({
+        ...RAW_MEETINGS,
+        series: {
+          ...(RAW_MEETINGS.series || {}),
+          ["s" + sid]: ser
+        }
+      })).then(() => {
+        postFeed({
+          type: "meeting",
+          meetingId: sid,
+          text: `새 정기 모임: ${seriesText(ser).split(" · ")[0]} ${ser.start} · ${ser.place}`
+        });
+        return sid;
       });
-      onSaved(id);
-    }).catch(e => {
+    } else {
+      const id = editing ? initial.id : Date.now();
+      const info = {
+        ...(editing ? initial.info : {}),
+        ...base,
+        date: f.date,
+        openAt: f.openAt || "",
+        createdBy: editing ? initial.info.createdBy || "" : ME,
+        createdByUid: editing ? initial.info.createdByUid || "" : uid,
+        createdAt: editing ? initial.info.createdAt || Date.now() : Date.now(),
+        ...(editing ? {
+          updatedAt: Date.now()
+        } : {})
+      };
+      job = saveMeetingPath("m" + id + "/info", JSON.parse(JSON.stringify(info))).then(() => {
+        const sid = editing && initial.info.seriesId;
+        if (!(sid && f.applyFuture)) return;
+        // 이후 반복 모임에도 적용: 반복 설정과 이미 만들어진 다음 모임들의 시간·장소·정원·설명을 바꿔요
+        const later = Object.keys(RAW_MEETINGS).filter(k => /^m\d+$/.test(k) && RAW_MEETINGS[k] && RAW_MEETINGS[k].info && RAW_MEETINGS[k].info.seriesId === sid && RAW_MEETINGS[k].info.date > f.date);
+        const {
+          kind,
+          ...tmpl
+        } = base;
+        return Promise.all([saveMeetingPath("series/s" + sid, {
+          ...((RAW_MEETINGS.series || {})["s" + sid] || {}),
+          ...tmpl
+        }), ...later.map(k => saveMeetingPath(k + "/info", {
+          ...RAW_MEETINGS[k].info,
+          ...tmpl,
+          updatedAt: Date.now()
+        }))]);
+      }).then(() => {
+        if (!editing) postFeed({
+          type: "meeting",
+          meetingId: id,
+          text: `새 ${KIND_LABEL[f.kind]}: ${fmtDate(info.date)} ${info.start} · ${info.place}`
+        });
+        return id;
+      });
+    }
+    job.then(id => onSaved(id)).catch(e => {
       setSaving(false);
       setErr(authMsg(e));
     });
@@ -6231,6 +6483,14 @@ function MeetingForm({
     display: "flex",
     gap: 10
   };
+  const hint = t => /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, t);
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     style: {
@@ -6292,7 +6552,22 @@ function MeetingForm({
       gap: 16
     }
   }, /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uB0A0\uC9DC",
+    label: "\uBAA8\uC784 \uC885\uB958",
+    required: true
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uBAA8\uC784 \uC885\uB958",
+    value: f.kind,
+    onChange: v => set("kind", v),
+    options: [["regular", "정기 모임"], ["flash", "⚡ 번개 모임"]]
+  }), hint(f.kind === "regular" ? "이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요." : "번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")), !editing && f.kind === "regular" && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uBC18\uBCF5"
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uBC18\uBCF5",
+    value: f.repeat,
+    onChange: v => set("repeat", v),
+    options: [["none", "한 번만"], ["1", "매주"], ["2", "격주"]]
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: repeating ? "첫 모임 날짜" : "날짜",
     required: true,
     error: errors.date
   }, /*#__PURE__*/React.createElement("input", {
@@ -6300,7 +6575,7 @@ function MeetingForm({
     value: f.date,
     onChange: e => set("date", e.target.value),
     style: inputStyle
-  })), /*#__PURE__*/React.createElement(FieldWrap, {
+  }), repeating && f.date && hint(`${f.repeat === "2" ? "2주마다" : "매주"} ${WEEK[dowOf(f.date)]}요일에 열려요`)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC2DC\uAC04",
     required: true,
     error: errors.time
@@ -6339,8 +6614,14 @@ function MeetingForm({
     onChange: e => set("place", e.target.value),
     placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
     style: inputStyle
-  })), /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uC815\uC6D0",
+  })), /*#__PURE__*/React.createElement("div", {
+    style: row
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC815\uC6D0 (\uD68C\uC6D0)",
     required: true,
     error: errors.capacity
   }, /*#__PURE__*/React.createElement("input", {
@@ -6351,7 +6632,71 @@ function MeetingForm({
     value: f.capacity,
     onChange: e => set("capacity", e.target.value),
     style: inputStyle
-  })), /*#__PURE__*/React.createElement(FieldWrap, {
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC815\uC6D0 \uC678 \uAC8C\uC2A4\uD2B8",
+    error: errors.guestCap
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    "aria-label": "\uC815\uC6D0 \uC678 \uAC8C\uC2A4\uD2B8",
+    min: 0,
+    max: 50,
+    value: f.guestCap,
+    onChange: e => set("guestCap", e.target.value),
+    style: inputStyle
+  })))), hint("게스트는 정원과 별도로 이 인원까지 선착순으로 받아요. 회원 자리가 남으면 남은 게스트가 그 자리도 쓸 수 있어요."), repeating ? /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC608\uC57D \uC624\uD508 (\uBC18\uBCF5)",
+    required: true,
+    error: errors.openAt
+  }, /*#__PURE__*/React.createElement("div", {
+    style: row
+  }, /*#__PURE__*/React.createElement("select", {
+    "aria-label": "\uC608\uC57D \uC624\uD508 \uC694\uC77C",
+    value: f.openDow,
+    onChange: e => set("openDow", e.target.value),
+    style: {
+      ...inputStyle,
+      flex: 1
+    }
+  }, WEEK.map((w, i) => /*#__PURE__*/React.createElement("option", {
+    key: i,
+    value: String(i)
+  }, "\uBAA8\uC784 \uC804 ", w, "\uC694\uC77C"))), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    "aria-label": "\uC608\uC57D \uC624\uD508 \uC2DC\uAC01",
+    value: f.openTime,
+    onChange: e => set("openTime", e.target.value),
+    style: {
+      ...inputStyle,
+      flex: 1
+    }
+  })), preview.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      background: "#fff",
+      borderRadius: 14,
+      padding: "10px 12px",
+      border: "1px solid #E4E9F7",
+      display: "flex",
+      flexDirection: "column",
+      gap: 4
+    }
+  }, preview.map(d => /*#__PURE__*/React.createElement("p", {
+    key: d,
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#4A5578"
+    }
+  }, fmtDate(d), " \uBAA8\uC784 \u2192 ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: BLUE
+    }
+  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC608\uC57D \uC624\uD508",
     error: errors.openAt
   }, /*#__PURE__*/React.createElement("input", {
@@ -6359,13 +6704,16 @@ function MeetingForm({
     value: f.openAt,
     onChange: e => set("openAt", e.target.value),
     style: inputStyle
-  }), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: "6px 0 0",
-      fontSize: 11,
-      color: "#A3AAC2"
-    }
-  }, "\uC774 \uC2DC\uAC01\uBD80\uD130 \uCC38\uC11D \uD22C\uD45C\uB97C \uBC1B\uC544\uC694. \uBE44\uC6B0\uBA74 \uBC14\uB85C \uC5F4\uB824\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
+  }), hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")), repeating && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uBC18\uBCF5 \uC885\uB8CC\uC77C",
+    error: errors.endDate
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    "aria-label": "\uBC18\uBCF5 \uC885\uB8CC\uC77C",
+    value: f.endDate,
+    onChange: e => set("endDate", e.target.value),
+    style: inputStyle
+  }), hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC124\uBA85"
   }, /*#__PURE__*/React.createElement("textarea", {
     value: f.desc,
@@ -6377,7 +6725,20 @@ function MeetingForm({
       borderRadius: 18,
       resize: "none"
     }
-  })), err && /*#__PURE__*/React.createElement("p", {
+  })), editing && initial.info.seriesId && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 13,
+      color: "#4A5578",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: !!f.applyFuture,
+    onChange: e => set("applyFuture", e.target.checked)
+  }), "\uC774\uD6C4 \uBC18\uBCF5 \uBAA8\uC784\uC5D0\uB3C4 \uC2DC\uAC04\xB7\uC7A5\uC18C\xB7\uC815\uC6D0\xB7\uC124\uBA85 \uC801\uC6A9"), err && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -6391,7 +6752,7 @@ function MeetingForm({
       ...btnPrimary,
       opacity: saving ? 0.6 : 1
     }
-  }, saving ? "저장 중…" : editing ? "수정 완료" : "모임 만들기"))));
+  }, saving ? "저장 중…" : editing ? "수정 완료" : repeating ? "반복 모임 만들기" : "모임 만들기"))));
 }
 
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
@@ -7122,6 +7483,11 @@ function App() {
   const [noti, setNoti] = useState(null); // 알림함 (열 때의 목록)
   const [noticeForm, setNoticeForm] = useState(false);
   const [focusNotice, setFocusNotice] = useState(null);
+  // 반복 모임: 모임 목록이 바뀔 때마다 다가오는 회차가 빠졌으면 만들어 둬요 (승인된 회원·관리자만 쓸 수 있음)
+  const canWriteMeetings = !FB || !!(account && (account.admin || account.approved));
+  useEffect(() => {
+    if (list.ready && canWriteMeetings) ensureSeries(RAW_MEETINGS);
+  }, [list.meetings, list.ready, canWriteMeetings]);
   if (splash) return /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
   });
