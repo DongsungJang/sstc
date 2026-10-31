@@ -1074,19 +1074,24 @@ const voteValue=(status,prev)=>({name:ME,ntrp:MEMBER_NTRP[ME]||"",status,
   guests:status==="attend"?((prev&&prev.guests)||[]):[]});
 
 // 모든 모임 기록을 실시간으로 받아서 MEETINGS를 다시 만듦
+// 파이어베이스 규칙이 로그인한 사람만 읽게 하므로, 로그인 상태가 바뀔 때마다 구독을 다시 걺
 function useMeetingList(){
   const [state,setState]=useState({meetings:MEETINGS,ready:false,shared:false,error:null});
+  const [uid,setUid]=useState(()=>FB&&FB.auth.currentUser?FB.auth.currentUser.uid:null);
+  useEffect(()=>FB?FB.auth.onAuthStateChanged(u=>setUid(u?u.uid:null)):undefined,[]);
   useEffect(()=>{
     let alive=true, unsub=null;
+    if(FB&&!uid){ setState(s=>({...s,ready:false,error:null})); return; }   // 로그인 전에는 안 읽음
     dbReady.then(db=>{
       if(!alive) return;
       if(!db){ setState({meetings:buildMeetings({}),ready:true,shared:false,error:null}); return; }
       unsub=db.doc("meetings").onSnapshot(
         snap=>alive&&setState({meetings:buildMeetings(snap.exists?snap.data():{}),ready:true,shared:db.shared,error:null}),
-        e=>alive&&setState(s=>({...s,ready:true,error:authMsg(e)})));
+        e=>alive&&setState(s=>({...s,ready:true,error:/PERMISSION_DENIED|permission/i.test(String(e&&(e.code||e.message)))
+          ?"읽기 권한이 없어요. 파이어베이스 규칙을 확인해 주세요":authMsg(e)})));
     });
     return ()=>{alive=false;if(unsub)unsub();};
-  },[]);
+  },[uid]);
   return state;
 }
 
