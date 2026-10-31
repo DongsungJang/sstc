@@ -269,8 +269,10 @@ function buildMeetings(all) {
     return toMeeting(+k.slice(1), all[k], sid && all.series ? all.series["s" + sid] : null);
   });
   RAW_MEETINGS = all || {};
-  const up = list.filter(m => m.status === "upcoming").sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0);
-  const past = list.filter(m => m.status === "past").sort((a, b) => a.iso < b.iso ? 1 : a.iso > b.iso ? -1 : 0);
+  // 같은 날짜면 시작 시간이 빠른 모임부터
+  const st = (a, b) => a.info.start < b.info.start ? -1 : a.info.start > b.info.start ? 1 : 0;
+  const up = list.filter(m => m.status === "upcoming").sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : st(a, b));
+  const past = list.filter(m => m.status === "past").sort((a, b) => a.iso < b.iso ? 1 : a.iso > b.iso ? -1 : st(a, b));
   MEETINGS = [...up, ...past];
   refreshAttendance();
   return MEETINGS;
@@ -3885,6 +3887,63 @@ function NumStepper({
     style: stepBtn(true, value >= max)
   }, "+"));
 }
+
+// 24시간제 시간 고르기 (기기 설정에 따라 오전/오후로 나오는 기본 시간 칸 대신). 값은 "HH:MM"
+function TimeInput({
+  value,
+  onChange,
+  label,
+  style
+}) {
+  const [h, m] = (value || "").split(":");
+  const mins = Array.from({
+    length: 12
+  }, (_, i) => pad0(i * 5));
+  if (m && !mins.includes(m)) mins.push(m);
+  const sel = {
+    ...inputStyle,
+    flex: 1,
+    minWidth: 0,
+    padding: "8px 10px",
+    textAlign: "center"
+  };
+  const put = (hh, mm) => onChange(`${hh || "00"}:${mm || "00"}`);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    "aria-label": `${label} 시`,
+    value: h || "",
+    onChange: e => put(e.target.value, m),
+    style: sel
+  }, !h && /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\uC2DC"), Array.from({
+    length: 24
+  }, (_, i) => pad0(i)).map(x => /*#__PURE__*/React.createElement("option", {
+    key: x,
+    value: x
+  }, x, "\uC2DC"))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 700
+    }
+  }, ":"), /*#__PURE__*/React.createElement("select", {
+    "aria-label": `${label} 분`,
+    value: m || "",
+    onChange: e => put(h, e.target.value),
+    style: sel
+  }, !m && /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\uBD84"), mins.sort().map(x => /*#__PURE__*/React.createElement("option", {
+    key: x,
+    value: x
+  }, x, "\uBD84"))));
+}
 function BracketSetup({
   meeting,
   participants,
@@ -4031,29 +4090,23 @@ function BracketSetup({
     style: rowS
   }, /*#__PURE__*/React.createElement("span", {
     style: label
-  }, "\uC2DC\uC791 \uC2DC\uAC04"), /*#__PURE__*/React.createElement("input", {
-    id: "bk-start",
-    type: "time",
+  }, "\uC2DC\uC791 \uC2DC\uAC04"), /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uB300\uC9C4 \uC2DC\uC791",
     value: start,
-    onChange: e => setStart(e.target.value),
+    onChange: setStart,
     style: {
-      ...inputStyle,
-      width: 132,
-      padding: "8px 14px"
+      width: 190
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: rowS
   }, /*#__PURE__*/React.createElement("span", {
     style: label
-  }, "\uC885\uB8CC \uC2DC\uAC04"), /*#__PURE__*/React.createElement("input", {
-    id: "bk-end",
-    type: "time",
+  }, "\uC885\uB8CC \uC2DC\uAC04"), /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uB300\uC9C4 \uC885\uB8CC",
     value: end,
-    onChange: e => setEnd(e.target.value),
+    onChange: setEnd,
     style: {
-      ...inputStyle,
-      width: 132,
-      padding: "8px 14px"
+      width: 190
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5250,15 +5303,12 @@ function MeetingDetail({
       background: val ? BLUE : "#fff",
       color: val ? "#fff" : "#6B7493"
     }
-  }, l), val ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
-    type: "time",
-    "aria-label": `${w} 시간`,
+  }, l), val ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(TimeInput, {
+    label: `${w} 시간`,
     value: val,
-    onChange: e => e.target.value && setTimeNote(k, e.target.value),
+    onChange: v => setTimeNote(k, v),
     style: {
-      ...inputStyle,
-      flex: 1,
-      padding: "6px 12px"
+      flex: 1
     }
   }), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -6989,13 +7039,11 @@ function MeetingForm({
     error: errors.time
   }, /*#__PURE__*/React.createElement("div", {
     style: row
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "time",
-    "aria-label": "\uC2DC\uC791 \uC2DC\uAC04",
+  }, /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uC2DC\uC791",
     value: f.start,
-    onChange: e => set("start", e.target.value),
+    onChange: v => set("start", v),
     style: {
-      ...inputStyle,
       flex: 1
     }
   }), /*#__PURE__*/React.createElement("span", {
@@ -7003,13 +7051,11 @@ function MeetingForm({
       alignSelf: "center",
       color: "#A3AAC2"
     }
-  }, "~"), /*#__PURE__*/React.createElement("input", {
-    type: "time",
-    "aria-label": "\uC885\uB8CC \uC2DC\uAC04",
+  }, "~"), /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uC885\uB8CC",
     value: f.end,
-    onChange: e => set("end", e.target.value),
+    onChange: v => set("end", v),
     style: {
-      ...inputStyle,
       flex: 1
     }
   }))), /*#__PURE__*/React.createElement(FieldWrap, {
@@ -7113,13 +7159,11 @@ function MeetingForm({
   }, WEEK.map((w, i) => /*#__PURE__*/React.createElement("option", {
     key: i,
     value: String(i)
-  }, "\uBAA8\uC784 \uC804 ", w, "\uC694\uC77C"))), /*#__PURE__*/React.createElement("input", {
-    type: "time",
-    "aria-label": "\uC608\uC57D \uC624\uD508 \uC2DC\uAC01",
+  }, "\uBAA8\uC784 \uC804 ", w, "\uC694\uC77C"))), /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uC608\uC57D \uC624\uD508",
     value: f.openTime,
-    onChange: e => set("openTime", e.target.value),
+    onChange: v => set("openTime", v),
     style: {
-      ...inputStyle,
       flex: 1
     }
   })), preview.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -7147,12 +7191,23 @@ function MeetingForm({
   }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : f.kind === "flash" ? hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요.") : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC608\uC57D \uC624\uD508",
     error: errors.openAt
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
   }, /*#__PURE__*/React.createElement("input", {
-    type: "datetime-local",
-    value: f.openAt,
-    onChange: e => set("openAt", e.target.value),
+    type: "date",
+    "aria-label": "\uC608\uC57D \uC624\uD508 \uB0A0\uC9DC",
+    value: (f.openAt || "").slice(0, 10),
+    onChange: e => set("openAt", e.target.value ? e.target.value + "T" + ((f.openAt || "").slice(11, 16) || "00:00") : ""),
     style: inputStyle
-  }), hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")), repeating && /*#__PURE__*/React.createElement(FieldWrap, {
+  }), f.openAt && /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uC608\uC57D \uC624\uD508 \uC2DC\uAC01",
+    value: f.openAt.slice(11, 16),
+    onChange: v => set("openAt", f.openAt.slice(0, 10) + "T" + v)
+  })), hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")), repeating && /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC18\uBCF5 \uC885\uB8CC\uC77C",
     error: errors.endDate
   }, /*#__PURE__*/React.createElement("input", {

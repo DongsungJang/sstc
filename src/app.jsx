@@ -98,8 +98,10 @@ function buildMeetings(all){
   const list=Object.keys(all||{}).filter(k=>/^m\d+$/.test(k)&&all[k]&&all[k].info&&all[k].info.date)
     .map(k=>{const sid=all[k].info.seriesId;return toMeeting(+k.slice(1),all[k],sid&&all.series?all.series["s"+sid]:null);});
   RAW_MEETINGS=all||{};
-  const up=list.filter(m=>m.status==="upcoming").sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:0);
-  const past=list.filter(m=>m.status==="past").sort((a,b)=>a.iso<b.iso?1:a.iso>b.iso?-1:0);
+  // 같은 날짜면 시작 시간이 빠른 모임부터
+  const st=(a,b)=>a.info.start<b.info.start?-1:a.info.start>b.info.start?1:0;
+  const up=list.filter(m=>m.status==="upcoming").sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:st(a,b));
+  const past=list.filter(m=>m.status==="past").sort((a,b)=>a.iso<b.iso?1:a.iso>b.iso?-1:st(a,b));
   MEETINGS=[...up,...past];
   refreshAttendance();
   return MEETINGS;
@@ -1438,6 +1440,26 @@ function NumStepper({value,onChange,min,max,unit}){
   );
 }
 
+// 24시간제 시간 고르기 (기기 설정에 따라 오전/오후로 나오는 기본 시간 칸 대신). 값은 "HH:MM"
+function TimeInput({value,onChange,label,style}){
+  const [h,m]=(value||"").split(":");
+  const mins=Array.from({length:12},(_,i)=>pad0(i*5)); if(m&&!mins.includes(m)) mins.push(m);
+  const sel={...inputStyle,flex:1,minWidth:0,padding:"8px 10px",textAlign:"center"};
+  const put=(hh,mm)=>onChange(`${hh||"00"}:${mm||"00"}`);
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:4,...style}}>
+      <select aria-label={`${label} 시`} value={h||""} onChange={e=>put(e.target.value,m)} style={sel}>
+        {!h&&<option value="">시</option>}
+        {Array.from({length:24},(_,i)=>pad0(i)).map(x=><option key={x} value={x}>{x}시</option>)}
+      </select>
+      <span style={{color:"#A3AAC2",fontWeight:700}}>:</span>
+      <select aria-label={`${label} 분`} value={m||""} onChange={e=>put(h,e.target.value)} style={sel}>
+        {!m&&<option value="">분</option>}
+        {mins.sort().map(x=><option key={x} value={x}>{x}분</option>)}
+      </select>
+    </div>
+  );
+}
 function BracketSetup({meeting,participants,onCreate}) {
   const [order,setOrder]=useState(()=>participants.slice().sort((x,y)=>NTRP_NUM(y.ntrp)-NTRP_NUM(x.ntrp)));
   const n=order.length;
@@ -1503,8 +1525,8 @@ function BracketSetup({meeting,participants,onCreate}) {
       <Card>
         <SectionTitle>시간 · 코트</SectionTitle>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div style={rowS}><span style={label}>시작 시간</span><input id="bk-start" type="time" value={start} onChange={e=>setStart(e.target.value)} style={{...inputStyle,width:132,padding:"8px 14px"}}/></div>
-          <div style={rowS}><span style={label}>종료 시간</span><input id="bk-end" type="time" value={end} onChange={e=>setEnd(e.target.value)} style={{...inputStyle,width:132,padding:"8px 14px"}}/></div>
+          <div style={rowS}><span style={label}>시작 시간</span><TimeInput label="대진 시작" value={start} onChange={setStart} style={{width:190}}/></div>
+          <div style={rowS}><span style={label}>종료 시간</span><TimeInput label="대진 종료" value={end} onChange={setEnd} style={{width:190}}/></div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <span style={label}>게임당 시간</span>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1803,7 +1825,7 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
                 {[["arrive","늦게 와요","도착",mine.arrive,hhmmApp(Math.min(toMin(mEnd)-30,toMin(mStart)+30))],["leave","일찍 가요","출발",mine.leave,hhmmApp(Math.max(toMin(mStart)+30,toMin(mEnd)-30))]].map(([k,l,w,val,def])=>(
                   <div key={k} style={{display:"flex",alignItems:"center",gap:8}}>
                     <button type="button" aria-pressed={!!val} onClick={()=>setTimeNote(k,val?null:pad2(def))} style={{flex:"0 0 92px",padding:"7px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",border:`1.5px solid ${val?BLUE:"#D6DEF7"}`,background:val?BLUE:"#fff",color:val?"#fff":"#6B7493"}}>{l}</button>
-                    {val?<><input type="time" aria-label={`${w} 시간`} value={val} onChange={e=>e.target.value&&setTimeNote(k,e.target.value)} style={{...inputStyle,flex:1,padding:"6px 12px"}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
+                    {val?<><TimeInput label={`${w} 시간`} value={val} onChange={v=>setTimeNote(k,v)} style={{flex:1}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
                       :<span style={{fontSize:12,color:"#A3AAC2"}}>{k==="arrive"?`${mStart}부터 와요`:`${mEnd}까지 있어요`}</span>}
                   </div>
                 ))}
@@ -2322,9 +2344,9 @@ function MeetingForm({initial,onClose,onSaved}) {
           </FieldWrap>
           <FieldWrap label="시간" required error={errors.time}>
             <div style={row}>
-              <input type="time" aria-label="시작 시간" value={f.start} onChange={e=>set("start",e.target.value)} style={{...inputStyle,flex:1}}/>
+              <TimeInput label="시작" value={f.start} onChange={v=>set("start",v)} style={{flex:1}}/>
               <span style={{alignSelf:"center",color:"#A3AAC2"}}>~</span>
-              <input type="time" aria-label="종료 시간" value={f.end} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1}}/>
+              <TimeInput label="종료" value={f.end} onChange={v=>set("end",v)} style={{flex:1}}/>
             </div>
           </FieldWrap>
           <FieldWrap label="테니스장 이름" required error={errors.place}>
@@ -2357,7 +2379,7 @@ function MeetingForm({initial,onClose,onSaved}) {
                 <select aria-label="예약 오픈 요일" value={f.openDow} onChange={e=>set("openDow",e.target.value)} style={{...inputStyle,flex:1}}>
                   {WEEK.map((w,i)=><option key={i} value={String(i)}>모임 전 {w}요일</option>)}
                 </select>
-                <input type="time" aria-label="예약 오픈 시각" value={f.openTime} onChange={e=>set("openTime",e.target.value)} style={{...inputStyle,flex:1}}/>
+                <TimeInput label="예약 오픈" value={f.openTime} onChange={v=>set("openTime",v)} style={{flex:1}}/>
               </div>
               {preview.length>0&&<div style={{marginTop:8,background:"#fff",borderRadius:14,padding:"10px 12px",border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:4}}>
                 {preview.map(d=><p key={d} style={{margin:0,fontSize:12,color:"#4A5578"}}>{fmtDate(d)} 모임 → <b style={{color:BLUE}}>{fmtOpen(openFor(d,rule))}</b> 오픈</p>)}
@@ -2365,7 +2387,10 @@ function MeetingForm({initial,onClose,onSaved}) {
             </FieldWrap>
           ):f.kind==="flash"?hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요."):(
             <FieldWrap label="예약 오픈" error={errors.openAt}>
-              <input type="datetime-local" value={f.openAt} onChange={e=>set("openAt",e.target.value)} style={inputStyle}/>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <input type="date" aria-label="예약 오픈 날짜" value={(f.openAt||"").slice(0,10)} onChange={e=>set("openAt",e.target.value?e.target.value+"T"+((f.openAt||"").slice(11,16)||"00:00"):"")} style={inputStyle}/>
+                {f.openAt&&<TimeInput label="예약 오픈 시각" value={f.openAt.slice(11,16)} onChange={v=>set("openAt",f.openAt.slice(0,10)+"T"+v)}/>}
+              </div>
               {hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")}
             </FieldWrap>
           )}
