@@ -230,8 +230,20 @@ function StepIndicator({current}) {
 }
 
 // ─── 로그인 ───────────────────────────────────────────────────────────────────
+// ─── 아이디 저장 · 로그인 상태 유지 ───────────────────────────────────────────
+// 아이디 저장: 이메일을 이 기기에 기억. 로그인 상태 유지: 마지막으로 앱을 연 날부터 30일 동안 유지(열 때마다 연장).
+// 유지를 끄면 브라우저(탭)를 닫을 때 로그아웃돼요.
+const KEEP_DAYS=30;
+const LS={email:"sstc-saved-email",keep:"sstc-keep-login",until:"sstc-login-until"};
+const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet=(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} };
+const extendLogin=()=>{ if(lsGet(LS.keep)!=="0") lsSet(LS.until,String(Date.now()+KEEP_DAYS*86400000)); };
+const loginExpired=()=>{ const u=+lsGet(LS.until); return lsGet(LS.keep)!=="0"&&u>0&&Date.now()>u; };
+
 function LoginScreen({onSignup,onForgot,onLogin}) {
-  const [email,setEmail]=useState("");
+  const [email,setEmail]=useState(()=>lsGet(LS.email)||"");
+  const [remember,setRemember]=useState(()=>!!lsGet(LS.email));
+  const [keep,setKeep]=useState(()=>lsGet(LS.keep)!=="0");
   const [pw,setPw]=useState("");
   const [vis,setVis]=useState(false);
   const [err,setErr]=useState("");
@@ -245,7 +257,11 @@ function LoginScreen({onSignup,onForgot,onLogin}) {
     }
     if (!email||!pw){setErr("이메일과 비밀번호를 입력해주세요");return;}
     setBusy(true);setErr("");
-    FB.auth.signInWithEmailAndPassword(email.trim(),pw).catch(e=>{setErr(authMsg(e));setBusy(false);});
+    lsSet(LS.email,remember?email.trim():null);
+    lsSet(LS.keep,keep?"1":"0"); lsSet(LS.until,null); if(keep) extendLogin();
+    Promise.resolve(FB.auth.setPersistence?FB.auth.setPersistence(keep?"local":"session"):null)
+      .then(()=>FB.auth.signInWithEmailAndPassword(email.trim(),pw))
+      .catch(e=>{setErr(authMsg(e));setBusy(false);});
   };
 
   return (
@@ -259,6 +275,13 @@ function LoginScreen({onSignup,onForgot,onLogin}) {
           <button type="button" onClick={()=>setVis(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",fontSize:12,color:"#A3AAC2",cursor:"pointer"}}>{vis?"숨김":"보기"}</button>
         </div>
       </FieldWrap>
+      <div style={{display:"flex",gap:18,marginTop:-4,paddingLeft:4}}>
+        {[["아이디 저장",remember,setRemember],[`로그인 상태 유지 (${KEEP_DAYS}일)`,keep,setKeep]].map(([label,on,set])=>(
+          <label key={label} style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"#4A5578",cursor:"pointer",userSelect:"none"}}>
+            <input type="checkbox" checked={on} onChange={e=>set(e.target.checked)} style={{width:17,height:17,accentColor:BLUE,margin:0,cursor:"pointer"}}/>{label}
+          </label>
+        ))}
+      </div>
       {err&&<p style={{fontSize:13,color:"#ef4444",margin:0}}>{err}</p>}
       <button type="button" onClick={handle} disabled={busy} style={{...btnPrimary,marginTop:4,opacity:busy?0.6:1}}>{busy?"로그인 중…":"로그인"}</button>
       <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:4}}>
@@ -1815,6 +1838,74 @@ function StatsTab() {
   );
 }
 
+// ─── 내 정보 ──────────────────────────────────────────────────────────────────
+function MyInfoSheet({account,onClose,onLogout}) {
+  const pr=(account&&account.profile)||{};
+  const held=myHeld(), ym=todayYmd().slice(0,7), y=ym.slice(0,4);
+  const mine=MEETINGS.filter(m=>m.status==="upcoming").map(m=>{
+    const v=m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
+    if(!v||!v.status) return null;
+    const ci=(m.attendees||[]).findIndex(a=>a.isMe), wi=(m.waitlist||[]).findIndex(a=>a.isMe);
+    const label=v.status==="attend"?(ci>=0?"참석 확정":`대기 ${wi+1}번`):v.status==="absent"?"불참":"미정";
+    return {m,label,color:v.status==="attend"&&ci>=0?BLUE:v.status==="attend"?"#C2610C":"#8A93B2"};
+  }).filter(Boolean);
+  const until=+lsGet(LS.until), keepLeft=lsGet(LS.keep)==="0"?null:until?Math.max(0,Math.ceil((until-Date.now())/86400000)):null;
+  const badge=(text,bg,color)=><span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,background:bg,color}}>{text}</span>;
+  const Row=({k,v})=>v?<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid #EEF1FA"}}><span style={{width:84,fontSize:13,color:"#A3AAC2"}}>{k}</span><span style={{flex:1,fontSize:13,fontWeight:500,color:"#1B2559",wordBreak:"keep-all"}}>{v}</span></div>:null;
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>내 정보</p>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer"}}>✕</button>
+        </div>
+        <Card style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:56,height:56,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><MascotSvg size={44}/></div>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{margin:"0 0 3px",fontSize:18,fontWeight:700,color:"#1B2559"}}>{pr.nickname||ME}</p>
+            <p style={{margin:"0 0 6px",fontSize:12,color:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.email||(account&&account.user&&account.user.email)||""}</p>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {account&&account.admin&&badge("관리자",BLUE,"#fff")}
+              {account&&(account.admin||account.approved)?badge("승인된 회원",BLUE_LIGHT,BLUE):FB&&badge("승인 대기","#FFF4E5","#C2610C")}
+            </div>
+          </div>
+        </Card>
+        <div style={{display:"flex",gap:10}}>
+          {[["이번 달",held.filter(m=>m.iso.slice(0,7)===ym).length],["올해",held.filter(m=>m.iso.slice(0,4)===y).length],["누적",held.length]].map(([k,v])=>(
+            <Card key={k} style={{flex:1,textAlign:"center",padding:14}}>
+              <p style={{margin:"0 0 6px",fontSize:11,color:"#A3AAC2"}}>{k} 참석</p>
+              <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE}}>{v}회</p>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <SectionTitle>다가오는 모임 내 투표</SectionTitle>
+          {mine.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>투표한 모임이 없어요.</p>:mine.map(({m,label,color})=>(
+            <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #EEF1FA"}}>
+              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>📍 {m.place}</p></div>
+              <span style={{fontSize:12,fontWeight:700,color}}>{label}</span>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <SectionTitle>프로필</SectionTitle>
+          <Row k="NTRP" v={pr.ntrp||MEMBER_NTRP[ME]}/>
+          <Row k="구력" v={calcCareer(pr.tennisStart)}/>
+          <Row k="손·백핸드" v={Array.isArray(pr.hand)?pr.hand.join(", "):pr.hand}/>
+          <Row k="운동 횟수" v={pr.weeklyFreq}/>
+          <Row k="레슨" v={pr.lessonStatus}/>
+          <Row k="지역" v={pr.region}/>
+          <Row k="자주 가는 코트" v={pr.court}/>
+          <Row k="연락처" v={pr.phone}/>
+          {!pr.ntrp&&!pr.region&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>저장된 프로필이 없어요.</p>}
+        </Card>
+        <p style={{margin:0,fontSize:12,color:"#8A93B2",textAlign:"center"}}>{keepLeft==null?"이 브라우저를 닫으면 로그아웃돼요":`로그인 상태 유지 중 · ${keepLeft}일 동안 안 열면 로그아웃돼요`}</p>
+        <button type="button" onClick={onLogout} style={{...btnSecondary,color:"#ef4444",borderColor:"#FBD5D5"}}>로그아웃</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── 모임 만들기·수정 ─────────────────────────────────────────────────────────
 // 기본값: 다음 토요일 08:00~12:00, 정원 12명, 예약 오픈은 모임 7일 전 00:00
 function nextSaturday(){ const d=new Date(); d.setDate(d.getDate()+((6-d.getDay()+7)%7||7)); return ymd(d); }
@@ -1898,51 +1989,10 @@ button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 
 const iconBtn={width:38,height:38,borderRadius:"50%",border:"none",background:"rgba(255,255,255,0.18)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
-// ── 스플래시 화면 (SSTC_app_assets/splash.html) ──
-// 원본은 390×844 고정 크기라 비율 그대로 화면에 맞게 키우거나 줄여서 가운데 놓아요. 애니메이션 CSS는 src/splash.css.
-const SPLASH_W=390, SPLASH_H=844;
-function SplashScreen({onStart}) {
-  const fit=()=>Math.min(window.innerWidth/SPLASH_W, window.innerHeight/SPLASH_H);
-  const [scale,setScale]=useState(fit);
-  useEffect(()=>{
-    const onResize=()=>setScale(fit());
-    window.addEventListener("resize",onResize);
-    return ()=>window.removeEventListener("resize",onResize);
-  },[]);
+// 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
+function MascotSvg({size}) {
   return(
-    <div style={{position:"fixed",inset:0,background:"#2152E6",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",zIndex:100}}>
-      <div style={{width:SPLASH_W*scale,height:SPLASH_H*scale,flexShrink:0}}>
-        <div style={{width:SPLASH_W,height:SPLASH_H,transform:`scale(${scale})`,transformOrigin:"0 0"}}>
-      <div style={{width:"390px",height:"844px",position:"relative",overflow:"hidden",background:"#2152E6",fontFamily:"Fredoka, Jua, system-ui, sans-serif",display:"flex",flexDirection:"column",alignItems:"center",boxSizing:"border-box",padding:"112px 32px 48px"}}>
-      <svg aria-hidden="true" width="390" height="844" viewBox="0 0 390 844" style={{position:"absolute",left:"0",top:"0"}}>
-      <g stroke="rgba(255,255,255,0.2)" strokeWidth="3" fill="none">
-      <rect x="30" y="64" width="330" height="715"/>
-      <path d="M71 64 V779 M319 64 V779"/>
-      <path d="M71 229 H319 M71 614 H319"/>
-      <path d="M195 229 V614"/>
-      <path d="M195 64 V76 M195 779 V767"/>
-      </g>
-      <path d="M18 421.5 H372" stroke="rgba(255,255,255,0.32)" strokeWidth="5" strokeDasharray="2 4"/>
-      <path d="M18 421.5 H372" stroke="rgba(255,255,255,0.22)" strokeWidth="2"/>
-      <circle cx="18" cy="421.5" r="4" fill="rgba(255,255,255,0.32)"/>
-      <circle cx="372" cy="421.5" r="4" fill="rgba(255,255,255,0.32)"/>
-      </svg>
-      <div className="sp-title" style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:"10px"}}>
-      <h1 style={{margin:"0",fontSize:"84px",fontWeight:"700",color:"#FFFFFF",letterSpacing:"5px",lineHeight:"1"}}>SSTC</h1>
-      <p style={{margin:"0",padding:"6px 14px",borderRadius:"999px",background:"rgba(11,30,91,0.35)",color:"#DCE8FF",fontSize:"14px",fontWeight:"600",letterSpacing:"2px",whiteSpace:"nowrap"}}>SERVE &amp; SMASH TENNIS CLUB</p>
-      </div>
-      <div style={{position:"relative",width:"326px",height:"380px",marginTop:"28px",flexShrink:"0"}}>
-      <svg className="sp-spark" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" style={{position:"absolute",left:"14px",top:"40px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
-      <svg className="sp-spark b" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" style={{position:"absolute",right:"18px",top:"150px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#D7F24A" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
-      <svg className="sp-spark c" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" style={{position:"absolute",left:"120px",top:"8px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
-      <div style={{position:"absolute",left:"63px",bottom:"22px",width:"200px",display:"flex",flexDirection:"column",alignItems:"center",zIndex:"2"}}>
-      <div className="sp-move" style={{position:"relative",width:"200px",height:"200px"}}>
-      <div className="sp-bubble" style={{position:"absolute",left:"118px",top:"-48px",zIndex:"3"}}>
-      <p style={{margin:"0",padding:"12px 18px",borderRadius:"20px",background:"#FFFFFF",color:"#0B1E5B",fontSize:"22px",fontWeight:"600",whiteSpace:"nowrap",boxShadow:"0 6px 0 rgba(11,30,91,0.25)",display:"grid"}}><span className="sp-sorry" style={{gridArea:"1 / 1"}}>Sorry…</span><span className="sp-smug" style={{gridArea:"1 / 1"}}>not sorry</span></p>
-      <div aria-hidden="true" style={{position:"absolute",left:"22px",bottom:"-8px",width:"18px",height:"18px",background:"#FFFFFF",transform:"rotate(45deg)",borderRadius:"3px"}}></div>
-      </div>
-      <div className="sp-bounce" style={{width:"200px",height:"200px"}}>
-      <svg role="img" aria-label="Tennis ball mascot hiding a smug grin behind its hand" width="200" height="200" viewBox="0 0 120 120">
+      <svg role="img" aria-label="Tennis ball mascot hiding a smug grin behind its hand" width={size} height={size} viewBox="0 0 120 120">
       <circle cx="60" cy="60" r="56" fill="#D7F24A"/>
       <path d="M12 32 C 40 44, 40 76, 12 88" stroke="#FFFFFF" strokeWidth="5" fill="none" strokeLinecap="round"/>
       <path d="M108 32 C 80 44, 80 76, 108 88" stroke="#FFFFFF" strokeWidth="5" fill="none" strokeLinecap="round"/>
@@ -1987,6 +2037,54 @@ function SplashScreen({onStart}) {
       <path d="M54 65 V91 M60 63.5 V92.5 M66 65 V91 M49 70 H71 M47 78 H73 M49 86 H71" stroke="#8FA2D9" strokeWidth="1.4" fill="none"/>
       </g>
       </svg>
+  );
+}
+
+// ── 스플래시 화면 (SSTC_app_assets/splash.html) ──
+// 원본은 390×844 고정 크기라 비율 그대로 화면에 맞게 키우거나 줄여서 가운데 놓아요. 애니메이션 CSS는 src/splash.css.
+const SPLASH_W=390, SPLASH_H=844;
+function SplashScreen({onStart}) {
+  const fit=()=>Math.min(window.innerWidth/SPLASH_W, window.innerHeight/SPLASH_H);
+  const [scale,setScale]=useState(fit);
+  useEffect(()=>{
+    const onResize=()=>setScale(fit());
+    window.addEventListener("resize",onResize);
+    return ()=>window.removeEventListener("resize",onResize);
+  },[]);
+  return(
+    <div style={{position:"fixed",inset:0,background:"#2152E6",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",zIndex:100}}>
+      <div style={{width:SPLASH_W*scale,height:SPLASH_H*scale,flexShrink:0}}>
+        <div style={{width:SPLASH_W,height:SPLASH_H,transform:`scale(${scale})`,transformOrigin:"0 0"}}>
+      <div style={{width:"390px",height:"844px",position:"relative",overflow:"hidden",background:"#2152E6",fontFamily:"Fredoka, Jua, system-ui, sans-serif",display:"flex",flexDirection:"column",alignItems:"center",boxSizing:"border-box",padding:"112px 32px 48px"}}>
+      <svg aria-hidden="true" width="390" height="844" viewBox="0 0 390 844" style={{position:"absolute",left:"0",top:"0"}}>
+      <g stroke="rgba(255,255,255,0.2)" strokeWidth="3" fill="none">
+      <rect x="30" y="64" width="330" height="715"/>
+      <path d="M71 64 V779 M319 64 V779"/>
+      <path d="M71 229 H319 M71 614 H319"/>
+      <path d="M195 229 V614"/>
+      <path d="M195 64 V76 M195 779 V767"/>
+      </g>
+      <path d="M18 421.5 H372" stroke="rgba(255,255,255,0.32)" strokeWidth="5" strokeDasharray="2 4"/>
+      <path d="M18 421.5 H372" stroke="rgba(255,255,255,0.22)" strokeWidth="2"/>
+      <circle cx="18" cy="421.5" r="4" fill="rgba(255,255,255,0.32)"/>
+      <circle cx="372" cy="421.5" r="4" fill="rgba(255,255,255,0.32)"/>
+      </svg>
+      <div className="sp-title" style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:"10px"}}>
+      <h1 style={{margin:"0",fontSize:"84px",fontWeight:"700",color:"#FFFFFF",letterSpacing:"5px",lineHeight:"1"}}>SSTC</h1>
+      <p style={{margin:"0",padding:"6px 14px",borderRadius:"999px",background:"rgba(11,30,91,0.35)",color:"#DCE8FF",fontSize:"14px",fontWeight:"600",letterSpacing:"2px",whiteSpace:"nowrap"}}>SERVE &amp; SMASH TENNIS CLUB</p>
+      </div>
+      <div style={{position:"relative",width:"326px",height:"380px",marginTop:"28px",flexShrink:"0"}}>
+      <svg className="sp-spark" aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" style={{position:"absolute",left:"14px",top:"40px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
+      <svg className="sp-spark b" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" style={{position:"absolute",right:"18px",top:"150px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#D7F24A" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
+      <svg className="sp-spark c" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" style={{position:"absolute",left:"120px",top:"8px"}}><path d="M12 2v6M12 16v6M2 12h6M16 12h6" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" fill="none"/></svg>
+      <div style={{position:"absolute",left:"63px",bottom:"22px",width:"200px",display:"flex",flexDirection:"column",alignItems:"center",zIndex:"2"}}>
+      <div className="sp-move" style={{position:"relative",width:"200px",height:"200px"}}>
+      <div className="sp-bubble" style={{position:"absolute",left:"118px",top:"-48px",zIndex:"3"}}>
+      <p style={{margin:"0",padding:"12px 18px",borderRadius:"20px",background:"#FFFFFF",color:"#0B1E5B",fontSize:"22px",fontWeight:"600",whiteSpace:"nowrap",boxShadow:"0 6px 0 rgba(11,30,91,0.25)",display:"grid"}}><span className="sp-sorry" style={{gridArea:"1 / 1"}}>Sorry…</span><span className="sp-smug" style={{gridArea:"1 / 1"}}>not sorry</span></p>
+      <div aria-hidden="true" style={{position:"absolute",left:"22px",bottom:"-8px",width:"18px",height:"18px",background:"#FFFFFF",transform:"rotate(45deg)",borderRadius:"3px"}}></div>
+      </div>
+      <div className="sp-bounce" style={{width:"200px",height:"200px"}}>
+      <MascotSvg size={200}/>
       </div>
       </div>
       <div className="sp-shadow" aria-hidden="true" style={{width:"150px",height:"18px",borderRadius:"50%",background:"#0B1E5B",marginTop:"-6px"}}></div>
@@ -2011,6 +2109,8 @@ export default function App() {
   // screen: "login" | "forgot" | "signup" | "main"
   const [splash,setSplash]=useState(true);   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
+  const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
+  const [myInfo,setMyInfo]=useState(false);   // 내 정보 창
   const [mForm,setForm2]=useState(null);      // 모임 만들기·수정 창: {initial} | null
   const [screen,setScreen]=useState("login");
   const [step,setStep]=useState(1);
@@ -2053,11 +2153,13 @@ export default function App() {
     if(!FB) return;
     return FB.auth.onAuthStateChanged(user=>{
       if(!user){ setAccount(null); setScreen(s=>s==="main"?"login":s); return; }
+      if(loginExpired()){ lsSet(LS.until,null); FB.auth.signOut(); return; }   // 30일 넘게 안 열었으면 다시 로그인
+      extendLogin();
       if(signingUp.current) return;   // 가입 중에는 가입 완료 화면을 먼저 보여줌
       loadAccount(user).then(()=>setScreen("main"));
     });
   },[]);
-  const logout=()=>{ if(FB) FB.auth.signOut(); setScreen("login"); setTab("home"); setOpenMeeting(null); };
+  const logout=()=>{ lsSet(LS.until,null); if(FB) FB.auth.signOut(); setScreen("login"); setTab("home"); setOpenMeeting(null); };
   const submitSignup=async()=>{
     if(!FB){ setSignupDone(true); return; }
     setSignupErr(""); setSignupBusy(true); signingUp.current=true;
@@ -2100,7 +2202,9 @@ export default function App() {
         <div style={{background:GRAD,borderRadius:"0 0 36px 36px",padding:`${screen==="login"?56:36}px 24px ${screen==="login"?88:72}px`,color:"#fff",textAlign:"center",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",width:220,height:220,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.18)",top:-90,right:-70}}/>
           <div style={{position:"absolute",width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.07)",bottom:-50,left:-40}}/>
-          <div style={{width:screen==="login"?92:68,height:screen==="login"?92:68,margin:"0 auto 14px",borderRadius:"50%",border:"2px solid rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:screen==="login"?42:30,background:"rgba(255,255,255,0.12)",cursor:"pointer",userSelect:"none"}} onClick={()=>setWink(w=>!w)}>{wink?"😜":"🎾"}</div>
+          <div title="Sorry, not sorry" style={{width:screen==="login"?112:76,height:screen==="login"?112:76,margin:"0 auto 14px",borderRadius:"50%",border:"2px solid rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.12)",cursor:"pointer",userSelect:"none"}} onClick={()=>setWink(w=>!w)}>
+            <div className="sp-hop"><div className="sp-bounce"><MascotSvg size={screen==="login"?80:54}/></div></div>
+          </div>
           <h1 style={{fontSize:30,fontWeight:700,margin:"0 0 2px",letterSpacing:"0.08em"}}>SSTC</h1>
           <p style={{fontSize:12,margin:"0 0 10px",opacity:0.8,letterSpacing:"0.04em"}}>{wink?"Sorry, not sorry":"Serve & Smash Tennis Club"}</p>
           <p style={{fontSize:14,margin:0,opacity:0.85}}>{loading?"불러오는 중":pending?"승인 대기":titles[screen]}</p>
@@ -2164,7 +2268,9 @@ export default function App() {
             :<span style={{fontSize:14,fontWeight:600,opacity:0.9}}>🎾 SSTC</span>}
           <div style={{display:"flex",gap:8}}>
             <button type="button" style={iconBtn} title="알림"><Icon name="bell" size={19}/></button>
-            <button type="button" onClick={logout} style={iconBtn} title="로그아웃" aria-label="로그아웃"><Icon name="user" size={19}/></button>
+            <div style={{position:"relative"}}>
+              <button type="button" onClick={()=>setMenu(v=>!v)} style={iconBtn} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}><Icon name="user" size={19}/></button>
+            </div>
           </div>
         </div>
         {isHome?(
@@ -2210,6 +2316,15 @@ export default function App() {
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       )}
+      {menu&&<>
+                <div onClick={()=>setMenu(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
+                <div role="menu" style={{position:"fixed",right:"max(20px, calc(50% - 200px))",top:62,zIndex:41,background:"#fff",borderRadius:18,boxShadow:"0 12px 32px rgba(20,40,120,0.22)",padding:6,minWidth:150}}>
+                  {[["내 정보 보기",()=>{setMenu(false);setMyInfo(true);},"#1B2559"],["로그아웃",()=>{setMenu(false);logout();},"#ef4444"]].map(([l,f,c])=>(
+                    <button key={l} type="button" role="menuitem" onClick={f} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",background:"none",border:"none",borderRadius:12,fontSize:14,fontWeight:600,color:c,cursor:"pointer",fontFamily:FONT}}>{l}</button>
+                  ))}
+                </div>
+              </>}
+      {myInfo&&<MyInfoSheet account={account} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
       {mForm&&<MeetingForm initial={mForm.initial} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
