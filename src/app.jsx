@@ -1987,7 +1987,6 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
         </Card>
         <p style={{margin:0,fontSize:12,color:"#8A93B2",textAlign:"center"}}>{keepLeft==null?"이 브라우저를 닫으면 로그아웃돼요":`로그인 상태 유지 중 · ${keepLeft}일 동안 안 열면 로그아웃돼요`}</p>
         {FB&&account&&account.user&&<button type="button" onClick={()=>setEdit(true)} style={{...btnPrimary}}>정보 수정하기</button>}
-        <button type="button" onClick={onLogout} style={{...btnSecondary,color:"#ef4444",borderColor:"#FBD5D5"}}>로그아웃</button>
         </>}
       </div>
     </div>
