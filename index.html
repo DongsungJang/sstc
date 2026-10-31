@@ -1142,6 +1142,7 @@ function Step2({
   const validate = () => {
     if (isAdmin) return true;
     const e = {};
+    if (!(data.realName || "").trim()) e.realName = "본명을 입력해주세요";
     if (!data.nickname) e.nickname = "닉네임을 입력해주세요";
     if (!data.birthdate) e.birthdate = "생년월일을 입력해주세요";
     if (!data.phone) e.phone = "연락처를 입력해주세요";else if (!/^010-\d{4}-\d{4}$/.test(data.phone)) e.phone = "010-0000-0000 형식으로 입력해주세요";
@@ -1211,7 +1212,24 @@ function Step2({
       display: "none"
     },
     onChange: handlePhoto
-  })), editing ? /*#__PURE__*/React.createElement(FieldWrap, {
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uBCF8\uBA85",
+    required: true,
+    error: errors.realName
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: data.realName || "",
+    style: inputStyle,
+    onChange: e => onChange("realName", e.target.value),
+    placeholder: "\uC2E4\uBA85",
+    autoComplete: "name"
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2",
+      margin: 0
+    }
+  }, "\uD68C\uC6D0 \uD655\uC778\uC6A9\uC774\uC5D0\uC694. \uBAA8\uC784 \uD654\uBA74\uC5D0\uB294 \uB2C9\uB124\uC784\uB9CC \uBCF4\uC5EC\uC694")), editing ? /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB2C9\uB124\uC784"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -3291,6 +3309,7 @@ async function signUpMember(form) {
     ...JSON.parse(JSON.stringify(rest)),
     email: form.email.trim(),
     nickname: nick,
+    realName: (form.realName || "").trim(),
     region: form.region === "타지역" ? form.regionCustom || "타지역" : form.region,
     createdAt: Date.now()
   };
@@ -3433,7 +3452,12 @@ function AdminTab() {
       fontWeight: 600,
       color: "#1B2559"
     }
-  }, m.nickname || "(닉네임 없음)"), m.ntrp && /*#__PURE__*/React.createElement("span", {
+  }, m.nickname || "(닉네임 없음)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: m.realName ? "#4A5578" : "#C2610C"
+    }
+  }, m.realName ? `(${m.realName})` : "(본명 미입력)"), m.ntrp && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2"
@@ -5501,7 +5525,7 @@ function StatsTab() {
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 닉네임·이메일은 고정) ─────────
-const PROFILE_FIELDS = ["birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
+const PROFILE_FIELDS = ["realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
 function ProfileEdit({
   account,
   onDone,
@@ -5539,6 +5563,7 @@ function ProfileEdit({
       patch[k] = data[k] === undefined ? null : data[k];
     });
     patch.region = data.region === "타지역" ? data.regionCustom || "타지역" : data.region;
+    patch.realName = (data.realName || "").trim();
     patch.updatedAt = Date.now();
     setSaving(true);
     setErr("");
@@ -5589,9 +5614,10 @@ function MyInfoSheet({
   account,
   onClose,
   onLogout,
-  onProfileSaved
+  onProfileSaved,
+  startEdit
 }) {
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState(!!startEdit);
   const pr = account && account.profile || {};
   const held = myHeld(),
     ym = todayYmd().slice(0, 7),
@@ -5739,7 +5765,14 @@ function MyInfoSheet({
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, pr.nickname || ME), /*#__PURE__*/React.createElement("p", {
+  }, pr.nickname || ME, pr.realName && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: "#6B7493",
+      marginLeft: 6
+    }
+  }, pr.realName)), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 6px",
       fontSize: 12,
@@ -5817,6 +5850,9 @@ function MyInfoSheet({
       color
     }
   }, label)))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD504\uB85C\uD544"), /*#__PURE__*/React.createElement(Row, {
+    k: "\uBCF8\uBA85",
+    v: pr.realName || (FB ? "입력 안 됨 · 정보 수정하기에서 넣어 주세요" : "")
+  }), /*#__PURE__*/React.createElement(Row, {
     k: "NTRP",
     v: pr.ntrp || MEMBER_NTRP[ME]
   }), /*#__PURE__*/React.createElement(Row, {
@@ -6941,7 +6977,7 @@ function App() {
   const [splash, setSplash] = useState(true); // 앱을 열 때마다 스플래시부터
   const list = useMeetingList(); // 모든 모임 (실시간)
   const [menu, setMenu] = useState(false); // 우측 상단 내 메뉴
-  const [myInfo, setMyInfo] = useState(false); // 내 정보 창
+  const [myInfo, setMyInfo] = useState(false); // 내 정보 창 (false | true | "edit")
   const [mForm, setForm2] = useState(null); // 모임 만들기·수정 창: {initial} | null
   const [screen, setScreen] = useState("login");
   const [step, setStep] = useState(1);
@@ -7067,6 +7103,7 @@ function App() {
     inviteCode: "",
     referrer: "",
     photo: null,
+    realName: "",
     nickname: "",
     birthdate: "",
     phone: "",
@@ -7555,7 +7592,37 @@ function App() {
       flex: 1,
       padding: "16px 16px 96px"
     }
-  }, list.error && /*#__PURE__*/React.createElement(Card, {
+  }, FB && account && account.profile && !account.profile.realName && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      background: "#FFF8EC",
+      border: "1px solid #FDE2B8"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13,
+      color: "#8A5A12",
+      lineHeight: 1.5
+    }
+  }, "\uBCF8\uBA85\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694. \uD68C\uC6D0 \uD655\uC778\uC744 \uC704\uD574 \uBCF8\uBA85\uC744 \uB123\uC5B4 \uC8FC\uC138\uC694."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMyInfo("edit"),
+    style: {
+      padding: "8px 14px",
+      background: GRAD,
+      color: "#fff",
+      border: "none",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, "\uC785\uB825\uD558\uAE30")), list.error && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 12
     }
@@ -7688,6 +7755,7 @@ function App() {
   }), noticeForm && /*#__PURE__*/React.createElement(NoticeForm, {
     onClose: () => setNoticeForm(false)
   }), myInfo && /*#__PURE__*/React.createElement(MyInfoSheet, {
+    startEdit: myInfo === "edit",
     account: account,
     onProfileSaved: p => {
       setMe(p);
