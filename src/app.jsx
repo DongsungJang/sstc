@@ -113,7 +113,7 @@ function rankingOf(list){
   });
 }
 const dDay=iso=>{ const d=Math.round((new Date(iso+"T00:00:00")-new Date(todayYmd()+"T00:00:00"))/86400000); return d===0?"D-DAY":`D-${d}`; };
-const isOpen=m=>!m.openAt||nowAt().slice(0,16)>=m.openAt;
+const isOpen=m=>m.kind==="flash"||!m.openAt||nowAt().slice(0,16)>=m.openAt;   // 번개 모임은 만들자마자 투표 가능
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
 // 정기 모임: 이 모임 전까지 그 달 정기 모임에 덜 참석한 회원이 항상 먼저, 같은 횟수면 투표 시각 순.
@@ -1767,7 +1767,7 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-          {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},{icon:"🗓️",label:"예약 오픈",value:meeting.openDate},
+          {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"🗓️",label:"예약 오픈",value:meeting.openDate}]),
             ...(ser?[{icon:"🔁",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
             <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:15,width:22,textAlign:"center"}}>{r.icon}</span>
@@ -2239,7 +2239,7 @@ function MeetingForm({initial,onClose,onSaved}) {
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
     const gcap=f.guestCap===""?0:parseInt(f.guestCap,10); if(!(gcap>=0&&gcap<=50)) e.guestCap="게스트는 0~50명이에요";
     if(repeating){ if(!f.openTime) e.openAt="예약 오픈 시각을 넣어 주세요"; if(f.endDate&&f.date&&f.endDate<f.date) e.endDate="종료일은 첫 모임 날짜 뒤여야 해요"; }
-    else if(f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
+    else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
     const base={kind:f.kind,start:f.start,end:f.end,place:f.place.trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
@@ -2254,7 +2254,7 @@ function MeetingForm({initial,onClose,onSaved}) {
       });
     }else{
       const id=editing?initial.id:Date.now();
-      const info={...(editing?initial.info:{}),...base,date:f.date,openAt:f.openAt||"",
+      const info={...(editing?initial.info:{}),...base,date:f.date,openAt:f.kind==="flash"?"":(f.openAt||""),
         createdBy:editing?(initial.info.createdBy||""):ME,createdByUid:editing?(initial.info.createdByUid||""):uid,
         createdAt:editing?(initial.info.createdAt||Date.now()):Date.now(),...(editing?{updatedAt:Date.now()}:{})};
       job=saveMeetingPath("m"+id+"/info",JSON.parse(JSON.stringify(info))).then(()=>{
@@ -2324,7 +2324,7 @@ function MeetingForm({initial,onClose,onSaved}) {
                 {preview.map(d=><p key={d} style={{margin:0,fontSize:12,color:"#4A5578"}}>{fmtDate(d)} 모임 → <b style={{color:BLUE}}>{fmtOpen(openFor(d,rule))}</b> 오픈</p>)}
               </div>}
             </FieldWrap>
-          ):(
+          ):f.kind==="flash"?hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요."):(
             <FieldWrap label="예약 오픈" error={errors.openAt}>
               <input type="datetime-local" value={f.openAt} onChange={e=>set("openAt",e.target.value)} style={inputStyle}/>
               {hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")}

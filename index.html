@@ -297,7 +297,7 @@ const dDay = iso => {
   const d = Math.round((new Date(iso + "T00:00:00") - new Date(todayYmd() + "T00:00:00")) / 86400000);
   return d === 0 ? "D-DAY" : `D-${d}`;
 };
-const isOpen = m => !m.openAt || nowAt().slice(0, 16) >= m.openAt;
+const isOpen = m => m.kind === "flash" || !m.openAt || nowAt().slice(0, 16) >= m.openAt; // 번개 모임은 만들자마자 투표 가능
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
 // 정기 모임: 이 모임 전까지 그 달 정기 모임에 덜 참석한 회원이 항상 먼저, 같은 횟수면 투표 시각 순.
@@ -5070,11 +5070,11 @@ function MeetingDetail({
     icon: "👥",
     label: "제한 인원",
     value: `${meeting.capacity}명${meeting.guestCap ? ` + 게스트 ${meeting.guestCap}명` : ""}`
-  }, {
+  }, ...(meeting.kind === "flash" ? [] : [{
     icon: "🗓️",
     label: "예약 오픈",
     value: meeting.openDate
-  }, ...(ser ? [{
+  }]), ...(ser ? [{
     icon: "🔁",
     label: "반복",
     value: serActive ? seriesText(ser) : "반복 멈춤"
@@ -6720,7 +6720,7 @@ function MeetingForm({
     if (repeating) {
       if (!f.openTime) e.openAt = "예약 오픈 시각을 넣어 주세요";
       if (f.endDate && f.date && f.endDate < f.date) e.endDate = "종료일은 첫 모임 날짜 뒤여야 해요";
-    } else if (f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
+    } else if (f.kind !== "flash" && f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e);
     if (Object.keys(e).length) return;
     const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
@@ -6770,7 +6770,7 @@ function MeetingForm({
         ...(editing ? initial.info : {}),
         ...base,
         date: f.date,
-        openAt: f.openAt || "",
+        openAt: f.kind === "flash" ? "" : f.openAt || "",
         createdBy: editing ? initial.info.createdBy || "" : ME,
         createdByUid: editing ? initial.info.createdByUid || "" : uid,
         createdAt: editing ? initial.info.createdAt || Date.now() : Date.now(),
@@ -7026,7 +7026,7 @@ function MeetingForm({
     style: {
       color: BLUE
     }
-  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : /*#__PURE__*/React.createElement(FieldWrap, {
+  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : f.kind === "flash" ? hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요.") : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC608\uC57D \uC624\uD508",
     error: errors.openAt
   }, /*#__PURE__*/React.createElement("input", {
