@@ -102,8 +102,68 @@ const ICON_PATHS = {
   calendar: ["M4 6h16v14H4z", "M4 10h16", "M8 3v4", "M16 3v4"],
   chart: ["M4 20V10", "M10 20V4", "M16 20v-7", "M22 20H2"],
   bell: ["M6 16V11a6 6 0 0 1 12 0v5l2 2H4z", "M10 20a2 2 0 0 0 4 0"],
-  user: ["M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M4 21a8 8 0 0 1 16 0"]
+  user: ["M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M4 21a8 8 0 0 1 16 0"],
+  clock: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 6v6l4 2"],
+  pin: ["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z", "M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"],
+  users: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
+  userPlus: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M19 8v6", "M22 11h-6"],
+  map: ["M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z", "M9 3v15", "M15 6v15"],
+  repeat: ["M17 1l4 4-4 4", "M3 11V9a4 4 0 0 1 4-4h14", "M7 23l-4-4 4-4", "M21 13v2a4 4 0 0 1-4 4H3"],
+  zap: ["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
+  check: ["M20 6 9 17l-5-5"],
+  checkCircle: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4 12 14.01l-3-3"],
+  x: ["M18 6 6 18", "M6 6l12 12"],
+  mail: ["M3 5h18v14H3z", "M21 7l-9 6-9-6"],
+  camera: ["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z", "M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
+  crown: ["M5 18 3 7l5 4 4-7 4 7 5-4-2 11z", "M5 21h14"],
+  megaphone: ["M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z", "M17 9a4 4 0 0 1 0 6", "M20 6a8 8 0 0 1 0 12"],
+  coffee: ["M17 8h1a4 4 0 0 1 0 8h-1", "M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z", "M6 2v3", "M10 2v3", "M14 2v3"],
+  cloud: ["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"],
+  phone: ["M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z", "M11 18h2"],
+  flame: ["M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"],
+  hourglass: ["M5 22h14", "M5 2h14", "M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22", "M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"],
+  ball: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M18.1 4.1a10 10 0 0 0 0 15.8", "M5.9 4.1a10 10 0 0 1 0 15.8"],
+  arrive: ["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4", "M10 17l5-5-5-5", "M15 12H3"],
+  leave: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"]
 };
+// 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
+const RankNo = ({
+  r
+}) => /*#__PURE__*/React.createElement("span", {
+  style: {
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 12,
+    fontWeight: 700,
+    flexShrink: 0,
+    background: r.top ? r.rank === 1 ? BLUE : BLUE_LIGHT : "transparent",
+    color: r.top ? r.rank === 1 ? "#fff" : BLUE : "#A3AAC2"
+  }
+}, r.rank);
+// 글자 사이에 넣는 작은 선 아이콘
+const Ic = ({
+  n,
+  s = 14,
+  c = "currentColor",
+  w = 1.9,
+  style
+}) => /*#__PURE__*/React.createElement("span", {
+  style: {
+    display: "inline-flex",
+    verticalAlign: "-0.15em",
+    flexShrink: 0,
+    ...style
+  }
+}, /*#__PURE__*/React.createElement(Icon, {
+  name: n,
+  size: s,
+  color: c,
+  stroke: w
+}));
 function Icon({
   name,
   size = 22,
@@ -256,7 +316,7 @@ function toMeeting(id, rec, series) {
     desc: info.desc || "",
     openAt: info.openAt || "",
     openDate: fmtOpen(info.openAt),
-    status: info.date < today ? "past" : "upcoming",
+    status: info.date < today || info.date === today && info.end && nowAt().slice(11, 16) >= info.end ? "past" : "upcoming",
     createdBy: info.createdBy || "",
     createdByUid: info.createdByUid || "",
     votes: votesFromRec(rec)
@@ -299,7 +359,7 @@ function rankingOf(list) {
       name,
       count: c[name],
       ntrp: MEMBER_NTRP[name] || "-",
-      badge: ["", "🥇", "🥈", "🥉"][rank] || "",
+      top: rank <= 3,
       isMe: name === ME
     };
   });
@@ -893,11 +953,12 @@ function ForgotScreen({
       flexDirection: "column",
       gap: 16
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 48
-    }
-  }, "\uD83D\uDCE7"), /*#__PURE__*/React.createElement("h3", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "mail",
+    size: 48,
+    color: BLUE,
+    stroke: 1.6
+  }), /*#__PURE__*/React.createElement("h3", {
     style: {
       margin: 0,
       color: BLUE,
@@ -1027,7 +1088,10 @@ function Step1({
       fontSize: 12,
       color: "#a16207"
     }
-  }, "\uD83D\uDC51 \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "crown",
+    s: 13
+  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC774\uBA54\uC77C",
     required: !isAdmin,
     error: errors.email
@@ -1212,7 +1276,10 @@ function Step2({
       fontSize: 12,
       color: "#a16207"
     }
-  }, "\uD83D\uDC51 \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), !editing && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "crown",
+    s: 13
+  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), !editing && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -1241,11 +1308,12 @@ function Step2({
       height: "100%",
       objectFit: "cover"
     }
-  }) : /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 32
-    }
-  }, "\uD83D\uDCF7")), /*#__PURE__*/React.createElement("p", {
+  }) : /*#__PURE__*/React.createElement(Icon, {
+    name: "camera",
+    size: 30,
+    color: "#A3AAC2",
+    stroke: 1.6
+  })), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
       color: "#A3AAC2",
@@ -1406,7 +1474,7 @@ function Step3({
   onSubmit,
   onBack,
   isAdmin,
-  submitLabel = "가입 완료 🎾"
+  submitLabel = "가입 완료"
 }) {
   const [errors, setErrors] = useState({});
   const [ntrpPopup, setNtrpPopup] = useState(null);
@@ -1448,7 +1516,10 @@ function Step3({
       fontSize: 12,
       color: "#a16207"
     }
-  }, "\uD83D\uDC51 \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), ntrpPopup && popupItem && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "crown",
+    s: 13
+  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), ntrpPopup && popupItem && /*#__PURE__*/React.createElement("div", {
     onClick: () => setNtrpPopup(null),
     style: {
       position: "fixed",
@@ -1916,7 +1987,7 @@ function HomeTab({
   }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
     action: next ? "전체보기" : null,
     onAction: onGoBooking
-  }, "\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784 \uD83D\uDCC5"), !next ? /*#__PURE__*/React.createElement(Empty, {
+  }, "\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784"), !next ? /*#__PURE__*/React.createElement(Empty, {
     action: "+ \uBAA8\uC784 \uB9CC\uB4E4\uAE30",
     onAction: onCreate
   }, "\uC544\uC9C1 \uC7A1\uD78C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
@@ -1953,13 +2024,19 @@ function HomeTab({
       fontSize: 13,
       color: "#4A5578"
     }
-  }, "\uD83D\uDD57 ", next.time), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "clock",
+    s: 13
+  }), " ", next.time), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
       color: "#4A5578"
     }
-  }, "\uD83D\uDCCD ", next.place)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 13
+  }), " ", next.place)), /*#__PURE__*/React.createElement("span", {
     style: {
       background: GRAD,
       color: "#fff",
@@ -2044,7 +2121,10 @@ function HomeTab({
       color: "#6B7493",
       textAlign: "center"
     }
-  }, "\uD83D\uDDD3\uFE0F \uC608\uC57D\uC740 ", next.openDate, "\uC5D0 \uC5F4\uB824\uC694")), nextNext && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "calendar",
+    s: 13
+  }), " \uC608\uC57D\uC740 ", next.openDate, "\uC5D0 \uC5F4\uB824\uC694")), nextNext && /*#__PURE__*/React.createElement("div", {
     onClick: () => onOpenMeeting(nextNext.id, "info"),
     style: {
       marginTop: 10,
@@ -2069,7 +2149,10 @@ function HomeTab({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, "\uD83D\uDCCD ", nextNext.place)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 13
+  }), " ", nextNext.place)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: "#A3AAC2"
@@ -2077,7 +2160,7 @@ function HomeTab({
   }, nextNext.attendees.length, "\uBA85 \uCC38\uC11D\uC608\uC815"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
     action: lastMeeting ? mine ? "대진·스코어" : "결과 기록하기" : null,
     onAction: () => lastMeeting && onOpenMeeting(lastMeeting.id, "bracket")
-  }, "\uB9C8\uC9C0\uB9C9 \uCC38\uC11D \uBAA8\uC784 \uD83C\uDFBE"), !lastMeeting ? /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uCC38\uC11D\uD55C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, "\uB9C8\uC9C0\uB9C9 \uCC38\uC11D \uBAA8\uC784"), !lastMeeting ? /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uCC38\uC11D\uD55C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -2117,7 +2200,7 @@ function HomeTab({
       color: "#1B2559",
       wordBreak: "keep-all"
     }
-  }, item.value))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC774\uB2EC\uC758 \uCC38\uC5EC \uB7AD\uD0B9 \uD83C\uDFC6"), monthRank.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC774\uBC88 \uB2EC \uCC38\uC11D \uAE30\uB85D\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, item.value))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC774\uB2EC\uC758 \uCC38\uC5EC \uB7AD\uD0B9"), monthRank.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC774\uBC88 \uB2EC \uCC38\uC11D \uAE30\uB85D\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -2134,15 +2217,9 @@ function HomeTab({
       background: r.isMe ? BLUE_LIGHT : "#F5F7FE",
       border: r.isMe ? `1.5px solid ${BLUE}` : "1px solid transparent"
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 22,
-      textAlign: "center",
-      fontSize: r.badge ? 16 : 13,
-      fontWeight: 700,
-      color: "#A3AAC2"
-    }
-  }, r.badge || r.rank), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(RankNo, {
+    r: r
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
       fontSize: 14,
@@ -2173,7 +2250,7 @@ function HomeTab({
   }, r.count, "\uD68C"))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
     action: isAdmin ? "+ 공지 쓰기" : null,
     onAction: onWriteNotice
-  }, "\uACF5\uC9C0\uC0AC\uD56D \uD83D\uDCE2"), notices.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, "\uACF5\uC9C0\uC0AC\uD56D"), notices.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column"
@@ -3270,11 +3347,11 @@ const postFeed = item => FB ? FB.club.child("feed/" + newId()).set({
   byUid: myUid()
 }).catch(() => {}) : Promise.resolve();
 const NOTI_ICON = {
-  member: "👋",
-  meeting: "📅",
-  notice: "📢",
-  approved: "✅",
-  admin: "📣"
+  member: "userPlus",
+  meeting: "calendar",
+  notice: "megaphone",
+  approved: "checkCircle",
+  admin: "bell"
 };
 const ago = t => {
   const m = Math.floor((Date.now() - t) / 60000);
@@ -3397,11 +3474,12 @@ function PendingScreen({
       textAlign: "center",
       padding: "12px 0"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 44
-    }
-  }, "\u23F3"), /*#__PURE__*/React.createElement("h2", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "hourglass",
+    size: 44,
+    color: BLUE,
+    stroke: 1.6
+  }), /*#__PURE__*/React.createElement("h2", {
     style: {
       margin: 0,
       fontSize: 19,
@@ -3436,7 +3514,7 @@ function PendingScreen({
 
 // 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
 // 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
-const ADMIN_MSG = [["vote", "모임 투표 독려", m => m ? `${m.date} ${m.place} 모임 참석 투표해 주세요! 🎾` : "다가오는 모임 참석 투표해 주세요! 🎾"], ["profile", "정보 수정 요청", () => "프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["realName", "본명 입력 요청", () => "본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."], ["career", "구력 확인 요청", () => "구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["custom", "직접 쓰기", () => ""]];
+const ADMIN_MSG = [["vote", "모임 투표 독려", m => m ? `${m.date} ${m.place} 모임 참석 투표해 주세요!` : "다가오는 모임 참석 투표해 주세요!"], ["profile", "정보 수정 요청", () => "프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["realName", "본명 입력 요청", () => "본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."], ["career", "구력 확인 요청", () => "구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["custom", "직접 쓰기", () => ""]];
 function AdminTab() {
   const [members, setMembers] = useState(null);
   const [approved, setApproved] = useState({});
@@ -3489,7 +3567,7 @@ function AdminTab() {
   });
   const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => inbox(uid, {
     type: "approved",
-    text: "정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾"
+    text: "정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요"
   })).catch(fail);
   const demote = m => {
     if (!window.confirm(`${m.nickname} 님을 준회원으로 바꿀까요? 모임 투표를 못 하게 돼요.`)) return;
@@ -3678,7 +3756,7 @@ function AdminTab() {
       gap: 16,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC54C\uB9BC \uBCF4\uB0B4\uAE30 \uD83D\uDCE3"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC54C\uB9BC \uBCF4\uB0B4\uAE30"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
@@ -3750,14 +3828,17 @@ function AdminTab() {
       color: BLUE,
       textAlign: "center"
     }
-  }, "\u2705 ", sent), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "check",
+    s: 14
+  }), " ", sent), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "8px 0 0",
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uBC1B\uC740 \uC0AC\uB78C\uC758 \uD83D\uDD14 \uC54C\uB9BC\uC5D0 \uB5A0\uC694. \uD22C\uD45C \uB3C5\uB824\uB294 \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784\uC73C\uB85C, \uC815\uBCF4 \uC218\uC815 \uC694\uCCAD\uC740 \uB204\uB974\uBA74 \uC815\uBCF4 \uC218\uC815 \uD654\uBA74\uC73C\uB85C \uAC00\uC694.")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC900\uD68C\uC6D0 \xB7 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uBC1B\uC740 \uC0AC\uB78C\uC758 \uC54C\uB9BC \uBAA9\uB85D\uC5D0 \uB5A0\uC694. \uD22C\uD45C \uB3C5\uB824\uB294 \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784\uC73C\uB85C, \uC815\uBCF4 \uC218\uC815 \uC694\uCCAD\uC740 \uB204\uB974\uBA74 \uC815\uBCF4 \uC218\uC815 \uD654\uBA74\uC73C\uB85C \uAC00\uC694.")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC900\uD68C\uC6D0 \xB7 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -4046,10 +4127,14 @@ function BracketSetup({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 36,
-      marginBottom: 8
+      marginBottom: 8,
+      color: BLUE
     }
-  }, "\uD83C\uDFBE"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "ball",
+    size: 36,
+    stroke: 1.6
+  })), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 4px",
       fontWeight: 700,
@@ -4539,7 +4624,10 @@ function MeetingBracket({
       color: "#A3AAC2",
       textAlign: "center"
     }
-  }, mode === "shared" ? "☁️ " : "📱 ", modeNote);
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: mode === "shared" ? "cloud" : "phone",
+    s: 12
+  }), " ", modeNote);
   if (!bracket) return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -4692,7 +4780,10 @@ function MeetingBracket({
       fontSize: 12,
       color: "#6B7493"
     }
-  }, "\u2615 \uD734\uC2DD \xB7 ", ses.rest.map(i => bracket.players[i]).join(", ")))), show === "table" && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC1C\uC778 \uC131\uC801"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "coffee",
+    s: 13
+  }), " \uD734\uC2DD \xB7 ", ses.rest.map(i => bracket.players[i]).join(", ")))), show === "table" && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC1C\uC778 \uC131\uC801"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       fontSize: 11,
@@ -4913,7 +5004,10 @@ function VoteRow({
       background: "#EEF4FF",
       color: BLUE
     }
-  }, "\u23F0 ", v.arrive, " \uB3C4\uCC29"), v.leave && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "arrive",
+    s: 11
+  }), " ", v.arrive, " \uB3C4\uCC29"), v.leave && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
@@ -4922,7 +5016,10 @@ function VoteRow({
       background: "#EEF4FF",
       color: BLUE
     }
-  }, "\uD83C\uDFC3 ", v.leave, " \uCD9C\uBC1C"), v.bumped && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "leave",
+    s: 11
+  }), " ", v.leave, " \uCD9C\uBC1C"), v.bumped && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
@@ -4995,7 +5092,7 @@ function MeetingDetail({
   const myCount = counts[ME] || 0;
   const myConfirmIdx = confirmed.findIndex(v => v.isMe),
     myWaitIdx = waitlist.findIndex(v => v.isMe);
-  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `✅ 참석 확정 · ${myConfirmIdx + 1}번째` : `⏳ 대기 ${myWaitIdx + 1}번${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "❌ 불참으로 등록되었어요" : myStatus === "maybe" ? "⏳ 미정으로 등록되었어요" : "";
+  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `참석 확정 · ${myConfirmIdx + 1}번째` : `대기 ${myWaitIdx + 1}번${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "불참으로 등록되었어요" : myStatus === "maybe" ? "미정으로 등록되었어요" : "";
   // 대진표 참가자 = 참석 확정자
   const participants = confirmed.map(v => ({
     name: v.name,
@@ -5121,15 +5218,15 @@ function MeetingDetail({
       marginBottom: 14
     }
   }, [{
-    icon: "🕗",
+    icon: "clock",
     label: "시간",
     value: meeting.time
   }, {
-    icon: "📍",
+    icon: "pin",
     label: "장소",
     value: meeting.place
   }, ...(meeting.address ? [{
-    icon: "🗺️",
+    icon: "map",
     label: "주소",
     value: /*#__PURE__*/React.createElement("a", {
       href: mapUrl(meeting.address),
@@ -5142,15 +5239,15 @@ function MeetingDetail({
       }
     }, meeting.address)
   }] : []), {
-    icon: "👥",
+    icon: "users",
     label: "제한 인원",
     value: `${meeting.capacity}명${meeting.guestCap ? ` + 게스트 ${meeting.guestCap}명` : ""}`
   }, ...(meeting.kind === "flash" ? [] : [{
-    icon: "🗓️",
+    icon: "calendar",
     label: "예약 오픈",
     value: meeting.openDate
   }]), ...(ser ? [{
-    icon: "🔁",
+    icon: "repeat",
     label: "반복",
     value: serActive ? seriesText(ser) : "반복 멈춤"
   }] : [])].map(r => /*#__PURE__*/React.createElement("div", {
@@ -5162,11 +5259,16 @@ function MeetingDetail({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 15,
       width: 22,
-      textAlign: "center"
+      display: "flex",
+      justifyContent: "center",
+      color: "#8A93B2"
     }
-  }, r.icon), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: r.icon,
+    size: 17,
+    stroke: 1.8
+  })), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       color: "#A3AAC2",
@@ -5180,7 +5282,7 @@ function MeetingDetail({
     }
   }, r.value)))), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: isPast ? 0 : 14
+      marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5212,7 +5314,26 @@ function MeetingDetail({
       background: fill >= 100 ? "#ef4444" : BLUE,
       borderRadius: 10
     }
-  }))), !isPast && !open && /*#__PURE__*/React.createElement("p", {
+  }))), isPast && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 600,
+      textAlign: "center",
+      color: "#8A93B2",
+      background: "#EEF1FA",
+      borderRadius: 12,
+      padding: "12px 0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "clock",
+    size: 16,
+    stroke: 1.9
+  }), "\uC885\uB8CC\uB41C \uBAA8\uC784"), !isPast && !open && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -5222,7 +5343,10 @@ function MeetingDetail({
       borderRadius: 12,
       padding: "10px 0"
     }
-  }, "\uD83D\uDDD3\uFE0F \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !isPast && open && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "calendar",
+    s: 13
+  }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !isPast && open && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5281,7 +5405,10 @@ function MeetingDetail({
       fontWeight: 600,
       color: "#2B3674"
     }
-  }, "\u23F0 \uB2A6\uAC8C \uC624\uAC70\uB098 \uC77C\uCC0D \uAC00\uB098\uC694?"), [["arrive", "늦게 와요", "도착", mine.arrive, hhmmApp(Math.min(toMin(mEnd) - 30, toMin(mStart) + 30))], ["leave", "일찍 가요", "출발", mine.leave, hhmmApp(Math.max(toMin(mStart) + 30, toMin(mEnd) - 30))]].map(([k, l, w, val, def]) => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "clock",
+    s: 14
+  }), " \uB2A6\uAC8C \uC624\uAC70\uB098 \uC77C\uCC0D \uAC00\uB098\uC694?"), [["arrive", "늦게 와요", "도착", mine.arrive, hhmmApp(Math.min(toMin(mEnd) - 30, toMin(mStart) + 30))], ["leave", "일찍 가요", "출발", mine.leave, hhmmApp(Math.max(toMin(mStart) + 30, toMin(mEnd) - 30))]].map(([k, l, w, val, def]) => /*#__PURE__*/React.createElement("div", {
     key: k,
     style: {
       display: "flex",
@@ -5352,7 +5479,10 @@ function MeetingDetail({
       fontWeight: 600,
       color: "#2B3674"
     }
-  }, "\uD83D\uDC65 \uAC8C\uC2A4\uD2B8 \uCD08\uB300"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "userPlus",
+    s: 14
+  }), " \uAC8C\uC2A4\uD2B8 \uCD08\uB300"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShowGuest(v => !v),
     style: {
@@ -5383,11 +5513,11 @@ function MeetingDetail({
       borderRadius: 999,
       border: "1px solid #E4E9F7"
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 16
-    }
-  }, "\uD83D\uDE4B"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "user",
+    s: 15,
+    c: "#8A93B2"
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
       fontSize: 13,
@@ -5452,7 +5582,7 @@ function MeetingDetail({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, meeting.guestCap ? `정원 외 게스트 ${meeting.guestCap}명까지 선착순으로 받아요` : "게스트 자리는 따로 없어요. 회원 자리가 남으면 참석할 수 있어요")))), meeting.desc && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uC124\uBA85 \uD83D\uDCCB"), /*#__PURE__*/React.createElement("p", {
+  }, meeting.guestCap ? `정원 외 게스트 ${meeting.guestCap}명까지 선착순으로 받아요` : "게스트 자리는 따로 없어요. 회원 자리가 남으면 참석할 수 있어요")))), meeting.desc && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uC124\uBA85"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
@@ -5467,7 +5597,7 @@ function MeetingDetail({
       gap: 6,
       marginBottom: 12
     }
-  }, (prio ? [["1", "이달 덜 참석한 회원", "먼저"], ["2", "같은 횟수면", "투표 빠른 순"]] : [["⚡", "번개 모임", "선착순"]]).concat([["👥", "게스트", meeting.guestCap ? `정원 외 ${meeting.guestCap}명 · 선착순` : "빈자리만"]]).map(([n, a, b]) => /*#__PURE__*/React.createElement("span", {
+  }, (prio ? [["1", "이달 덜 참석한 회원", "먼저"], ["2", "같은 횟수면", "투표 빠른 순"]] : [["i:zap", "번개 모임", "선착순"]]).concat([["i:userPlus", "게스트", meeting.guestCap ? `정원 외 ${meeting.guestCap}명 · 선착순` : "빈자리만"]]).map(([n, a, b]) => /*#__PURE__*/React.createElement("span", {
     key: a,
     style: {
       fontSize: 11,
@@ -5480,7 +5610,10 @@ function MeetingDetail({
     style: {
       color: BLUE
     }
-  }, n), " ", a, " \xB7 ", b))), /*#__PURE__*/React.createElement("div", {
+  }, n.startsWith("i:") ? /*#__PURE__*/React.createElement(Ic, {
+    n: n.slice(2),
+    s: 12
+  }) : n), " ", a, " \xB7 ", b))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5656,13 +5789,19 @@ function BookingTab({
         fontSize: 13,
         color: "#6B7493"
       }
-    }, "\uD83D\uDD57 ", m.time), /*#__PURE__*/React.createElement("p", {
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "clock",
+      s: 13
+    }), " ", m.time), /*#__PURE__*/React.createElement("p", {
       style: {
         margin: 0,
         fontSize: 13,
         color: "#6B7493"
       }
-    }, "\uD83D\uDCCD ", m.place)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "pin",
+      s: 13
+    }), " ", m.place)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -5750,7 +5889,10 @@ function BookingTab({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, "\uD83D\uDCCD ", m.place, " \xB7 ", m.attendees.length, "\uBA85 \uCC38\uC11D")), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 13
+  }), " ", m.place, " \xB7 ", m.attendees.length, "\uBA85 \uCC38\uC11D")), /*#__PURE__*/React.createElement("span", {
     style: {
       background: "#E4E9F7",
       color: "#A3AAC2",
@@ -5815,7 +5957,14 @@ function StatsTab() {
     value: `${mineList.filter(m => m.iso.slice(0, 4) === year).length}회`
   }, {
     label: "연속 참석",
-    value: `${streak}회${streak >= 3 ? " 🔥" : ""}`
+    value: /*#__PURE__*/React.createElement(React.Fragment, null, streak, "\uD68C", streak >= 3 && /*#__PURE__*/React.createElement(Ic, {
+      n: "flame",
+      s: 15,
+      c: "#ef4444",
+      style: {
+        marginLeft: 3
+      }
+    }))
   }].map(s => /*#__PURE__*/React.createElement(Card, {
     key: s.label,
     style: {
@@ -5938,15 +6087,9 @@ function StatsTab() {
       background: r.isMe ? BLUE_LIGHT : "#F5F7FE",
       border: r.isMe ? `1.5px solid ${BLUE}` : "1px solid transparent"
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 22,
-      textAlign: "center",
-      fontSize: r.badge ? 16 : 13,
-      fontWeight: 700,
-      color: "#A3AAC2"
-    }
-  }, r.badge || r.rank), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(RankNo, {
+    r: r
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
       fontSize: 14,
@@ -6188,9 +6331,16 @@ function MyInfoSheet({
       height: 34,
       fontSize: 16,
       color: "#6B7493",
-      cursor: "pointer"
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
     }
-  }, "\u2715")), edit ? /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(ProfileEdit, {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 16,
+    stroke: 2.2
+  }))), edit ? /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(ProfileEdit, {
     account: account,
     onCancel: () => setEdit(false),
     onDone: p => {
@@ -6306,7 +6456,10 @@ function MyInfoSheet({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, "\uD83D\uDCCD ", m.place)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 13
+  }), " ", m.place)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       fontWeight: 700,
@@ -6398,7 +6551,7 @@ function NoticeForm({
     });
   };
   return /*#__PURE__*/React.createElement(Sheet, {
-    title: "\uACF5\uC9C0 \uC4F0\uAE30 \uD83D\uDCE2",
+    title: "\uACF5\uC9C0 \uC4F0\uAE30",
     onClose: onClose
   }, /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC81C\uBAA9",
@@ -6525,9 +6678,16 @@ function Sheet({
       height: 34,
       fontSize: 16,
       color: "#6B7493",
-      cursor: "pointer"
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
     }
-  }, "\u2715")), children));
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 16,
+    stroke: 2.2
+  }))), children));
 }
 
 // ─── 알림함 ───────────────────────────────────────────────────────────────────
@@ -6538,7 +6698,7 @@ function NotiSheet({
   isAdmin
 }) {
   return /*#__PURE__*/React.createElement(Sheet, {
-    title: "\uC54C\uB9BC \uD83D\uDD14",
+    title: "\uC54C\uB9BC",
     onClose: onClose
   }, items.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC0C8 \uC54C\uB9BC\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6568,10 +6728,21 @@ function NotiSheet({
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 20,
-        lineHeight: 1.2
+        width: 34,
+        height: 34,
+        borderRadius: "50%",
+        background: BLUE_LIGHT,
+        color: BLUE,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
       }
-    }, NOTI_ICON[n.type] || "🔔"), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: NOTI_ICON[n.type] || "bell",
+      size: 17,
+      stroke: 1.9
+    })), /*#__PURE__*/React.createElement("span", {
       style: {
         flex: 1,
         minWidth: 0
@@ -6690,7 +6861,13 @@ function KindBadge({
       color: flash ? "#C2610C" : BLUE,
       whiteSpace: "nowrap"
     }
-  }, flash ? "⚡ 번개" : m.seriesId ? "🔁 정기" : "정기");
+  }, flash ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "zap",
+    s: 11
+  }), " \uBC88\uAC1C") : m.seriesId ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "repeat",
+    s: 11
+  }), " \uC815\uAE30") : "정기");
 }
 function Pills({
   value,
@@ -6989,7 +7166,7 @@ function MeetingForm({
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, editing ? "모임 수정 ✏️" : "모임 만들기 🎾"), /*#__PURE__*/React.createElement("button", {
+  }, editing ? "모임 수정" : "모임 만들기"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onClose,
     "aria-label": "\uB2EB\uAE30",
@@ -7001,9 +7178,16 @@ function MeetingForm({
       height: 34,
       fontSize: 16,
       color: "#6B7493",
-      cursor: "pointer"
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
     }
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 16,
+    stroke: 2.2
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -7016,7 +7200,7 @@ function MeetingForm({
     label: "\uBAA8\uC784 \uC885\uB958",
     value: f.kind,
     onChange: v => set("kind", v),
-    options: [["regular", "정기 모임"], ["flash", "⚡ 번개 모임"]]
+    options: [["regular", "정기 모임"], ["flash", "번개 모임"]]
   }), hint(f.kind === "regular" ? "이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요." : "번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")), !editing && f.kind === "regular" && /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC18\uBCF5"
   }, /*#__PURE__*/React.createElement(Pills, {
@@ -7188,7 +7372,7 @@ function MeetingForm({
     style: {
       color: BLUE
     }
-  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : f.kind === "flash" ? hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요.") : /*#__PURE__*/React.createElement(FieldWrap, {
+  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : f.kind === "flash" ? hint("번개 모임은 만들자마자 바로 참석 투표를 받아요.") : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC608\uC57D \uC624\uD508",
     error: errors.openAt
   }, /*#__PURE__*/React.createElement("div", {
@@ -8148,10 +8332,11 @@ function App() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 46,
         boxShadow: SHADOW_BTN
       }
-    }, "\uD83C\uDFBE"), /*#__PURE__*/React.createElement("h2", {
+    }, /*#__PURE__*/React.createElement(MascotSvg, {
+      size: 72
+    })), /*#__PURE__*/React.createElement("h2", {
       style: {
         fontSize: 20,
         fontWeight: 700,
@@ -8313,9 +8498,16 @@ function App() {
     style: {
       fontSize: 14,
       fontWeight: 600,
-      opacity: 0.9
+      opacity: 0.9,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
     }
-  }, "\uD83C\uDFBE SSTC"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "ball",
+    size: 16,
+    stroke: 2
+  }), "SSTC"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -8378,7 +8570,7 @@ function App() {
       fontSize: 13,
       opacity: 0.85
     }
-  }, "\uC548\uB155\uD558\uC138\uC694 \uD83D\uDC4B"), /*#__PURE__*/React.createElement("p", {
+  }, "\uC548\uB155\uD558\uC138\uC694"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 26,
@@ -8406,7 +8598,10 @@ function App() {
       fontSize: 13,
       opacity: 0.85
     }
-  }, "\uD83D\uDCCD ", curMeeting.place), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 13
+  }), " ", curMeeting.place), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 24,
