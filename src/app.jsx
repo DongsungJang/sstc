@@ -17,7 +17,34 @@ const ICON_PATHS = {
   chart:["M4 20V10","M10 20V4","M16 20v-7","M22 20H2"],
   bell:["M6 16V11a6 6 0 0 1 12 0v5l2 2H4z","M10 20a2 2 0 0 0 4 0"],
   user:["M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M4 21a8 8 0 0 1 16 0"],
+  clock:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M12 6v6l4 2"],
+  pin:["M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z","M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"],
+  users:["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2","M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M22 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+  userPlus:["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2","M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M19 8v6","M22 11h-6"],
+  map:["M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z","M9 3v15","M15 6v15"],
+  repeat:["M17 1l4 4-4 4","M3 11V9a4 4 0 0 1 4-4h14","M7 23l-4-4 4-4","M21 13v2a4 4 0 0 1-4 4H3"],
+  zap:["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
+  check:["M20 6 9 17l-5-5"],
+  checkCircle:["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4 12 14.01l-3-3"],
+  x:["M18 6 6 18","M6 6l12 12"],
+  mail:["M3 5h18v14H3z","M21 7l-9 6-9-6"],
+  camera:["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z","M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
+  crown:["M5 18 3 7l5 4 4-7 4 7 5-4-2 11z","M5 21h14"],
+  megaphone:["M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z","M17 9a4 4 0 0 1 0 6","M20 6a8 8 0 0 1 0 12"],
+  coffee:["M17 8h1a4 4 0 0 1 0 8h-1","M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z","M6 2v3","M10 2v3","M14 2v3"],
+  cloud:["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"],
+  phone:["M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z","M11 18h2"],
+  flame:["M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"],
+  hourglass:["M5 22h14","M5 2h14","M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22","M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"],
+  ball:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M18.1 4.1a10 10 0 0 0 0 15.8","M5.9 4.1a10 10 0 0 1 0 15.8"],
+  arrive:["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4","M10 17l5-5-5-5","M15 12H3"],
+  leave:["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
 };
+// 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
+const RankNo=({r})=><span style={{width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0,
+  background:r.top?(r.rank===1?BLUE:BLUE_LIGHT):"transparent",color:r.top?(r.rank===1?"#fff":BLUE):"#A3AAC2"}}>{r.rank}</span>;
+// 글자 사이에 넣는 작은 선 아이콘
+const Ic=({n,s=14,c="currentColor",w=1.9,style})=><span style={{display:"inline-flex",verticalAlign:"-0.15em",flexShrink:0,...style}}><Icon name={n} size={s} color={c} stroke={w}/></span>;
 function Icon({name,size=22,color="currentColor",stroke=2}) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -90,7 +117,7 @@ function toMeeting(id,rec,series){
     place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:""), placeName:info.place, courtNo:info.courtNo||"", address:info.address||"",
     kind:kindOf(info), capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
-    status:info.date<today?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
+    status:(info.date<today||(info.date===today&&info.end&&nowAt().slice(11,16)>=info.end))?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
     votes:votesFromRec(rec) };
 }
 // 다가오는 모임은 가까운 날짜부터, 지난 모임은 최근 것부터
@@ -98,8 +125,10 @@ function buildMeetings(all){
   const list=Object.keys(all||{}).filter(k=>/^m\d+$/.test(k)&&all[k]&&all[k].info&&all[k].info.date)
     .map(k=>{const sid=all[k].info.seriesId;return toMeeting(+k.slice(1),all[k],sid&&all.series?all.series["s"+sid]:null);});
   RAW_MEETINGS=all||{};
-  const up=list.filter(m=>m.status==="upcoming").sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:0);
-  const past=list.filter(m=>m.status==="past").sort((a,b)=>a.iso<b.iso?1:a.iso>b.iso?-1:0);
+  // 같은 날짜면 시작 시간이 빠른 모임부터
+  const st=(a,b)=>a.info.start<b.info.start?-1:a.info.start>b.info.start?1:0;
+  const up=list.filter(m=>m.status==="upcoming").sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:st(a,b));
+  const past=list.filter(m=>m.status==="past").sort((a,b)=>a.iso<b.iso?1:a.iso>b.iso?-1:st(a,b));
   MEETINGS=[...up,...past];
   refreshAttendance();
   return MEETINGS;
@@ -113,7 +142,7 @@ function rankingOf(list){
   list.forEach(m=>(m.attendees||[]).forEach(v=>{ if(!v.isGuest) c[v.name]=(c[v.name]||0)+1; }));
   return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b,"ko")).map(name=>{
     const rank=1+Object.keys(c).filter(n=>c[n]>c[name]).length;
-    return {rank,name,count:c[name],ntrp:MEMBER_NTRP[name]||"-",badge:["","🥇","🥈","🥉"][rank]||"",isMe:name===ME};
+    return {rank,name,count:c[name],ntrp:MEMBER_NTRP[name]||"-",top:rank<=3,isMe:name===ME};
   });
 }
 const dDay=iso=>{ const d=Math.round((new Date(iso+"T00:00:00")-new Date(todayYmd()+"T00:00:00"))/86400000); return d===0?"D-DAY":`D-${d}`; };
@@ -329,7 +358,7 @@ function ForgotScreen({onBack}) {
   );
   if(sent) return(
     <div style={{textAlign:"center",padding:"24px 0",display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{fontSize:48}}>📧</div>
+      <Icon name="mail" size={48} color={BLUE} stroke={1.6}/>
       <h3 style={{margin:0,color:BLUE,fontSize:18}}>{FB?"재설정 메일을 보냈어요":"임시 비밀번호 발송 완료"}</h3>
       <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>{FB?<>메일함(스팸함 포함)에서 링크를 눌러<br/>새 비밀번호를 정해 주세요.</>:<>가입 시 등록한 이메일로<br/>임시 비밀번호를 보내드렸어요.</>}</p>
       <button type="button" onClick={onBack} style={{...btnPrimary,marginTop:8}}>로그인으로 돌아가기</button>
@@ -373,7 +402,7 @@ function Step1({data,onChange,onNext,isAdmin}) {
   };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
-      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}>👑 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
+      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
       <FieldWrap label="이메일" required={!isAdmin} error={errors.email}>
         <div style={{display:"flex",gap:8}}>
           <input type="email" value={data.email} style={inputStyle} onChange={e=>{onChange("email",e.target.value);setEmailChecked(false);setEmailMsg("");}} placeholder="example@email.com"/>
@@ -428,10 +457,10 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
   };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
-      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}>👑 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
+      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
       {!editing&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
         <div onClick={()=>fileRef.current.click()} style={{width:88,height:88,borderRadius:"50%",border:"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F5F7FE"}}>
-          {preview?<img src={preview} alt="프로필" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:32}}>📷</span>}
+          {preview?<img src={preview} alt="프로필" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
         </div>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>클릭해서 프로필 사진 추가 (선택)</p>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
@@ -478,7 +507,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
 }
 
 // ─── 회원가입 STEP 3 ──────────────────────────────────────────────────────────
-function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료 🎾"}) {
+function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료"}) {
   const [errors,setErrors]=useState({});
   const [ntrpPopup,setNtrpPopup]=useState(null);
   const career=calcCareer(data.tennisStart);
@@ -495,7 +524,7 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
   };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:22}}>
-      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}>👑 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
+      {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
       {/* NTRP 팝업 */}
       {ntrpPopup&&popupItem&&(
         <div onClick={()=>setNtrpPopup(null)} style={{position:"fixed",inset:0,background:"rgba(27,37,89,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
@@ -611,14 +640,14 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <Card>
-        <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임 📅</SectionTitle>
+        <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임</SectionTitle>
         {!next?<Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty>:(
         <div style={{background:BLUE_LIGHT,borderRadius:18,padding:16}}>
           <div onClick={()=>onOpenMeeting(next.id,"info")} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,cursor:"pointer"}}>
             <div>
               <p style={{margin:"0 0 3px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{next.date}<KindBadge m={next}/></p>
-              <p style={{margin:"0 0 2px",fontSize:13,color:"#4A5578"}}>🕗 {next.time}</p>
-              <p style={{margin:0,fontSize:13,color:"#4A5578"}}>📍 {next.place}</p>
+              <p style={{margin:"0 0 2px",fontSize:13,color:"#4A5578"}}><Ic n="clock" s={13}/> {next.time}</p>
+              <p style={{margin:0,fontSize:13,color:"#4A5578"}}><Ic n="pin" s={13}/> {next.place}</p>
             </div>
             <span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,boxShadow:SHADOW_BTN}}>{dDay(next.iso)}</span>
           </div>
@@ -634,17 +663,17 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <button type="button" onClick={()=>vote("attend")} style={{flex:1,padding:"9px 0",background:myStatus==="attend"?GRAD:"#fff",color:myStatus==="attend"?"#fff":BLUE,border:myStatus==="attend"?"none":`1.5px solid ${BLUE}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:myStatus==="attend"?SHADOW_BTN:"none"}}>{myStatus==="attend"?"참석 투표함 ✓":"참석하기 ✓"}</button>
             <button type="button" onClick={()=>vote("absent")} style={{flex:1,padding:"8px 0",background:myStatus==="absent"?"#fef2f2":"#fff",color:myStatus==="absent"?"#ef4444":"#6B7493",border:`1.5px solid ${myStatus==="absent"?"#ef4444":"#D6DEF7"}`,borderRadius:999,fontSize:13,fontWeight:myStatus==="absent"?600:400,cursor:"pointer"}}>불참</button>
           </div>
-          ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}>🗓️ 예약은 {next.openDate}에 열려요</p>}
+          ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}><Ic n="calendar" s={13}/> 예약은 {next.openDate}에 열려요</p>}
         </div>)}
         {nextNext&&(
           <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>📍 {nextNext.place}</p></div>
+            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.place}</p></div>
             <span style={{fontSize:12,color:"#A3AAC2"}}>{nextNext.attendees.length}명 참석예정</span>
           </div>
         )}
       </Card>
       <Card>
-        <SectionTitle action={lastMeeting?(mine?"대진·스코어":"결과 기록하기"):null} onAction={()=>lastMeeting&&onOpenMeeting(lastMeeting.id,"bracket")}>마지막 참석 모임 🎾</SectionTitle>
+        <SectionTitle action={lastMeeting?(mine?"대진·스코어":"결과 기록하기"):null} onAction={()=>lastMeeting&&onOpenMeeting(lastMeeting.id,"bracket")}>마지막 참석 모임</SectionTitle>
         {!lastMeeting?<Empty>아직 참석한 모임이 없어요.</Empty>:(
         <div style={{display:"flex",gap:8}}>
           {[{label:"날짜",value:lastMeeting.date},{label:"장소",value:lastMeeting.place},{label:"내 결과",value:mine?mine.result:"기록 없음"},{label:"자주 친 파트너",value:mine?mine.partner:"-"}].map(item=>(
@@ -656,12 +685,12 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </div>)}
       </Card>
       <Card>
-        <SectionTitle>이달의 참여 랭킹 🏆</SectionTitle>
+        <SectionTitle>이달의 참여 랭킹</SectionTitle>
         {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {monthRank.slice(0,7).map(r=>(
             <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
-              <span style={{width:22,textAlign:"center",fontSize:r.badge?16:13,fontWeight:700,color:"#A3AAC2"}}>{r.badge||r.rank}</span>
+              <RankNo r={r}/>
               <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
               <span style={{fontSize:11,color:"#A3AAC2",marginRight:4}}>NTRP {r.ntrp}</span>
               <span style={{fontSize:13,fontWeight:700,color:BLUE}}>{r.count}회</span>
@@ -670,7 +699,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </div>)}
       </Card>
       <Card>
-        <SectionTitle action={isAdmin?"+ 공지 쓰기":null} onAction={onWriteNotice}>공지사항 📢</SectionTitle>
+        <SectionTitle action={isAdmin?"+ 공지 쓰기":null} onAction={onWriteNotice}>공지사항</SectionTitle>
         {notices.length===0?<Empty>등록된 공지사항이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column"}}>
           {notices.map((n,i)=>(
@@ -1210,7 +1239,7 @@ const once = ref => ref.once("value").then(s=>s.val());
 const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 const postFeed = item => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:ME,byUid:myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {member:"👋",meeting:"📅",notice:"📢",approved:"✅",admin:"📣"};
+const NOTI_ICON = {member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell"};
 const ago = t => { const m=Math.floor((Date.now()-t)/60000); if(m<1) return "방금"; if(m<60) return m+"분 전"; const h=Math.floor(m/60); if(h<24) return h+"시간 전";
   const d=Math.floor(h/24); if(d<7) return d+"일 전"; const x=new Date(t); return `${x.getMonth()+1}/${x.getDate()}`; };
 const toList = (obj,extra={}) => Object.keys(obj||{}).map(id=>({id,...extra,...obj[id]}));
@@ -1260,7 +1289,7 @@ async function signUpMember(form){
 function PendingScreen({profile,onRefresh,onLogout}){
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center",padding:"12px 0"}}>
-      <div style={{fontSize:44}}>⏳</div>
+      <Icon name="hourglass" size={44} color={BLUE} stroke={1.6}/>
       <h2 style={{margin:0,fontSize:19,color:BLUE}}>준회원이에요 · 정회원 승인 대기 중</h2>
       <p style={{margin:0,fontSize:14,color:"#6B7493",lineHeight:1.6}}>{profile&&profile.nickname?`${profile.nickname} 님, `:""}관리자가 승인하면<br/>모임 예약과 대진표를 쓸 수 있어요.</p>
       <button type="button" onClick={onRefresh} style={{...btnPrimary,marginTop:6}}>승인됐는지 다시 확인</button>
@@ -1272,7 +1301,7 @@ function PendingScreen({profile,onRefresh,onLogout}){
 // 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
 // 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
 const ADMIN_MSG=[
-  ["vote","모임 투표 독려",m=>m?`${m.date} ${m.place} 모임 참석 투표해 주세요! 🎾`:"다가오는 모임 참석 투표해 주세요! 🎾"],
+  ["vote","모임 투표 독려",m=>m?`${m.date} ${m.place} 모임 참석 투표해 주세요!`:"다가오는 모임 참석 투표해 주세요!"],
   ["profile","정보 수정 요청",()=>"프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
   ["realName","본명 입력 요청",()=>"본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."],
   ["career","구력 확인 요청",()=>"구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
@@ -1307,7 +1336,7 @@ function AdminTab(){
   const fail=e=>setErr(authMsg(e));
   const inbox=(uid,msg)=>FB.club.child("inbox/"+uid+"/"+newId()).set({...msg,at:Date.now()});
   const approve=uid=>FB.club.child("approved/"+uid).set(true)
-    .then(()=>inbox(uid,{type:"approved",text:"정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요 🎾"})).catch(fail);
+    .then(()=>inbox(uid,{type:"approved",text:"정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요"})).catch(fail);
   const demote=m=>{ if(!window.confirm(`${m.nickname} 님을 준회원으로 바꿀까요? 모임 투표를 못 하게 돼요.`)) return;
     FB.club.child("approved/"+m.uid).remove().catch(fail); };
   const withdraw=m=>{ if(!window.confirm(`${m.nickname} 님을 탈퇴시킬까요? 다음에 앱을 열면 로그아웃되고 다시 들어올 수 없어요.`)) return;
@@ -1360,7 +1389,7 @@ function AdminTab(){
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <Card>
-        <SectionTitle>알림 보내기 📣</SectionTitle>
+        <SectionTitle>알림 보내기</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
           {chip("전체",()=>pick(live))}{chip("정회원 전체",()=>pick(active))}{chip("준회원 전체",()=>pick(pending))}
           {chip("본명 미입력",()=>pick(live.filter(m=>!m.realName)))}{chip("구력 미입력",()=>pick(live.filter(m=>!m.tennisStart)))}
@@ -1375,8 +1404,8 @@ function AdminTab(){
         </select>:<p style={{margin:"0 0 8px",fontSize:12,color:"#A3AAC2"}}>다가오는 모임이 없어요.</p>)}
         <textarea aria-label="알림 내용" value={text} onChange={e=>{setText(e.target.value);setSent("");}} rows={3} placeholder="보낼 내용을 써 주세요" style={{...inputStyle,borderRadius:18,resize:"none",marginBottom:10}}/>
         <button type="button" disabled={busy||!chosen.length||!text.trim()} onClick={send} style={{...btnPrimary,opacity:busy||!chosen.length||!text.trim()?0.5:1}}>{busy?"보내는 중…":`${chosen.length||""}${chosen.length?"명에게 ":""}알림 보내기`}</button>
-        {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}>✅ {sent}</p>}
-        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 🔔 알림에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
+        {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}><Ic n="check" s={14}/> {sent}</p>}
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 알림 목록에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
       </Card>
       <Card>
         <SectionTitle>준회원 · 승인 대기 ({pending.length}명)</SectionTitle>
@@ -1438,6 +1467,26 @@ function NumStepper({value,onChange,min,max,unit}){
   );
 }
 
+// 24시간제 시간 고르기 (기기 설정에 따라 오전/오후로 나오는 기본 시간 칸 대신). 값은 "HH:MM"
+function TimeInput({value,onChange,label,style}){
+  const [h,m]=(value||"").split(":");
+  const mins=Array.from({length:12},(_,i)=>pad0(i*5)); if(m&&!mins.includes(m)) mins.push(m);
+  const sel={...inputStyle,flex:1,minWidth:0,padding:"8px 10px",textAlign:"center"};
+  const put=(hh,mm)=>onChange(`${hh||"00"}:${mm||"00"}`);
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:4,...style}}>
+      <select aria-label={`${label} 시`} value={h||""} onChange={e=>put(e.target.value,m)} style={sel}>
+        {!h&&<option value="">시</option>}
+        {Array.from({length:24},(_,i)=>pad0(i)).map(x=><option key={x} value={x}>{x}시</option>)}
+      </select>
+      <span style={{color:"#A3AAC2",fontWeight:700}}>:</span>
+      <select aria-label={`${label} 분`} value={m||""} onChange={e=>put(h,e.target.value)} style={sel}>
+        {!m&&<option value="">분</option>}
+        {mins.sort().map(x=><option key={x} value={x}>{x}분</option>)}
+      </select>
+    </div>
+  );
+}
 function BracketSetup({meeting,participants,onCreate}) {
   const [order,setOrder]=useState(()=>participants.slice().sort((x,y)=>NTRP_NUM(y.ntrp)-NTRP_NUM(x.ntrp)));
   const n=order.length;
@@ -1491,7 +1540,7 @@ function BracketSetup({meeting,participants,onCreate}) {
   };
   if(n<4) return (
     <Card style={{textAlign:"center",padding:"28px 18px"}}>
-      <div style={{fontSize:36,marginBottom:8}}>🎾</div>
+      <div style={{marginBottom:8,color:BLUE}}><Icon name="ball" size={36} stroke={1.6}/></div>
       <p style={{margin:"0 0 4px",fontWeight:700,color:"#1B2559"}}>참석자가 {n}명이에요</p>
       <p style={{margin:0,fontSize:13,color:"#6B7493",lineHeight:1.6}}>복식 대진은 4명 이상부터 만들 수 있어요.<br/>참석자나 게스트가 늘면 다시 와 주세요.</p>
     </Card>
@@ -1503,8 +1552,8 @@ function BracketSetup({meeting,participants,onCreate}) {
       <Card>
         <SectionTitle>시간 · 코트</SectionTitle>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div style={rowS}><span style={label}>시작 시간</span><input id="bk-start" type="time" value={start} onChange={e=>setStart(e.target.value)} style={{...inputStyle,width:132,padding:"8px 14px"}}/></div>
-          <div style={rowS}><span style={label}>종료 시간</span><input id="bk-end" type="time" value={end} onChange={e=>setEnd(e.target.value)} style={{...inputStyle,width:132,padding:"8px 14px"}}/></div>
+          <div style={rowS}><span style={label}>시작 시간</span><TimeInput label="대진 시작" value={start} onChange={setStart} style={{width:190}}/></div>
+          <div style={rowS}><span style={label}>종료 시간</span><TimeInput label="대진 종료" value={end} onChange={setEnd} style={{width:190}}/></div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <span style={label}>게임당 시간</span>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1619,7 +1668,7 @@ function MeetingBracket({meeting,participants,store}) {
   const [show,setShow]=useState("games");
   const bracket=rec&&rec.bracket, scores=(rec&&rec.scores)||{};
   const modeNote={shared:"모임 멤버 모두에게 실시간으로 저장돼요",local:"이 기기에 저장돼요",readonly:"저장 권한이 없어 이 기기에서만 보여요"}[mode];
-  const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>{mode==="shared"?"☁️ ":"📱 "}{modeNote}</p>;
+  const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}><Ic n={mode==="shared"?"cloud":"phone"} s={12}/> {modeNote}</p>;
   if(!bracket) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <BracketSetup meeting={meeting} participants={participants} onCreate={saveBracket}/>
@@ -1659,7 +1708,7 @@ function MeetingBracket({meeting,participants,store}) {
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {games.filter(g=>g.s===s).map(g=><GameCard key={g.key} court={g.c+1} game={g} onScore={saveScore} me={ME}/>)}
           </div>
-          {(ses.rest||[]).length>0&&<p style={{margin:"12px 0 0",fontSize:12,color:"#6B7493"}}>☕ 휴식 · {ses.rest.map(i=>bracket.players[i]).join(", ")}</p>}
+          {(ses.rest||[]).length>0&&<p style={{margin:"12px 0 0",fontSize:12,color:"#6B7493"}}><Ic n="coffee" s={13}/> 휴식 · {ses.rest.map(i=>bracket.players[i]).join(", ")}</p>}
         </Card>
       ))}
       {show==="table"&&(
@@ -1712,8 +1761,8 @@ function VoteRow({v,idx,wait}) {
           <span style={{fontSize:14,fontWeight:v.isMe?700:500,color:v.isMe?BLUE:"#1B2559"}}>{v.name}</span>
           {!v.isGuest&&<span style={{fontSize:11,color:"#A3AAC2"}}>{v.ntrp}</span>}
           {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:tag.bg,color:tag.c}}>{tag.t}</span>}
-          {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}>⏰ {v.arrive} 도착</span>}
-          {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}>🏃 {v.leave} 출발</span>}
+          {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
+          {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
           {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
         <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} 투표</span>
@@ -1746,8 +1795,8 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
   const myCount=counts[ME]||0;
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
-    ?(myConfirmIdx>=0?`✅ 참석 확정 · ${myConfirmIdx+1}번째`:`⏳ 대기 ${myWaitIdx+1}번${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
-    :myStatus==="absent"?"❌ 불참으로 등록되었어요":myStatus==="maybe"?"⏳ 미정으로 등록되었어요":"";
+    ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
+    :myStatus==="absent"?"불참으로 등록되었어요":myStatus==="maybe"?"미정으로 등록되었어요":"";
   // 대진표 참가자 = 참석 확정자
   const participants=confirmed.map(v=>({name:v.name,ntrp:v.ntrp,isGuest:v.isGuest,isMe:v.isMe,arrive:v.arrive||"",leave:v.leave||""}));
   // 늦게 도착·일찍 출발 (대진표 짤 때 첫판·막판 제외로 반영)
@@ -1771,23 +1820,24 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-          {[{icon:"🕗",label:"시간",value:meeting.time},{icon:"📍",label:"장소",value:meeting.place},...(meeting.address?[{icon:"🗺️",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),{icon:"👥",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"🗓️",label:"예약 오픈",value:meeting.openDate}]),
-            ...(ser?[{icon:"🔁",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
+          {[{icon:"clock",label:"시간",value:meeting.time},{icon:"pin",label:"장소",value:meeting.place},...(meeting.address?[{icon:"map",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),{icon:"users",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"calendar",label:"예약 오픈",value:meeting.openDate}]),
+            ...(ser?[{icon:"repeat",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
             <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:15,width:22,textAlign:"center"}}>{r.icon}</span>
+              <span style={{width:22,display:"flex",justifyContent:"center",color:"#8A93B2"}}><Icon name={r.icon} size={17} stroke={1.8}/></span>
               <span style={{fontSize:13,color:"#A3AAC2",width:64}}>{r.label}</span>
               <span style={{fontSize:13,fontWeight:500,color:"#1B2559"}}>{r.value}</span>
             </div>
           ))}
         </div>
-        <div style={{marginBottom:isPast?0:14}}>
+        <div style={{marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
             <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
             <span style={{fontSize:12,fontWeight:700,color:fill>=100?"#ef4444":BLUE}}>{total} / {meeting.total}명{fill>=100?" · 마감":""}</span>
           </div>
           <div style={{height:7,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${Math.min(fill,100)}%`,background:fill>=100?"#ef4444":BLUE,borderRadius:10}}/></div>
         </div>
-        {!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}>🗓️ 예약은 {meeting.openDate}에 열려요</p>}
+        {isPast&&<p style={{margin:0,fontSize:14,fontWeight:600,textAlign:"center",color:"#8A93B2",background:"#EEF1FA",borderRadius:12,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="clock" size={16} stroke={1.9}/>종료된 모임</p>}
+        {!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
         {!isPast&&open&&(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"flex",gap:8}}>
@@ -1799,11 +1849,11 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             {myStatus&&<p style={{margin:0,fontSize:12,textAlign:"center",color:myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>}
             {myStatus==="attend"&&(
               <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
-                <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}>⏰ 늦게 오거나 일찍 가나요?</span>
+                <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}><Ic n="clock" s={14}/> 늦게 오거나 일찍 가나요?</span>
                 {[["arrive","늦게 와요","도착",mine.arrive,hhmmApp(Math.min(toMin(mEnd)-30,toMin(mStart)+30))],["leave","일찍 가요","출발",mine.leave,hhmmApp(Math.max(toMin(mStart)+30,toMin(mEnd)-30))]].map(([k,l,w,val,def])=>(
                   <div key={k} style={{display:"flex",alignItems:"center",gap:8}}>
                     <button type="button" aria-pressed={!!val} onClick={()=>setTimeNote(k,val?null:pad2(def))} style={{flex:"0 0 92px",padding:"7px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",border:`1.5px solid ${val?BLUE:"#D6DEF7"}`,background:val?BLUE:"#fff",color:val?"#fff":"#6B7493"}}>{l}</button>
-                    {val?<><input type="time" aria-label={`${w} 시간`} value={val} onChange={e=>e.target.value&&setTimeNote(k,e.target.value)} style={{...inputStyle,flex:1,padding:"6px 12px"}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
+                    {val?<><TimeInput label={`${w} 시간`} value={val} onChange={v=>setTimeNote(k,v)} style={{flex:1}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
                       :<span style={{fontSize:12,color:"#A3AAC2"}}>{k==="arrive"?`${mStart}부터 와요`:`${mEnd}까지 있어요`}</span>}
                   </div>
                 ))}
@@ -1814,13 +1864,13 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             {myStatus==="attend"&&(
               <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:guests.length>0?10:0}}>
-                  <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}>👥 게스트 초대</span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}><Ic n="userPlus" s={14}/> 게스트 초대</span>
                   <button type="button" onClick={()=>setShowGuest(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:999,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer"}}>{showGuest?"취소":"+ 게스트 추가"}</button>
                 </div>
                 {guests.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:showGuest?10:0}}>
                   {guests.map((g,i)=>(
                     <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#fff",borderRadius:999,border:"1px solid #E4E9F7"}}>
-                      <span style={{fontSize:16}}>🙋</span>
+                      <Ic n="user" s={15} c="#8A93B2"/>
                       <span style={{flex:1,fontSize:13,color:"#2B3674",fontWeight:500}}>{g.name}</span>
                       <span style={{fontSize:11,background:"#E4E9F7",color:"#6B7493",padding:"2px 7px",borderRadius:10}}>게스트</span>
                       <button type="button" onClick={()=>removeGuest(i)} style={{background:"none",border:"none",color:"#A3AAC2",fontSize:16,cursor:"pointer",padding:0,lineHeight:1}}>✕</button>
@@ -1837,12 +1887,12 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
           </div>
         )}
       </Card>
-      {meeting.desc&&<Card><SectionTitle>모임 설명 📋</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
+      {meeting.desc&&<Card><SectionTitle>모임 설명</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
       <Card>
         <SectionTitle>참석 확정 ({total}/{meeting.total}명)</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-          {(prio?[["1","이달 덜 참석한 회원","먼저"],["2","같은 횟수면","투표 빠른 순"]]:[["⚡","번개 모임","선착순"]]).concat([["👥","게스트",meeting.guestCap?`정원 외 ${meeting.guestCap}명 · 선착순`:"빈자리만"]]).map(([n,a,b])=>(
-            <span key={a} style={{fontSize:11,padding:"4px 10px",borderRadius:999,background:BLUE_LIGHT,color:"#2B3674"}}><b style={{color:BLUE}}>{n}</b> {a} · {b}</span>
+          {(prio?[["1","이달 덜 참석한 회원","먼저"],["2","같은 횟수면","투표 빠른 순"]]:[["i:zap","번개 모임","선착순"]]).concat([["i:userPlus","게스트",meeting.guestCap?`정원 외 ${meeting.guestCap}명 · 선착순`:"빈자리만"]]).map(([n,a,b])=>(
+            <span key={a} style={{fontSize:11,padding:"4px 10px",borderRadius:999,background:BLUE_LIGHT,color:"#2B3674"}}><b style={{color:BLUE}}>{n.startsWith("i:")?<Ic n={n.slice(2)} s={12}/>:n}</b> {a} · {b}</span>
           ))}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -1895,8 +1945,8 @@ function BookingTab({open,onOpen,ready,canManage,onEdit,onDeleted,onCreate}) {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                   <div>
                     <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
-                    <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}>🕗 {m.time}</p>
-                    <p style={{margin:0,fontSize:13,color:"#6B7493"}}>📍 {m.place}</p>
+                    <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}><Ic n="clock" s={13}/> {m.time}</p>
+                    <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.place}</p>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                     <span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{m.attendees.length}/{m.total}명</span>
@@ -1919,7 +1969,7 @@ function BookingTab({open,onOpen,ready,canManage,onEdit,onDeleted,onCreate}) {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <p style={{margin:"0 0 3px",fontWeight:600,fontSize:14,color:"#6B7493"}}>{m.date}</p>
-                    <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>📍 {m.place} · {m.attendees.length}명 참석</p>
+                    <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.place} · {m.attendees.length}명 참석</p>
                   </div>
                   <span style={{background:"#E4E9F7",color:"#A3AAC2",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>종료</span>
                 </div>
@@ -1952,7 +2002,7 @@ function StatsTab() {
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <div style={{display:"flex",gap:10}}>
-        {[{label:"총 누적 참석",value:`${mineList.length}회`},{label:"올해 참석",value:`${mineList.filter(m=>m.iso.slice(0,4)===year).length}회`},{label:"연속 참석",value:`${streak}회${streak>=3?" 🔥":""}`}].map(s=>(
+        {[{label:"총 누적 참석",value:`${mineList.length}회`},{label:"올해 참석",value:`${mineList.filter(m=>m.iso.slice(0,4)===year).length}회`},{label:"연속 참석",value:<>{streak}회{streak>=3&&<Ic n="flame" s={15} c="#ef4444" style={{marginLeft:3}}/>}</>}].map(s=>(
           <Card key={s.label} style={{flex:1,textAlign:"center",padding:14}}>
             <p style={{margin:"0 0 6px",fontSize:11,color:"#A3AAC2"}}>{s.label}</p>
             <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE,fontVariantNumeric:"tabular-nums"}}>{s.value}</p>
@@ -1988,7 +2038,7 @@ function StatsTab() {
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {rank.map(r=>(
             <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
-              <span style={{width:22,textAlign:"center",fontSize:r.badge?16:13,fontWeight:700,color:"#A3AAC2"}}>{r.badge||r.rank}</span>
+              <RankNo r={r}/>
               <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
               <div style={{width:70,height:6,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${(r.count/rank[0].count)*100}%`,background:r.isMe?BLUE:"#A9BCFF",borderRadius:10}}/></div>
               <span style={{fontSize:13,fontWeight:700,color:BLUE,width:28,textAlign:"right"}}>{r.count}</span>
@@ -2054,7 +2104,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
       <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{edit?"정보 수정":"내 정보"}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer"}}>✕</button>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         {edit?<Card><ProfileEdit account={account} onCancel={()=>setEdit(false)} onDone={p=>{onProfileSaved(p);setEdit(false);}}/></Card>:<>
         <Card style={{display:"flex",alignItems:"center",gap:14}}>
@@ -2080,7 +2130,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
           <SectionTitle>다가오는 모임 내 투표</SectionTitle>
           {mine.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>투표한 모임이 없어요.</p>:mine.map(({m,label,color})=>(
             <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #EEF1FA"}}>
-              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>📍 {m.place}</p></div>
+              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.place}</p></div>
               <span style={{fontSize:12,fontWeight:700,color}}>{label}</span>
             </div>
           ))}
@@ -2119,7 +2169,7 @@ function NoticeForm({onClose}) {
       .then(onClose).catch(e=>{setSaving(false);setErr(authMsg(e));});
   };
   return(
-    <Sheet title="공지 쓰기 📢" onClose={onClose}>
+    <Sheet title="공지 쓰기" onClose={onClose}>
       <FieldWrap label="제목" required><input type="text" value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="예: 11월 정모 장소 변경" style={inputStyle}/></FieldWrap>
       <FieldWrap label="내용"><textarea value={f.content} onChange={e=>setF({...f,content:e.target.value})} rows={5} style={{...inputStyle,borderRadius:18,resize:"none"}}/></FieldWrap>
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#4A5578",cursor:"pointer"}}>
@@ -2138,7 +2188,7 @@ function Sheet({title,onClose,children}) {
       <div role="dialog" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{title}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer"}}>✕</button>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         {children}
       </div>
@@ -2149,14 +2199,14 @@ function Sheet({title,onClose,children}) {
 // ─── 알림함 ───────────────────────────────────────────────────────────────────
 function NotiSheet({items,onClose,onPick,isAdmin}) {
   return(
-    <Sheet title="알림 🔔" onClose={onClose}>
+    <Sheet title="알림" onClose={onClose}>
       {items.length===0?<Empty>새 알림이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {items.map(n=>{
             const go=n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action));
             return(
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
-                <span style={{fontSize:20,lineHeight:1.2}}>{NOTI_ICON[n.type]||"🔔"}</span>
+                <span style={{width:34,height:34,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={NOTI_ICON[n.type]||"bell"} size={17} stroke={1.9}/></span>
                 <span style={{flex:1,minWidth:0}}>
                   <span style={{display:"block",fontSize:14,fontWeight:n.unread?700:500,color:"#1B2559",lineHeight:1.45,wordBreak:"keep-all"}}>{n.text}</span>
                   <span style={{display:"block",fontSize:11,color:"#A3AAC2",marginTop:3}}>{ago(n.at)}{n.type==="member"&&isAdmin?" · 눌러서 승인하기":go?" · 눌러서 보기":""}</span>
@@ -2211,7 +2261,7 @@ function ensureSeries(all){
 }
 function KindBadge({m}){
   const flash=m.kind==="flash";
-  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:flash?"#FFF4E5":BLUE_LIGHT,color:flash?"#C2610C":BLUE,whiteSpace:"nowrap"}}>{flash?"⚡ 번개":m.seriesId?"🔁 정기":"정기"}</span>;
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:flash?"#FFF4E5":BLUE_LIGHT,color:flash?"#C2610C":BLUE,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
 }
 function Pills({value,options,onChange,label}){
   return(
@@ -2305,12 +2355,12 @@ function MeetingForm({initial,onClose,onSaved}) {
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{editing?"모임 수정 ✏️":"모임 만들기 🎾"}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer"}}>✕</button>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{editing?"모임 수정":"모임 만들기"}</p>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <FieldWrap label="모임 종류" required>
-            <Pills label="모임 종류" value={f.kind} onChange={v=>set("kind",v)} options={[["regular","정기 모임"],["flash","⚡ 번개 모임"]]}/>
+            <Pills label="모임 종류" value={f.kind} onChange={v=>set("kind",v)} options={[["regular","정기 모임"],["flash","번개 모임"]]}/>
             {hint(f.kind==="regular"?"이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요.":"번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")}
           </FieldWrap>
           {!editing&&f.kind==="regular"&&<FieldWrap label="반복">
@@ -2322,9 +2372,9 @@ function MeetingForm({initial,onClose,onSaved}) {
           </FieldWrap>
           <FieldWrap label="시간" required error={errors.time}>
             <div style={row}>
-              <input type="time" aria-label="시작 시간" value={f.start} onChange={e=>set("start",e.target.value)} style={{...inputStyle,flex:1}}/>
+              <TimeInput label="시작" value={f.start} onChange={v=>set("start",v)} style={{flex:1}}/>
               <span style={{alignSelf:"center",color:"#A3AAC2"}}>~</span>
-              <input type="time" aria-label="종료 시간" value={f.end} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1}}/>
+              <TimeInput label="종료" value={f.end} onChange={v=>set("end",v)} style={{flex:1}}/>
             </div>
           </FieldWrap>
           <FieldWrap label="테니스장 이름" required error={errors.place}>
@@ -2357,15 +2407,18 @@ function MeetingForm({initial,onClose,onSaved}) {
                 <select aria-label="예약 오픈 요일" value={f.openDow} onChange={e=>set("openDow",e.target.value)} style={{...inputStyle,flex:1}}>
                   {WEEK.map((w,i)=><option key={i} value={String(i)}>모임 전 {w}요일</option>)}
                 </select>
-                <input type="time" aria-label="예약 오픈 시각" value={f.openTime} onChange={e=>set("openTime",e.target.value)} style={{...inputStyle,flex:1}}/>
+                <TimeInput label="예약 오픈" value={f.openTime} onChange={v=>set("openTime",v)} style={{flex:1}}/>
               </div>
               {preview.length>0&&<div style={{marginTop:8,background:"#fff",borderRadius:14,padding:"10px 12px",border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:4}}>
                 {preview.map(d=><p key={d} style={{margin:0,fontSize:12,color:"#4A5578"}}>{fmtDate(d)} 모임 → <b style={{color:BLUE}}>{fmtOpen(openFor(d,rule))}</b> 오픈</p>)}
               </div>}
             </FieldWrap>
-          ):f.kind==="flash"?hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요."):(
+          ):f.kind==="flash"?hint("번개 모임은 만들자마자 바로 참석 투표를 받아요."):(
             <FieldWrap label="예약 오픈" error={errors.openAt}>
-              <input type="datetime-local" value={f.openAt} onChange={e=>set("openAt",e.target.value)} style={inputStyle}/>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <input type="date" aria-label="예약 오픈 날짜" value={(f.openAt||"").slice(0,10)} onChange={e=>set("openAt",e.target.value?e.target.value+"T"+((f.openAt||"").slice(11,16)||"00:00"):"")} style={inputStyle}/>
+                {f.openAt&&<TimeInput label="예약 오픈 시각" value={f.openAt.slice(11,16)} onChange={v=>set("openAt",f.openAt.slice(0,10)+"T"+v)}/>}
+              </div>
               {hint("이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.")}
             </FieldWrap>
           )}
@@ -2642,7 +2695,7 @@ export default function App() {
             {!loading&&!pending&&screen==="signup"&&(
               signupDone?(
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 0",gap:16,textAlign:"center"}}>
-                  <div style={{width:96,height:96,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",fontSize:46,boxShadow:SHADOW_BTN}}>🎾</div>
+                  <div style={{width:96,height:96,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:SHADOW_BTN}}><MascotSvg size={72}/></div>
                   <h2 style={{fontSize:20,fontWeight:700,color:BLUE,margin:0}}>가입 완료!</h2>
                   <p style={{color:"#6B7493",fontSize:14,margin:0,lineHeight:1.6}}>모임에 오신 걸 환영해요.<br/>관리자 승인 후 이용 가능합니다.</p>
                   <button onClick={finishSignup} style={{...btnPrimary,width:"auto",padding:"13px 36px",marginTop:8}}>{FB?"확인":"홈으로 이동"}</button>
@@ -2689,7 +2742,7 @@ export default function App() {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
             ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",borderRadius:999,gap:2,fontSize:13,fontWeight:600}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":"목록"}</button>
-            :<span style={{fontSize:14,fontWeight:600,opacity:0.9}}>🎾 SSTC</span>}
+            :<span style={{fontSize:14,fontWeight:600,opacity:0.9,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="ball" size={16} stroke={2}/>SSTC</span>}
           <div style={{display:"flex",gap:8}}>
             <button type="button" onClick={()=>{setNoti(club.items);club.markSeen();}} style={{...iconBtn,position:"relative"}} title="알림" aria-label={`알림${club.unread?` ${club.unread}개 안 읽음`:""}`}>
               <Icon name="bell" size={19}/>
@@ -2702,13 +2755,13 @@ export default function App() {
         </div>
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
-            <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요 👋</p>
+            <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요</p>
             <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{account&&account.admin&&<span style={{fontSize:11,fontWeight:700,marginLeft:8,padding:"3px 9px",borderRadius:999,background:"rgba(255,255,255,0.22)",verticalAlign:"middle"}}>관리자</span>}</p>
           </div>
         ):(
           curMeeting?(
             <div style={{position:"relative",marginTop:18}}>
-              <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>📍 {curMeeting.place}</p>
+              <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}><Ic n="pin" s={13}/> {curMeeting.place}</p>
               <p style={{margin:0,fontSize:24,fontWeight:700,letterSpacing:"-0.01em"}}>{curMeeting.date}</p>
             </div>
           ):<p style={{position:"relative",margin:"18px 0 0",fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{tabTitles[tab]}</p>
