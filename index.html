@@ -205,7 +205,9 @@ function votesFromRec(rec) {
       key,
       name: v.name,
       ntrp: v.ntrp || "",
-      at: v.at
+      at: v.at,
+      arrive: v.arrive || "",
+      leave: v.leave || ""
     });
     (v.guests || []).forEach(g => g && g.name && out.push({
       key,
@@ -222,6 +224,12 @@ const KIND_LABEL = {
   regular: "정기 모임",
   flash: "번개 모임"
 };
+// 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
+const courtLabel = v => {
+  v = String(v || "").trim();
+  return /^[\d\s,·~\-]+$/.test(v) ? `${v.replace(/\s+/g, "")}번 코트` : v;
+};
+const mapUrl = addr => "https://map.kakao.com/?q=" + encodeURIComponent(addr);
 const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
 function toMeeting(id, rec, series) {
   const info = rec.info,
@@ -235,7 +243,10 @@ function toMeeting(id, rec, series) {
     date: fmtDate(info.date),
     iso: info.date,
     time: `${info.start} ~ ${info.end}`,
-    place: info.place,
+    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : ""),
+    placeName: info.place,
+    courtNo: info.courtNo || "",
+    address: info.address || "",
     kind: kindOf(info),
     capacity,
     guestCap,
@@ -295,7 +306,7 @@ const dDay = iso => {
   const d = Math.round((new Date(iso + "T00:00:00") - new Date(todayYmd() + "T00:00:00")) / 86400000);
   return d === 0 ? "D-DAY" : `D-${d}`;
 };
-const isOpen = m => !m.openAt || nowAt().slice(0, 16) >= m.openAt;
+const isOpen = m => m.kind === "flash" || !m.openAt || nowAt().slice(0, 16) >= m.openAt; // 번개 모임은 만들자마자 투표 가능
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
 // 정기 모임: 이 모임 전까지 그 달 정기 모임에 덜 참석한 회원이 항상 먼저, 같은 횟수면 투표 시각 순.
@@ -3100,7 +3111,9 @@ const voteValue = (status, prev) => ({
   ntrp: MEMBER_NTRP[ME] || "",
   status,
   at: status === "attend" ? prev && prev.status === "attend" && prev.at || nowAt() : null,
-  guests: status === "attend" ? prev && prev.guests || [] : []
+  guests: status === "attend" ? prev && prev.guests || [] : [],
+  arrive: status === "attend" ? prev && prev.arrive || null : null,
+  leave: status === "attend" ? prev && prev.leave || null : null
 });
 
 // 모든 모임 기록을 실시간으로 받아서 MEETINGS를 다시 만듦
@@ -3890,7 +3903,8 @@ function BracketSetup({
   const leftover = span > 0 ? span - k * dur : 0;
   const total = k * slot;
   const [games, setGames] = useState(() => evenGames(n, total, k));
-  const [excl, setExcl] = useState(() => order.map(() => 0));
+  // 늦게 오는 사람은 첫판 제외, 일찍 가는 사람은 막판 제외로 시작 (둘 다면 첫판)
+  const [excl, setExcl] = useState(() => order.map(p => p.arrive ? 1 : p.leave ? 2 : 0));
   // 시간·코트·인원이 바뀌면 게임 수를 다시 고르게 나눔
   const layoutKey = `${k}_${slot}_${n}`,
     lastKey = useRef(layoutKey);
@@ -4146,7 +4160,14 @@ function BracketSetup({
       fontWeight: 400,
       marginLeft: 5
     }
-  }, p.isGuest ? "게스트" : p.ntrp)), /*#__PURE__*/React.createElement("button", {
+  }, p.isGuest ? "게스트" : p.ntrp), (p.arrive || p.leave) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 11,
+      color: BLUE,
+      fontWeight: 500
+    }
+  }, [p.arrive && `${p.arrive} 도착`, p.leave && `${p.leave} 출발`].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => cycleGames(i),
     title: "\uAC8C\uC784 \uC218",
@@ -4830,7 +4851,25 @@ function VoteRow({
       background: tag.bg,
       color: tag.c
     }
-  }, tag.t), v.bumped && /*#__PURE__*/React.createElement("span", {
+  }, tag.t), v.arrive && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      padding: "2px 7px",
+      borderRadius: 999,
+      background: "#EEF4FF",
+      color: BLUE
+    }
+  }, "\u23F0 ", v.arrive, " \uB3C4\uCC29"), v.leave && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      padding: "2px 7px",
+      borderRadius: 999,
+      background: "#EEF4FF",
+      color: BLUE
+    }
+  }, "\uD83C\uDFC3 ", v.leave, " \uCD9C\uBC1C"), v.bumped && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
@@ -4909,8 +4948,17 @@ function MeetingDetail({
     name: v.name,
     ntrp: v.ntrp,
     isGuest: v.isGuest,
-    isMe: v.isMe
+    isMe: v.isMe,
+    arrive: v.arrive || "",
+    leave: v.leave || ""
   }));
+  // 늦게 도착·일찍 출발 (대진표 짤 때 첫판·막판 제외로 반영)
+  const mStart = meeting.time.slice(0, 5),
+    mEnd = (meeting.time.split("~")[1] || "").trim().slice(0, 5);
+  const setTimeNote = (k, v) => store.saveRsvp({
+    ...voteValue("attend", mine),
+    [k]: v || null
+  });
   const C = {
     attend: {
       border: BLUE,
@@ -5027,15 +5075,28 @@ function MeetingDetail({
     icon: "📍",
     label: "장소",
     value: meeting.place
-  }, {
+  }, ...(meeting.address ? [{
+    icon: "🗺️",
+    label: "주소",
+    value: /*#__PURE__*/React.createElement("a", {
+      href: mapUrl(meeting.address),
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: {
+        color: BLUE,
+        textDecoration: "underline",
+        textUnderlineOffset: 3
+      }
+    }, meeting.address)
+  }] : []), {
     icon: "👥",
     label: "제한 인원",
     value: `${meeting.capacity}명${meeting.guestCap ? ` + 게스트 ${meeting.guestCap}명` : ""}`
-  }, {
+  }, ...(meeting.kind === "flash" ? [] : [{
     icon: "🗓️",
     label: "예약 오픈",
     value: meeting.openDate
-  }, ...(ser ? [{
+  }]), ...(ser ? [{
     icon: "🔁",
     label: "반복",
     value: serActive ? seriesText(ser) : "반복 멈춤"
@@ -5123,9 +5184,6 @@ function MeetingDetail({
     label: "✓ 참석",
     val: "attend"
   }, {
-    label: "△ 미정",
-    val: "maybe"
-  }, {
     label: "✕ 불참",
     val: "absent"
   }].map(btn => {
@@ -5154,7 +5212,70 @@ function MeetingDetail({
       textAlign: "center",
       color: myStatus === "attend" && myConfirmIdx < 0 ? "#C2610C" : "#6B7493"
     }
-  }, myMsg), prio && /*#__PURE__*/React.createElement("p", {
+  }, myMsg), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F5F7FE",
+      borderRadius: 12,
+      padding: 12,
+      border: "1px solid #E4E9F7",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#2B3674"
+    }
+  }, "\u23F0 \uB2A6\uAC8C \uC624\uAC70\uB098 \uC77C\uCC0D \uAC00\uB098\uC694?"), [["arrive", "늦게 와요", "도착", mine.arrive, hhmmApp(Math.min(toMin(mEnd) - 30, toMin(mStart) + 30))], ["leave", "일찍 가요", "출발", mine.leave, hhmmApp(Math.max(toMin(mStart) + 30, toMin(mEnd) - 30))]].map(([k, l, w, val, def]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-pressed": !!val,
+    onClick: () => setTimeNote(k, val ? null : pad2(def)),
+    style: {
+      flex: "0 0 92px",
+      padding: "7px 0",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      border: `1.5px solid ${val ? BLUE : "#D6DEF7"}`,
+      background: val ? BLUE : "#fff",
+      color: val ? "#fff" : "#6B7493"
+    }
+  }, l), val ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    "aria-label": `${w} 시간`,
+    value: val,
+    onChange: e => e.target.value && setTimeNote(k, e.target.value),
+    style: {
+      ...inputStyle,
+      flex: 1,
+      padding: "6px 12px"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#6B7493"
+    }
+  }, w)) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, k === "arrive" ? `${mStart}부터 와요` : `${mEnd}까지 있어요`))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uB300\uC9C4\uD45C \uB9CC\uB4E4 \uB54C \uCCAB\uD310\xB7\uB9C9\uD310 \uC81C\uC678\uB85C \uBBF8\uB9AC \uBC18\uC601\uB3FC\uC694.")), prio && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
@@ -6469,6 +6590,8 @@ function occInfo(sid, ser, i) {
     start: ser.start,
     end: ser.end,
     place: ser.place,
+    courtNo: ser.courtNo || "",
+    address: ser.address || "",
     capacity: +ser.capacity,
     guestCap: +ser.guestCap || 0,
     desc: ser.desc || "",
@@ -6556,6 +6679,59 @@ function Pills({
     }, l);
   }));
 }
+// 도로명 주소 검색: 카카오(다음) 우편번호 서비스를 폼 안에 띄워요 (키 없이 무료). 못 불러오면 직접 입력.
+let postcodeLoad = null;
+function loadPostcode() {
+  if (window.daum && window.daum.Postcode) return Promise.resolve();
+  if (!postcodeLoad) postcodeLoad = new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+    sc.onload = ok;
+    sc.onerror = () => {
+      postcodeLoad = null;
+      no();
+    };
+    document.head.appendChild(sc);
+  });
+  return postcodeLoad;
+}
+function AddressSearch({
+  onPick
+}) {
+  const box = useRef(null);
+  const [fail, setFail] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadPostcode().then(() => {
+      if (!alive || !box.current) return;
+      new window.daum.Postcode({
+        width: "100%",
+        height: "100%",
+        oncomplete: d => onPick((d.roadAddress || d.jibunAddress || d.address) + (d.buildingName ? ` (${d.buildingName})` : ""))
+      }).embed(box.current);
+    }).catch(() => alive && setFail(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return fail ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 12,
+      color: "#ef4444"
+    }
+  }, "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC8FC\uC18C\uB97C \uC9C1\uC811 \uC785\uB825\uD574 \uC8FC\uC138\uC694.") : /*#__PURE__*/React.createElement("div", {
+    ref: box,
+    style: {
+      marginTop: 8,
+      height: 420,
+      border: "1px solid #E4E9F7",
+      borderRadius: 14,
+      overflow: "hidden",
+      background: "#fff"
+    }
+  });
+}
 function MeetingForm({
   initial,
   onClose,
@@ -6591,6 +6767,7 @@ function MeetingForm({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [addrOpen, setAddrOpen] = useState(false);
   const set = (k, v) => setF(p => {
     const n = {
       ...p,
@@ -6610,7 +6787,8 @@ function MeetingForm({
     const e = {};
     if (!f.date) e.date = "날짜를 골라 주세요";
     if (!f.start || !f.end) e.time = "시작·종료 시간을 넣어 주세요";else if (f.end <= f.start) e.time = "종료 시간이 시작보다 늦어야 해요";
-    if (!f.place.trim()) e.place = "장소를 입력해 주세요";
+    if (!f.place.trim()) e.place = "테니스장 이름을 입력해 주세요";
+    if (!String(f.courtNo || "").trim()) e.courtNo = "코트 번호를 입력해 주세요";
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
     const gcap = f.guestCap === "" ? 0 : parseInt(f.guestCap, 10);
@@ -6618,7 +6796,7 @@ function MeetingForm({
     if (repeating) {
       if (!f.openTime) e.openAt = "예약 오픈 시각을 넣어 주세요";
       if (f.endDate && f.date && f.endDate < f.date) e.endDate = "종료일은 첫 모임 날짜 뒤여야 해요";
-    } else if (f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
+    } else if (f.kind !== "flash" && f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e);
     if (Object.keys(e).length) return;
     const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
@@ -6627,6 +6805,8 @@ function MeetingForm({
       start: f.start,
       end: f.end,
       place: f.place.trim(),
+      courtNo: String(f.courtNo || "").trim(),
+      address: (f.address || "").trim(),
       capacity: cap,
       guestCap: gcap,
       desc: (f.desc || "").trim()
@@ -6668,7 +6848,7 @@ function MeetingForm({
         ...(editing ? initial.info : {}),
         ...base,
         date: f.date,
-        openAt: f.openAt || "",
+        openAt: f.kind === "flash" ? "" : f.openAt || "",
         createdBy: editing ? initial.info.createdBy || "" : ME,
         createdByUid: editing ? initial.info.createdByUid || "" : uid,
         createdAt: editing ? initial.info.createdAt || Date.now() : Date.now(),
@@ -6833,7 +7013,7 @@ function MeetingForm({
       flex: 1
     }
   }))), /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uC7A5\uC18C",
+    label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
     required: true,
     error: errors.place
   }, /*#__PURE__*/React.createElement("input", {
@@ -6842,7 +7022,47 @@ function MeetingForm({
     onChange: e => set("place", e.target.value),
     placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
     style: inputStyle
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uCF54\uD2B8 \uBC88\uD638",
+    required: true,
+    error: errors.courtNo
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uCF54\uD2B8 \uBC88\uD638",
+    value: f.courtNo || "",
+    onChange: e => set("courtNo", e.target.value),
+    placeholder: "\uC608: 3 \uB610\uB294 5, 6",
+    style: inputStyle
+  }), String(f.courtNo || "").trim() && hint(`모임 화면에는 "${courtLabel(f.courtNo)}"로 보여요`)), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: row
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C",
+    value: f.address || "",
+    onChange: e => set("address", e.target.value),
+    placeholder: "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uB20C\uB7EC \uCC3E\uC544\uC694",
+    style: {
+      ...inputStyle,
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setAddrOpen(v => !v),
+    style: {
+      ...btnSmall,
+      background: addrOpen ? "#fff" : GRAD,
+      color: addrOpen ? "#6B7493" : "#fff",
+      border: addrOpen ? "1.5px solid #D6DEF7" : "none",
+      flexShrink: 0
+    }
+  }, addrOpen ? "닫기" : "주소 검색")), addrOpen && /*#__PURE__*/React.createElement(AddressSearch, {
+    onPick: a => {
+      set("address", a);
+      setAddrOpen(false);
+    }
+  }), hint("선택이에요. 넣으면 모임 화면에서 눌러서 지도로 볼 수 있어요.")), /*#__PURE__*/React.createElement("div", {
     style: row
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6924,7 +7144,7 @@ function MeetingForm({
     style: {
       color: BLUE
     }
-  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : /*#__PURE__*/React.createElement(FieldWrap, {
+  }, fmtOpen(openFor(d, rule))), " \uC624\uD508")))) : f.kind === "flash" ? hint("⚡ 번개 모임은 만들자마자 바로 참석 투표를 받아요.") : /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC608\uC57D \uC624\uD508",
     error: errors.openAt
   }, /*#__PURE__*/React.createElement("input", {
