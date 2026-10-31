@@ -17,6 +17,11 @@
 참석 횟수는 달마다 새로 세요. "2회 초과"는 그 달에 이미 2번 참석 확정된 회원(이번이 3번째 이상)이에요.
 기준 숫자는 `src/app.jsx`의 `MONTHLY_PRIORITY_LIMIT`로 바꿀 수 있어요.
 
+## 스플래시·아이콘
+- 앱을 열면 스플래시 화면(`SplashScreen`, 애니메이션 CSS는 `src/splash.css`)이 먼저 뜨고, "시작하기"를 누르면 로그인 화면으로 가요. 390×844 원본을 화면 크기에 맞춰 비율 그대로 키우거나 줄여요.
+- 폰트는 `fonts/`의 Fredoka, Jua를 써요. Jua는 "시작하기" 글자만 남긴 작은 파일이라, 다른 한글에 쓰려면 원본 Jua.ttf로 바꿔 주세요.
+- 아이콘은 `icons/`(favicon 32, apple-touch-icon 180, 홈 화면용 192·512)이고 `manifest.webmanifest`에 들어 있어요.
+
 ## 저장 (Firebase Realtime Database)
 참석 투표, 대진표, 점수는 `firebase-config.js`의 프로젝트에 `club/meetings/m<모임 id>` 경로로 저장돼요.
 설정값이 없거나 연결이 안 되면 그 기기(브라우저)에만 저장돼요.

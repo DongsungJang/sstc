@@ -6,19 +6,22 @@ let src=fs.readFileSync(path.join(ROOT,'src/app.jsx'),'utf8');
 src=src.replace('import { useState, useRef, useEffect } from "react";','const { useState, useRef, useEffect } = React;')
        .replace('export default function App()','function App()');
 src+='\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));\n';
+const splashCss=fs.readFileSync(path.join(ROOT,'src/splash.css'),'utf8');
 const out=Babel.transform(src,{presets:[['react',{runtime:'classic'}]]}).code;
 const page=(scripts)=>`<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#3B63F3">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2152E6">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
 <title>SSTC · Serve &amp; Smash Tennis Club</title>
-<style>body{margin:0;background:#E9EDFA;color:#1B2559}</style>
+<style>body{margin:0;background:#E9EDFA;color:#1B2559}
+${splashCss}</style>
 </head>
 <body>
 <div id="root"></div>

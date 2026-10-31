@@ -3,13 +3,69 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#3B63F3">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2152E6">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
 <title>SSTC · Serve &amp; Smash Tennis Club</title>
-<style>body{margin:0;background:#E9EDFA;color:#1B2559}</style>
+<style>body{margin:0;background:#E9EDFA;color:#1B2559}
+/* 스플래시 화면 (SSTC_app_assets/splash.html 원본 CSS). sp-bounce 뒤에 남아 있던 } 하나만 지웠어요. */
+@font-face{font-family:Fredoka;src:url(fonts/Fredoka.ttf) format("truetype");font-display:swap;font-weight:300 700}
+@font-face{font-family:Jua;src:url(fonts/Jua.ttf) format("truetype");font-display:swap}
+
+.sp-move{animation:sp-move 1.2s infinite}
+@keyframes sp-move{
+0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+12%{transform:translateY(-16px);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+50%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.6,0,.8,.3)}
+88%{transform:translateY(-16px)}
+100%{transform:translateY(0)}
+}
+.sp-bounce{animation:sp-bounce 1.2s infinite;transform-origin:50% 100%}
+@keyframes sp-bounce{
+0%{transform:scale(1.16,.82);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+12%{transform:scale(.93,1.08);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+50%{transform:scale(1,1) rotate(-6deg);animation-timing-function:cubic-bezier(.6,0,.8,.3)}
+88%{transform:scale(.93,1.08)}
+100%{transform:scale(1.16,.82)}
+}
+.sp-shadow{animation:sp-shadow 1.2s infinite}
+@keyframes sp-shadow{0%,100%{transform:scaleX(1);opacity:.35}50%{transform:scaleX(.45);opacity:.12}}
+.sp-wink{transform-box:fill-box;transform-origin:center;animation:sp-wink 3.6s infinite}
+@keyframes sp-wink{0%,82%,100%{transform:scaleY(1)}87%{transform:scaleY(.12)}93%{transform:scaleY(1)}}
+.sp-bubble{transform-origin:12% 100%;animation:sp-pop 4.8s infinite}
+@keyframes sp-pop{
+0%,4%{transform:scale(0) rotate(-10deg);opacity:0}
+10%{transform:scale(1.12) rotate(4deg);opacity:1}
+14%,42%{transform:scale(1) rotate(0deg);opacity:1}
+47%{transform:scale(1.2) rotate(-6deg);opacity:1}
+52%,88%{transform:scale(1) rotate(0deg);opacity:1}
+94%,100%{transform:scale(0) rotate(8deg);opacity:0}
+}
+.sp-spark{animation:sp-spark 1.8s ease-in-out infinite}
+.sp-spark.b{animation-delay:.6s}
+.sp-spark.c{animation-delay:1.2s}
+@keyframes sp-spark{0%,100%{transform:scale(.3) rotate(0deg);opacity:0}50%{transform:scale(1) rotate(45deg);opacity:1}}
+.sp-dot{animation:sp-dot 1.2s ease-in-out infinite}
+.sp-dot.b{animation-delay:.15s}
+.sp-dot.c{animation-delay:.3s}
+@keyframes sp-dot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-8px);opacity:1}}
+.sp-title{animation:sp-title 2.4s ease-in-out infinite}
+@keyframes sp-title{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.sp-cta{transition:transform .15s ease}
+.sp-cta:hover{transform:translateY(-2px)}
+.sp-cta:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){.sp-move,.sp-bounce,.sp-shadow,.sp-wink,.sp-bubble,.sp-spark,.sp-dot,.sp-title{animation:none}.sp-bubble{opacity:1;transform:none}}
+.sp-sorry{animation:sp-a 4.8s infinite}
+.sp-smug{animation:sp-b 4.8s infinite}
+@keyframes sp-a{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
+@keyframes sp-b{0%,40%{opacity:0}46%,94%{opacity:1}100%{opacity:0}}
+.sp-hand{transform-box:fill-box;transform-origin:50% 100%;animation:sp-hand 4.8s infinite}
+@keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.5px) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,16px) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
+@media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,16px) rotate(0deg)}}
+</style>
 </head>
 <body>
 <div id="root"></div>
@@ -5092,8 +5148,534 @@ const iconBtn = {
   justifyContent: "center",
   cursor: "pointer"
 };
+
+// ── 스플래시 화면 (SSTC_app_assets/splash.html) ──
+// 원본은 390×844 고정 크기라 비율 그대로 화면에 맞게 키우거나 줄여서 가운데 놓아요. 애니메이션 CSS는 src/splash.css.
+const SPLASH_W = 390,
+  SPLASH_H = 844;
+function SplashScreen({
+  onStart
+}) {
+  const fit = () => Math.min(window.innerWidth / SPLASH_W, window.innerHeight / SPLASH_H);
+  const [scale, setScale] = useState(fit);
+  useEffect(() => {
+    const onResize = () => setScale(fit());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "#2152E6",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      zIndex: 100
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: SPLASH_W * scale,
+      height: SPLASH_H * scale,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: SPLASH_W,
+      height: SPLASH_H,
+      transform: `scale(${scale})`,
+      transformOrigin: "0 0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "390px",
+      height: "844px",
+      position: "relative",
+      overflow: "hidden",
+      background: "#2152E6",
+      fontFamily: "Fredoka, Jua, system-ui, sans-serif",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      boxSizing: "border-box",
+      padding: "112px 32px 48px"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    width: "390",
+    height: "844",
+    viewBox: "0 0 390 844",
+    style: {
+      position: "absolute",
+      left: "0",
+      top: "0"
+    }
+  }, /*#__PURE__*/React.createElement("g", {
+    stroke: "rgba(255,255,255,0.2)",
+    strokeWidth: "3",
+    fill: "none"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "30",
+    y: "64",
+    width: "330",
+    height: "715"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M71 64 V779 M319 64 V779"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M71 229 H319 M71 614 H319"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M195 229 V614"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M195 64 V76 M195 779 V767"
+  })), /*#__PURE__*/React.createElement("path", {
+    d: "M18 421.5 H372",
+    stroke: "rgba(255,255,255,0.32)",
+    strokeWidth: "5",
+    strokeDasharray: "2 4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M18 421.5 H372",
+    stroke: "rgba(255,255,255,0.22)",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "18",
+    cy: "421.5",
+    r: "4",
+    fill: "rgba(255,255,255,0.32)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "372",
+    cy: "421.5",
+    r: "4",
+    fill: "rgba(255,255,255,0.32)"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sp-title",
+    style: {
+      position: "relative",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("h1", {
+    style: {
+      margin: "0",
+      fontSize: "84px",
+      fontWeight: "700",
+      color: "#FFFFFF",
+      letterSpacing: "5px",
+      lineHeight: "1"
+    }
+  }, "SSTC"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0",
+      padding: "6px 14px",
+      borderRadius: "999px",
+      background: "rgba(11,30,91,0.35)",
+      color: "#DCE8FF",
+      fontSize: "14px",
+      fontWeight: "600",
+      letterSpacing: "2px",
+      whiteSpace: "nowrap"
+    }
+  }, "SERVE & SMASH TENNIS CLUB")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      width: "326px",
+      height: "380px",
+      marginTop: "28px",
+      flexShrink: "0"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    className: "sp-spark",
+    "aria-hidden": "true",
+    width: "26",
+    height: "26",
+    viewBox: "0 0 24 24",
+    style: {
+      position: "absolute",
+      left: "14px",
+      top: "40px"
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 2v6M12 16v6M2 12h6M16 12h6",
+    stroke: "#FFFFFF",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    fill: "none"
+  })), /*#__PURE__*/React.createElement("svg", {
+    className: "sp-spark b",
+    "aria-hidden": "true",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    style: {
+      position: "absolute",
+      right: "18px",
+      top: "150px"
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 2v6M12 16v6M2 12h6M16 12h6",
+    stroke: "#D7F24A",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    fill: "none"
+  })), /*#__PURE__*/React.createElement("svg", {
+    className: "sp-spark c",
+    "aria-hidden": "true",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    style: {
+      position: "absolute",
+      left: "120px",
+      top: "8px"
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 2v6M12 16v6M2 12h6M16 12h6",
+    stroke: "#FFFFFF",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    fill: "none"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: "63px",
+      bottom: "22px",
+      width: "200px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      zIndex: "2"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sp-move",
+    style: {
+      position: "relative",
+      width: "200px",
+      height: "200px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sp-bubble",
+    style: {
+      position: "absolute",
+      left: "118px",
+      top: "-48px",
+      zIndex: "3"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0",
+      padding: "12px 18px",
+      borderRadius: "20px",
+      background: "#FFFFFF",
+      color: "#0B1E5B",
+      fontSize: "22px",
+      fontWeight: "600",
+      whiteSpace: "nowrap",
+      boxShadow: "0 6px 0 rgba(11,30,91,0.25)",
+      display: "grid"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sp-sorry",
+    style: {
+      gridArea: "1 / 1"
+    }
+  }, "Sorry\u2026"), /*#__PURE__*/React.createElement("span", {
+    className: "sp-smug",
+    style: {
+      gridArea: "1 / 1"
+    }
+  }, "not sorry")), /*#__PURE__*/React.createElement("div", {
+    "aria-hidden": "true",
+    style: {
+      position: "absolute",
+      left: "22px",
+      bottom: "-8px",
+      width: "18px",
+      height: "18px",
+      background: "#FFFFFF",
+      transform: "rotate(45deg)",
+      borderRadius: "3px"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sp-bounce",
+    style: {
+      width: "200px",
+      height: "200px"
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    role: "img",
+    "aria-label": "Tennis ball mascot hiding a smug grin behind its hand",
+    width: "200",
+    height: "200",
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "60",
+    cy: "60",
+    r: "56",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 32 C 40 44, 40 76, 12 88",
+    stroke: "#FFFFFF",
+    strokeWidth: "5",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M108 32 C 80 44, 80 76, 108 88",
+    stroke: "#FFFFFF",
+    strokeWidth: "5",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-sorry",
+    transform: "rotate(4 60 60)"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M33 47 Q 42 46 50 39",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M70 39 Q 78 46 87 47",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "43",
+    cy: "60",
+    rx: "6.5",
+    ry: "7.5",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "45.5",
+    cy: "57",
+    r: "2.6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "41",
+    cy: "63.5",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "77",
+    cy: "60",
+    rx: "6.5",
+    ry: "7.5",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "79.5",
+    cy: "57",
+    r: "2.6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "75",
+    cy: "63.5",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M94 38 Q 98 45 94 48 Q 90 45 94 38 Z",
+    fill: "#9CD3FF"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "sp-smug",
+    transform: "rotate(-7 60 60)"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M36 46 Q 44 43.5 52 46",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M68 43 Q 76 36 86 41",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-wink"
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "44",
+    cy: "58",
+    rx: "8",
+    ry: "6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "48",
+    cy: "59.5",
+    r: "4.2",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "49.5",
+    cy: "58",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M35 57 Q 44 48 53 57 Z",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M35 57 Q 44 54.5 53 57",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "sp-wink"
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "76",
+    cy: "58",
+    rx: "8",
+    ry: "6",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "80",
+    cy: "59.5",
+    r: "4.2",
+    fill: "#0B1E5B"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "81.5",
+    cy: "58",
+    r: "1.3",
+    fill: "#FFFFFF"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M67 57 Q 76 48 85 57 Z",
+    fill: "#D7F24A"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M67 57 Q 76 54.5 85 57",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("path", {
+    d: "M45 72 Q 62 87 77 70 Q 62 79 45 72 Z",
+    fill: "#FF4F8B",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    strokeLinejoin: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M76 70.5 Q 80 69.5 80 66",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    fill: "none",
+    strokeLinecap: "round"
+  })), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "32",
+    cy: "71",
+    rx: "8",
+    ry: "4.5",
+    fill: "#FF8FB1",
+    opacity: "0.75"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "88",
+    cy: "71",
+    rx: "8",
+    ry: "4.5",
+    fill: "#FF8FB1",
+    opacity: "0.75"
+  }), /*#__PURE__*/React.createElement("g", {
+    className: "sp-hand"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M60 99 V117",
+    stroke: "#0B1E5B",
+    strokeWidth: "7.5",
+    strokeLinecap: "round",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M60 105 V110",
+    stroke: "#FF8FB1",
+    strokeWidth: "7.5",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M54 91 L60 100 L66 91",
+    stroke: "#0B1E5B",
+    strokeWidth: "3",
+    strokeLinejoin: "round",
+    strokeLinecap: "round",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "60",
+    cy: "78",
+    rx: "13",
+    ry: "15",
+    fill: "#FFFFFF",
+    stroke: "#0B1E5B",
+    strokeWidth: "3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M54 65 V91 M60 63.5 V92.5 M66 65 V91 M49 70 H71 M47 78 H73 M49 86 H71",
+    stroke: "#8FA2D9",
+    strokeWidth: "1.4",
+    fill: "none"
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "sp-shadow",
+    "aria-hidden": "true",
+    style: {
+      width: "150px",
+      height: "18px",
+      borderRadius: "50%",
+      background: "#0B1E5B",
+      marginTop: "-6px"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "auto",
+      width: "100%",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "22px",
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    "aria-hidden": "true",
+    style: {
+      display: "flex",
+      gap: "10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sp-dot",
+    style: {
+      width: "10px",
+      height: "10px",
+      borderRadius: "50%",
+      background: "#D7F24A"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sp-dot b",
+    style: {
+      width: "10px",
+      height: "10px",
+      borderRadius: "50%",
+      background: "#D7F24A"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sp-dot c",
+    style: {
+      width: "10px",
+      height: "10px",
+      borderRadius: "50%",
+      background: "#D7F24A"
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "sp-cta",
+    type: "button",
+    onClick: onStart,
+    lang: "ko",
+    style: {
+      width: "100%",
+      height: "58px",
+      border: "0",
+      borderRadius: "18px",
+      background: "#FFFFFF",
+      color: "#0B1E5B",
+      fontFamily: "Jua, Fredoka, system-ui, sans-serif",
+      fontSize: "20px",
+      cursor: "pointer",
+      boxShadow: "0 6px 0 rgba(11,30,91,0.3)"
+    }
+  }, "\uC2DC\uC791\uD558\uAE30"))))));
+}
 function App() {
   // screen: "login" | "forgot" | "signup" | "main"
+  const [splash, setSplash] = useState(true); // 앱을 열 때마다 스플래시부터
   const [screen, setScreen] = useState("login");
   const [step, setStep] = useState(1);
   const [signupDone, setSignupDone] = useState(false);
@@ -5233,6 +5815,9 @@ function App() {
     ...p,
     [key]: val
   }));
+  if (splash) return /*#__PURE__*/React.createElement(SplashScreen, {
+    onStart: () => setSplash(false)
+  });
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
   const pending = FB && screen === "main" && account && account.user && !account.admin && !account.approved;
