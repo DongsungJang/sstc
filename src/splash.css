@@ -1,0 +1,54 @@
+/* 스플래시 화면 (SSTC_app_assets/splash.html 원본 CSS). sp-bounce 뒤에 남아 있던 } 하나만 지웠어요. */
+@font-face{font-family:Fredoka;src:url(fonts/Fredoka.ttf) format("truetype");font-display:swap;font-weight:300 700}
+@font-face{font-family:Jua;src:url(fonts/Jua.ttf) format("truetype");font-display:swap}
+
+.sp-move{animation:sp-move 1.2s infinite}
+@keyframes sp-move{
+0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+12%{transform:translateY(-16px);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+50%{transform:translateY(-84px);animation-timing-function:cubic-bezier(.6,0,.8,.3)}
+88%{transform:translateY(-16px)}
+100%{transform:translateY(0)}
+}
+.sp-bounce{animation:sp-bounce 1.2s infinite;transform-origin:50% 100%}
+@keyframes sp-bounce{
+0%{transform:scale(1.16,.82);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+12%{transform:scale(.93,1.08);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+50%{transform:scale(1,1) rotate(-6deg);animation-timing-function:cubic-bezier(.6,0,.8,.3)}
+88%{transform:scale(.93,1.08)}
+100%{transform:scale(1.16,.82)}
+}
+.sp-shadow{animation:sp-shadow 1.2s infinite}
+@keyframes sp-shadow{0%,100%{transform:scaleX(1);opacity:.35}50%{transform:scaleX(.45);opacity:.12}}
+.sp-wink{transform-box:fill-box;transform-origin:center;animation:sp-wink 3.6s infinite}
+@keyframes sp-wink{0%,82%,100%{transform:scaleY(1)}87%{transform:scaleY(.12)}93%{transform:scaleY(1)}}
+.sp-bubble{transform-origin:12% 100%;animation:sp-pop 4.8s infinite}
+@keyframes sp-pop{
+0%,4%{transform:scale(0) rotate(-10deg);opacity:0}
+10%{transform:scale(1.12) rotate(4deg);opacity:1}
+14%,42%{transform:scale(1) rotate(0deg);opacity:1}
+47%{transform:scale(1.2) rotate(-6deg);opacity:1}
+52%,88%{transform:scale(1) rotate(0deg);opacity:1}
+94%,100%{transform:scale(0) rotate(8deg);opacity:0}
+}
+.sp-spark{animation:sp-spark 1.8s ease-in-out infinite}
+.sp-spark.b{animation-delay:.6s}
+.sp-spark.c{animation-delay:1.2s}
+@keyframes sp-spark{0%,100%{transform:scale(.3) rotate(0deg);opacity:0}50%{transform:scale(1) rotate(45deg);opacity:1}}
+.sp-dot{animation:sp-dot 1.2s ease-in-out infinite}
+.sp-dot.b{animation-delay:.15s}
+.sp-dot.c{animation-delay:.3s}
+@keyframes sp-dot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-8px);opacity:1}}
+.sp-title{animation:sp-title 2.4s ease-in-out infinite}
+@keyframes sp-title{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.sp-cta{transition:transform .15s ease}
+.sp-cta:hover{transform:translateY(-2px)}
+.sp-cta:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){.sp-move,.sp-bounce,.sp-shadow,.sp-wink,.sp-bubble,.sp-spark,.sp-dot,.sp-title{animation:none}.sp-bubble{opacity:1;transform:none}}
+.sp-sorry{animation:sp-a 4.8s infinite}
+.sp-smug{animation:sp-b 4.8s infinite}
+@keyframes sp-a{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
+@keyframes sp-b{0%,40%{opacity:0}46%,94%{opacity:1}100%{opacity:0}}
+.sp-hand{transform-box:fill-box;transform-origin:50% 100%;animation:sp-hand 4.8s infinite}
+@keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.5px) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,16px) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
+@media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,16px) rotate(0deg)}}
