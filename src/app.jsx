@@ -73,7 +73,7 @@ function votesFromRec(rec){
     const v=rec.votes[key];
     if(!v||v.status!=="attend"||!v.at) return;
     if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
-    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at});
+    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||""});
     (v.guests||[]).forEach(g=>g&&g.name&&out.push({key,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
   });
   return out;
@@ -1121,7 +1121,8 @@ const saveMeetingPath=(path,value)=>dbReady.then(db=>{ if(!db) throw new Error("
 const myVoteKey=()=>(FB&&FB.auth.currentUser)?FB.auth.currentUser.uid:nickKey(ME);
 const voteValue=(status,prev)=>({name:ME,ntrp:MEMBER_NTRP[ME]||"",status,
   at:status==="attend"?((prev&&prev.status==="attend"&&prev.at)||nowAt()):null,
-  guests:status==="attend"?((prev&&prev.guests)||[]):[]});
+  guests:status==="attend"?((prev&&prev.guests)||[]):[],
+  arrive:status==="attend"?((prev&&prev.arrive)||null):null, leave:status==="attend"?((prev&&prev.leave)||null):null});
 
 // 모든 모임 기록을 실시간으로 받아서 MEETINGS를 다시 만듦
 // 파이어베이스 규칙이 로그인한 사람만 읽게 하므로, 로그인 상태가 바뀔 때마다 구독을 다시 걺
@@ -1447,7 +1448,8 @@ function BracketSetup({meeting,participants,onCreate}) {
   const leftover=span>0?span-k*dur:0;
   const total=k*slot;
   const [games,setGames]=useState(()=>evenGames(n,total,k));
-  const [excl,setExcl]=useState(()=>order.map(()=>0));
+  // 늦게 오는 사람은 첫판 제외, 일찍 가는 사람은 막판 제외로 시작 (둘 다면 첫판)
+  const [excl,setExcl]=useState(()=>order.map(p=>p.arrive?1:p.leave?2:0));
   // 시간·코트·인원이 바뀌면 게임 수를 다시 고르게 나눔
   const layoutKey=`${k}_${slot}_${n}`, lastKey=useRef(layoutKey);
   useEffect(()=>{ if(lastKey.current!==layoutKey){ lastKey.current=layoutKey; setGames(evenGames(n,total,k)); } },[layoutKey]);
@@ -1525,6 +1527,7 @@ function BracketSetup({meeting,participants,onCreate}) {
               <span style={{width:20,fontSize:12,fontWeight:700,color:BLUE,textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{i+1}</span>
               <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:p.isMe?700:500,color:"#1B2559",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {p.name}<span style={{fontSize:11,color:"#A3AAC2",fontWeight:400,marginLeft:5}}>{p.isGuest?"게스트":p.ntrp}</span>
+                {(p.arrive||p.leave)&&<span style={{display:"block",fontSize:11,color:BLUE,fontWeight:500}}>{[p.arrive&&`${p.arrive} 도착`,p.leave&&`${p.leave} 출발`].filter(Boolean).join(" · ")}</span>}
               </span>
               <button type="button" onClick={()=>cycleGames(i)} title="게임 수" style={{...chipBtn,background:"#fff",color:games[i]>caps[i]?"#ef4444":BLUE,border:`1.5px solid ${games[i]>caps[i]?"#ef4444":BLUE}`}}>{games[i]}게임</button>
               <button type="button" onClick={()=>cycleExcl(i)} title="첫판/막판 제외" style={{...chipBtn,width:54,background:excl[i]?"#FFF4E5":"#fff",color:excl[i]?"#C2610C":"#A3AAC2",border:`1.5px solid ${excl[i]?"#FBD38D":"#E4E9F7"}`}}>{EXCL_LABEL[excl[i]]}</button>
@@ -1705,6 +1708,8 @@ function VoteRow({v,idx,wait}) {
           <span style={{fontSize:14,fontWeight:v.isMe?700:500,color:v.isMe?BLUE:"#1B2559"}}>{v.name}</span>
           {!v.isGuest&&<span style={{fontSize:11,color:"#A3AAC2"}}>{v.ntrp}</span>}
           {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:tag.bg,color:tag.c}}>{tag.t}</span>}
+          {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}>⏰ {v.arrive} 도착</span>}
+          {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}>🏃 {v.leave} 출발</span>}
           {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
         <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} 투표</span>
@@ -1740,7 +1745,10 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
     ?(myConfirmIdx>=0?`✅ 참석 확정 · ${myConfirmIdx+1}번째`:`⏳ 대기 ${myWaitIdx+1}번${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
     :myStatus==="absent"?"❌ 불참으로 등록되었어요":myStatus==="maybe"?"⏳ 미정으로 등록되었어요":"";
   // 대진표 참가자 = 참석 확정자
-  const participants=confirmed.map(v=>({name:v.name,ntrp:v.ntrp,isGuest:v.isGuest,isMe:v.isMe}));
+  const participants=confirmed.map(v=>({name:v.name,ntrp:v.ntrp,isGuest:v.isGuest,isMe:v.isMe,arrive:v.arrive||"",leave:v.leave||""}));
+  // 늦게 도착·일찍 출발 (대진표 짤 때 첫판·막판 제외로 반영)
+  const mStart=meeting.time.slice(0,5), mEnd=(meeting.time.split("~")[1]||"").trim().slice(0,5);
+  const setTimeNote=(k,v)=>store.saveRsvp({...voteValue("attend",mine),[k]:v||null});
   const C={attend:{border:BLUE,bg:BLUE,color:"#fff"},maybe:{border:"#f59e0b",bg:"#fffbeb",color:"#d97706"},absent:{border:"#ef4444",bg:"#fef2f2",color:"#ef4444"}};
   const I={border:"#E4E9F7",bg:"#fff",color:"#6B7493"};
   return(
@@ -1785,6 +1793,19 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
               })}
             </div>
             {myStatus&&<p style={{margin:0,fontSize:12,textAlign:"center",color:myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>}
+            {myStatus==="attend"&&(
+              <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}>⏰ 늦게 오거나 일찍 가나요?</span>
+                {[["arrive","늦게 와요","도착",mine.arrive,hhmmApp(Math.min(toMin(mEnd)-30,toMin(mStart)+30))],["leave","일찍 가요","출발",mine.leave,hhmmApp(Math.max(toMin(mStart)+30,toMin(mEnd)-30))]].map(([k,l,w,val,def])=>(
+                  <div key={k} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <button type="button" aria-pressed={!!val} onClick={()=>setTimeNote(k,val?null:pad2(def))} style={{flex:"0 0 92px",padding:"7px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",border:`1.5px solid ${val?BLUE:"#D6DEF7"}`,background:val?BLUE:"#fff",color:val?"#fff":"#6B7493"}}>{l}</button>
+                    {val?<><input type="time" aria-label={`${w} 시간`} value={val} onChange={e=>e.target.value&&setTimeNote(k,e.target.value)} style={{...inputStyle,flex:1,padding:"6px 12px"}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
+                      :<span style={{fontSize:12,color:"#A3AAC2"}}>{k==="arrive"?`${mStart}부터 와요`:`${mEnd}까지 있어요`}</span>}
+                  </div>
+                ))}
+                <span style={{fontSize:11,color:"#A3AAC2"}}>대진표 만들 때 첫판·막판 제외로 미리 반영돼요.</span>
+              </div>
+            )}
             {prio&&<p style={{margin:0,fontSize:11,textAlign:"center",color:"#A3AAC2"}}>이번 달 정기 모임 참석 {myCount}회 (이 모임 전까지)</p>}
             {myStatus==="attend"&&(
               <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7"}}>
