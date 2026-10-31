@@ -50,56 +50,67 @@ const NTRP_LEVELS = [
   { score:"선출", label:"선출",  desc:"중·고·대학교 테니스부 등 학교 선수 출신이에요." },
 ];
 
-const NOTICES = [
-  { id:1, title:"6월 정모 장소 변경 안내", date:"2025.06.10", important:true,  content:"6월 정모 장소가 올림픽공원 → 한강 반포 테니스장으로 변경되었습니다." },
-  { id:2, title:"신규 회원 환영합니다 🎾",  date:"2025.06.05", important:false, content:"이번 달 새로 합류하신 김민준, 이서연 님을 환영합니다!" },
-  { id:3, title:"라켓 공동구매 신청 마감 D-3", date:"2025.06.01", important:false, content:"바볼랏 퓨어드라이브 공동구매 신청 마감이 3일 남았습니다." },
-];
+// 공지사항 (아직 작성 기능 없음)
+const NOTICES = [];
 
-// 회원 NTRP (투표 데이터에서 이름으로 찾음)
-const MEMBER_NTRP = {김민준:"4.0",박지현:"3.5",이서연:"3.5",최동훈:"4.5",동토리:"3.5",정유진:"3.0",한승민:"4.0",강태양:"3.5",
-  윤소희:"3.0",오민석:"4.0",송다은:"3.5",임준혁:"3.0",권나연:"3.5",배성우:"4.0"};
-// 투표 기록: [이름, 투표 시각, (게스트면) 초대한 회원]
-const V = (rows) => rows.map(([name,at,guestOf])=>({name,at,ntrp:guestOf?"":(MEMBER_NTRP[name]||""),...(guestOf?{guestOf}:{})}));
+// 회원 NTRP (투표에 같이 저장된 값으로 채움)
+const MEMBER_NTRP = {};
 
-const MEETINGS = [
-  { id:1, date:"2025.06.21 (토)", time:"08:00 ~ 12:00", place:"한강 반포 테니스장", capacity:12, status:"upcoming", openDate:"2025.06.14 (토) 00:00",
-    desc:"6월 정기 모임입니다. 복식 위주로 진행되며 간단한 음료는 공동 구매 예정이에요.",
-    votes:V([["김민준","2025-06-14T00:00:03"],["최동훈","2025-06-14T00:00:05"],["박지현","2025-06-14T00:00:09"],["동토리","2025-06-14T00:00:12"],
-      ["한승민","2025-06-14T00:00:20"],["이서연","2025-06-14T00:01:02"],["오민석","2025-06-14T00:02:15"],["정유진","2025-06-14T00:05:40"],
-      ["강태양","2025-06-14T00:12:08"],["송다은","2025-06-14T00:30:44"],["윤소희","2025-06-14T01:10:00"],["임준혁","2025-06-14T07:45:12"],
-      ["배성우","2025-06-14T08:30:00"],["홍민우","2025-06-14T09:00:00","김민준"],["권나연","2025-06-15T10:20:00"]]) },
-  { id:2, date:"2025.07.05 (토)", time:"08:00 ~ 12:00", place:"올림픽공원 테니스장", capacity:16, status:"upcoming", openDate:"2025.06.28 (토) 00:00",
-    desc:"7월 정기 모임입니다. 단식/복식 혼합 진행 예정이에요. 7월이라 참석 횟수가 새로 시작돼요.",
-    votes:V([["김민준","2025-06-28T00:00:04"],["박지현","2025-06-28T00:00:10"],["이서연","2025-06-28T00:00:31"],["최동훈","2025-06-28T00:02:00"]]) },
-  { id:5, date:"2025.06.14 (토)", time:"14:00 ~ 18:00", place:"올림픽공원 테니스장", capacity:8, status:"past", openDate:"2025.06.07 (토) 00:00",
-    desc:"6월 번개 모임이었습니다. 코트 2면, 8명 정원.",
-    votes:V([["김민준","2025-06-07T00:00:02"],["최동훈","2025-06-07T00:00:04"],["동토리","2025-06-07T00:00:07"],["박지현","2025-06-07T00:00:11"],
-      ["한승민","2025-06-07T00:00:15"],["배성우","2025-06-07T00:03:20"],["권나연","2025-06-07T00:10:05"],["송다은","2025-06-07T00:20:41"],
-      ["정유진","2025-06-07T02:00:00"]]) },
-  { id:4, date:"2025.06.07 (토)", time:"08:00 ~ 12:00", place:"한강 반포 테니스장", capacity:12, status:"past", openDate:"2025.05.31 (토) 00:00",
-    desc:"6월 첫 정기 모임이었습니다.",
-    votes:V([["김민준","2025-05-31T00:00:02"],["최동훈","2025-05-31T00:00:06"],["박지현","2025-05-31T00:00:08"],["한승민","2025-05-31T00:00:13"],
-      ["이서연","2025-05-31T00:00:30"],["오민석","2025-05-31T00:01:12"],["정유진","2025-05-31T00:03:00"],["강태양","2025-05-31T00:08:45"],
-      ["송다은","2025-05-31T00:15:20"],["윤소희","2025-05-31T01:02:00"],["임준혁","2025-05-31T06:30:00"],["권나연","2025-05-31T09:12:00"]]) },
-  { id:3, date:"2025.05.17 (토)", time:"08:00 ~ 12:00", place:"올림픽공원 테니스장", capacity:16, status:"past", openDate:"2025.05.10 (토) 00:00",
-    desc:"5월 정기 모임이었습니다.",
-    votes:V([["김민준","2025-05-10T00:00:02"],["박지현","2025-05-10T00:00:05"],["이서연","2025-05-10T00:00:09"],["최동훈","2025-05-10T00:00:14"],
-      ["동토리","2025-05-10T00:00:20"],["정유진","2025-05-10T00:01:00"],["한승민","2025-05-10T00:02:30"],["강태양","2025-05-10T00:05:00"],
-      ["윤소희","2025-05-10T00:09:10"],["오민석","2025-05-10T00:20:00"],["송다은","2025-05-10T00:40:00"],["임준혁","2025-05-10T01:30:00"],
-      ["권나연","2025-05-10T03:00:00"],["배성우","2025-05-10T08:00:00"]]) },
-];
-
-const RANKING = [
-  {rank:1,name:"김민준",ntrp:"4.0",count:18,badge:"🥇"},
-  {rank:2,name:"박지현",ntrp:"3.5",count:16,badge:"🥈"},
-  {rank:3,name:"이서연",ntrp:"3.5",count:15,badge:"🥉"},
-  {rank:4,name:"최동훈",ntrp:"4.5",count:14,badge:""},
-  {rank:5,name:"동토리",ntrp:"3.5",count:12,badge:"",isMe:true},
-  {rank:6,name:"정유진",ntrp:"3.0",count:11,badge:""},
-  {rank:7,name:"한승민",ntrp:"4.0",count:10,badge:""},
-];
-const LAST_MEETING = {date:"2025.06.14 (토)",place:"올림픽공원",myResult:"3승 1패",myPartner:"이서연"};
+// ─── 모임 목록 ────────────────────────────────────────────────────────────────
+// 모임은 club/meetings/m<id>에 저장해요: info(날짜·시간·장소·정원·예약 오픈·설명), votes(<회원 키>: 참석 투표), bracket, scores.
+// MEETINGS는 그 기록을 화면에서 쓰기 좋게 바꾼 목록이고, App이 실시간으로 다시 채워요.
+let MEETINGS = [];
+const WEEK = ["일","월","화","수","목","금","토"];
+const pad0 = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad0(d.getMonth()+1)}-${pad0(d.getDate())}`;
+const todayYmd = () => ymd(new Date());
+// "2026-11-07" → "2026.11.07 (토)"
+const fmtDate = iso => { if(!iso) return ""; const d=new Date(iso+"T00:00:00"); return `${iso.replace(/-/g,".")} (${WEEK[d.getDay()]})`; };
+// "2026-10-31T00:00" → "2026.10.31 (토) 00:00"
+const fmtOpen = at => at?`${fmtDate(at.slice(0,10))} ${at.slice(11,16)}`:"바로 열림";
+// 투표 기록 → resolveVotes가 쓰는 줄 (참석만, 게스트는 초대한 회원 뒤에 따로)
+function votesFromRec(rec){
+  const out=[];
+  Object.keys((rec&&rec.votes)||{}).forEach(key=>{
+    const v=rec.votes[key];
+    if(!v||v.status!=="attend"||!v.at) return;
+    if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
+    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at});
+    (v.guests||[]).forEach(g=>g&&g.name&&out.push({key,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
+  });
+  return out;
+}
+function toMeeting(id,rec){
+  const info=rec.info, today=todayYmd();
+  return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`, place:info.place,
+    capacity:+info.capacity||0, desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
+    status:info.date<today?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
+    votes:votesFromRec(rec) };
+}
+// 다가오는 모임은 가까운 날짜부터, 지난 모임은 최근 것부터
+function buildMeetings(all){
+  const list=Object.keys(all||{}).filter(k=>/^m\d+$/.test(k)&&all[k]&&all[k].info&&all[k].info.date)
+    .map(k=>toMeeting(+k.slice(1),all[k]));
+  const up=list.filter(m=>m.status==="upcoming").sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:0);
+  const past=list.filter(m=>m.status==="past").sort((a,b)=>a.iso<b.iso?1:a.iso>b.iso?-1:0);
+  MEETINGS=[...up,...past];
+  refreshAttendance();
+  return MEETINGS;
+}
+function refreshAttendance(){ MEETINGS.forEach(m=>{const r=resolveVotes(m,m.votes);m.attendees=r.confirmed;m.waitlist=r.waitlist;}); }
+// 이미 열린(오늘 포함) 모임, 참석 횟수, 랭킹 — 홈·통계에서 씀 (게스트 제외)
+const heldMeetings=()=>MEETINGS.filter(m=>m.iso<=todayYmd());
+const myHeld=()=>heldMeetings().filter(m=>(m.attendees||[]).some(a=>a.isMe));
+function rankingOf(list){
+  const c={};
+  list.forEach(m=>(m.attendees||[]).forEach(v=>{ if(!v.isGuest) c[v.name]=(c[v.name]||0)+1; }));
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b,"ko")).map(name=>{
+    const rank=1+Object.keys(c).filter(n=>c[n]>c[name]).length;
+    return {rank,name,count:c[name],ntrp:MEMBER_NTRP[name]||"-",badge:["","🥇","🥈","🥉"][rank]||"",isMe:name===ME};
+  });
+}
+const dDay=iso=>{ const d=Math.round((new Date(iso+"T00:00:00")-new Date(todayYmd()+"T00:00:00"))/86400000); return d===0?"D-DAY":`D-${d}`; };
+const isOpen=m=>!m.openAt||nowAt().slice(0,16)>=m.openAt;
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
 // 참석 횟수는 달마다 새로 셈. 정원 안에서는 선착순이 기본이지만,
@@ -134,8 +145,6 @@ function resolveVotes(meeting,votes) {
   waitlist.forEach(v=>{v.bumped=fcfs.has(v.name+"|"+(v.guestOf||""));});
   return {confirmed,waitlist,counts};
 }
-// 목록·홈 화면용 기본값 (샘플 투표 기준)
-MEETINGS.forEach(m=>{const r=resolveVotes(m,m.votes);m.attendees=r.confirmed;m.waitlist=r.waitlist;});
 const fmtAt = at => `${+at.slice(5,7)}/${+at.slice(8,10)} ${at.slice(11,19)}`;
 const nowAt = () => { const d=new Date(),p=n=>String(n).padStart(2,"0");
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
@@ -530,26 +539,40 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin}) {
 }
 
 // ─── 홈 탭 ────────────────────────────────────────────────────────────────────
-function HomeTab({onGoBooking,onOpenMeeting}) {
-  const lastMeeting=MEETINGS.find(m=>m.status==="past"&&m.attendees.some(a=>a.isMe));
-  const {rec:lastRec}=useMeetingRecord(lastMeeting?lastMeeting.id:0);
-  const mine=lastRec&&lastRec.bracket?myRecord(lastRec.bracket,lastRec.scores,ME):null;
+function Empty({children,action,onAction}) {
+  return(
+    <div style={{padding:"18px 12px",background:"#F5F7FE",borderRadius:16,textAlign:"center"}}>
+      <p style={{margin:0,fontSize:13,color:"#8A93B2",lineHeight:1.6}}>{children}</p>
+      {action&&<button type="button" onClick={onAction} style={{marginTop:10,padding:"8px 16px",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:SHADOW_BTN}}>{action}</button>}
+    </div>
+  );
+}
+function HomeTab({onGoBooking,onOpenMeeting,onCreate}) {
+  const lastMeeting=myHeld()[0]||null;
+  const lastRec=lastMeeting&&lastMeeting.rec;
+  const mine=lastRec&&lastRec.bracket?myRecord(lastRec.bracket,lastRec.scores||{},ME):null;
   const [exp,setExp]=useState(null);
-  const next=MEETINGS.find(m=>m.status==="upcoming");
-  const nextNext=MEETINGS.filter(m=>m.status==="upcoming")[1];
-  const fill=Math.round((next.attendees.length/next.capacity)*100);
+  const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
+  const next=upcoming[0], nextNext=upcoming[1];
+  const monthRank=rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
+  // 홈에서 바로 참석·불참 투표
+  const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
+  const myStatus=myVote&&myVote.status;
+  const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).catch(e=>alert(authMsg(e)));
+  const fill=next?Math.min(100,Math.round((next.attendees.length/Math.max(1,next.capacity))*100)):0;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <Card>
-        <SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임 📅</SectionTitle>
+        <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임 📅</SectionTitle>
+        {!next?<Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty>:(
         <div style={{background:BLUE_LIGHT,borderRadius:18,padding:16}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+          <div onClick={()=>onOpenMeeting(next.id,"info")} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,cursor:"pointer"}}>
             <div>
               <p style={{margin:"0 0 3px",fontWeight:700,fontSize:15,color:"#1B2559"}}>{next.date}</p>
               <p style={{margin:"0 0 2px",fontSize:13,color:"#4A5578"}}>🕗 {next.time}</p>
               <p style={{margin:0,fontSize:13,color:"#4A5578"}}>📍 {next.place}</p>
             </div>
-            <span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,boxShadow:SHADOW_BTN}}>D-10</span>
+            <span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,boxShadow:SHADOW_BTN}}>{dDay(next.iso)}</span>
           </div>
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
@@ -558,44 +581,49 @@ function HomeTab({onGoBooking,onOpenMeeting}) {
             </div>
             <div style={{height:6,background:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:GRAD,borderRadius:10}}/></div>
           </div>
+          {isOpen(next)?(
           <div style={{display:"flex",gap:8}}>
-            <button style={{flex:1,padding:"9px 0",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:SHADOW_BTN}}>참석하기 ✓</button>
-            <button style={{flex:1,padding:"8px 0",background:"#fff",color:"#6B7493",border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:13,cursor:"pointer"}}>불참</button>
+            <button type="button" onClick={()=>vote("attend")} style={{flex:1,padding:"9px 0",background:myStatus==="attend"?GRAD:"#fff",color:myStatus==="attend"?"#fff":BLUE,border:myStatus==="attend"?"none":`1.5px solid ${BLUE}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:myStatus==="attend"?SHADOW_BTN:"none"}}>{myStatus==="attend"?"참석 투표함 ✓":"참석하기 ✓"}</button>
+            <button type="button" onClick={()=>vote("absent")} style={{flex:1,padding:"8px 0",background:myStatus==="absent"?"#fef2f2":"#fff",color:myStatus==="absent"?"#ef4444":"#6B7493",border:`1.5px solid ${myStatus==="absent"?"#ef4444":"#D6DEF7"}`,borderRadius:999,fontSize:13,fontWeight:myStatus==="absent"?600:400,cursor:"pointer"}}>불참</button>
           </div>
-        </div>
+          ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}>🗓️ 예약은 {next.openDate}에 열려요</p>}
+        </div>)}
         {nextNext&&(
-          <div style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
             <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>📍 {nextNext.place}</p></div>
             <span style={{fontSize:12,color:"#A3AAC2"}}>{nextNext.attendees.length}명 참석예정</span>
           </div>
         )}
       </Card>
       <Card>
-        <SectionTitle action={mine?"대진·스코어":"결과 기록하기"} onAction={()=>lastMeeting&&onOpenMeeting(lastMeeting.id,"bracket")}>마지막 참석 모임 🎾</SectionTitle>
+        <SectionTitle action={lastMeeting?(mine?"대진·스코어":"결과 기록하기"):null} onAction={()=>lastMeeting&&onOpenMeeting(lastMeeting.id,"bracket")}>마지막 참석 모임 🎾</SectionTitle>
+        {!lastMeeting?<Empty>아직 참석한 모임이 없어요.</Empty>:(
         <div style={{display:"flex",gap:8}}>
-          {[{label:"날짜",value:LAST_MEETING.date},{label:"장소",value:LAST_MEETING.place},{label:"내 결과",value:mine?mine.result:LAST_MEETING.myResult},{label:mine?"자주 친 파트너":"파트너",value:mine?mine.partner:LAST_MEETING.myPartner}].map(item=>(
+          {[{label:"날짜",value:lastMeeting.date},{label:"장소",value:lastMeeting.place},{label:"내 결과",value:mine?mine.result:"기록 없음"},{label:"자주 친 파트너",value:mine?mine.partner:"-"}].map(item=>(
             <div key={item.label} style={{flex:1,textAlign:"center",padding:"10px 4px",background:BLUE_LIGHT,borderRadius:10}}>
               <p style={{margin:"0 0 4px",fontSize:10,color:"#6B7493"}}>{item.label}</p>
-              <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1B2559"}}>{item.value}</p>
+              <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1B2559",wordBreak:"keep-all"}}>{item.value}</p>
             </div>
           ))}
-        </div>
+        </div>)}
       </Card>
       <Card>
         <SectionTitle>이달의 참여 랭킹 🏆</SectionTitle>
+        {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {RANKING.map(r=>(
-            <div key={r.rank} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
+          {monthRank.slice(0,7).map(r=>(
+            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
               <span style={{width:22,textAlign:"center",fontSize:r.badge?16:13,fontWeight:700,color:"#A3AAC2"}}>{r.badge||r.rank}</span>
               <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
               <span style={{fontSize:11,color:"#A3AAC2",marginRight:4}}>NTRP {r.ntrp}</span>
               <span style={{fontSize:13,fontWeight:700,color:BLUE}}>{r.count}회</span>
             </div>
           ))}
-        </div>
+        </div>)}
       </Card>
       <Card>
         <SectionTitle>공지사항 📢</SectionTitle>
+        {NOTICES.length===0?<Empty>등록된 공지사항이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column"}}>
           {NOTICES.map((n,i)=>(
             <div key={n.id}>
@@ -608,7 +636,7 @@ function HomeTab({onGoBooking,onOpenMeeting}) {
               {exp===n.id&&<div style={{padding:"10px 12px",fontSize:13,color:"#4A5578",lineHeight:1.65,background:BLUE_LIGHT,borderRadius:14,marginBottom:6}}>{n.content}</div>}
             </div>
           ))}
-        </div>
+        </div>)}
       </Card>
     </div>
   );
@@ -991,9 +1019,9 @@ function myRecord(bracket, scores, me) {
   return {result:`${w}승 ${l}패${d?` ${d}무`:""}`,partner};
 }
 
-// ─── 모임별 저장소 ───────────────────────────────────────────────────────────
-// 공유 저장소 순서: ① 파이어베이스 Realtime Database (window.FIREBASE_CONFIG가 있을 때, GitHub Pages)
-// ② claude.ai 아티팩트 공유 DB ③ 둘 다 없으면 이 기기(localStorage). 세 경우 모두 같은 doc() 모양으로 써요.
+// ─── 저장소 ──────────────────────────────────────────────────────────────────
+// ① 파이어베이스 Realtime Database (window.FIREBASE_CONFIG가 있을 때, GitHub Pages)
+// ② 없으면 이 기기(localStorage)에 같은 모양으로 저장. 두 경우 모두 같은 doc(path) 모양으로 써요.
 const FIREBASE_ROOT = "club";   // 스코어보드(results)와 섞이지 않게 club/ 아래에 저장
 // 중첩 객체를 "a/b" 경로로 펼침 → RTDB update가 하위 값을 병합하게 함 (배열은 통째로)
 function flatPaths(obj,prefix,out){
@@ -1005,61 +1033,81 @@ function firebaseDb(){
   const cfg=window.FIREBASE_CONFIG;
   if(!window.firebase.apps.length) window.firebase.initializeApp(cfg);
   const root=window.firebase.database().ref(FIREBASE_ROOT);
-  return { doc:path=>{
+  return { shared:true, doc:path=>{
     const ref=root.child(path);
     return {
       onSnapshot:(next,error)=>{const h=snap=>next({exists:snap.exists(),data:()=>snap.val()});ref.on("value",h,error);return ()=>ref.off("value",h);},
-      set:v=>ref.set(JSON.parse(JSON.stringify(v))),
+      set:v=>ref.set(v==null?null:JSON.parse(JSON.stringify(v))),
       update:v=>ref.update(flatPaths(JSON.parse(JSON.stringify(v)),"",{})),
       delete:()=>ref.remove(),
     };
   }};
 }
+// 파이어베이스가 없을 때: 이 기기에 club 트리 하나를 통째로 저장
+const LOCAL_KEY="sstc-club-local-v2";
+function localDb(){
+  let tree; try{ tree=JSON.parse(localStorage.getItem(LOCAL_KEY)||"{}"); }catch(e){ tree={}; }
+  const subs=new Set();
+  const get=path=>path.split("/").reduce((o,k)=>o==null?undefined:o[k],tree);
+  const put=(path,v)=>{
+    const ks=path.split("/"); let o=tree;
+    ks.slice(0,-1).forEach(k=>{ if(!o[k]||typeof o[k]!=="object") o[k]={}; o=o[k]; });
+    if(v==null) delete o[ks[ks.length-1]]; else o[ks[ks.length-1]]=JSON.parse(JSON.stringify(v));
+  };
+  const commit=()=>{ try{ localStorage.setItem(LOCAL_KEY,JSON.stringify(tree)); }catch(e){} subs.forEach(f=>f()); return Promise.resolve(); };
+  return { shared:false, doc:path=>({
+    onSnapshot:next=>{ const f=()=>{const v=get(path);next({exists:v!==undefined,data:()=>v===undefined?null:JSON.parse(JSON.stringify(v))});}; subs.add(f); setTimeout(f,0); return ()=>subs.delete(f); },
+    set:v=>{ put(path,v); return commit(); },
+    update:v=>{ const f=flatPaths(v,"",{}); Object.keys(f).forEach(k=>put(path+"/"+k,f[k])); return commit(); },
+    delete:()=>{ put(path,null); return commit(); },
+  })};
+}
 const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
-  : (window.firebase&&window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.databaseURL)
-    ? Promise.resolve().then(firebaseDb).catch(()=>null)
-  : (window.claude&&window.claude.use) ? window.claude.use("db").catch(()=>null)
-  : Promise.resolve(null);
-const lsKey = id => "tennis-meeting-v1-"+id;
-function lsLoad(id){ try{ return JSON.parse(localStorage.getItem(lsKey(id))||"null"); }catch(e){ return null; } }
-function lsSave(id,v){ try{ if(v) localStorage.setItem(lsKey(id),JSON.stringify(v)); else localStorage.removeItem(lsKey(id)); }catch(e){} }
+  : Promise.resolve().then(()=>(window.firebase&&window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.databaseURL)?firebaseDb():localDb())
+      .catch(()=>{ try{ return localDb(); }catch(e){ return null; } });
+// club/meetings/<path>에 값 쓰기 (null이면 지움)
+const saveMeetingPath=(path,value)=>dbReady.then(db=>{ if(!db) throw new Error("저장소가 없어요"); return db.doc("meetings/"+path).set(value); });
+// 지금 로그인한 사람의 투표 키: 파이어베이스 계정이면 uid, 아니면 닉네임
+const myVoteKey=()=>(FB&&FB.auth.currentUser)?FB.auth.currentUser.uid:nickKey(ME);
+const voteValue=(status,prev)=>({name:ME,ntrp:MEMBER_NTRP[ME]||"",status,
+  at:status==="attend"?((prev&&prev.status==="attend"&&prev.at)||nowAt()):null,
+  guests:status==="attend"?((prev&&prev.guests)||[]):[]});
 
-function useMeetingRecord(meetingId) {
-  const [rec,setRecState]=useState(()=>lsLoad(meetingId));
-  const recRef=useRef(rec);
-  const setRec=next=>{recRef.current=next;setRecState(next);lsSave(meetingId,next);};
-  const [mode,setMode]=useState("local");   // "shared" | "local" | "readonly"
-  const refRef=useRef(null), chain=useRef(Promise.resolve()), timers=useRef({});
+// 모든 모임 기록을 실시간으로 받아서 MEETINGS를 다시 만듦
+function useMeetingList(){
+  const [state,setState]=useState({meetings:MEETINGS,ready:false,shared:false,error:null});
   useEffect(()=>{
     let alive=true, unsub=null;
     dbReady.then(db=>{
-      if(!alive||!db) return;
-      try{
-        const ref=db.doc("meetings/m"+meetingId);
-        refRef.current=ref; setMode("shared");
-        unsub=ref.onSnapshot(snap=>setRec(snap.exists?snap.data():null),
-          ()=>{refRef.current=null;setMode("local");});
-      }catch(e){ setMode("local"); }
+      if(!alive) return;
+      if(!db){ setState({meetings:buildMeetings({}),ready:true,shared:false,error:null}); return; }
+      unsub=db.doc("meetings").onSnapshot(
+        snap=>alive&&setState({meetings:buildMeetings(snap.exists?snap.data():{}),ready:true,shared:db.shared,error:null}),
+        e=>alive&&setState(s=>({...s,ready:true,error:authMsg(e)})));
     });
-    return ()=>{alive=false;if(unsub)unsub();Object.values(timers.current).forEach(clearTimeout);};
-  },[meetingId]);
-  // 같은 문서에는 한 번에 하나씩 씀
-  const write=fn=>{
-    const ref=refRef.current; if(!ref) return;
-    chain.current=chain.current.then(()=>fn(ref)).catch(e=>{
-      if(e&&(e.code==="invalid_argument"||/PERMISSION_DENIED|permission/i.test(String(e.code||e.message)))) setMode("readonly");
-    });
-  };
-  // 문서 전체를 다시 씀 (참석 투표·대진표·점수가 한 문서에 있음)
-  const put=patch=>{ const next={...(recRef.current||{}),...patch,updatedAt:Date.now()}; setRec(next); write(ref=>ref.set(next)); };
-  const saveBracket=bracket=>put({bracket,scores:{}});
-  const clearBracket=()=>put({bracket:null,scores:{}});
-  const saveRsvp=rsvp=>put({rsvp});
+    return ()=>{alive=false;if(unsub)unsub();};
+  },[]);
+  return state;
+}
+
+// 모임 하나의 투표·대진표·점수 쓰기. 읽기는 목록 구독(meeting.rec)에서 받고, 점수만 입력 중에 화면에 먼저 반영
+function useMeetingRecord(meeting) {
+  const id=meeting.id, base="m"+id;
+  const [mode,setMode]=useState("local");   // "shared" | "local" | "readonly"
+  const [pending,setPending]=useState({});  // 아직 안 보낸 점수
+  const timers=useRef({});
+  useEffect(()=>{ dbReady.then(db=>db&&setMode(db.shared?"shared":"local")); return ()=>Object.values(timers.current).forEach(clearTimeout); },[id]);
+  const fail=e=>{ if(e&&(e.code==="invalid_argument"||/PERMISSION_DENIED|permission/i.test(String(e.code||e.message)))) setMode("readonly"); };
+  const src=meeting.rec||{};
+  const rec={...src,scores:{...(src.scores||{}),...pending}};
+  const saveBracket=bracket=>{ setPending({}); Promise.all([saveMeetingPath(base+"/bracket",bracket),saveMeetingPath(base+"/scores",null)]).catch(fail); };
+  const clearBracket=()=>saveBracket(null);
+  const saveRsvp=v=>saveMeetingPath(base+"/votes/"+myVoteKey(),v).catch(fail);
   const saveScore=(key,val)=>{
-    const prev=recRef.current||{};
-    setRec({...prev,scores:{...(prev.scores||{}),[key]:val},updatedAt:Date.now()});
+    setPending(p=>({...p,[key]:val}));
     clearTimeout(timers.current[key]);
-    timers.current[key]=setTimeout(()=>write(ref=>ref.update({scores:{[key]:val},updatedAt:Date.now()})),600);
+    timers.current[key]=setTimeout(()=>saveMeetingPath(base+"/scores/"+key,val)
+      .then(()=>setPending(p=>{const n={...p};delete n[key];return n;})).catch(fail),600);
   };
   return {rec,mode,saveBracket,clearBracket,saveScore,saveRsvp};
 }
@@ -1100,7 +1148,7 @@ function setMe(profile){
   if(!profile||!profile.nickname) return;
   ME=profile.nickname;
   if(profile.ntrp) MEMBER_NTRP[ME]=profile.ntrp;
-  MEETINGS.forEach(m=>{const r=resolveVotes(m,m.votes);m.attendees=r.confirmed;m.waitlist=r.waitlist;});
+  refreshAttendance();
 }
 
 // 회원가입: 계정 생성 → 프로필·닉네임 저장. 승인은 관리자가 따로 함
@@ -1507,25 +1555,23 @@ function VoteRow({v,idx,wait}) {
   );
 }
 
-function MeetingDetail({meeting,onBack,initialView="info"}) {
+function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) {
   const [view,setView]=useState(initialView);
-  const store=useMeetingRecord(meeting.id);
+  const store=useMeetingRecord(meeting);
   const [guestInput,setGuestInput]=useState("");
   const [showGuest,setShowGuest]=useState(false);
-  const isPast=meeting.status==="past";
-  // 내 투표: 저장된 값이 있으면 그것, 없으면 샘플 투표
-  const sampleMe=meeting.votes.find(v=>v.name===ME&&!v.guestOf);
-  const rsvp=(store.rec&&store.rec.rsvp)||{status:sampleMe?"attend":null,at:sampleMe?sampleMe.at:null,guests:[]};
-  const myStatus=rsvp.status, guests=rsvp.guests||[];
-  const others=meeting.votes.filter(v=>!(v.name===ME&&!v.guestOf)&&v.guestOf!==ME);
-  const votes=myStatus==="attend"?[...others,{name:ME,ntrp:MEMBER_NTRP[ME],at:rsvp.at},
-    ...guests.map(g=>({name:g.name,ntrp:"",at:g.at,guestOf:ME}))]:others;
-  const {confirmed,waitlist,counts}=resolveVotes(meeting,votes);
+  const isPast=meeting.status==="past", open=isOpen(meeting);
+  // 내 투표 (club/meetings/m<id>/votes/<내 키>)
+  const mine=(meeting.rec&&meeting.rec.votes&&meeting.rec.votes[myVoteKey()])||null;
+  const myStatus=mine&&mine.status, guests=(mine&&mine.guests)||[];
+  const {confirmed,waitlist,counts}=resolveVotes(meeting,meeting.votes);
   const total=confirmed.length;
-  const fill=Math.round((total/meeting.capacity)*100);
-  const setMyStatus=val=>store.saveRsvp({...rsvp,status:val,at:val==="attend"?(myStatus==="attend"?rsvp.at:nowAt()):null,guests});
-  const addGuest=()=>{const n=guestInput.trim();if(!n)return;store.saveRsvp({...rsvp,guests:[...guests,{name:n,at:nowAt()}]});setGuestInput("");setShowGuest(false);};
-  const removeGuest=i=>store.saveRsvp({...rsvp,guests:guests.filter((_,idx)=>idx!==i)});
+  const fill=Math.round((total/Math.max(1,meeting.capacity))*100);
+  const setMyStatus=val=>store.saveRsvp(voteValue(val,mine));
+  const addGuest=()=>{const n=guestInput.trim();if(!n)return;store.saveRsvp({...voteValue("attend",mine),guests:[...guests,{name:n,at:nowAt()}]});setGuestInput("");setShowGuest(false);};
+  const removeGuest=i=>store.saveRsvp({...voteValue("attend",mine),guests:guests.filter((_,idx)=>idx!==i)});
+  const remove=()=>{ if(!window.confirm(`${meeting.date} 모임을 지울까요? 투표·대진표·점수도 함께 지워져요.`)) return;
+    saveMeetingPath("m"+meeting.id,null).then(onDeleted).catch(e=>alert(authMsg(e))); };
   const myCount=counts[ME]||0;
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
@@ -1565,7 +1611,8 @@ function MeetingDetail({meeting,onBack,initialView="info"}) {
           </div>
           <div style={{height:7,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${Math.min(fill,100)}%`,background:fill>=100?"#ef4444":BLUE,borderRadius:10}}/></div>
         </div>
-        {!isPast&&(
+        {!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}>🗓️ 예약은 {meeting.openDate}에 열려요</p>}
+        {!isPast&&open&&(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"flex",gap:8}}>
               {[{label:"✓ 참석",val:"attend"},{label:"△ 미정",val:"maybe"},{label:"✕ 불참",val:"absent"}].map(btn=>{
@@ -1601,7 +1648,7 @@ function MeetingDetail({meeting,onBack,initialView="info"}) {
           </div>
         )}
       </Card>
-      <Card><SectionTitle>모임 설명 📋</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7}}>{meeting.desc}</p></Card>
+      {meeting.desc&&<Card><SectionTitle>모임 설명 📋</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
       <Card>
         <SectionTitle>참석 확정 ({total}/{meeting.capacity}명)</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
@@ -1611,6 +1658,7 @@ function MeetingDetail({meeting,onBack,initialView="info"}) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1}/>)}
+          {confirmed.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"8px 0"}}>아직 참석 투표가 없어요</p>}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>참석 횟수는 달마다 새로 세요. 같은 순위 안에서는 투표 시각이 빠른 순이에요.</p>
       </Card>
@@ -1623,25 +1671,34 @@ function MeetingDetail({meeting,onBack,initialView="info"}) {
           <p style={{margin:"10px 0 0",fontSize:12,color:"#A3AAC2"}}>자리가 나면 대기 순서대로 참석 확정돼요.</p>
         </Card>
       )}
+      {canManage&&(
+        <div style={{display:"flex",gap:8}}>
+          <button type="button" onClick={onEdit} style={{...btnSecondary,flex:1}}>모임 수정</button>
+          <button type="button" onClick={remove} style={{...btnSecondary,flex:1,color:"#ef4444",borderColor:"#FBD5D5"}}>모임 삭제</button>
+        </div>
+      )}
+      {meeting.createdBy&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>{meeting.createdBy} 님이 만든 모임</p>}
       </>)}
     </div>
   );
 }
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
-function BookingTab({open,onOpen}) {
+function BookingTab({open,onOpen,ready,canManage,onEdit,onDeleted,onCreate}) {
   const setSelId=id=>onOpen(id,"info");
   const sel=open&&MEETINGS.find(m=>m.id===open.id);
-  if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view}/>;
+  if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
+  if(open) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>{ready?"모임을 찾을 수 없어요. 지워졌을 수 있어요.":"모임을 불러오는 중이에요…"}</p></Card>;
   const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
   const past=MEETINGS.filter(m=>m.status==="past");
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
       <div>
         <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#1B2559"}}>다가오는 모임</p>
+        {upcoming.length===0&&<Empty action="+ 모임 만들기" onAction={onCreate}>{ready?"아직 잡힌 모임이 없어요.":"모임을 불러오는 중이에요…"}</Empty>}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {upcoming.map(m=>{
-            const fill=Math.round((m.attendees.length/m.capacity)*100);
+            const fill=Math.min(100,Math.round((m.attendees.length/Math.max(1,m.capacity))*100));
             const isAtt=m.attendees.some(a=>a.isMe);
             return(
               <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#fff",borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
@@ -1687,12 +1744,25 @@ function BookingTab({open,onOpen}) {
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
 function StatsTab() {
-  const months=["1월","2월","3월","4월","5월","6월"];
-  const myData=[1,2,3,2,3,3],avgData=[2,2,3,3,3,3],maxVal=4;
+  const held=heldMeetings(), mineList=myHeld();
+  const year=todayYmd().slice(0,4);
+  // 연속 참석: 가장 최근 모임부터 거꾸로, 빠지지 않고 참석한 횟수
+  let streak=0; for(const m of held){ if((m.attendees||[]).some(a=>a.isMe)) streak++; else break; }
+  // 최근 6개월: 나 vs 참석한 회원 평균
+  const now=new Date(), months=[];
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push({key:`${d.getFullYear()}.${pad0(d.getMonth()+1)}`,label:`${d.getMonth()+1}월`}); }
+  const rows=months.map(mo=>{
+    const list=held.filter(m=>m.date.slice(0,7)===mo.key);
+    const r=rankingOf(list), me=r.find(x=>x.isMe);
+    const avg=r.length?r.reduce((a,x)=>a+x.count,0)/r.length:0;
+    return {...mo,me:me?me.count:0,avg:Math.round(avg*10)/10};
+  });
+  const maxVal=Math.max(1,...rows.map(r=>Math.max(r.me,r.avg)));
+  const rank=rankingOf(held);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <div style={{display:"flex",gap:10}}>
-        {[{label:"총 누적 참석",value:"12회"},{label:"올해 참석",value:"3회"},{label:"연속 참석",value:"4회 🔥"}].map(s=>(
+        {[{label:"총 누적 참석",value:`${mineList.length}회`},{label:"올해 참석",value:`${mineList.filter(m=>m.iso.slice(0,4)===year).length}회`},{label:"연속 참석",value:`${streak}회${streak>=3?" 🔥":""}`}].map(s=>(
           <Card key={s.label} style={{flex:1,textAlign:"center",padding:14}}>
             <p style={{margin:"0 0 6px",fontSize:11,color:"#A3AAC2"}}>{s.label}</p>
             <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE,fontVariantNumeric:"tabular-nums"}}>{s.value}</p>
@@ -1702,21 +1772,21 @@ function StatsTab() {
       <Card>
         <SectionTitle>월별 참석 횟수</SectionTitle>
         <div style={{display:"flex",alignItems:"flex-end",gap:6,height:120,padding:"0 4px"}}>
-          {months.map((m,i)=>(
-            <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-              <span style={{fontSize:10,color:BLUE,fontWeight:700}}>{myData[i]}</span>
+          {rows.map(r=>(
+            <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              <span style={{fontSize:10,color:BLUE,fontWeight:700}}>{r.me}</span>
               <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:80}}>
-                <div style={{flex:1,background:"linear-gradient(180deg,#5B8DEF,#3B63F3)",borderRadius:"6px 6px 0 0",height:`${(myData[i]/maxVal)*100}%`,minHeight:4}}/>
-                <div style={{flex:1,background:"#DCE4FF",borderRadius:"6px 6px 0 0",height:`${(avgData[i]/maxVal)*100}%`,minHeight:4}}/>
+                <div style={{flex:1,background:"linear-gradient(180deg,#5B8DEF,#3B63F3)",borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
+                <div style={{flex:1,background:"#DCE4FF",borderRadius:"6px 6px 0 0",height:`${(r.avg/maxVal)*100}%`,minHeight:4}}/>
               </div>
-              <span style={{fontSize:10,color:"#A3AAC2"}}>{m}</span>
+              <span style={{fontSize:10,color:"#A3AAC2"}}>{r.label}</span>
             </div>
           ))}
         </div>
         <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
-          {[{bg:BLUE,label:"나"},{bg:"#DCE4FF",label:"평균"}].map(l=>(
+          {[{bg:BLUE,label:"나"},{bg:"#DCE4FF",label:"참석 회원 평균"}].map(l=>(
             <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:10,height:10,background:l.bg,borderRadius:2,border:l.border}}/>
+              <div style={{width:10,height:10,background:l.bg,borderRadius:2}}/>
               <span style={{fontSize:11,color:"#6B7493"}}>{l.label}</span>
             </div>
           ))}
@@ -1724,17 +1794,86 @@ function StatsTab() {
       </Card>
       <Card>
         <SectionTitle>전체 참여 랭킹</SectionTitle>
+        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {RANKING.map(r=>(
-            <div key={r.rank} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
+          {rank.map(r=>(
+            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
               <span style={{width:22,textAlign:"center",fontSize:r.badge?16:13,fontWeight:700,color:"#A3AAC2"}}>{r.badge||r.rank}</span>
               <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
-              <div style={{width:70,height:6,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${(r.count/RANKING[0].count)*100}%`,background:r.isMe?BLUE:"#A9BCFF",borderRadius:10}}/></div>
+              <div style={{width:70,height:6,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${(r.count/rank[0].count)*100}%`,background:r.isMe?BLUE:"#A9BCFF",borderRadius:10}}/></div>
               <span style={{fontSize:13,fontWeight:700,color:BLUE,width:28,textAlign:"right"}}>{r.count}</span>
             </div>
           ))}
-        </div>
+        </div>)}
       </Card>
+    </div>
+  );
+}
+
+// ─── 모임 만들기·수정 ─────────────────────────────────────────────────────────
+// 기본값: 다음 토요일 08:00~12:00, 정원 12명, 예약 오픈은 모임 7일 전 00:00
+function nextSaturday(){ const d=new Date(); d.setDate(d.getDate()+((6-d.getDay()+7)%7||7)); return ymd(d); }
+const weekBefore=iso=>{ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()-7); return ymd(d)+"T00:00"; };
+function MeetingForm({initial,onClose,onSaved}) {
+  const editing=!!initial;
+  const [f,setF]=useState(()=>initial?{...initial.info,capacity:String(initial.info.capacity),openAt:initial.info.openAt||""}
+    :(()=>{const date=nextSaturday();return {date,start:"08:00",end:"12:00",place:"",capacity:"12",openAt:weekBefore(date),desc:""};})());
+  const [errors,setErrors]=useState({});
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+  const set=(k,v)=>setF(p=>{const n={...p,[k]:v}; if(k==="date"&&!editing&&v) n.openAt=weekBefore(v); return n;});
+  const submit=()=>{
+    const e={};
+    if(!f.date) e.date="날짜를 골라 주세요";
+    if(!f.start||!f.end) e.time="시작·종료 시간을 넣어 주세요"; else if(f.end<=f.start) e.time="종료 시간이 시작보다 늦어야 해요";
+    if(!f.place.trim()) e.place="장소를 입력해 주세요";
+    const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
+    if(f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
+    setErrors(e); if(Object.keys(e).length) return;
+    const id=editing?initial.id:Date.now();
+    const info={date:f.date,start:f.start,end:f.end,place:f.place.trim(),capacity:cap,openAt:f.openAt||"",desc:(f.desc||"").trim(),
+      createdBy:editing?(initial.info.createdBy||""):ME,
+      createdByUid:editing?(initial.info.createdByUid||""):((FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||""),
+      createdAt:editing?(initial.info.createdAt||Date.now()):Date.now(),...(editing?{updatedAt:Date.now()}:{})};
+    setSaving(true); setErr("");
+    saveMeetingPath("m"+id+"/info",info).then(()=>onSaved(id)).catch(e=>{setSaving(false);setErr(authMsg(e));});
+  };
+  const row={display:"flex",gap:10};
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{editing?"모임 수정 ✏️":"모임 만들기 🎾"}</p>
+          <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <FieldWrap label="날짜" required error={errors.date}>
+            <input type="date" value={f.date} onChange={e=>set("date",e.target.value)} style={inputStyle}/>
+          </FieldWrap>
+          <FieldWrap label="시간" required error={errors.time}>
+            <div style={row}>
+              <input type="time" aria-label="시작 시간" value={f.start} onChange={e=>set("start",e.target.value)} style={{...inputStyle,flex:1}}/>
+              <span style={{alignSelf:"center",color:"#A3AAC2"}}>~</span>
+              <input type="time" aria-label="종료 시간" value={f.end} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1}}/>
+            </div>
+          </FieldWrap>
+          <FieldWrap label="장소" required error={errors.place}>
+            <input type="text" value={f.place} onChange={e=>set("place",e.target.value)} placeholder="예: 올림픽공원 테니스장" style={inputStyle}/>
+          </FieldWrap>
+          <FieldWrap label="정원" required error={errors.capacity}>
+            <input type="number" inputMode="numeric" min={2} max={99} value={f.capacity} onChange={e=>set("capacity",e.target.value)} style={inputStyle}/>
+          </FieldWrap>
+          <FieldWrap label="예약 오픈" error={errors.openAt}>
+            <input type="datetime-local" value={f.openAt} onChange={e=>set("openAt",e.target.value)} style={inputStyle}/>
+            <p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2"}}>이 시각부터 참석 투표를 받아요. 비우면 바로 열려요.</p>
+          </FieldWrap>
+          <FieldWrap label="모임 설명">
+            <textarea value={f.desc} onChange={e=>set("desc",e.target.value)} rows={3} placeholder="진행 방식, 준비물 등" style={{...inputStyle,borderRadius:18,resize:"none"}}/>
+          </FieldWrap>
+          {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
+          <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?"저장 중…":editing?"수정 완료":"모임 만들기"}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1866,6 +2005,8 @@ function SplashScreen({onStart}) {
 export default function App() {
   // screen: "login" | "forgot" | "signup" | "main"
   const [splash,setSplash]=useState(true);   // 앱을 열 때마다 스플래시부터
+  const list=useMeetingList();               // 모든 모임 (실시간)
+  const [mForm,setForm2]=useState(null);      // 모임 만들기·수정 창: {initial} | null
   const [screen,setScreen]=useState("login");
   const [step,setStep]=useState(1);
   const [signupDone,setSignupDone]=useState(false);
@@ -2001,6 +2142,11 @@ export default function App() {
   const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
+  const isAdminUser=!!(account&&account.admin)||!FB;
+  // 모임 수정·삭제: 관리자 또는 만든 사람
+  const canManage=m=>isAdminUser||(!!m.createdByUid&&FB&&FB.auth.currentUser&&FB.auth.currentUser.uid===m.createdByUid);
+  const openCreate=()=>setForm2({initial:null});
+  const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#F3F5FB",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style>
@@ -2035,7 +2181,7 @@ export default function App() {
         <div style={{margin:"-38px 16px 0",position:"relative",zIndex:2}}>
           <Card style={{padding:"16px 8px",display:"flex"}}>
             {[{label:"NTRP",value:(account&&account.profile&&account.profile.ntrp)||MEMBER_NTRP[ME]||"-"},
-              {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"3년 2개월"},{label:"올해(누적)",value:"3회 (12회)"}].map((s,i)=>(
+              {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"-"},{label:"올해(누적)",value:`${yearCount}회 (${myCount.length}회)`}].map((s,i)=>(
               <div key={s.label} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",borderLeft:i>0?"1px solid #EEF1FA":"none"}}>
                 <p style={{margin:"0 0 4px",fontSize:11,color:"#A3AAC2",letterSpacing:"0.04em"}}>{s.label}</p>
                 <p style={{margin:0,fontSize:15,fontWeight:700,color:BLUE}}>{s.value}</p>
@@ -2045,11 +2191,21 @@ export default function App() {
         </div>
       )}
       <div style={{flex:1,padding:"16px 16px 96px"}}>
-        {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")}/>}
-        {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")}/>}
+        {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
+        {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}/>}
+        {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
+          canManage={canManage} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
       </div>
+      {/* 모임 만들기 버튼: 탭바 바로 위 오른쪽 (모임 상세 화면에서는 숨김) */}
+      {!curMeeting&&(
+        <button type="button" onClick={openCreate} aria-label="모임 만들기" title="모임 만들기"
+          style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",width:58,height:58,borderRadius:"50%",border:"none",background:GRAD,color:"#fff",boxShadow:"0 8px 20px rgba(40,70,180,0.35)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      )}
+      {mForm&&<MeetingForm initial={mForm.initial} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {tabs.map(t=>{const on=tab===t.key;return(
