@@ -124,6 +124,7 @@ const ICON_PATHS = {
   hourglass: ["M5 22h14", "M5 2h14", "M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22", "M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"],
   ball: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M18.1 4.1a10 10 0 0 0 0 15.8", "M5.9 4.1a10 10 0 0 1 0 15.8"],
   arrive: ["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4", "M10 17l5-5-5-5", "M15 12H3"],
+  coin: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5", "M12 6v2", "M12 16v2"],
   leave: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"]
 };
 // 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
@@ -290,6 +291,13 @@ const courtLabel = v => {
   return /^[\d\s,·~\-]+$/.test(v) ? `${v.replace(/\s+/g, "")}번 코트` : v;
 };
 const mapUrl = addr => "https://map.kakao.com/?q=" + encodeURIComponent(addr);
+const FLASH_TYPE = {
+  game: "게임",
+  training: "훈련"
+};
+// 코트비 1인당: 참석 확정 인원(게스트 포함)으로 나누고 100원 단위 올림
+const perHead = (fee, n) => n > 0 ? Math.ceil(fee / n / 100) * 100 : 0;
+const won = n => Number(n || 0).toLocaleString("ko-KR") + "원";
 const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
 function toMeeting(id, rec, series) {
   const info = rec.info,
@@ -308,6 +316,8 @@ function toMeeting(id, rec, series) {
     courtNo: info.courtNo || "",
     address: info.address || "",
     kind: kindOf(info),
+    flashType: info.kind === "flash" ? info.flashType || "game" : "",
+    courtFee: +info.courtFee || 0,
     capacity,
     guestCap,
     total: capacity + guestCap,
@@ -5145,7 +5155,7 @@ function MeetingDetail({
       borderRadius: 999,
       padding: 4
     }
-  }, [["info", "모임 정보"], ["bracket", "대진표 · 스코어"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["info", "모임 정보"], ...(meeting.flashType === "training" ? [] : [["bracket", "대진표 · 스코어"]])].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     type: "button",
     onClick: () => setView(k),
@@ -5161,7 +5171,7 @@ function MeetingDetail({
       color: view === k ? "#fff" : "#6B7493",
       boxShadow: view === k ? SHADOW_BTN : "none"
     }
-  }, l))), view === "bracket" ? /*#__PURE__*/React.createElement(MeetingBracket, {
+  }, l))), view === "bracket" && meeting.flashType !== "training" ? /*#__PURE__*/React.createElement(MeetingBracket, {
     meeting: meeting,
     participants: participants,
     store: store
@@ -5238,6 +5248,25 @@ function MeetingDetail({
         textUnderlineOffset: 3
       }
     }, meeting.address)
+  }] : []), ...(meeting.kind === "flash" ? [{
+    icon: "zap",
+    label: "종류",
+    value: `${FLASH_TYPE[meeting.flashType]} 모임`
+  }] : []), ...(meeting.kind === "flash" && meeting.courtFee ? [{
+    icon: "coin",
+    label: "코트비",
+    value: /*#__PURE__*/React.createElement("span", null, won(meeting.courtFee), total > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: BLUE,
+        fontWeight: 600
+      }
+    }, " \xB7 1\uC778 ", won(perHead(meeting.courtFee, total))), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: "#A3AAC2"
+      }
+    }, total > 0 ? `참석 확정 ${total}명 기준 · 회비와 별도` : "참석 확정 인원으로 나눠요 · 회비와 별도"))
   }] : []), {
     icon: "users",
     label: "제한 인원",
@@ -5708,6 +5737,19 @@ function BookingTab({
   onDeleted,
   onCreate
 }) {
+  const [kind, setKind] = useState(() => {
+    try {
+      return sessionStorage.getItem("sstc-booking-kind") || "regular";
+    } catch (e) {
+      return "regular";
+    }
+  });
+  const pickKind = k => {
+    setKind(k);
+    try {
+      sessionStorage.setItem("sstc-booking-kind", k);
+    } catch (e) {}
+  };
   const setSelId = id => onOpen(id, "info");
   const sel = open && MEETINGS.find(m => m.id === open.id);
   if (sel) return /*#__PURE__*/React.createElement(MeetingDetail, {
@@ -5725,8 +5767,10 @@ function BookingTab({
       color: "#6B7493"
     }
   }, ready ? "모임을 찾을 수 없어요. 지워졌을 수 있어요." : "모임을 불러오는 중이에요…"));
-  const upcoming = MEETINGS.filter(m => m.status === "upcoming");
-  const past = MEETINGS.filter(m => m.status === "past");
+  const upAll = MEETINGS.filter(m => m.status === "upcoming");
+  const upcoming = upAll.filter(m => m.kind === kind);
+  const past = MEETINGS.filter(m => m.status === "past" && m.kind === kind);
+  const label = kind === "flash" ? "번개 모임" : "정기 모임";
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5734,17 +5778,66 @@ function BookingTab({
       gap: 20,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "tablist",
+    "aria-label": "\uBAA8\uC784 \uC885\uB958",
+    style: {
+      display: "flex",
+      background: "#E4E9F7",
+      borderRadius: 999,
+      padding: 4
+    }
+  }, [["regular", "정기 모임", "calendar"], ["flash", "번개 모임", "zap"]].map(([k, l, ic]) => {
+    const on = kind === k,
+      n = upAll.filter(m => m.kind === k).length;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      role: "tab",
+      "aria-selected": on,
+      onClick: () => pickKind(k),
+      style: {
+        flex: 1,
+        padding: "10px 0",
+        borderRadius: 999,
+        border: "none",
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        background: on ? GRAD : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        boxShadow: on ? SHADOW_BTN : "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: ic,
+      size: 15,
+      stroke: 2
+    }), l, n > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        minWidth: 18,
+        padding: "1px 6px",
+        borderRadius: 999,
+        background: on ? "rgba(255,255,255,0.25)" : "#fff",
+        color: on ? "#fff" : BLUE
+      }
+    }, n));
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 10px",
       fontSize: 15,
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, "\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784"), upcoming.length === 0 && /*#__PURE__*/React.createElement(Empty, {
-    action: "+ \uBAA8\uC784 \uB9CC\uB4E4\uAE30",
-    onAction: onCreate
-  }, ready ? "아직 잡힌 모임이 없어요." : "모임을 불러오는 중이에요…"), /*#__PURE__*/React.createElement("div", {
+  }, "\uB2E4\uAC00\uC624\uB294 ", label), upcoming.length === 0 && /*#__PURE__*/React.createElement(Empty, {
+    action: `+ ${label} 만들기`,
+    onAction: () => onCreate(kind)
+  }, ready ? `아직 잡힌 ${label}이 없어요.` : "모임을 불러오는 중이에요…"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -6864,7 +6957,7 @@ function KindBadge({
   }, flash ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
     n: "zap",
     s: 11
-  }), " \uBC88\uAC1C") : m.seriesId ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+  }), " \uBC88\uAC1C", m.flashType ? ` · ${FLASH_TYPE[m.flashType]}` : "") : m.seriesId ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
     n: "repeat",
     s: 11
   }), " \uC815\uAE30") : "정기");
@@ -6961,6 +7054,7 @@ function AddressSearch({
 }
 function MeetingForm({
   initial,
+  defaultKind,
   onClose,
   onSaved
 }) {
@@ -6968,6 +7062,8 @@ function MeetingForm({
   const [f, setF] = useState(() => initial ? {
     ...initial.info,
     kind: kindOf(initial.info),
+    flashType: initial.info.flashType || "game",
+    courtFee: initial.info.courtFee ? String(initial.info.courtFee) : "",
     capacity: String(initial.info.capacity),
     guestCap: String(initial.info.guestCap || 0),
     openAt: initial.info.openAt || "",
@@ -6976,7 +7072,9 @@ function MeetingForm({
   } : (() => {
     const date = nextSaturday();
     return {
-      kind: "regular",
+      kind: defaultKind === "flash" ? "flash" : "regular",
+      flashType: "game",
+      courtFee: "",
       date,
       start: "08:00",
       end: "12:00",
@@ -7018,6 +7116,8 @@ function MeetingForm({
     if (!String(f.courtNo || "").trim()) e.courtNo = "코트 번호를 입력해 주세요";
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
+    const fee = String(f.courtFee || "").replace(/[^\d]/g, "");
+    if (f.kind === "flash" && fee.length > 7) e.courtFee = "코트비를 확인해 주세요";
     const gcap = f.guestCap === "" ? 0 : parseInt(f.guestCap, 10);
     if (!(gcap >= 0 && gcap <= 50)) e.guestCap = "게스트는 0~50명이에요";
     if (repeating) {
@@ -7029,6 +7129,13 @@ function MeetingForm({
     const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
     const base = {
       kind: f.kind,
+      ...(f.kind === "flash" ? {
+        flashType: f.flashType || "game",
+        courtFee: +fee || 0
+      } : {
+        flashType: null,
+        courtFee: null
+      }),
       start: f.start,
       end: f.end,
       place: f.place.trim(),
@@ -7104,7 +7211,7 @@ function MeetingForm({
         if (!editing) postFeed({
           type: "meeting",
           meetingId: id,
-          text: `새 ${KIND_LABEL[f.kind]}: ${fmtDate(info.date)} ${info.start} · ${info.place}`
+          text: `새 ${KIND_LABEL[f.kind]}${f.kind === "flash" ? `(${FLASH_TYPE[f.flashType || "game"]})` : ""}: ${fmtDate(info.date)} ${info.start} · ${info.place}`
         });
         return id;
       });
@@ -7201,7 +7308,15 @@ function MeetingForm({
     value: f.kind,
     onChange: v => set("kind", v),
     options: [["regular", "정기 모임"], ["flash", "번개 모임"]]
-  }), hint(f.kind === "regular" ? "이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요." : "번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")), !editing && f.kind === "regular" && /*#__PURE__*/React.createElement(FieldWrap, {
+  }), hint(f.kind === "regular" ? "이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요." : "번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")), f.kind === "flash" && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uBC88\uAC1C \uC885\uB958",
+    required: true
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uBC88\uAC1C \uC885\uB958",
+    value: f.flashType || "game",
+    onChange: v => set("flashType", v),
+    options: [["game", "게임 모임"], ["training", "훈련 모임"]]
+  }), hint(f.flashType === "training" ? "훈련 모임은 대진표 없이 진행해요." : "게임 모임은 대진표·스코어를 쓸 수 있어요.")), !editing && f.kind === "regular" && /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC18\uBCF5"
   }, /*#__PURE__*/React.createElement(Pills, {
     label: "\uBC18\uBCF5",
@@ -7400,7 +7515,34 @@ function MeetingForm({
     value: f.endDate,
     onChange: e => set("endDate", e.target.value),
     style: inputStyle
-  }), hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)), /*#__PURE__*/React.createElement(FieldWrap, {
+  }), hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)), f.kind === "flash" && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uCF54\uD2B8\uBE44 (\uC5D4\uBE75)",
+    error: errors.courtFee
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "numeric",
+    "aria-label": "\uCF54\uD2B8\uBE44",
+    value: f.courtFee ? Number(String(f.courtFee).replace(/[^\d]/g, "")).toLocaleString("ko-KR") : "",
+    onChange: e => set("courtFee", e.target.value.replace(/[^\d]/g, "")),
+    placeholder: "\uC608: 40,000",
+    style: {
+      ...inputStyle,
+      paddingRight: 40
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      right: 16,
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: 14,
+      color: "#6B7493"
+    }
+  }, "\uC6D0")), hint("모임 회비와 별도로 참석자끼리 나눠 내는 금액이에요. 모임 화면에 1인당 금액이 같이 보여요.")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC124\uBA85"
   }, /*#__PURE__*/React.createElement("textarea", {
     value: f.desc,
@@ -8670,7 +8812,7 @@ function App() {
   // ── 메인 앱 화면 ──
   const tabTitles = {
     home: "SSTC",
-    booking: "정모 예약",
+    booking: "모임 예약",
     members: "회원",
     stats: "통계",
     admin: "관리"
@@ -8685,9 +8827,19 @@ function App() {
   const isAdminUser = !!(account && account.admin) || !FB;
   // 모임 수정·삭제: 관리자 또는 만든 사람
   const canManage = m => isAdminUser || !!m.createdByUid && FB && FB.auth.currentUser && FB.auth.currentUser.uid === m.createdByUid;
-  const openCreate = () => setForm2({
-    initial: null
-  });
+  // 예약 탭에서 + 를 누르면 지금 보고 있는 종류(정기/번개)로 시작
+  const openCreate = k => {
+    let kind = typeof k === "string" ? k : null;
+    if (!kind && tab === "booking") {
+      try {
+        kind = sessionStorage.getItem("sstc-booking-kind");
+      } catch (e) {}
+    }
+    setForm2({
+      initial: null,
+      kind
+    });
+  };
   const myCount = myHeld(),
     yearCount = myCount.filter(m => m.iso.slice(0, 4) === todayYmd().slice(0, 4)).length;
   return /*#__PURE__*/React.createElement("div", {
@@ -9092,6 +9244,7 @@ function App() {
     }
   }), mForm && /*#__PURE__*/React.createElement(MeetingForm, {
     initial: mForm.initial,
+    defaultKind: mForm.kind,
     onClose: () => setForm2(null),
     onSaved: id => {
       const editing = !!mForm.initial;

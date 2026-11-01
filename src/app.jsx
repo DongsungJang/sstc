@@ -38,6 +38,7 @@ const ICON_PATHS = {
   hourglass:["M5 22h14","M5 2h14","M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22","M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"],
   ball:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M18.1 4.1a10 10 0 0 0 0 15.8","M5.9 4.1a10 10 0 0 1 0 15.8"],
   arrive:["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4","M10 17l5-5-5-5","M15 12H3"],
+  coin:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5","M12 6v2","M12 16v2"],
   leave:["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
 };
 // 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
@@ -110,12 +111,16 @@ const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
 // 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
 const courtLabel=v=>{ v=String(v||"").trim(); return /^[\d\s,·~\-]+$/.test(v)?`${v.replace(/\s+/g,"")}번 코트`:v; };
 const mapUrl=addr=>"https://map.kakao.com/?q="+encodeURIComponent(addr);
+const FLASH_TYPE={game:"게임",training:"훈련"};
+// 코트비 1인당: 참석 확정 인원(게스트 포함)으로 나누고 100원 단위 올림
+const perHead=(fee,n)=>n>0?Math.ceil(fee/n/100)*100:0;
+const won=n=>Number(n||0).toLocaleString("ko-KR")+"원";
 const kindOf=info=>info&&info.kind==="flash"?"flash":"regular";
 function toMeeting(id,rec,series){
   const info=rec.info, today=todayYmd(), capacity=+info.capacity||0, guestCap=+info.guestCap||0;
   return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`,
     place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:""), placeName:info.place, courtNo:info.courtNo||"", address:info.address||"",
-    kind:kindOf(info), capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
+    kind:kindOf(info), flashType:info.kind==="flash"?(info.flashType||"game"):"", courtFee:+info.courtFee||0, capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
     status:(info.date<today||(info.date===today&&info.end&&nowAt().slice(11,16)>=info.end))?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
     votes:votesFromRec(rec) };
@@ -1807,11 +1812,11 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14,paddingBottom:24}}>
       <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
-        {[["info","모임 정보"],["bracket","대진표 · 스코어"]].map(([k,l])=>(
+        {[["info","모임 정보"],...(meeting.flashType==="training"?[]:[["bracket","대진표 · 스코어"]])].map(([k,l])=>(
           <button key={k} type="button" onClick={()=>setView(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#6B7493",boxShadow:view===k?SHADOW_BTN:"none"}}>{l}</button>
         ))}
       </div>
-      {view==="bracket"?<MeetingBracket meeting={meeting} participants={participants} store={store}/>:(<>
+      {view==="bracket"&&meeting.flashType!=="training"?<MeetingBracket meeting={meeting} participants={participants} store={store}/>:(<>
       <Card>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:"#1B2559"}}>{meeting.date}</p><KindBadge m={meeting}/></div>
@@ -1820,7 +1825,9 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-          {[{icon:"clock",label:"시간",value:meeting.time},{icon:"pin",label:"장소",value:meeting.place},...(meeting.address?[{icon:"map",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),{icon:"users",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"calendar",label:"예약 오픈",value:meeting.openDate}]),
+          {[{icon:"clock",label:"시간",value:meeting.time},{icon:"pin",label:"장소",value:meeting.place},...(meeting.address?[{icon:"map",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),...(meeting.kind==="flash"?[{icon:"zap",label:"종류",value:`${FLASH_TYPE[meeting.flashType]} 모임`}]:[]),
+            ...(meeting.kind==="flash"&&meeting.courtFee?[{icon:"coin",label:"코트비",value:<span>{won(meeting.courtFee)}{total>0&&<span style={{color:BLUE,fontWeight:600}}> · 1인 {won(perHead(meeting.courtFee,total))}</span>}<span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{total>0?`참석 확정 ${total}명 기준 · 회비와 별도`:"참석 확정 인원으로 나눠요 · 회비와 별도"}</span></span>}]:[]),
+            {icon:"users",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"calendar",label:"예약 오픈",value:meeting.openDate}]),
             ...(ser?[{icon:"repeat",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
             <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{width:22,display:"flex",justifyContent:"center",color:"#8A93B2"}}><Icon name={r.icon} size={17} stroke={1.8}/></span>
@@ -1925,17 +1932,27 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
 function BookingTab({open,onOpen,ready,canManage,onEdit,onDeleted,onCreate}) {
+  const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"regular";}catch(e){return "regular";}});
+  const pickKind=k=>{setKind(k);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
   const setSelId=id=>onOpen(id,"info");
   const sel=open&&MEETINGS.find(m=>m.id===open.id);
   if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
   if(open) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>{ready?"모임을 찾을 수 없어요. 지워졌을 수 있어요.":"모임을 불러오는 중이에요…"}</p></Card>;
-  const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
-  const past=MEETINGS.filter(m=>m.status==="past");
+  const upAll=MEETINGS.filter(m=>m.status==="upcoming");
+  const upcoming=upAll.filter(m=>m.kind===kind);
+  const past=MEETINGS.filter(m=>m.status==="past"&&m.kind===kind);
+  const label=kind==="flash"?"번개 모임":"정기 모임";
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
+      <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+        {[["regular","정기 모임","calendar"],["flash","번개 모임","zap"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length;return(
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?GRAD:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <Icon name={ic} size={15} stroke={2}/>{l}{n>0&&<span style={{fontSize:11,fontWeight:700,minWidth:18,padding:"1px 6px",borderRadius:999,background:on?"rgba(255,255,255,0.25)":"#fff",color:on?"#fff":BLUE}}>{n}</span>}
+          </button>);})}
+      </div>
       <div>
-        <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#1B2559"}}>다가오는 모임</p>
-        {upcoming.length===0&&<Empty action="+ 모임 만들기" onAction={onCreate}>{ready?"아직 잡힌 모임이 없어요.":"모임을 불러오는 중이에요…"}</Empty>}
+        <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#1B2559"}}>다가오는 {label}</p>
+        {upcoming.length===0&&<Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty>}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {upcoming.map(m=>{
             const fill=Math.min(100,Math.round((m.attendees.length/Math.max(1,m.total))*100));
@@ -2261,7 +2278,7 @@ function ensureSeries(all){
 }
 function KindBadge({m}){
   const flash=m.kind==="flash";
-  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:flash?"#FFF4E5":BLUE_LIGHT,color:flash?"#C2610C":BLUE,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:flash?"#FFF4E5":BLUE_LIGHT,color:flash?"#C2610C":BLUE,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
 }
 function Pills({value,options,onChange,label}){
   return(
@@ -2293,11 +2310,11 @@ function AddressSearch({onPick}){
   return fail?<p style={{margin:"8px 0 0",fontSize:12,color:"#ef4444"}}>주소 검색을 불러오지 못했어요. 주소를 직접 입력해 주세요.</p>
     :<div ref={box} style={{marginTop:8,height:420,border:"1px solid #E4E9F7",borderRadius:14,overflow:"hidden",background:"#fff"}}/>;
 }
-function MeetingForm({initial,onClose,onSaved}) {
+function MeetingForm({initial,defaultKind,onClose,onSaved}) {
   const editing=!!initial;
   const [f,setF]=useState(()=>initial
-    ?{...initial.info,kind:kindOf(initial.info),capacity:String(initial.info.capacity),guestCap:String(initial.info.guestCap||0),openAt:initial.info.openAt||"",repeat:"none",applyFuture:false}
-    :(()=>{const date=nextSaturday();return {kind:"regular",date,start:"08:00",end:"12:00",place:"",capacity:"12",guestCap:"0",openAt:weekBefore(date),desc:"",
+    ?{...initial.info,kind:kindOf(initial.info),flashType:initial.info.flashType||"game",courtFee:initial.info.courtFee?String(initial.info.courtFee):"",capacity:String(initial.info.capacity),guestCap:String(initial.info.guestCap||0),openAt:initial.info.openAt||"",repeat:"none",applyFuture:false}
+    :(()=>{const date=nextSaturday();return {kind:defaultKind==="flash"?"flash":"regular",flashType:"game",courtFee:"",date,start:"08:00",end:"12:00",place:"",capacity:"12",guestCap:"0",openAt:weekBefore(date),desc:"",
       repeat:"none",openDow:"0",openTime:"21:00",endDate:""};})());
   const [errors,setErrors]=useState({});
   const [saving,setSaving]=useState(false);
@@ -2314,12 +2331,13 @@ function MeetingForm({initial,onClose,onSaved}) {
     if(!f.place.trim()) e.place="테니스장 이름을 입력해 주세요";
     if(!String(f.courtNo||"").trim()) e.courtNo="코트 번호를 입력해 주세요";
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
+    const fee=String(f.courtFee||"").replace(/[^\d]/g,""); if(f.kind==="flash"&&fee.length>7) e.courtFee="코트비를 확인해 주세요";
     const gcap=f.guestCap===""?0:parseInt(f.guestCap,10); if(!(gcap>=0&&gcap<=50)) e.guestCap="게스트는 0~50명이에요";
     if(repeating){ if(!f.openTime) e.openAt="예약 오픈 시각을 넣어 주세요"; if(f.endDate&&f.date&&f.endDate<f.date) e.endDate="종료일은 첫 모임 날짜 뒤여야 해요"; }
     else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),address:(f.address||"").trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),address:(f.address||"").trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -2343,7 +2361,7 @@ function MeetingForm({initial,onClose,onSaved}) {
         return Promise.all([saveMeetingPath("series/s"+sid,{...((RAW_MEETINGS.series||{})["s"+sid]||{}),...tmpl}),
           ...later.map(k=>saveMeetingPath(k+"/info",{...RAW_MEETINGS[k].info,...tmpl,updatedAt:Date.now()}))]);
       }).then(()=>{
-        if(!editing) postFeed({type:"meeting",meetingId:id,text:`새 ${KIND_LABEL[f.kind]}: ${fmtDate(info.date)} ${info.start} · ${info.place}`});
+        if(!editing) postFeed({type:"meeting",meetingId:id,text:`새 ${KIND_LABEL[f.kind]}${f.kind==="flash"?`(${FLASH_TYPE[f.flashType||"game"]})`:""}: ${fmtDate(info.date)} ${info.start} · ${info.place}`});
         return id;
       });
     }
@@ -2363,6 +2381,10 @@ function MeetingForm({initial,onClose,onSaved}) {
             <Pills label="모임 종류" value={f.kind} onChange={v=>set("kind",v)} options={[["regular","정기 모임"],["flash","번개 모임"]]}/>
             {hint(f.kind==="regular"?"이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요.":"번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")}
           </FieldWrap>
+          {f.kind==="flash"&&<FieldWrap label="번개 종류" required>
+            <Pills label="번개 종류" value={f.flashType||"game"} onChange={v=>set("flashType",v)} options={[["game","게임 모임"],["training","훈련 모임"]]}/>
+            {hint(f.flashType==="training"?"훈련 모임은 대진표 없이 진행해요.":"게임 모임은 대진표·스코어를 쓸 수 있어요.")}
+          </FieldWrap>}
           {!editing&&f.kind==="regular"&&<FieldWrap label="반복">
             <Pills label="반복" value={f.repeat} onChange={v=>set("repeat",v)} options={[["none","한 번만"],["1","매주"],["2","격주"]]}/>
           </FieldWrap>}
@@ -2425,6 +2447,13 @@ function MeetingForm({initial,onClose,onSaved}) {
           {repeating&&<FieldWrap label="반복 종료일" error={errors.endDate}>
             <input type="date" aria-label="반복 종료일" value={f.endDate} onChange={e=>set("endDate",e.target.value)} style={inputStyle}/>
             {hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)}
+          </FieldWrap>}
+          {f.kind==="flash"&&<FieldWrap label="코트비 (엔빵)" error={errors.courtFee}>
+            <div style={{position:"relative"}}>
+              <input type="text" inputMode="numeric" aria-label="코트비" value={f.courtFee?Number(String(f.courtFee).replace(/[^\d]/g,"")).toLocaleString("ko-KR"):""} onChange={e=>set("courtFee",e.target.value.replace(/[^\d]/g,""))} placeholder="예: 40,000" style={{...inputStyle,paddingRight:40}}/>
+              <span style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#6B7493"}}>원</span>
+            </div>
+            {hint("모임 회비와 별도로 참석자끼리 나눠 내는 금액이에요. 모임 화면에 1인당 금액이 같이 보여요.")}
           </FieldWrap>}
           <FieldWrap label="모임 설명">
             <textarea value={f.desc} onChange={e=>set("desc",e.target.value)} rows={3} placeholder="진행 방식, 준비물 등" style={{...inputStyle,borderRadius:18,resize:"none"}}/>
@@ -2801,14 +2830,17 @@ export default function App() {
   }
 
   // ── 메인 앱 화면 ──
-  const tabTitles={home:"SSTC",booking:"정모 예약",members:"회원",stats:"통계",admin:"관리"};
+  const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",stats:"통계",admin:"관리"};
   const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
   const isAdminUser=!!(account&&account.admin)||!FB;
   // 모임 수정·삭제: 관리자 또는 만든 사람
   const canManage=m=>isAdminUser||(!!m.createdByUid&&FB&&FB.auth.currentUser&&FB.auth.currentUser.uid===m.createdByUid);
-  const openCreate=()=>setForm2({initial:null});
+  // 예약 탭에서 + 를 누르면 지금 보고 있는 종류(정기/번개)로 시작
+  const openCreate=k=>{ let kind=typeof k==="string"?k:null;
+    if(!kind&&tab==="booking"){ try{kind=sessionStorage.getItem("sstc-booking-kind");}catch(e){} }
+    setForm2({initial:null,kind}); };
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#F3F5FB",display:"flex",flexDirection:"column",fontFamily:FONT}}>
@@ -2898,7 +2930,7 @@ export default function App() {
       }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
-      {mForm&&<MeetingForm initial={mForm.initial} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
+      {mForm&&<MeetingForm initial={mForm.initial} defaultKind={mForm.kind} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {tabs.map(t=>{const on=tab===t.key;return(
