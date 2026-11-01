@@ -1491,7 +1491,7 @@ function Step3({
   const [errors, setErrors] = useState({});
   const [ntrpPopup, setNtrpPopup] = useState(null);
   const career = calcCareer(data.tennisStart);
-  const HANDS = ["오른손 (양손 백핸드)", "오른손 (한손 백핸드)", "왼손 (양손 백핸드)", "왼손 (한손 백핸드)"];
+  const HANDS = HAND_ORDER;
   const tab = active => ({
     flex: 1,
     padding: "10px 4px",
@@ -7836,10 +7836,23 @@ const activeMembers = data => Object.entries(data && data.members || {}).map(([u
   uid,
   ...m
 })).filter(m => m && m.nickname && !m.withdrawn && (data.approved[m.uid] || data.admins[m.uid]));
+const HAND_ORDER = ["오른손 (양손 백핸드)", "오른손 (한손 백핸드)", "왼손 (양손 백핸드)", "왼손 (한손 백핸드)"];
 function MembersTab() {
   const data = useClubMembers();
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState("ntrp");
+  const [sort, setSort] = useState(() => {
+    try {
+      return sessionStorage.getItem("sstc-members-sort") || "name";
+    } catch (e) {
+      return "name";
+    }
+  });
+  const pickSort = k => {
+    setSort(k);
+    try {
+      sessionStorage.setItem("sstc-members-sort", k);
+    } catch (e) {}
+  };
   const [open, setOpen] = useState(null);
   if (!data) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
     style: {
@@ -7853,16 +7866,29 @@ function MembersTab() {
   rankingOf(heldMeetings().filter(m => m.iso.slice(0, 7) === ym)).forEach(r => {
     monthCount[r.name] = r.count;
   });
-  const months = t => {
-    if (!t) return -1;
-    const s = new Date(t + "-01"),
-      n = new Date();
-    return (n.getFullYear() - s.getFullYear()) * 12 + (n.getMonth() - s.getMonth());
-  };
+  const handOf = m => (Array.isArray(m.hand) ? m.hand[0] : m.hand) || "";
   const list = activeMembers(data).filter(m => {
     const k = q.trim().toLowerCase();
-    return !k || [m.nickname, m.region, m.court, m.ntrp].some(v => String(v || "").toLowerCase().includes(k));
-  }).sort(sort === "ntrp" ? (a, b) => NTRP_NUM(b.ntrp) - NTRP_NUM(a.ntrp) || a.nickname.localeCompare(b.nickname, "ko") : sort === "career" ? (a, b) => months(b.tennisStart) - months(a.tennisStart) || a.nickname.localeCompare(b.nickname, "ko") : (a, b) => a.nickname.localeCompare(b.nickname, "ko"));
+    return !k || [m.nickname, m.region, m.court, m.ntrp, handOf(m)].some(v => String(v || "").toLowerCase().includes(k));
+  }).sort((a, b) => a.nickname.localeCompare(b.nickname, "ko"));
+  // 동네별·손별은 묶어서 보여 줘요 (묶음 안은 이름순, 미입력은 맨 뒤)
+  const groupKey = sort === "region" ? m => m.region || "" : sort === "hand" ? handOf : null;
+  const groups = groupKey ? (() => {
+    const g = new Map();
+    list.forEach(m => {
+      const k = groupKey(m);
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(m);
+    });
+    const keys = [...g.keys()].sort((a, b) => !a ? 1 : !b ? -1 : sort === "hand" ? HAND_ORDER.indexOf(a) + 99 * (HAND_ORDER.indexOf(a) < 0) - (HAND_ORDER.indexOf(b) + 99 * (HAND_ORDER.indexOf(b) < 0)) : a.localeCompare(b, "ko"));
+    return keys.map(k => ({
+      label: k || (sort === "hand" ? "손 미입력" : "동네 미입력"),
+      items: g.get(k)
+    }));
+  })() : [{
+    label: null,
+    items: list
+  }];
   const total = Object.values(data.members).filter(m => m && m.nickname && !m.withdrawn).length;
   const chip = (n, t) => /*#__PURE__*/React.createElement("span", {
     style: {
@@ -7906,10 +7932,11 @@ function MembersTab() {
       display: "flex",
       gap: 6
     }
-  }, [["ntrp", "실력순"], ["career", "구력순"], ["name", "이름순"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["name", "이름순"], ["region", "동네별"], ["hand", "손별"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     type: "button",
-    onClick: () => setSort(k),
+    "aria-pressed": sort === k,
+    onClick: () => pickSort(k),
     style: {
       padding: "6px 14px",
       borderRadius: 999,
@@ -7927,7 +7954,29 @@ function MembersTab() {
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, list.length, "\uBA85"))), list.length === 0 && /*#__PURE__*/React.createElement(Empty, null, q ? "찾는 회원이 없어요." : total ? "아직 정회원이 없어요." : "아직 회원이 없어요."), list.map(m => {
+  }, list.length, "\uBA85"))), list.length === 0 && /*#__PURE__*/React.createElement(Empty, null, q ? "찾는 회원이 없어요." : total ? "아직 정회원이 없어요." : "아직 회원이 없어요."), groups.map(gr => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: gr.label || "all"
+  }, gr.label && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 4px 0",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#2B3674",
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: sort === "hand" ? "user" : "pin",
+    s: 14,
+    c: BLUE
+  }), gr.label, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 500,
+      color: "#A3AAC2"
+    }
+  }, gr.items.length, "\uBA85")), gr.items.map(m => {
     const isMe = m.nickname === ME,
       career = calcCareer(m.tennisStart),
       hand = Array.isArray(m.hand) ? m.hand.join(", ") : m.hand,
@@ -8030,8 +8079,8 @@ function MembersTab() {
         gap: 6,
         marginTop: 12
       }
-    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, hand && chip("user", hand), m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus)))));
-  }), list.length > 0 && /*#__PURE__*/React.createElement("p", {
+    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), hand && (sort === "hand" || open === m.uid) && chip("user", hand), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus)))));
+  }))), list.length > 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,

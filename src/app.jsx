@@ -516,7 +516,7 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
   const [errors,setErrors]=useState({});
   const [ntrpPopup,setNtrpPopup]=useState(null);
   const career=calcCareer(data.tennisStart);
-  const HANDS=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
+  const HANDS=HAND_ORDER;
   const tab=(active)=>({flex:1,padding:"10px 4px",borderRadius:16,lineHeight:1.3,fontSize:12,cursor:"pointer",border:`1px solid ${active?BLUE:"#D6DEF7"}`,background:active?BLUE:"#fff",color:active?"#fff":"#4A5578"});
   const popupItem=NTRP_LEVELS.find(n=>n.score===ntrpPopup);
   const validate=()=>{
@@ -2556,20 +2556,25 @@ function useClubMembers(){
 const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])=>({uid,...m}))
   .filter(m=>m&&m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]));
 
+const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
 function MembersTab(){
   const data=useClubMembers();
   const [q,setQ]=useState("");
-  const [sort,setSort]=useState("ntrp");
+  const [sort,setSort]=useState(()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
+  const pickSort=k=>{setSort(k);try{sessionStorage.setItem("sstc-members-sort",k);}catch(e){}};
   const [open,setOpen]=useState(null);
   if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const ym=todayYmd().slice(0,7);
   const monthCount={}; rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===ym)).forEach(r=>{monthCount[r.name]=r.count;});
-  const months=t=>{ if(!t) return -1; const s=new Date(t+"-01"), n=new Date(); return (n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth()); };
+  const handOf=m=>(Array.isArray(m.hand)?m.hand[0]:m.hand)||"";
   const list=activeMembers(data)
-    .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp].some(v=>String(v||"").toLowerCase().includes(k)); })
-    .sort(sort==="ntrp"?(a,b)=>NTRP_NUM(b.ntrp)-NTRP_NUM(a.ntrp)||a.nickname.localeCompare(b.nickname,"ko")
-      :sort==="career"?(a,b)=>months(b.tennisStart)-months(a.tennisStart)||a.nickname.localeCompare(b.nickname,"ko")
-      :(a,b)=>a.nickname.localeCompare(b.nickname,"ko"));
+    .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp,handOf(m)].some(v=>String(v||"").toLowerCase().includes(k)); })
+    .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko"));
+  // 동네별·손별은 묶어서 보여 줘요 (묶음 안은 이름순, 미입력은 맨 뒤)
+  const groupKey=sort==="region"?m=>m.region||"":sort==="hand"?handOf:null;
+  const groups=groupKey?(()=>{ const g=new Map(); list.forEach(m=>{const k=groupKey(m); if(!g.has(k)) g.set(k,[]); g.get(k).push(m);});
+    const keys=[...g.keys()].sort((a,b)=>!a?1:!b?-1:sort==="hand"?(HAND_ORDER.indexOf(a)+99*(HAND_ORDER.indexOf(a)<0))-(HAND_ORDER.indexOf(b)+99*(HAND_ORDER.indexOf(b)<0)):a.localeCompare(b,"ko"));
+    return keys.map(k=>({label:k||(sort==="hand"?"손 미입력":"동네 미입력"),items:g.get(k)})); })():[{label:null,items:list}];
   const total=Object.values(data.members).filter(m=>m&&m.nickname&&!m.withdrawn).length;
   const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F5F7FE",borderRadius:999,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
   return(
@@ -2577,14 +2582,16 @@ function MembersTab(){
       <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 동네, 코트로 찾기" style={inputStyle}/>
         <div style={{display:"flex",gap:6}}>
-          {[["ntrp","실력순"],["career","구력순"],["name","이름순"]].map(([k,l])=>(
-            <button key={k} type="button" onClick={()=>setSort(k)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
+          {[["name","이름순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
+            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
           ))}
           <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"#A3AAC2"}}>{list.length}명</span>
         </div>
       </Card>
       {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
-      {list.map(m=>{
+      {groups.map(gr=>(<React.Fragment key={gr.label||"all"}>
+      {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:"#2B3674",display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
+      {gr.items.map(m=>{
         const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
         return(
           <div key={m.uid} role="button" tabIndex={0} onClick={()=>setOpen(open===m.uid?null:m.uid)} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
@@ -2606,8 +2613,8 @@ function MembersTab(){
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
               {chip("clock",career?`구력 ${career}`:"구력 미입력")}
               {chip("pin",m.region||"동네 미입력")}
+              {hand&&(sort==="hand"||open===m.uid)&&chip("user",hand)}
               {open===m.uid&&<>
-                {hand&&chip("user",hand)}
                 {m.court&&chip("ball",m.court)}
                 {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
                 {m.lessonStatus&&chip("users",m.lessonStatus)}
@@ -2616,6 +2623,7 @@ function MembersTab(){
           </Card></div>
         );
       })}
+      </React.Fragment>))}
       {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수도 보여요. 본명·연락처는 보이지 않아요.</p>}
     </div>
   );
