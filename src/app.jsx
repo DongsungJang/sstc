@@ -11,6 +11,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
+  grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
   back:["M15 5l-7 7 7 7"],
   calendar:["M4 6h16v14H4z","M4 10h16","M8 3v4","M16 3v4"],
@@ -1492,8 +1493,18 @@ function TimeInput({value,onChange,label,style}){
     </div>
   );
 }
-function BracketSetup({meeting,participants,onCreate}) {
-  const [order,setOrder]=useState(()=>participants.slice().sort((x,y)=>NTRP_NUM(y.ntrp)-NTRP_NUM(x.ntrp)));
+// 실력 순서: 이미 정해 둔 순서(prev 이름 목록)는 그대로 두고, 새로 온 사람만 NTRP 자리에 끼워 넣어요
+function arrangeOrder(participants,prev){
+  const byNtrp=(x,y)=>NTRP_NUM(y.ntrp)-NTRP_NUM(x.ntrp);
+  if(!prev||!prev.length) return participants.slice().sort(byNtrp);
+  const idx=new Map(prev.map((nm,i)=>[nm,i]));
+  const out=participants.filter(p=>idx.has(p.name)).sort((a,b)=>idx.get(a.name)-idx.get(b.name));
+  participants.filter(p=>!idx.has(p.name)).sort(byNtrp).forEach(p=>{
+    let at=0; out.forEach((q,i)=>{ if(NTRP_NUM(q.ntrp)>=NTRP_NUM(p.ntrp)) at=i+1; }); out.splice(at,0,p); });   // 나보다 잘하는 사람 중 맨 아래 바로 다음
+  return out;
+}
+function BracketSetup({meeting,participants,onCreate,prevOrder}) {
+  const [order,setOrder]=useState(()=>arrangeOrder(participants,prevOrder&&prevOrder.players));
   const n=order.length;
   // 모임 시간에서 기본값: "08:00 ~ 12:00"
   const [start,setStart]=useState(()=>meeting.time.slice(0,5));
@@ -1507,7 +1518,17 @@ function BracketSetup({meeting,participants,onCreate}) {
   const total=k*slot;
   const [games,setGames]=useState(()=>evenGames(n,total,k));
   // 늦게 오는 사람은 첫판 제외, 일찍 가는 사람은 막판 제외로 시작 (둘 다면 첫판)
-  const [excl,setExcl]=useState(()=>order.map(p=>p.arrive?1:p.leave?2:0));
+  const exclOf=p=>{ const i=prevOrder&&prevOrder.players?prevOrder.players.indexOf(p.name):-1; return i>=0&&prevOrder.excl?prevOrder.excl[i]||0:p.arrive?1:p.leave?2:0; };
+  const [excl,setExcl]=useState(()=>order.map(exclOf));
+  // 투표가 바뀌어 참석자가 달라지면 내가 정한 순서는 지키고 들어오고 나간 사람만 반영
+  const pKey=participants.map(p=>p.name).join("|");
+  const firstP=useRef(true);
+  useEffect(()=>{ if(firstP.current){firstP.current=false;return;}
+    const next=arrangeOrder(participants,order.map(p=>p.name));
+    const ex=new Map(order.map((p,i)=>[p.name,excl[i]])), gm=new Map(order.map((p,i)=>[p.name,games[i]]));
+    setOrder(next); setExcl(next.map(p=>ex.has(p.name)?ex.get(p.name):(p.arrive?1:p.leave?2:0)));
+    if(next.length===order.length) setGames(next.map(p=>gm.get(p.name)||0));
+  },[pKey]);
   // 시간·코트·인원이 바뀌면 게임 수를 다시 고르게 나눔
   const layoutKey=`${k}_${slot}_${n}`, lastKey=useRef(layoutKey);
   useEffect(()=>{ if(lastKey.current!==layoutKey){ lastKey.current=layoutKey; setGames(evenGames(n,total,k)); } },[layoutKey]);
@@ -1524,9 +1545,22 @@ function BracketSetup({meeting,participants,onCreate}) {
     : null;
   const fixable=problem&&!(span<=0||k<1||n<slot||c1>n-slot||c2>n-slot);
   const fit=()=>{const f=fitTo(games,total,caps);if(f)setGames(f);};
-  const move=(i,d)=>{const j=i+d;if(j<0||j>=n)return;
-    const sw=a=>{const c=a.slice();[c[i],c[j]]=[c[j],c[i]];return c;};
-    setOrder(sw(order));setGames(sw(games));setExcl(sw(excl));};
+  // i번째를 j 자리로 옮김 (순서·게임 수·제외를 같이)
+  const moveTo=(i,j)=>{ if(j<0||j>=n||i===j) return;
+    const mv=a=>{const c=a.slice();const [x]=c.splice(i,1);c.splice(j,0,x);return c;};
+    setOrder(mv(order));setGames(mv(games));setExcl(mv(excl)); };
+  const move=(i,d)=>moveTo(i,i+d);
+  // 드래그: 손잡이를 누른 채 위아래로 끌어요 (터치·마우스 모두 포인터 이벤트)
+  const [drag,setDrag]=useState(null);   // {i, y0, dy, h}
+  const listRef=useRef(null);
+  const dragTarget=d=>d?Math.max(0,Math.min(n-1,d.i+Math.round(d.dy/d.h))):-1;
+  const onGrip=i=>e=>{ const row=e.currentTarget.closest("[data-row]"); if(!row) return;
+    e.preventDefault(); try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){}
+    setDrag({i,y0:e.clientY,dy:0,h:row.getBoundingClientRect().height+6}); };
+  const onGripMove=e=>{ if(!drag) return; e.preventDefault(); setDrag(d=>d&&{...d,dy:e.clientY-d.y0}); };
+  const onGripUp=()=>{ if(!drag) return; const t=dragTarget(drag); const from=drag.i; setDrag(null); moveTo(from,t); };
+  const shiftOf=i=>{ if(!drag||i===drag.i) return 0; const t=dragTarget(drag);
+    if(drag.i<t&&i>drag.i&&i<=t) return -drag.h; if(drag.i>t&&i<drag.i&&i>=t) return drag.h; return 0; };
   const cycleGames=i=>setGames(g=>g.map((v,x)=>x===i?(v>=Math.max(1,k)?1:v+1):v));
   const cycleExcl=i=>setExcl(e=>e.map((v,x)=>x===i?(v+1)%3:v));
   const create=()=>{
@@ -1577,11 +1611,15 @@ function BracketSetup({meeting,participants,onCreate}) {
       <Card>
         <SectionTitle>참가자 · 게임 수</SectionTitle>
         <p style={{margin:"0 0 12px",fontSize:12,color:"#6B7493",lineHeight:1.6}}>
-          위에서부터 실력 순서예요(NTRP 순으로 채워 뒀어요). 화살표로 순서를 고치고, 게임 수와 첫판·막판 제외를 눌러 바꿔요.
+          위에서부터 실력 순서예요(NTRP 순으로 채워 뒀어요). 왼쪽 손잡이를 끌거나 화살표로 순서를 고치고, 게임 수와 첫판·막판 제외를 눌러 바꿔요.
+          순서를 바꿔도 아래 <b>대진표 만들기</b>를 눌러야 대진표가 만들어져요.
         </p>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {order.map((p,i)=>(
-            <div key={p.name+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px 6px 10px",borderRadius:14,background:p.isMe?BLUE_LIGHT:"#F5F7FE",border:p.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+        <div ref={listRef} style={{display:"flex",flexDirection:"column",gap:6,userSelect:drag?"none":"auto",WebkitUserSelect:drag?"none":"auto"}}>
+          {order.map((p,i)=>{ const dragging=drag&&drag.i===i; return(
+            <div key={(p.isGuest?"g:":"")+p.name} data-row="" style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px 6px 4px",borderRadius:14,background:p.isMe?BLUE_LIGHT:"#F5F7FE",border:p.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent",
+              transform:`translateY(${dragging?drag.dy:shiftOf(i)}px)`,transition:dragging?"none":"transform 0.15s",position:"relative",zIndex:dragging?2:0,boxShadow:dragging?"0 8px 20px rgba(33,82,230,0.25)":"none"}}>
+              <span role="button" aria-label={`${p.name} 순서 끌어서 옮기기`} onPointerDown={onGrip(i)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}
+                style={{touchAction:"none",userSelect:"none",WebkitUserSelect:"none",cursor:dragging?"grabbing":"grab",color:"#A3AAC2",display:"flex",padding:"6px 2px"}}><Icon name="grip" size={18} stroke={2.6}/></span>
               <span style={{width:20,fontSize:12,fontWeight:700,color:BLUE,textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{i+1}</span>
               <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:p.isMe?700:500,color:"#1B2559",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {p.name}<span style={{fontSize:11,color:"#A3AAC2",fontWeight:400,marginLeft:5}}>{p.isGuest?"게스트":p.ntrp}</span>
@@ -1593,8 +1631,7 @@ function BracketSetup({meeting,participants,onCreate}) {
                 <button type="button" onClick={()=>move(i,-1)} disabled={i===0} aria-label="위로" style={arrowBtn(i===0)}>▲</button>
                 <button type="button" onClick={()=>move(i,1)} disabled={i===n-1} aria-label="아래로" style={arrowBtn(i===n-1)}>▼</button>
               </div>
-            </div>
-          ))}
+            </div>);})}
         </div>
         <div style={{marginTop:14,background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":"#2B3674"}}>
           {problem||<>게임 수 합계 {sum} = {k}세션 × {slot}자리 ✓</>}
@@ -1672,11 +1709,13 @@ function MeetingBracket({meeting,participants,store}) {
   const [confirm,setConfirm]=useState(false);
   const [show,setShow]=useState("games");
   const bracket=rec&&rec.bracket, scores=(rec&&rec.scores)||{};
+  // 다시 만들 때는 지운 대진표의 실력 순서·제외를 그대로 이어서 써요
+  const [prevOrder,setPrevOrder]=useState(null);
   const modeNote={shared:"모임 멤버 모두에게 실시간으로 저장돼요",local:"이 기기에 저장돼요",readonly:"저장 권한이 없어 이 기기에서만 보여요"}[mode];
   const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}><Ic n={mode==="shared"?"cloud":"phone"} s={12}/> {modeNote}</p>;
   if(!bracket) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <BracketSetup meeting={meeting} participants={participants} onCreate={saveBracket}/>
+      <BracketSetup meeting={meeting} participants={participants} onCreate={saveBracket} prevOrder={prevOrder}/>
       {note}
     </div>
   );
@@ -1741,7 +1780,7 @@ function MeetingBracket({meeting,participants,store}) {
           <p style={{margin:0,fontSize:13,color:"#B91C1C",lineHeight:1.5}}>대진표와 입력한 점수가 모두 지워지고 설정 화면으로 돌아가요.</p>
           <div style={{display:"flex",gap:8}}>
             <button type="button" onClick={()=>setConfirm(false)} style={{...btnSecondary,padding:"10px 0",fontSize:13}}>취소</button>
-            <button type="button" onClick={()=>{clearBracket();setConfirm(false);}} style={{...btnSecondary,padding:"10px 0",fontSize:13,background:"#ef4444",color:"#fff",border:"none"}}>지우고 다시 만들기</button>
+            <button type="button" onClick={()=>{setPrevOrder({players:bracket.players,excl:bracket.excl});clearBracket();setConfirm(false);}} style={{...btnSecondary,padding:"10px 0",fontSize:13,background:"#ef4444",color:"#fff",border:"none"}}>지우고 다시 만들기</button>
           </div>
         </div>
       ):(
