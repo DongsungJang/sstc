@@ -1208,7 +1208,8 @@ function Step2({
   onNext,
   onBack,
   isAdmin,
-  editing
+  editing,
+  origNick
 }) {
   const [errors, setErrors] = useState({});
   const [nickChecked, setNickChecked] = useState(false);
@@ -1229,9 +1230,20 @@ function Step2({
       }));
       return;
     }
+    const myUid = FB && FB.auth.currentUser && FB.auth.currentUser.uid;
+    if (editing && data.nickname.trim() === origNick) {
+      setNickChecked(true);
+      setErrors(p => ({
+        ...p,
+        nickname: undefined
+      }));
+      setNickMsg("지금 쓰는 닉네임이에요");
+      return;
+    }
     if (FB) {
       try {
-        if (await once(FB.club.child("nicknames/" + nickKey(data.nickname)))) {
+        const owner = await once(FB.club.child("nicknames/" + nickKey(data.nickname)));
+        if (owner && owner !== myUid) {
           setNickChecked(false);
           setNickMsg("");
           setErrors(p => ({
@@ -1265,7 +1277,7 @@ function Step2({
     if (isAdmin) return true;
     const e = {};
     if (!(data.realName || "").trim()) e.realName = "본명을 입력해주세요";
-    if (!data.nickname) e.nickname = "닉네임을 입력해주세요";
+    if (!data.nickname || !data.nickname.trim()) e.nickname = "닉네임을 입력해주세요";else if (editing && data.nickname.trim() !== origNick && !nickChecked) e.nickname = "바꾼 닉네임은 중복확인을 해주세요";
     if (!data.birthdate) e.birthdate = "생년월일을 입력해주세요";
     if (!data.phone) e.phone = "연락처를 입력해주세요";else if (!/^010-\d{4}-\d{4}$/.test(data.phone)) e.phone = "010-0000-0000 형식으로 입력해주세요";
     if (!data.region) e.region = "지역을 선택해주세요";
@@ -1355,24 +1367,7 @@ function Step2({
       color: "#A3AAC2",
       margin: 0
     }
-  }, "\uD68C\uC6D0 \uD655\uC778\uC6A9\uC774\uC5D0\uC694. \uBAA8\uC784 \uD654\uBA74\uC5D0\uB294 \uB2C9\uB124\uC784\uB9CC \uBCF4\uC5EC\uC694")), editing ? /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uB2C9\uB124\uC784"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: data.nickname,
-    readOnly: true,
-    style: {
-      ...inputStyle,
-      background: "#F5F7FE",
-      color: "#6B7493"
-    }
-  }), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: "#A3AAC2",
-      margin: 0
-    }
-  }, "\uB2C9\uB124\uC784\uC740 \uD22C\uD45C\xB7\uB300\uC9C4 \uAE30\uB85D\uACFC \uC774\uC5B4\uC838 \uC788\uC5B4\uC11C \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694")) : /*#__PURE__*/React.createElement(FieldWrap, {
+  }, "\uD68C\uC6D0 \uD655\uC778\uC6A9\uC774\uC5D0\uC694. \uBAA8\uC784 \uD654\uBA74\uC5D0\uB294 \uB2C9\uB124\uC784\uB9CC \uBCF4\uC5EC\uC694")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB2C9\uB124\uC784",
     required: !isAdmin,
     error: errors.nickname
@@ -1402,7 +1397,13 @@ function Step2({
       fontWeight: 600,
       margin: 0
     }
-  }, nickMsg)), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, nickMsg), editing && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2",
+      margin: 0
+    }
+  }, "\uBC14\uAFB8\uBA74 \uC9C0\uAE08\uAE4C\uC9C0\uC758 \uD22C\uD45C\xB7\uB300\uC9C4\uD45C \uAE30\uB85D\uB3C4 \uC0C8 \uB2C9\uB124\uC784\uC73C\uB85C \uBC14\uB00C\uC5B4\uC694")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC0DD\uB144\uC6D4\uC77C",
     required: !isAdmin,
     error: errors.birthdate
@@ -6395,7 +6396,36 @@ function StatsTab() {
   }, r.count))))));
 }
 
-// ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 닉네임·이메일은 고정) ─────────
+// 닉네임 바꾸기: 새 닉네임 자리 차지 → 옛 닉네임 자리 비움 → 내 투표·대진표·내가 만든 모임의 이름을 새 닉네임으로
+// (투표 순서·이달 참석 횟수·대진표가 이름으로 이어져 있어서 같이 바꿔요. 규칙상 nicknames는 빈 자리이거나 내 자리만 쓸 수 있어요)
+async function changeNickname(uid, oldNick, newNick) {
+  const owner = await once(FB.club.child("nicknames/" + nickKey(newNick)));
+  if (owner && owner !== uid) throw {
+    code: "nick-taken",
+    message: "이미 쓰는 닉네임이에요. 다른 닉네임으로 바꿔 주세요"
+  };
+  await FB.club.child("nicknames/" + nickKey(newNick)).set(uid);
+  const old = await once(FB.club.child("nicknames/" + nickKey(oldNick)));
+  if (old === uid) await FB.club.child("nicknames/" + nickKey(oldNick)).remove();
+  const up = {};
+  MEETINGS.forEach(m => {
+    const r = m.rec || {},
+      k = "m" + m.id;
+    if (r.votes && r.votes[uid]) up[`${k}/votes/${uid}/name`] = newNick;
+    Object.keys(r.votes || {}).forEach(vk => {
+      const v = r.votes[vk];
+      if (v && v.by === oldNick) up[`${k}/votes/${vk}/by`] = newNick;
+    });
+    const pl = r.bracket && r.bracket.players;
+    if (pl) Object.keys(pl).forEach(i => {
+      if (pl[i] === oldNick) up[`${k}/bracket/players/${i}`] = newNick;
+    });
+    if (r.info && r.info.createdByUid === uid) up[`${k}/info/createdBy`] = newNick;
+  });
+  if (Object.keys(up).length) await FB.club.child("meetings").update(up).catch(() => {}); // 준회원은 모임 쓰기 권한이 없지만 바꿀 기록도 없어요
+}
+
+// ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
 const PROFILE_FIELDS = ["realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
 function ProfileEdit({
   account,
@@ -6436,15 +6466,18 @@ function ProfileEdit({
     patch.region = data.region === "타지역" ? data.regionCustom || "타지역" : data.region;
     patch.realName = (data.realName || "").trim();
     patch.updatedAt = Date.now();
+    const oldNick = pr.nickname || ME,
+      newNick = (data.nickname || "").trim() || oldNick;
+    if (newNick !== oldNick) patch.nickname = newNick;
     setSaving(true);
     setErr("");
     const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid;
-    (uid ? FB.club.child("members/" + uid).update(JSON.parse(JSON.stringify(patch))) : Promise.resolve()).then(() => onDone({
+    (uid ? (newNick !== oldNick ? changeNickname(uid, oldNick, newNick) : Promise.resolve()).then(() => FB.club.child("members/" + uid).update(JSON.parse(JSON.stringify(patch)))) : Promise.resolve()).then(() => onDone({
       ...pr,
       ...patch
     })).catch(e => {
       setSaving(false);
-      setErr(authMsg(e));
+      setErr(e && e.code === "nick-taken" ? e.message : authMsg(e));
     });
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -6464,7 +6497,8 @@ function ProfileEdit({
     onChange: onChange,
     onNext: () => setStep(3),
     onBack: onCancel,
-    editing: true
+    editing: true,
+    origNick: pr.nickname || ME
   }) : /*#__PURE__*/React.createElement(Step3, {
     data: data,
     onChange: onChange,
