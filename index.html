@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2152E6">
+<!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
+<meta name="color-scheme" content="only light">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -36,7 +38,7 @@
 .sp-hop{animation:sp-hop 1.2s infinite}
 @keyframes sp-hop{0%,100%{transform:translateY(3px);animation-timing-function:cubic-bezier(.2,.7,.4,1)}50%{transform:translateY(-7px);animation-timing-function:cubic-bezier(.6,0,.8,.3)}}
 @keyframes sp-shadow{0%,100%{transform:scaleX(1);opacity:.35}50%{transform:scaleX(.45);opacity:.12}}
-.sp-wink{transform-box:fill-box;transform-origin:center;animation:sp-wink 3.6s infinite}
+.sp-wink{animation:sp-wink 3.6s infinite}   /* 눈 하나씩 따로 겹친 svg라 transform-origin은 앱에서 눈 위치로 지정 */
 @keyframes sp-wink{0%,82%,100%{transform:scaleY(1)}87%{transform:scaleY(.12)}93%{transform:scaleY(1)}}
 .sp-bubble{transform-origin:12% 100%;animation:sp-pop 4.8s infinite}
 @keyframes sp-pop{
@@ -65,9 +67,9 @@
 .sp-smug{animation:sp-b 4.8s infinite}
 @keyframes sp-a{0%,40%{opacity:1}46%,94%{opacity:0}100%{opacity:1}}
 @keyframes sp-b{0%,40%{opacity:0}46%,94%{opacity:1}100%{opacity:0}}
-.sp-hand{transform-box:fill-box;transform-origin:50% 100%;animation:sp-hand 4.8s infinite}
-@keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.5px) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,16px) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
-@media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,16px) rotate(0deg)}}
+.sp-hand{transform-origin:50% 97.5%;animation:sp-hand 4.8s infinite}   /* 손만 그린 120×120 svg 상자: 손목 아래(60,117) 기준, 이동은 상자 크기의 % (16 = 13.33%) */
+@keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.25%) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,13.33%) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
+@media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,13.33%) rotate(0deg)}}
 </style>
 </head>
 <body>
@@ -97,6 +99,8 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
+  chevL: ["M15 18l-6-6 6-6"],
+  chevR: ["M9 18l6-6-6-6"],
   grip: ["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"],
   home: ["M3 10.5 12 3l9 7.5", "M5 9.5V20h5v-6h4v6h5V9.5"],
   back: ["M15 5l-7 7 7 7"],
@@ -6035,6 +6039,242 @@ function MeetingDetail({
   }, meeting.createdBy, " \uB2D8\uC774 \uB9CC\uB4E0 \uBAA8\uC784")));
 }
 
+// ─── 작은 달력 (예약 탭 맨 위) ─────────────────────────────────────────────────
+// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 주황, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
+const KIND_DOT = {
+  regular: BLUE,
+  flash: "#F59E0B"
+};
+function MiniCalendar({
+  onOpen
+}) {
+  const today = todayYmd();
+  const [ym, setYm] = useState(() => today.slice(0, 7));
+  const [pick, setPick] = useState(null);
+  const [y, mo] = ym.split("-").map(Number);
+  const shift = d => {
+    const t = new Date(y, mo - 1 + d, 1);
+    setYm(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`);
+    setPick(null);
+  };
+  const byDay = {};
+  MEETINGS.forEach(m => {
+    if (m.iso && m.iso.slice(0, 7) === ym) (byDay[m.iso] = byDay[m.iso] || []).push(m);
+  });
+  Object.values(byDay).forEach(a => a.sort((p, q) => (p.info && p.info.start || "") < (q.info && q.info.start || "") ? -1 : 1));
+  const first = new Date(y, mo - 1, 1).getDay(),
+    days = new Date(y, mo, 0).getDate();
+  const cells = [...Array(first).fill(null), ...Array.from({
+    length: days
+  }, (_, i) => i + 1)];
+  const count = Object.values(byDay).reduce((a, l) => a + l.length, 0);
+  const picked = pick && byDay[pick];
+  const navBtn = (d, ic, label) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": label,
+    onClick: () => shift(d),
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: 999,
+      border: "1px solid #E4E9F7",
+      background: "#fff",
+      color: "#4A5578",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: ic,
+    size: 16,
+    stroke: 2.2
+  }));
+  return /*#__PURE__*/React.createElement(Card, {
+    style: {
+      padding: "12px 12px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8
+    }
+  }, navBtn(-1, "chevL", "이전 달"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, y, "\uB144 ", mo, "\uC6D4"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, count ? `모임 ${count}개` : "모임 없음")), navBtn(1, "chevR", "다음 달")), /*#__PURE__*/React.createElement("div", {
+    role: "grid",
+    "aria-label": `${y}년 ${mo}월 모임 달력`,
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      rowGap: 2
+    }
+  }, WEEK.map((w, i) => /*#__PURE__*/React.createElement("span", {
+    key: w,
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      fontWeight: 600,
+      color: i === 0 ? "#E5484D" : i === 6 ? BLUE : "#A3AAC2",
+      padding: "2px 0 4px"
+    }
+  }, w)), cells.map((d, i) => {
+    if (!d) return /*#__PURE__*/React.createElement("span", {
+      key: "e" + i
+    });
+    const iso = `${ym}-${String(d).padStart(2, "0")}`,
+      list = byDay[iso] || [],
+      isToday = iso === today,
+      on = pick === iso,
+      past = iso < today,
+      dow = i % 7;
+    return /*#__PURE__*/React.createElement("button", {
+      key: iso,
+      type: "button",
+      "aria-label": `${mo}월 ${d}일${list.length ? ` 모임 ${list.length}개` : ""}`,
+      "aria-pressed": on,
+      onClick: () => setPick(on || !list.length ? null : iso),
+      style: {
+        border: "none",
+        background: on ? BLUE_LIGHT : "transparent",
+        borderRadius: 10,
+        padding: "2px 0 3px",
+        cursor: list.length ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 1,
+        minHeight: 30
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 22,
+        height: 22,
+        lineHeight: "22px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: isToday || list.length ? 700 : 400,
+        fontVariantNumeric: "tabular-nums",
+        background: isToday ? GRAD : "transparent",
+        color: isToday ? "#fff" : past ? "#C5CBE0" : dow === 0 ? "#E5484D" : dow === 6 ? BLUE : "#1B2559"
+      }
+    }, d), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        gap: 2,
+        height: 5,
+        alignItems: "center"
+      }
+    }, list.slice(0, 3).map((m, k) => /*#__PURE__*/React.createElement("span", {
+      key: k,
+      style: {
+        width: 5,
+        height: 5,
+        borderRadius: 999,
+        background: KIND_DOT[m.kind] || BLUE,
+        opacity: past ? 0.45 : 1
+      }
+    })), list.length > 3 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        lineHeight: "5px",
+        color: "#6B7493",
+        fontWeight: 700
+      }
+    }, "+", list.length - 3)));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 12,
+      marginTop: 6,
+      fontSize: 11,
+      color: "#6B7493"
+    }
+  }, [["regular", "정기"], ["flash", "번개"]].map(([k, l]) => /*#__PURE__*/React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 6,
+      height: 6,
+      borderRadius: 999,
+      background: KIND_DOT[k]
+    }
+  }), l))), picked && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, picked.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m.id,
+    type: "button",
+    onClick: () => onOpen(m.id),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 10px",
+      borderRadius: 12,
+      border: "1px solid #E4E9F7",
+      background: "#F5F7FE",
+      cursor: "pointer",
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 6,
+      height: 6,
+      borderRadius: 999,
+      background: KIND_DOT[m.kind] || BLUE,
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#1B2559",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, m.time), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 13,
+      color: "#4A5578",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, m.place), /*#__PURE__*/React.createElement(KindBadge, {
+    m: m
+  })))));
+}
+
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
 function BookingTab({
   open,
@@ -6088,7 +6328,9 @@ function BookingTab({
       gap: 20,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(MiniCalendar, {
+    onOpen: setSelId
+  }), /*#__PURE__*/React.createElement("div", {
     role: "tablist",
     "aria-label": "\uBAA8\uC784 \uC885\uB958",
     style: {
@@ -8260,6 +8502,7 @@ const TABS = [{
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
+:root{color-scheme:only light}
 body{margin:0;background:#E9EDFA;font-family:${FONT};color:#1B2559;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 3px rgba(59,99,243,0.15)}
@@ -8280,15 +8523,33 @@ const iconBtn = {
 };
 
 // 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
+// 마스코트: 움직이는 부분(표정 바꾸기·윙크·손)을 각각 따로 겹친 SVG로 나눠서, 애니메이션이 SVG 안쪽 도형이 아니라
+// 상자(svg 요소 자체)에 걸리게 했어요. 아이패드 사파리는 움직이는 부모 안의 SVG 내부 도형 애니메이션을 가끔 멈춰 버려요.
 function MascotSvg({
   size
 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    role: "img",
-    "aria-label": "Tennis ball mascot hiding a smug grin behind its hand",
+  const L = {
+    position: "absolute",
+    left: 0,
+    top: 0,
     width: size,
     height: size,
-    viewBox: "0 0 120 120"
+    overflow: "visible"
+  };
+  const V = "0 0 120 120";
+  return /*#__PURE__*/React.createElement("div", {
+    role: "img",
+    "aria-label": "Tennis ball mascot hiding a smug grin behind its hand",
+    style: {
+      position: "relative",
+      width: size,
+      height: size,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    style: L,
+    viewBox: V
   }, /*#__PURE__*/React.createElement("circle", {
     cx: "60",
     cy: "60",
@@ -8306,8 +8567,12 @@ function MascotSvg({
     strokeWidth: "5",
     fill: "none",
     strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("g", {
+  })), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
     className: "sp-sorry",
+    style: L,
+    viewBox: V
+  }, /*#__PURE__*/React.createElement("g", {
     transform: "rotate(4 60 60)"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M33 47 Q 42 46 50 39",
@@ -8356,8 +8621,14 @@ function MascotSvg({
   }), /*#__PURE__*/React.createElement("path", {
     d: "M94 38 Q 98 45 94 48 Q 90 45 94 38 Z",
     fill: "#9CD3FF"
-  })), /*#__PURE__*/React.createElement("g", {
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "sp-smug",
+    style: L
+  }, /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    style: L,
+    viewBox: V
+  }, /*#__PURE__*/React.createElement("g", {
     transform: "rotate(-7 60 60)"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M36 46 Q 44 43.5 52 46",
@@ -8371,8 +8642,28 @@ function MascotSvg({
     strokeWidth: "3",
     fill: "none",
     strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("g", {
-    className: "sp-wink"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M45 72 Q 62 87 77 70 Q 62 79 45 72 Z",
+    fill: "#FF4F8B",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    strokeLinejoin: "round"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M76 70.5 Q 80 69.5 80 66",
+    stroke: "#0B1E5B",
+    strokeWidth: "2.5",
+    fill: "none",
+    strokeLinecap: "round"
+  }))), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    className: "sp-wink",
+    style: {
+      ...L,
+      transformOrigin: "36.6% 50%"
+    },
+    viewBox: V
+  }, /*#__PURE__*/React.createElement("g", {
+    transform: "rotate(-7 60 60)"
   }, /*#__PURE__*/React.createElement("ellipse", {
     cx: "44",
     cy: "58",
@@ -8398,8 +8689,16 @@ function MascotSvg({
     strokeWidth: "3",
     fill: "none",
     strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("g", {
-    className: "sp-wink"
+  }))), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    className: "sp-wink",
+    style: {
+      ...L,
+      transformOrigin: "63% 46.7%"
+    },
+    viewBox: V
+  }, /*#__PURE__*/React.createElement("g", {
+    transform: "rotate(-7 60 60)"
   }, /*#__PURE__*/React.createElement("ellipse", {
     cx: "76",
     cy: "58",
@@ -8425,19 +8724,11 @@ function MascotSvg({
     strokeWidth: "3",
     fill: "none",
     strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("path", {
-    d: "M45 72 Q 62 87 77 70 Q 62 79 45 72 Z",
-    fill: "#FF4F8B",
-    stroke: "#0B1E5B",
-    strokeWidth: "2.5",
-    strokeLinejoin: "round"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M76 70.5 Q 80 69.5 80 66",
-    stroke: "#0B1E5B",
-    strokeWidth: "2.5",
-    fill: "none",
-    strokeLinecap: "round"
-  })), /*#__PURE__*/React.createElement("ellipse", {
+  })))), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    style: L,
+    viewBox: V
+  }, /*#__PURE__*/React.createElement("ellipse", {
     cx: "32",
     cy: "71",
     rx: "8",
@@ -8451,8 +8742,11 @@ function MascotSvg({
     ry: "4.5",
     fill: "#FF8FB1",
     opacity: "0.75"
-  }), /*#__PURE__*/React.createElement("g", {
-    className: "sp-hand"
+  })), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    className: "sp-hand",
+    style: L,
+    viewBox: V
   }, /*#__PURE__*/React.createElement("path", {
     d: "M60 99 V117",
     stroke: "#0B1E5B",

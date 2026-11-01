@@ -11,6 +11,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
+  chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
   grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
   back:["M15 5l-7 7 7 7"],
@@ -2016,6 +2017,67 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   );
 }
 
+// ─── 작은 달력 (예약 탭 맨 위) ─────────────────────────────────────────────────
+// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 주황, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
+const KIND_DOT={regular:BLUE,flash:"#F59E0B"};
+function MiniCalendar({onOpen}){
+  const today=todayYmd();
+  const [ym,setYm]=useState(()=>today.slice(0,7));
+  const [pick,setPick]=useState(null);
+  const [y,mo]=ym.split("-").map(Number);
+  const shift=d=>{ const t=new Date(y,mo-1+d,1); setYm(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); setPick(null); };
+  const byDay={};
+  MEETINGS.forEach(m=>{ if(m.iso&&m.iso.slice(0,7)===ym) (byDay[m.iso]=byDay[m.iso]||[]).push(m); });
+  Object.values(byDay).forEach(a=>a.sort((p,q)=>(p.info&&p.info.start||"")<(q.info&&q.info.start||"")?-1:1));
+  const first=new Date(y,mo-1,1).getDay(), days=new Date(y,mo,0).getDate();
+  const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+  const count=Object.values(byDay).reduce((a,l)=>a+l.length,0);
+  const picked=pick&&byDay[pick];
+  const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:30,height:30,borderRadius:999,border:"1px solid #E4E9F7",background:"#fff",color:"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
+  return(
+    <Card style={{padding:"12px 12px 10px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        {navBtn(-1,"chevL","이전 달")}
+        <div style={{textAlign:"center"}}>
+          <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559"}}>{y}년 {mo}월</p>
+          <p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>{count?`모임 ${count}개`:"모임 없음"}</p>
+        </div>
+        {navBtn(1,"chevR","다음 달")}
+      </div>
+      <div role="grid" aria-label={`${y}년 ${mo}월 모임 달력`} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",rowGap:2}}>
+        {WEEK.map((w,i)=><span key={w} style={{textAlign:"center",fontSize:11,fontWeight:600,color:i===0?"#E5484D":i===6?BLUE:"#A3AAC2",padding:"2px 0 4px"}}>{w}</span>)}
+        {cells.map((d,i)=>{
+          if(!d) return <span key={"e"+i}/>;
+          const iso=`${ym}-${String(d).padStart(2,"0")}`, list=byDay[iso]||[], isToday=iso===today, on=pick===iso, past=iso<today, dow=i%7;
+          return(
+            <button key={iso} type="button" aria-label={`${mo}월 ${d}일${list.length?` 모임 ${list.length}개`:""}`} aria-pressed={on} onClick={()=>setPick(on||!list.length?null:iso)}
+              style={{border:"none",background:on?BLUE_LIGHT:"transparent",borderRadius:10,padding:"2px 0 3px",cursor:list.length?"pointer":"default",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minHeight:30}}>
+              <span style={{width:22,height:22,lineHeight:"22px",borderRadius:999,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
+                background:isToday?GRAD:"transparent",color:isToday?"#fff":past?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:"#1B2559"}}>{d}</span>
+              <span style={{display:"flex",gap:2,height:5,alignItems:"center"}}>
+                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,borderRadius:999,background:KIND_DOT[m.kind]||BLUE,opacity:past?0.45:1}}/>)}
+                {list.length>3&&<span style={{fontSize:8,lineHeight:"5px",color:"#6B7493",fontWeight:700}}>+{list.length-3}</span>}
+              </span>
+            </button>);
+        })}
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6,fontSize:11,color:"#6B7493"}}>
+        {[["regular","정기"],["flash","번개"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:999,background:KIND_DOT[k]}}/>{l}</span>)}
+      </div>
+      {picked&&<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
+        {picked.map(m=>(
+          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:12,border:"1px solid #E4E9F7",background:"#F5F7FE",cursor:"pointer",textAlign:"left"}}>
+            <span style={{width:6,height:6,borderRadius:999,background:KIND_DOT[m.kind]||BLUE,flexShrink:0}}/>
+            <span style={{fontSize:13,fontWeight:600,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{m.time}</span>
+            <span style={{flex:1,minWidth:0,fontSize:13,color:"#4A5578",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.place}</span>
+            <KindBadge m={m}/>
+          </button>
+        ))}
+      </div>}
+    </Card>
+  );
+}
+
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
 function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate}) {
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"regular";}catch(e){return "regular";}});
@@ -2030,6 +2092,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
   const label=kind==="flash"?"번개 모임":"정기 모임";
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
+      <MiniCalendar onOpen={setSelId}/>
       <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
         {[["regular","정기 모임","calendar"],["flash","번개 모임","zap"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length;return(
           <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?GRAD:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
@@ -2679,6 +2742,7 @@ const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",i
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
+:root{color-scheme:only light}
 body{margin:0;background:#E9EDFA;font-family:${FONT};color:#1B2559;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 3px rgba(59,99,243,0.15)}
@@ -2689,13 +2753,20 @@ button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 const iconBtn={width:38,height:38,borderRadius:"50%",border:"none",background:"rgba(255,255,255,0.18)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
 // 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
+// 마스코트: 움직이는 부분(표정 바꾸기·윙크·손)을 각각 따로 겹친 SVG로 나눠서, 애니메이션이 SVG 안쪽 도형이 아니라
+// 상자(svg 요소 자체)에 걸리게 했어요. 아이패드 사파리는 움직이는 부모 안의 SVG 내부 도형 애니메이션을 가끔 멈춰 버려요.
 function MascotSvg({size}) {
+  const L={position:"absolute",left:0,top:0,width:size,height:size,overflow:"visible"};
+  const V="0 0 120 120";
   return(
-      <svg role="img" aria-label="Tennis ball mascot hiding a smug grin behind its hand" width={size} height={size} viewBox="0 0 120 120">
+    <div role="img" aria-label="Tennis ball mascot hiding a smug grin behind its hand" style={{position:"relative",width:size,height:size,flexShrink:0}}>
+      <svg aria-hidden="true" style={L} viewBox={V}>
       <circle cx="60" cy="60" r="56" fill="#D7F24A"/>
       <path d="M12 32 C 40 44, 40 76, 12 88" stroke="#FFFFFF" strokeWidth="5" fill="none" strokeLinecap="round"/>
       <path d="M108 32 C 80 44, 80 76, 108 88" stroke="#FFFFFF" strokeWidth="5" fill="none" strokeLinecap="round"/>
-      <g className="sp-sorry" transform="rotate(4 60 60)">
+      </svg>
+      <svg aria-hidden="true" className="sp-sorry" style={L} viewBox={V}>
+      <g transform="rotate(4 60 60)">
       <path d="M33 47 Q 42 46 50 39" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
       <path d="M70 39 Q 78 46 87 47" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
       <ellipse cx="43" cy="60" rx="6.5" ry="7.5" fill="#0B1E5B"/>
@@ -2706,36 +2777,41 @@ function MascotSvg({size}) {
       <circle cx="75" cy="63.5" r="1.3" fill="#FFFFFF"/>
       <path d="M94 38 Q 98 45 94 48 Q 90 45 94 38 Z" fill="#9CD3FF"/>
       </g>
-      <g className="sp-smug" transform="rotate(-7 60 60)">
+      </svg>
+      <div className="sp-smug" style={L}>
+        <svg aria-hidden="true" style={L} viewBox={V}>
+        <g transform="rotate(-7 60 60)">
       <path d="M36 46 Q 44 43.5 52 46" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
       <path d="M68 43 Q 76 36 86 41" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <g className="sp-wink">
-      <ellipse cx="44" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
-      <circle cx="48" cy="59.5" r="4.2" fill="#0B1E5B"/>
-      <circle cx="49.5" cy="58" r="1.3" fill="#FFFFFF"/>
-      <path d="M35 57 Q 44 48 53 57 Z" fill="#D7F24A"/>
-      <path d="M35 57 Q 44 54.5 53 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      </g>
-      <g className="sp-wink">
-      <ellipse cx="76" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
-      <circle cx="80" cy="59.5" r="4.2" fill="#0B1E5B"/>
-      <circle cx="81.5" cy="58" r="1.3" fill="#FFFFFF"/>
-      <path d="M67 57 Q 76 48 85 57 Z" fill="#D7F24A"/>
-      <path d="M67 57 Q 76 54.5 85 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      </g>
+      
+      
       <path d="M45 72 Q 62 87 77 70 Q 62 79 45 72 Z" fill="#FF4F8B" stroke="#0B1E5B" strokeWidth="2.5" strokeLinejoin="round"/>
       <path d="M76 70.5 Q 80 69.5 80 66" stroke="#0B1E5B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
       </g>
+        </svg>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"36.6% 50%"}} viewBox={V}><g transform="rotate(-7 60 60)"><ellipse cx="44" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
+      <circle cx="48" cy="59.5" r="4.2" fill="#0B1E5B"/>
+      <circle cx="49.5" cy="58" r="1.3" fill="#FFFFFF"/>
+      <path d="M35 57 Q 44 48 53 57 Z" fill="#D7F24A"/>
+      <path d="M35 57 Q 44 54.5 53 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/></g></svg>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"63% 46.7%"}} viewBox={V}><g transform="rotate(-7 60 60)"><ellipse cx="76" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
+      <circle cx="80" cy="59.5" r="4.2" fill="#0B1E5B"/>
+      <circle cx="81.5" cy="58" r="1.3" fill="#FFFFFF"/>
+      <path d="M67 57 Q 76 48 85 57 Z" fill="#D7F24A"/>
+      <path d="M67 57 Q 76 54.5 85 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/></g></svg>
+      </div>
+      <svg aria-hidden="true" style={L} viewBox={V}>
       <ellipse cx="32" cy="71" rx="8" ry="4.5" fill="#FF8FB1" opacity="0.75"/>
       <ellipse cx="88" cy="71" rx="8" ry="4.5" fill="#FF8FB1" opacity="0.75"/>
-      <g className="sp-hand">
+      </svg>
+      <svg aria-hidden="true" className="sp-hand" style={L} viewBox={V}>
       <path d="M60 99 V117" stroke="#0B1E5B" strokeWidth="7.5" strokeLinecap="round" fill="none"/>
       <path d="M60 105 V110" stroke="#FF8FB1" strokeWidth="7.5" fill="none"/>
       <path d="M54 91 L60 100 L66 91" stroke="#0B1E5B" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
       <ellipse cx="60" cy="78" rx="13" ry="15" fill="#FFFFFF" stroke="#0B1E5B" strokeWidth="3"/>
       <path d="M54 65 V91 M60 63.5 V92.5 M66 65 V91 M49 70 H71 M47 78 H73 M49 86 H71" stroke="#8FA2D9" strokeWidth="1.4" fill="none"/>
-      </g>
       </svg>
+    </div>
   );
 }
 
