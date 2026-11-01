@@ -107,6 +107,9 @@ function votesFromRec(rec){
   });
   return out;
 }
+// 정원이 다 찬 모임은 빨간 계열로 표시 (마감)
+const FULL={c:"#E5484D",bg:"#FFF1F1",line:"#FBD5D5",bar:"linear-gradient(90deg,#FF8A8A,#E5484D)"};
+const isFull=m=>!!m&&m.total>0&&m.attendees.length>=m.total;
 // 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
 const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
 // 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
@@ -648,7 +651,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       <Card>
         <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임</SectionTitle>
         {!next?<Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty>:(
-        <div style={{background:BLUE_LIGHT,borderRadius:18,padding:16}}>
+        <div style={{background:isFull(next)?FULL.bg:BLUE_LIGHT,border:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:18,padding:16}}>
           <div onClick={()=>onOpenMeeting(next.id,"info")} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,cursor:"pointer"}}>
             <div>
               <p style={{margin:"0 0 3px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{next.date}<KindBadge m={next}/></p>
@@ -660,9 +663,9 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
               <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
-              <span style={{fontSize:12,fontWeight:600,color:BLUE}}>{next.attendees.length} / {next.total}명</span>
+              <span style={{fontSize:12,fontWeight:isFull(next)?700:600,color:isFull(next)?FULL.c:BLUE}}>{next.attendees.length} / {next.total}명{isFull(next)?" · 마감":""}</span>
             </div>
-            <div style={{height:6,background:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:GRAD,borderRadius:10}}/></div>
+            <div style={{height:6,background:isFull(next)?FULL.line:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:GRAD,borderRadius:10}}/></div>
           </div>
           {isOpen(next)?(
           <div style={{display:"flex",gap:8}}>
@@ -674,7 +677,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         {nextNext&&(
           <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
             <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.place}</p></div>
-            <span style={{fontSize:12,color:"#A3AAC2"}}>{nextNext.attendees.length}명 참석예정</span>
+            <span style={{fontSize:12,color:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)?700:400}}>{isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명`:`${nextNext.attendees.length}명 참석예정`}</span>
           </div>
         )}
       </Card>
@@ -1902,6 +1905,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:"#1B2559"}}>{meeting.date}</p><KindBadge m={meeting}/></div>
           {isPast?<span style={{background:"#EEF1FA",color:"#A3AAC2",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20}}>종료된 모임</span>
+            :open&&fill>=100?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>마감 · 대기 가능</span>
             :open?<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>예약 진행 중</span>
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
@@ -1920,9 +1924,9 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         <div style={{marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
             <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
-            <span style={{fontSize:12,fontWeight:700,color:fill>=100?"#ef4444":BLUE}}>{total} / {meeting.total}명{fill>=100?" · 마감":""}</span>
+            <span style={{fontSize:12,fontWeight:700,color:fill>=100?FULL.c:BLUE}}>{total} / {meeting.total}명{fill>=100?" · 마감":""}</span>
           </div>
-          <div style={{height:7,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${Math.min(fill,100)}%`,background:fill>=100?"#ef4444":BLUE,borderRadius:10}}/></div>
+          <div style={{height:7,background:fill>=100?FULL.line:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${Math.min(fill,100)}%`,background:fill>=100?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>
         {isPast&&<p style={{margin:0,fontSize:14,fontWeight:600,textAlign:"center",color:"#8A93B2",background:"#EEF1FA",borderRadius:12,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="clock" size={16} stroke={1.9}/>종료된 모임</p>}
         {!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
@@ -2038,9 +2042,9 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {upcoming.map(m=>{
             const fill=Math.min(100,Math.round((m.attendees.length/Math.max(1,m.total))*100));
-            const isAtt=m.attendees.some(a=>a.isMe);
+            const isAtt=m.attendees.some(a=>a.isMe), full=isFull(m);
             return(
-              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#fff",borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
+              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:full?FULL.bg:"#fff",border:`1.5px solid ${full?FULL.line:"transparent"}`,borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                   <div>
                     <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
@@ -2048,12 +2052,13 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                     <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.place}</p>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                    <span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{m.attendees.length}/{m.total}명</span>
+                    {full?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20}}>마감 {m.attendees.length}/{m.total}명</span>
+                      :<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{m.attendees.length}/{m.total}명</span>}
                     {isAtt&&<span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>참석 예정</span>}
                   </div>
                 </div>
-                <div style={{height:5,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:GRAD,borderRadius:10}}/></div>
-                <p style={{margin:"8px 0 0",fontSize:12,color:"#A3AAC2",textAlign:"right"}}>탭해서 자세히 보기 →</p>
+                <div style={{height:5,background:full?FULL.line:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:full?FULL.bar:GRAD,borderRadius:10}}/></div>
+                <p style={{margin:"8px 0 0",fontSize:12,color:full?FULL.c:"#A3AAC2",textAlign:"right"}}>{full?"정원이 다 찼어요 · 참석하면 대기로 들어가요 →":"탭해서 자세히 보기 →"}</p>
               </div>
             );
           })}
