@@ -436,7 +436,7 @@ function Step1({data,onChange,onNext,isAdmin}) {
 }
 
 // ─── 회원가입 STEP 2 ──────────────────────────────────────────────────────────
-function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
+function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   const [errors,setErrors]=useState({});
   const [nickChecked,setNickChecked]=useState(false);
   const [nickMsg,setNickMsg]=useState("");
@@ -445,7 +445,9 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
   const handlePhoto=e=>{const f=e.target.files[0];if(!f)return;onChange("photo",f);setPreview(URL.createObjectURL(f));};
   const checkNick=async()=>{
     if(!data.nickname.trim()){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}
-    if(FB){ try{ if(await once(FB.club.child("nicknames/"+nickKey(data.nickname)))){setNickChecked(false);setNickMsg("");setErrors(p=>({...p,nickname:"이미 쓰는 닉네임이에요"}));return;} }
+    const myUid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
+    if(editing&&data.nickname.trim()===origNick){setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("지금 쓰는 닉네임이에요");return;}
+    if(FB){ try{ const owner=await once(FB.club.child("nicknames/"+nickKey(data.nickname))); if(owner&&owner!==myUid){setNickChecked(false);setNickMsg("");setErrors(p=>({...p,nickname:"이미 쓰는 닉네임이에요"}));return;} }
       catch(e){ setErrors(p=>({...p,nickname:authMsg(e)})); return; } }
     setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("✓ 사용 가능한 닉네임이에요");};
   const fmt=v=>{const d=v.replace(/\D/g,"").slice(0,11);if(d.length<=3)return d;if(d.length<=7)return`${d.slice(0,3)}-${d.slice(3)}`;return`${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;};
@@ -453,7 +455,8 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
     if(isAdmin) return true;
     const e={};
     if(!(data.realName||"").trim()) e.realName="본명을 입력해주세요";
-    if(!data.nickname) e.nickname="닉네임을 입력해주세요";
+    if(!data.nickname||!data.nickname.trim()) e.nickname="닉네임을 입력해주세요";
+    else if(editing&&data.nickname.trim()!==origNick&&!nickChecked) e.nickname="바꾼 닉네임은 중복확인을 해주세요";
     if(!data.birthdate) e.birthdate="생년월일을 입력해주세요";
     if(!data.phone) e.phone="연락처를 입력해주세요";
     else if(!/^010-\d{4}-\d{4}$/.test(data.phone)) e.phone="010-0000-0000 형식으로 입력해주세요";
@@ -474,17 +477,14 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing}) {
         <input type="text" value={data.realName||""} style={inputStyle} onChange={e=>onChange("realName",e.target.value)} placeholder="실명" autoComplete="name"/>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>회원 확인용이에요. 모임 화면에는 닉네임만 보여요</p>
       </FieldWrap>
-      {editing?<FieldWrap label="닉네임">
-        <input type="text" value={data.nickname} readOnly style={{...inputStyle,background:"#F5F7FE",color:"#6B7493"}}/>
-        <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>닉네임은 투표·대진 기록과 이어져 있어서 바꿀 수 없어요</p>
-      </FieldWrap>:
       <FieldWrap label="닉네임" required={!isAdmin} error={errors.nickname}>
         <div style={{display:"flex",gap:8}}>
           <input type="text" value={data.nickname} style={inputStyle} onChange={e=>{onChange("nickname",e.target.value);setNickChecked(false);setNickMsg("");}} placeholder="모임에서 쓸 이름"/>
           <button type="button" onClick={checkNick} style={btnSmall}>중복확인</button>
         </div>
         {nickMsg&&<p style={{fontSize:12,color:BLUE,fontWeight:600,margin:0}}>{nickMsg}</p>}
-      </FieldWrap>}
+        {editing&&<p style={{fontSize:12,color:"#A3AAC2",margin:0}}>바꾸면 지금까지의 투표·대진표 기록도 새 닉네임으로 바뀌어요</p>}
+      </FieldWrap>
       <FieldWrap label="생년월일" required={!isAdmin} error={errors.birthdate}>
         <input type="date" value={data.birthdate} style={inputStyle} onChange={e=>onChange("birthdate",e.target.value)} max={new Date().toISOString().split("T")[0]}/>
       </FieldWrap>
@@ -2110,7 +2110,27 @@ function StatsTab() {
   );
 }
 
-// ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 닉네임·이메일은 고정) ─────────
+// 닉네임 바꾸기: 새 닉네임 자리 차지 → 옛 닉네임 자리 비움 → 내 투표·대진표·내가 만든 모임의 이름을 새 닉네임으로
+// (투표 순서·이달 참석 횟수·대진표가 이름으로 이어져 있어서 같이 바꿔요. 규칙상 nicknames는 빈 자리이거나 내 자리만 쓸 수 있어요)
+async function changeNickname(uid,oldNick,newNick){
+  const owner=await once(FB.club.child("nicknames/"+nickKey(newNick)));
+  if(owner&&owner!==uid) throw {code:"nick-taken",message:"이미 쓰는 닉네임이에요. 다른 닉네임으로 바꿔 주세요"};
+  await FB.club.child("nicknames/"+nickKey(newNick)).set(uid);
+  const old=await once(FB.club.child("nicknames/"+nickKey(oldNick)));
+  if(old===uid) await FB.club.child("nicknames/"+nickKey(oldNick)).remove();
+  const up={};
+  MEETINGS.forEach(m=>{
+    const r=m.rec||{}, k="m"+m.id;
+    if(r.votes&&r.votes[uid]) up[`${k}/votes/${uid}/name`]=newNick;
+    Object.keys(r.votes||{}).forEach(vk=>{ const v=r.votes[vk]; if(v&&v.by===oldNick) up[`${k}/votes/${vk}/by`]=newNick; });
+    const pl=r.bracket&&r.bracket.players;
+    if(pl) Object.keys(pl).forEach(i=>{ if(pl[i]===oldNick) up[`${k}/bracket/players/${i}`]=newNick; });
+    if(r.info&&r.info.createdByUid===uid) up[`${k}/info/createdBy`]=newNick;
+  });
+  if(Object.keys(up).length) await FB.club.child("meetings").update(up).catch(()=>{});   // 준회원은 모임 쓰기 권한이 없지만 바꿀 기록도 없어요
+}
+
+// ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
 const PROFILE_FIELDS=["realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
 function ProfileEdit({account,onDone,onCancel}) {
   const pr=(account&&account.profile)||{};
@@ -2129,15 +2149,18 @@ function ProfileEdit({account,onDone,onCancel}) {
     patch.region=data.region==="타지역"?(data.regionCustom||"타지역"):data.region;
     patch.realName=(data.realName||"").trim();
     patch.updatedAt=Date.now();
+    const oldNick=pr.nickname||ME, newNick=(data.nickname||"").trim()||oldNick;
+    if(newNick!==oldNick) patch.nickname=newNick;
     setSaving(true); setErr("");
     const uid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
-    (uid?FB.club.child("members/"+uid).update(JSON.parse(JSON.stringify(patch))):Promise.resolve())
-      .then(()=>onDone({...pr,...patch})).catch(e=>{setSaving(false);setErr(authMsg(e));});
+    (uid?(newNick!==oldNick?changeNickname(uid,oldNick,newNick):Promise.resolve())
+        .then(()=>FB.club.child("members/"+uid).update(JSON.parse(JSON.stringify(patch)))):Promise.resolve())
+      .then(()=>onDone({...pr,...patch})).catch(e=>{setSaving(false);setErr(e&&e.code==="nick-taken"?e.message:authMsg(e));});
   };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <p style={{margin:0,fontSize:13,color:"#6B7493"}}>{step===2?"1/2 · 기본 정보":"2/2 · 테니스 정보"}</p>
-      {step===2?<Step2 data={data} onChange={onChange} onNext={()=>setStep(3)} onBack={onCancel} editing/>
+      {step===2?<Step2 data={data} onChange={onChange} onNext={()=>setStep(3)} onBack={onCancel} editing origNick={pr.nickname||ME}/>
         :<Step3 data={data} onChange={onChange} onSubmit={save} onBack={()=>setStep(2)} submitLabel={saving?"저장 중…":"저장"}/>}
       {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
     </div>
