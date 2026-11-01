@@ -101,7 +101,7 @@ function votesFromRec(rec){
     const v=rec.votes[key];
     if(!v||v.status!=="attend"||!v.at) return;
     if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
-    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||""});
+    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:v.by||""});
     (v.guests||[]).forEach(g=>g&&g.name&&out.push({key,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
   });
   return out;
@@ -1754,7 +1754,7 @@ function MeetingBracket({meeting,participants,store}) {
 
 // ─── 예약 상세 ────────────────────────────────────────────────────────────────
 // 참석자·대기자 한 줄: 순서, 이름, 투표 시각, 우선순위 표시
-function VoteRow({v,idx,wait}) {
+function VoteRow({v,idx,wait,onRemove}) {
   const tag=v.isGuest?{t:`게스트 · ${v.guestOf} 초대`,bg:"#FFF4E5",c:"#C2610C"}
     :v.prio&&v.count>0?{t:`이달 ${v.count}회 참석`,bg:"#EEF1FA",c:"#6B7493"}:null;
   return (
@@ -1768,15 +1768,54 @@ function VoteRow({v,idx,wait}) {
           {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:tag.bg,color:tag.c}}>{tag.t}</span>}
           {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
           {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
+          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF9C3",color:"#A16207"}}>관리자 등록</span>}
           {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
-        <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} 투표</span>
+        <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} {v.by&&!v.isGuest?`${v.by} 님이 등록`:"투표"}</span>
       </div>
+      {onRemove&&<button type="button" aria-label={`${v.name} 참석 빼기`} onClick={onRemove} style={{background:"none",border:"1px solid #FBD5D5",borderRadius:999,color:"#ef4444",fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>빼기</button>}
     </div>
   );
 }
 
-function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) {
+// 관리자가 회원 대신 참석 처리: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
+// 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산되고, by에 넣은 관리자 닉네임이 남아요.
+function AdminAttend({meeting}){
+  const data=useClubMembers();
+  const [q,setQ]=useState("");
+  const [show,setShow]=useState(false);
+  const votes=(meeting.rec&&meeting.rec.votes)||{};
+  const going=k=>!!(votes[k]&&votes[k].status==="attend"&&votes[k].at);
+  const add=m=>saveMeetingPath(`m${meeting.id}/votes/${m.uid}`,{name:m.nickname,ntrp:m.ntrp||"",status:"attend",at:nowAt(),guests:[],arrive:null,leave:null,by:ME})
+    .catch(e=>alert(authMsg(e)));
+  const k=q.trim().toLowerCase();
+  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(!k||[m.nickname,m.ntrp,m.region].some(v=>String(v||"").toLowerCase().includes(k))))
+    .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko")):[];
+  return(
+    <Card>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:15,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6}}><Ic n="crown" s={15} c="#A16207"/>회원 대신 참석</span>
+        <button type="button" onClick={()=>setShow(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:999,color:BLUE,fontSize:12,fontWeight:600,padding:"5px 12px",cursor:"pointer"}}>{show?"닫기":"+ 회원 추가"}</button>
+      </div>
+      <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>관리자만 보여요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '관리자 등록'으로 표시돼요. 빼려면 명단에서 빼기를 눌러요.</p>
+      {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+        <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임으로 찾기" style={inputStyle}/>
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
+          {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
+          {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"모든 회원이 이미 참석으로 들어가 있어요"}</p>}
+          {list.map(m=>(
+            <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F5F7FE"}}>
+              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{votes[m.uid]&&votes[m.uid].status==="absent"&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
+              <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px"}}>참석</button>
+            </div>
+          ))}
+        </div>
+      </div>}
+    </Card>
+  );
+}
+
+function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDeleted}) {
   const [view,setView]=useState(initialView);
   const store=useMeetingRecord(meeting);
   const [guestInput,setGuestInput]=useState("");
@@ -1798,6 +1837,9 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
   const stopSeries=()=>{ if(!window.confirm("이 반복 모임을 멈출까요? 이미 만들어진 모임은 그대로 남아요.")) return;
     saveMeetingPath(`series/s${meeting.seriesId}/active`,false).catch(e=>alert(authMsg(e))); };
   const myCount=counts[ME]||0;
+  const votes0=(meeting.rec&&meeting.rec.votes)||{};
+  const kick=isAdmin?v=>()=>{ if(!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${(votes0[v.key]&&(votes0[v.key].guests||[]).length)?" 이 회원이 초대한 게스트도 함께 빠져요.":""}`)) return;
+    saveMeetingPath(`m${meeting.id}/votes/${v.key}`,null).catch(e=>alert(authMsg(e))); }:null;
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
     ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
@@ -1903,7 +1945,7 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
           ))}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1}/>)}
+          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} onRemove={kick&&!v.isGuest?kick(v):null}/>)}
           {confirmed.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"8px 0"}}>아직 참석 투표가 없어요</p>}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>{prio?"정기 모임 참석 횟수는 달마다 새로 세요. 투표를 빨리 해도 이달 더 많이 참석했으면 덜 참석한 회원 뒤로 가요.":"번개 모임은 투표한 순서대로 확정돼요."}</p>
@@ -1912,11 +1954,12 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
         <Card>
           <SectionTitle>예약 대기 ({waitlist.length}명)</SectionTitle>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait/>)}
+            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={kick&&!v.isGuest?kick(v):null}/>)}
           </div>
           <p style={{margin:"10px 0 0",fontSize:12,color:"#A3AAC2"}}>자리가 나면 대기 순서대로 참석 확정돼요.</p>
         </Card>
       )}
+      {isAdmin&&<AdminAttend meeting={meeting}/>}
       {canManage&&(
         <div style={{display:"flex",gap:8}}>
           <button type="button" onClick={onEdit} style={{...btnSecondary,flex:1}}>모임 수정</button>
@@ -1931,12 +1974,12 @@ function MeetingDetail({meeting,initialView="info",canManage,onEdit,onDeleted}) 
 }
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
-function BookingTab({open,onOpen,ready,canManage,onEdit,onDeleted,onCreate}) {
+function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate}) {
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"regular";}catch(e){return "regular";}});
   const pickKind=k=>{setKind(k);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
   const setSelId=id=>onOpen(id,"info");
   const sel=open&&MEETINGS.find(m=>m.id===open.id);
-  if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
+  if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} isAdmin={isAdmin} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
   if(open) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>{ready?"모임을 찾을 수 없어요. 지워졌을 수 있어요.":"모임을 불러오는 중이에요…"}</p></Card>;
   const upAll=MEETINGS.filter(m=>m.status==="upcoming");
   const upcoming=upAll.filter(m=>m.kind===kind);
@@ -2472,11 +2515,9 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
 
 // 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
 // 본명·연락처·이메일·생년월일은 보여주지 않아요.
-function MembersTab(){
+// 회원 프로필·승인·관리자 목록 실시간 구독 (회원 탭, 관리자 대신 참석에서 같이 씀)
+function useClubMembers(){
   const [data,setData]=useState(null);
-  const [q,setQ]=useState("");
-  const [sort,setSort]=useState("ntrp");
-  const [open,setOpen]=useState(null);
   useEffect(()=>{
     if(!FB){ setData({members:{},approved:{},admins:{}}); return; }
     let st={members:null,approved:{},admins:{}};
@@ -2486,12 +2527,22 @@ function MembersTab(){
     });
     return ()=>subs.forEach(f=>f());
   },[]);
+  return data;
+}
+// 승인된(탈퇴 안 한) 회원만
+const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])=>({uid,...m}))
+  .filter(m=>m&&m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]));
+
+function MembersTab(){
+  const data=useClubMembers();
+  const [q,setQ]=useState("");
+  const [sort,setSort]=useState("ntrp");
+  const [open,setOpen]=useState(null);
   if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const ym=todayYmd().slice(0,7);
   const monthCount={}; rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===ym)).forEach(r=>{monthCount[r.name]=r.count;});
   const months=t=>{ if(!t) return -1; const s=new Date(t+"-01"), n=new Date(); return (n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth()); };
-  const list=Object.entries(data.members).map(([uid,m])=>({uid,...m}))
-    .filter(m=>m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]))
+  const list=activeMembers(data)
     .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp].some(v=>String(v||"").toLowerCase().includes(k)); })
     .sort(sort==="ntrp"?(a,b)=>NTRP_NUM(b.ntrp)-NTRP_NUM(a.ntrp)||a.nickname.localeCompare(b.nickname,"ko")
       :sort==="career"?(a,b)=>months(b.tennisStart)-months(a.tennisStart)||a.nickname.localeCompare(b.nickname,"ko")
@@ -2901,7 +2952,7 @@ export default function App() {
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
           notices={club.notices} isAdmin={!!(account&&account.admin)} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
-          canManage={canManage} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
+          canManage={canManage} isAdmin={!!(account&&account.admin)} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="members"&&<MembersTab/>}
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
