@@ -7442,6 +7442,250 @@ function MeetingForm({
   }, saving ? "저장 중…" : editing ? "수정 완료" : repeating ? "반복 모임 만들기" : "모임 만들기"))));
 }
 
+// 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
+// 본명·연락처·이메일·생년월일은 보여주지 않아요.
+function MembersTab() {
+  const [data, setData] = useState(null);
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState("ntrp");
+  const [open, setOpen] = useState(null);
+  useEffect(() => {
+    if (!FB) {
+      setData({
+        members: {},
+        approved: {},
+        admins: {}
+      });
+      return;
+    }
+    let st = {
+      members: null,
+      approved: {},
+      admins: {}
+    };
+    const subs = [["members", "members"], ["approved", "approved"], ["admins", "admins"]].map(([p, k]) => {
+      const r = FB.club.child(p),
+        h = s => {
+          st = {
+            ...st,
+            [k]: s.val() || {}
+          };
+          if (st.members) setData(st);
+        };
+      r.on("value", h, () => {
+        st = {
+          ...st,
+          [k]: {}
+        };
+        if (st.members) setData(st);
+      });
+      return () => r.off("value", h);
+    });
+    return () => subs.forEach(f => f());
+  }, []);
+  if (!data) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      color: "#6B7493"
+    }
+  }, "\uD68C\uC6D0 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC774\uC5D0\uC694\u2026"));
+  const ym = todayYmd().slice(0, 7);
+  const monthCount = {};
+  rankingOf(heldMeetings().filter(m => m.iso.slice(0, 7) === ym)).forEach(r => {
+    monthCount[r.name] = r.count;
+  });
+  const months = t => {
+    if (!t) return -1;
+    const s = new Date(t + "-01"),
+      n = new Date();
+    return (n.getFullYear() - s.getFullYear()) * 12 + (n.getMonth() - s.getMonth());
+  };
+  const list = Object.entries(data.members).map(([uid, m]) => ({
+    uid,
+    ...m
+  })).filter(m => m.nickname && !m.withdrawn && (data.approved[m.uid] || data.admins[m.uid])).filter(m => {
+    const k = q.trim().toLowerCase();
+    return !k || [m.nickname, m.region, m.court, m.ntrp].some(v => String(v || "").toLowerCase().includes(k));
+  }).sort(sort === "ntrp" ? (a, b) => NTRP_NUM(b.ntrp) - NTRP_NUM(a.ntrp) || a.nickname.localeCompare(b.nickname, "ko") : sort === "career" ? (a, b) => months(b.tennisStart) - months(a.tennisStart) || a.nickname.localeCompare(b.nickname, "ko") : (a, b) => a.nickname.localeCompare(b.nickname, "ko"));
+  const total = Object.values(data.members).filter(m => m && m.nickname && !m.withdrawn).length;
+  const chip = (n, t) => /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      fontSize: 12,
+      color: "#4A5578",
+      background: "#F5F7FE",
+      borderRadius: 999,
+      padding: "4px 10px"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: n,
+    s: 12,
+    c: "#8A93B2"
+  }), t);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      paddingBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement(Card, {
+    style: {
+      padding: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "search",
+    "aria-label": "\uD68C\uC6D0 \uAC80\uC0C9",
+    value: q,
+    onChange: e => setQ(e.target.value),
+    placeholder: "\uB2C9\uB124\uC784, \uB3D9\uB124, \uCF54\uD2B8\uB85C \uCC3E\uAE30",
+    style: inputStyle
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, [["ntrp", "실력순"], ["career", "구력순"], ["name", "이름순"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    onClick: () => setSort(k),
+    style: {
+      padding: "6px 14px",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: sort === k ? 600 : 400,
+      cursor: "pointer",
+      border: `1.5px solid ${sort === k ? BLUE : "#D6DEF7"}`,
+      background: sort === k ? BLUE : "#fff",
+      color: sort === k ? "#fff" : "#4A5578"
+    }
+  }, l)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: "auto",
+      alignSelf: "center",
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, list.length, "\uBA85"))), list.length === 0 && /*#__PURE__*/React.createElement(Empty, null, q ? "찾는 회원이 없어요." : total ? "아직 정회원이 없어요." : "아직 회원이 없어요."), list.map(m => {
+    const isMe = m.nickname === ME,
+      career = calcCareer(m.tennisStart),
+      hand = Array.isArray(m.hand) ? m.hand.join(", ") : m.hand,
+      cnt = monthCount[m.nickname] || 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.uid,
+      role: "button",
+      tabIndex: 0,
+      onClick: () => setOpen(open === m.uid ? null : m.uid),
+      style: {
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement(Card, {
+      style: {
+        padding: 16,
+        border: isMe ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 44,
+        height: 44,
+        borderRadius: "50%",
+        background: BLUE_LIGHT,
+        color: BLUE,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 17,
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, m.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: "#1B2559"
+      }
+    }, m.nickname), isMe && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        background: BLUE,
+        color: "#fff",
+        padding: "1px 6px",
+        borderRadius: 10
+      }
+    }, "\uB098"), data.admins[m.uid] && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "1px 7px",
+        borderRadius: 999,
+        background: BLUE_LIGHT,
+        color: BLUE
+      }
+    }, "\uC6B4\uC601\uC9C4")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "#A3AAC2"
+      }
+    }, cnt ? `이달 ${cnt}회 참석` : "이달 참석 기록 없음")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 10,
+        color: "#A3AAC2"
+      }
+    }, "NTRP"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 18,
+        fontWeight: 700,
+        color: BLUE
+      }
+    }, m.ntrp || "-"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 12
+      }
+    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, hand && chip("user", hand), m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus)))));
+  }), list.length > 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11,
+      color: "#A3AAC2",
+      textAlign: "center"
+    }
+  }, "\uCE74\uB4DC\uB97C \uB204\uB974\uBA74 \uC190\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uB3C4 \uBCF4\uC5EC\uC694. \uBCF8\uBA85\xB7\uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
 const TABS = [{
   key: "home",
@@ -7451,6 +7695,10 @@ const TABS = [{
   key: "booking",
   label: "예약",
   icon: "calendar"
+}, {
+  key: "members",
+  label: "회원",
+  icon: "users"
 }, {
   key: "stats",
   label: "통계",
@@ -8423,6 +8671,7 @@ function App() {
   const tabTitles = {
     home: "SSTC",
     booking: "정모 예약",
+    members: "회원",
     stats: "통계",
     admin: "관리"
   };
@@ -8725,7 +8974,7 @@ function App() {
     }),
     onDeleted: () => closeM(),
     onCreate: openCreate
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && account && account.admin && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "members" && /*#__PURE__*/React.createElement(MembersTab, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && account && account.admin && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",

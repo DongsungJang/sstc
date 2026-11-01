@@ -2441,8 +2441,85 @@ function MeetingForm({initial,onClose,onSaved}) {
   );
 }
 
+// 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
+// 본명·연락처·이메일·생년월일은 보여주지 않아요.
+function MembersTab(){
+  const [data,setData]=useState(null);
+  const [q,setQ]=useState("");
+  const [sort,setSort]=useState("ntrp");
+  const [open,setOpen]=useState(null);
+  useEffect(()=>{
+    if(!FB){ setData({members:{},approved:{},admins:{}}); return; }
+    let st={members:null,approved:{},admins:{}};
+    const subs=[["members","members"],["approved","approved"],["admins","admins"]].map(([p,k])=>{
+      const r=FB.club.child(p), h=s=>{ st={...st,[k]:s.val()||{}}; if(st.members) setData(st); };
+      r.on("value",h,()=>{ st={...st,[k]:{}}; if(st.members) setData(st); }); return ()=>r.off("value",h);
+    });
+    return ()=>subs.forEach(f=>f());
+  },[]);
+  if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
+  const ym=todayYmd().slice(0,7);
+  const monthCount={}; rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===ym)).forEach(r=>{monthCount[r.name]=r.count;});
+  const months=t=>{ if(!t) return -1; const s=new Date(t+"-01"), n=new Date(); return (n.getFullYear()-s.getFullYear())*12+(n.getMonth()-s.getMonth()); };
+  const list=Object.entries(data.members).map(([uid,m])=>({uid,...m}))
+    .filter(m=>m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]))
+    .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp].some(v=>String(v||"").toLowerCase().includes(k)); })
+    .sort(sort==="ntrp"?(a,b)=>NTRP_NUM(b.ntrp)-NTRP_NUM(a.ntrp)||a.nickname.localeCompare(b.nickname,"ko")
+      :sort==="career"?(a,b)=>months(b.tennisStart)-months(a.tennisStart)||a.nickname.localeCompare(b.nickname,"ko")
+      :(a,b)=>a.nickname.localeCompare(b.nickname,"ko"));
+  const total=Object.values(data.members).filter(m=>m&&m.nickname&&!m.withdrawn).length;
+  const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F5F7FE",borderRadius:999,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+      <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
+        <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 동네, 코트로 찾기" style={inputStyle}/>
+        <div style={{display:"flex",gap:6}}>
+          {[["ntrp","실력순"],["career","구력순"],["name","이름순"]].map(([k,l])=>(
+            <button key={k} type="button" onClick={()=>setSort(k)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
+          ))}
+          <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"#A3AAC2"}}>{list.length}명</span>
+        </div>
+      </Card>
+      {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
+      {list.map(m=>{
+        const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
+        return(
+          <div key={m.uid} role="button" tabIndex={0} onClick={()=>setOpen(open===m.uid?null:m.uid)} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:44,height:44,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:700,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>{m.nickname}</span>
+                  {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
+                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:999,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
+                </div>
+                <span style={{fontSize:12,color:"#A3AAC2"}}>{cnt?`이달 ${cnt}회 참석`:"이달 참석 기록 없음"}</span>
+              </div>
+              <div style={{textAlign:"center",flexShrink:0}}>
+                <p style={{margin:0,fontSize:10,color:"#A3AAC2"}}>NTRP</p>
+                <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE}}>{m.ntrp||"-"}</p>
+              </div>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
+              {chip("clock",career?`구력 ${career}`:"구력 미입력")}
+              {chip("pin",m.region||"동네 미입력")}
+              {open===m.uid&&<>
+                {hand&&chip("user",hand)}
+                {m.court&&chip("ball",m.court)}
+                {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
+                {m.lessonStatus&&chip("users",m.lessonStatus)}
+              </>}
+            </div>
+          </Card></div>
+        );
+      })}
+      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수도 보여요. 본명·연락처는 보이지 않아요.</p>}
+    </div>
+  );
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
-const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"stats",label:"통계",icon:"chart"}];
+const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"stats",label:"통계",icon:"chart"}];
 
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
@@ -2724,7 +2801,7 @@ export default function App() {
   }
 
   // ── 메인 앱 화면 ──
-  const tabTitles={home:"SSTC",booking:"정모 예약",stats:"통계",admin:"관리"};
+  const tabTitles={home:"SSTC",booking:"정모 예약",members:"회원",stats:"통계",admin:"관리"};
   const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
@@ -2793,6 +2870,7 @@ export default function App() {
           notices={club.notices} isAdmin={!!(account&&account.admin)} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
           canManage={canManage} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
+        {tab==="members"&&<MembersTab/>}
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
       </div>
