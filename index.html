@@ -1220,6 +1220,9 @@ function Step1({
 }
 
 // ─── 회원가입 STEP 2 ──────────────────────────────────────────────────────────
+// 닉네임은 완성형 한글만 (띄어쓰기·영문·숫자·기호·자음만 쓰기 불가). 예전 닉네임은 바꾸지 않으면 그대로 둬요
+const NICK_RE = /^[가-힣]{1,10}$/;
+const nickRuleMsg = v => NICK_RE.test(v.trim()) ? null : /[ㄱ-ㅎㅏ-ㅣ]/.test(v) ? "자음·모음만 따로 쓸 수 없어요" : v.trim().length > 10 ? "닉네임은 10자까지예요" : "닉네임은 한글로만 써 주세요 (띄어쓰기·영문·숫자 불가)";
 function Step2({
   data,
   onChange,
@@ -1256,6 +1259,16 @@ function Step2({
         nickname: undefined
       }));
       setNickMsg("지금 쓰는 닉네임이에요");
+      return;
+    }
+    const rule = nickRuleMsg(data.nickname);
+    if (rule) {
+      setNickChecked(false);
+      setNickMsg("");
+      setErrors(p => ({
+        ...p,
+        nickname: rule
+      }));
       return;
     }
     if (FB) {
@@ -1295,7 +1308,7 @@ function Step2({
     if (isAdmin) return true;
     const e = {};
     if (!(data.realName || "").trim()) e.realName = "본명을 입력해주세요";
-    if (!data.nickname || !data.nickname.trim()) e.nickname = "닉네임을 입력해주세요";else if (editing && data.nickname.trim() !== origNick && !nickChecked) e.nickname = "바꾼 닉네임은 중복확인을 해주세요";
+    if (!data.nickname || !data.nickname.trim()) e.nickname = "닉네임을 입력해주세요";else if (!(editing && data.nickname.trim() === origNick) && nickRuleMsg(data.nickname)) e.nickname = nickRuleMsg(data.nickname);else if (editing && data.nickname.trim() !== origNick && !nickChecked) e.nickname = "바꾼 닉네임은 중복확인을 해주세요";
     if (!data.birthdate) e.birthdate = "생년월일을 입력해주세요";
     if (!data.phone) e.phone = "연락처를 입력해주세요";else if (!/^010-\d{4}-\d{4}$/.test(data.phone)) e.phone = "010-0000-0000 형식으로 입력해주세요";
     if (!data.region) e.region = "지역을 선택해주세요";
@@ -1403,7 +1416,8 @@ function Step2({
       setNickChecked(false);
       setNickMsg("");
     },
-    placeholder: "\uBAA8\uC784\uC5D0\uC11C \uC4F8 \uC774\uB984"
+    placeholder: "\uD55C\uAE00\uB9CC (\uC608: \uB3D9\uD1A0\uB9AC)",
+    maxLength: 10
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: checkNick,
