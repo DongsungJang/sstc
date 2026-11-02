@@ -13,6 +13,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 const ICON_PATHS = {
   message:["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"], pencil:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"], send:["M22 2 11 13","M22 2l-7 20-4-9-9-4 20-7z"],
   chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
+  trash:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v6","M14 11v6"], refresh:["M3 12a9 9 0 0 1 15-6.7L21 8","M21 3v5h-5","M21 12a9 9 0 0 1-15 6.7L3 16","M3 21v-5h5"],
   swap:["M7 16V4","M3 8l4-4 4 4","M17 8v12","M21 16l-4 4-4-4"],
   grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
@@ -2156,17 +2157,23 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           </div>
         </Card>
       )}
-      {canManage&&!goneForm&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{display:"flex",gap:8}}>
-            <button type="button" onClick={onEdit} style={{...btnSecondary,flex:1}}>모임 수정</button>
-            {gone?<button type="button" onClick={undoGone} style={{...btnSecondary,flex:1}}>무산 되돌리기</button>
-              :<button type="button" onClick={()=>setGoneForm({reason:"우천",memo:""})} style={{...btnSecondary,flex:1,color:"#374151",borderColor:GONE.line}}>무산 처리</button>}
-          </div>
-          <button type="button" onClick={remove} style={{background:"none",border:"none",fontSize:12,color:"#ef4444",cursor:"pointer",padding:"4px 0"}}>모임 삭제 (기록까지 지움)</button>
-        </div>
-      )}
-      {canManage&&serActive&&<button type="button" onClick={stopSeries} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer",textDecoration:"underline",textUnderlineOffset:3}}>반복 멈추기</button>}
+      {canManage&&!goneForm&&(()=>{
+        // 관리 버튼: 모두 같은 크기·글씨. 위 줄 수정·삭제, 아래 줄 무산 처리(또는 되돌리기)·반복 멈추기
+        const mb={...btnSecondary,flex:1,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6};
+        const goneBtn=gone?<button type="button" onClick={undoGone} style={{...mb,color:"#374151",borderColor:GONE.line}}><Icon name="refresh" size={15} stroke={2}/>무산 되돌리기</button>
+          :<button type="button" onClick={()=>setGoneForm({reason:"우천",memo:""})} style={{...mb,color:"#374151",borderColor:GONE.line}}><Icon name="x" size={15} stroke={2.2}/>무산 처리</button>;
+        return(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",gap:8}}>
+              <button type="button" onClick={onEdit} style={mb}><Icon name="pencil" size={15} stroke={2}/>모임 수정</button>
+              <button type="button" onClick={remove} style={{...mb,color:"#ef4444",borderColor:"#FBD5D5"}}><Icon name="trash" size={15} stroke={2}/>모임 삭제</button>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              {goneBtn}
+              {serActive&&<button type="button" onClick={stopSeries} style={{...mb,color:"#6B7493"}}><Icon name="repeat" size={15} stroke={2}/>반복 멈추기</button>}
+            </div>
+          </div>);
+      })()}
       {meeting.createdBy&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>{meeting.createdBy} 님이 만든 모임</p>}
       </>)}
     </div>
