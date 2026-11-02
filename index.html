@@ -99,6 +99,9 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
+  message: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"],
+  pencil: ["M12 20h9", "M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"],
+  send: ["M22 2 11 13", "M22 2l-7 20-4-9-9-4 20-7z"],
   chevL: ["M15 18l-6-6 6-6"],
   chevR: ["M9 18l6-6-6-6"],
   grip: ["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"],
@@ -2000,7 +2003,9 @@ function HomeTab({
   // 홈에서 바로 참석·불참 투표
   const myVote = next && next.rec && next.rec.votes && next.rec.votes[myVoteKey()];
   const myStatus = myVote && myVote.status;
-  const vote = status => saveMeetingPath("m" + next.id + "/votes/" + myVoteKey(), voteValue(status, myVote)).catch(e => alert(authMsg(e)));
+  const vote = status => saveMeetingPath("m" + next.id + "/votes/" + myVoteKey(), voteValue(status, myVote)).then(() => {
+    if (status === "attend") notifyAttend(next, myStatus);
+  }).catch(e => alert(authMsg(e)));
   const fill = next ? Math.min(100, Math.round(next.attendees.length / Math.max(1, next.total) * 100)) : 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3378,7 +3383,21 @@ const NOTI_ICON = {
   meeting: "calendar",
   notice: "megaphone",
   approved: "checkCircle",
-  admin: "bell"
+  admin: "bell",
+  attend: "check",
+  mention: "message"
+};
+// 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
+const MEETING_NOTI = ["meeting", "admin", "attend", "mention"];
+// 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
+const notifyAttend = (m, prevStatus) => {
+  if (!m || prevStatus === "attend" || !m.createdByUid || m.createdByUid === myUid()) return;
+  postFeed({
+    type: "attend",
+    to: m.createdByUid,
+    meetingId: m.id,
+    text: `${ME} 님이 ${m.date} ${m.placeName || m.place} 모임에 참석을 눌렀어요`
+  });
 };
 const ago = t => {
   const m = Math.floor((Date.now() - t) / 60000);
@@ -3427,7 +3446,7 @@ function useClubFeed(uid) {
   }, [uid]);
   const items = [...toList(st.feed), ...toList(st.inbox, {
     mine: true
-  })].filter(n => n && n.at).sort((a, b) => b.at - a.at).slice(0, 50).map(n => ({
+  })].filter(n => n && n.at && (!n.to || n.to === uid)).sort((a, b) => b.at - a.at).slice(0, 50).map(n => ({
     ...n,
     unread: n.at > (+st.seen || 0) && n.byUid !== uid
   }));
@@ -5205,6 +5224,399 @@ function VoteRow({
   }, "\uBE7C\uAE30"));
 }
 
+// ─── 모임 댓글 ─────────────────────────────────────────────────────────────────
+// club/meetings/m<id>/comments/<cid> = {uid,name,text,at,editedAt,mentions:{uid:true}}
+// @닉네임으로 회원을 부르면 그 회원에게 알림(feed, to=uid). 내 댓글은 수정·삭제, 관리자는 삭제만.
+const MENTION_RE = /@([^\s@]{1,20})/g;
+function CommentText({
+  text,
+  names
+}) {
+  const parts = [];
+  let last = 0;
+  text.replace(MENTION_RE, (m, nick, i) => {
+    if (!names.has(nick)) return m;
+    parts.push(text.slice(last, i));
+    parts.push( /*#__PURE__*/React.createElement("b", {
+      key: i,
+      style: {
+        color: BLUE,
+        fontWeight: 700
+      }
+    }, "@", nick));
+    last = i + m.length;
+    return m;
+  });
+  parts.push(text.slice(last));
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    }
+  }, parts);
+}
+function MentionInput({
+  value,
+  onChange,
+  members,
+  placeholder,
+  autoFocus,
+  onSubmit
+}) {
+  const ref = useRef(null);
+  const [caret, setCaret] = useState(0);
+  const [want, setWant] = useState(null);
+  const before = value.slice(0, caret),
+    m = before.match(/@([^\s@]{0,20})$/);
+  const q = m ? m[1].toLowerCase() : null;
+  const hits = q === null ? [] : members.filter(x => x.nickname.toLowerCase().includes(q)).slice(0, 6);
+  const pick = nick => {
+    const start = caret - m[0].length;
+    const next = value.slice(0, start) + "@" + nick + " " + value.slice(caret);
+    onChange(next);
+    const pos = start + nick.length + 2;
+    setCaret(pos);
+    setWant(pos);
+  };
+  // 고른 닉네임 바로 뒤로 커서를 옮겨요 (값이 바뀐 화면이 그려진 다음에)
+  useEffect(() => {
+    if (want != null && ref.current) {
+      ref.current.focus();
+      ref.current.setSelectionRange(want, want);
+      setWant(null);
+    }
+  }, [want]);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      flex: 1,
+      minWidth: 0
+    }
+  }, hits.length > 0 && /*#__PURE__*/React.createElement("div", {
+    role: "listbox",
+    "aria-label": "\uC5B8\uAE09\uD560 \uD68C\uC6D0",
+    style: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: "100%",
+      marginBottom: 6,
+      background: "#fff",
+      borderRadius: 14,
+      boxShadow: "0 8px 24px rgba(16,24,64,0.18)",
+      padding: 4,
+      zIndex: 5,
+      maxHeight: 220,
+      overflowY: "auto"
+    }
+  }, hits.map(x => /*#__PURE__*/React.createElement("button", {
+    key: x.uid,
+    type: "button",
+    role: "option",
+    "aria-selected": "false",
+    onMouseDown: e => e.preventDefault(),
+    onClick: () => pick(x.nickname),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      width: "100%",
+      padding: "8px 10px",
+      border: "none",
+      background: "none",
+      borderRadius: 10,
+      cursor: "pointer",
+      textAlign: "left",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: BLUE_LIGHT,
+      color: BLUE,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, x.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#1B2559"
+    }
+  }, x.nickname), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, x.ntrp || "")))), /*#__PURE__*/React.createElement("textarea", {
+    ref: ref,
+    value: value,
+    autoFocus: autoFocus,
+    rows: Math.min(4, Math.max(1, value.split("\n").length)),
+    placeholder: placeholder,
+    onChange: e => {
+      onChange(e.target.value);
+      setCaret(e.target.selectionStart);
+    },
+    onSelect: e => setCaret(e.target.selectionStart),
+    onKeyUp: e => setCaret(e.target.selectionStart),
+    onKeyDown: e => {
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && hits.length === 0) {
+        e.preventDefault();
+        onSubmit && onSubmit();
+      }
+    },
+    style: {
+      ...inputStyle,
+      borderRadius: 18,
+      resize: "none",
+      lineHeight: 1.5,
+      padding: "10px 14px",
+      display: "block"
+    }
+  }));
+}
+function MeetingComments({
+  meeting,
+  isAdmin
+}) {
+  const data = useClubMembers();
+  const members = data ? activeMembers(data) : [];
+  const byNick = new Map(members.map(x => [x.nickname, x.uid]));
+  const names = new Set(members.map(x => x.nickname));
+  const [text, setText] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState(null); // {id,text}
+  const uid = myUid() || myVoteKey();
+  const all = toList(meeting.rec && meeting.rec.comments).filter(c => c && c.text).sort((a, b) => a.at - b.at);
+  const mentionsOf = t => {
+    const out = {};
+    String(t).replace(MENTION_RE, (m, nick) => {
+      const u = byNick.get(nick);
+      if (u) out[u] = true;
+      return m;
+    });
+    return out;
+  };
+  const notify = (t, prev) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => postFeed({
+    type: "mention",
+    to: u,
+    meetingId: meeting.id,
+    text: `${ME} 님이 ${meeting.date} ${meeting.placeName || meeting.place} 모임 댓글에서 회원님을 불렀어요: "${t.length > 40 ? t.slice(0, 40) + "…" : t}"`
+  }));
+  const add = () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    const mentions = mentionsOf(t);
+    saveMeetingPath(`m${meeting.id}/comments/${newId()}`, {
+      uid,
+      name: ME,
+      text: t,
+      at: Date.now(),
+      ...(Object.keys(mentions).length ? {
+        mentions
+      } : {})
+    }).then(() => {
+      setText("");
+      notify(t, null);
+    }).catch(e => alert(authMsg(e))).finally(() => setBusy(false));
+  };
+  const saveEdit = c => {
+    const t = edit.text.trim();
+    if (!t) return;
+    const mentions = mentionsOf(t);
+    saveMeetingPath(`m${meeting.id}/comments/${c.id}`, {
+      ...c,
+      id: null,
+      text: t,
+      editedAt: Date.now(),
+      mentions: Object.keys(mentions).length ? mentions : null
+    }).then(() => {
+      setEdit(null);
+      notify(t, c.mentions);
+    }).catch(e => alert(authMsg(e)));
+  };
+  const del = c => {
+    if (!window.confirm("이 댓글을 지울까요?")) return;
+    saveMeetingPath(`m${meeting.id}/comments/${c.id}`, null).catch(e => alert(authMsg(e)));
+  };
+  const small = {
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: 12,
+    color: "#8A93B2",
+    cursor: "pointer",
+    fontFamily: FONT
+  };
+  return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB313\uAE00 ", all.length > 0 ? all.length : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      marginBottom: all.length ? 14 : 6
+    }
+  }, all.length === 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uCCAB \uB313\uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694. @\uB85C \uD68C\uC6D0\uC744 \uBD80\uB974\uBA74 \uC54C\uB9BC\uC774 \uAC00\uC694."), all.map(c => {
+    const mine = c.uid === uid,
+      editing = edit && edit.id === c.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        background: mine ? GRAD : BLUE_LIGHT,
+        color: mine ? "#fff" : BLUE,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, (c.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#1B2559"
+      }
+    }, c.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#A3AAC2"
+      }
+    }, ago(c.at), c.editedAt ? " · 수정됨" : "")), editing ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        marginTop: 4
+      }
+    }, /*#__PURE__*/React.createElement(MentionInput, {
+      value: edit.text,
+      onChange: v => setEdit({
+        ...edit,
+        text: v
+      }),
+      members: members,
+      autoFocus: true,
+      onSubmit: () => saveEdit(c)
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 12,
+        justifyContent: "flex-end"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setEdit(null),
+      style: small
+    }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => saveEdit(c),
+      style: {
+        ...small,
+        color: BLUE,
+        fontWeight: 700
+      }
+    }, "\uC800\uC7A5"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "3px 0 0",
+        fontSize: 14,
+        color: "#2B3674",
+        lineHeight: 1.55
+      }
+    }, /*#__PURE__*/React.createElement(CommentText, {
+      text: c.text,
+      names: names
+    })), (mine || isAdmin) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 12,
+        marginTop: 4
+      }
+    }, mine && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setEdit({
+        id: c.id,
+        text: c.text
+      }),
+      style: small
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "pencil",
+      s: 11
+    }), " \uC218\uC815"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => del(c),
+      style: small
+    }, "\uC0AD\uC81C")))));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement(MentionInput, {
+    value: text,
+    onChange: setText,
+    members: members,
+    placeholder: "\uB313\uAE00 \uC4F0\uAE30 \xB7 @\uB2C9\uB124\uC784\uC73C\uB85C \uD68C\uC6D0 \uBD80\uB974\uAE30",
+    onSubmit: add
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "\uB313\uAE00 \uC62C\uB9AC\uAE30",
+    disabled: !text.trim() || busy,
+    onClick: add,
+    style: {
+      width: 42,
+      height: 42,
+      flexShrink: 0,
+      borderRadius: "50%",
+      border: "none",
+      background: text.trim() ? GRAD : "#E4E9F7",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: text.trim() ? "pointer" : "default"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "send",
+    size: 18,
+    stroke: 2
+  }))));
+}
+
 // 관리자가 회원 대신 참석 처리: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
 // 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산되고, by에 넣은 관리자 닉네임이 남아요.
 function AdminAttend({
@@ -5364,7 +5776,11 @@ function MeetingDetail({
   const total = confirmed.length;
   const fill = Math.round(total / Math.max(1, meeting.total) * 100),
     prio = meeting.kind !== "flash";
-  const setMyStatus = val => store.saveRsvp(voteValue(val, mine));
+  const setMyStatus = val => {
+    const prev = myStatus;
+    store.saveRsvp(voteValue(val, mine));
+    if (val === "attend") notifyAttend(meeting, prev);
+  };
   const addGuest = () => {
     const n = guestInput.trim();
     if (!n) return;
@@ -5994,7 +6410,10 @@ function MeetingDetail({
       fontSize: 12,
       color: "#A3AAC2"
     }
-  }, "\uC790\uB9AC\uAC00 \uB098\uBA74 \uB300\uAE30 \uC21C\uC11C\uB300\uB85C \uCC38\uC11D \uD655\uC815\uB3FC\uC694.")), isAdmin && /*#__PURE__*/React.createElement(AdminAttend, {
+  }, "\uC790\uB9AC\uAC00 \uB098\uBA74 \uB300\uAE30 \uC21C\uC11C\uB300\uB85C \uCC38\uC11D \uD655\uC815\uB3FC\uC694.")), /*#__PURE__*/React.createElement(MeetingComments, {
+    meeting: meeting,
+    isAdmin: isAdmin
+  }), isAdmin && /*#__PURE__*/React.createElement(AdminAttend, {
     meeting: meeting
   }), canManage && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6225,54 +6644,97 @@ function MiniCalendar({
     }
   }), l))), picked && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 8,
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: "1px solid #EEF1FA",
       display: "flex",
       flexDirection: "column",
-      gap: 6
+      gap: 8
     }
-  }, picked.map(m => /*#__PURE__*/React.createElement("button", {
-    key: m.id,
-    type: "button",
-    onClick: () => onOpen(m.id),
+  }, /*#__PURE__*/React.createElement("p", {
     style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "8px 10px",
-      borderRadius: 12,
-      border: "1px solid #E4E9F7",
-      background: "#F5F7FE",
-      cursor: "pointer",
-      textAlign: "left"
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#1B2559"
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 6,
-      height: 6,
-      borderRadius: 999,
-      background: KIND_DOT[m.kind] || BLUE,
-      flexShrink: 0
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: "#1B2559",
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, m.time), /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
-      minWidth: 0,
-      fontSize: 13,
-      color: "#4A5578",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }
-  }, m.place), /*#__PURE__*/React.createElement(KindBadge, {
-    m: m
-  })))));
+  }, fmtDate(pick), " \uBAA8\uC784 ", picked.length, "\uAC1C"), picked.map(m => {
+    const full = isFull(m),
+      isAtt = (m.attendees || []).some(a => a.isMe);
+    return /*#__PURE__*/React.createElement("button", {
+      key: m.id,
+      type: "button",
+      onClick: () => onOpen(m.id),
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: "12px 14px",
+        borderRadius: 16,
+        border: `1.5px solid ${full ? FULL.line : "#E4E9F7"}`,
+        background: full ? FULL.bg : "#fff",
+        cursor: "pointer",
+        textAlign: "left",
+        boxShadow: "0 2px 8px rgba(33,82,230,0.06)",
+        fontFamily: FONT
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        width: "100%"
+      }
+    }, /*#__PURE__*/React.createElement(KindBadge, {
+      m: m
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: "#1B2559",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, m.time), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "3px 10px",
+        borderRadius: 999,
+        background: full ? FULL.c : BLUE_LIGHT,
+        color: full ? "#fff" : BLUE
+      }
+    }, full ? "마감 " : "", m.attendees.length, "/", m.total, "\uBA85")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: "#4A5578",
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "pin",
+      s: 14
+    }), m.place), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        fontSize: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: isAtt ? BLUE : "#A3AAC2",
+        fontWeight: isAtt ? 700 : 400
+      }
+    }, isAtt ? "참석 예정이에요" : m.status === "past" ? "지난 모임" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: BLUE,
+        fontWeight: 600
+      }
+    }, "\uC790\uC138\uD788 \uBCF4\uAE30 \u2192")));
+  })));
 }
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
@@ -6288,9 +6750,9 @@ function BookingTab({
 }) {
   const [kind, setKind] = useState(() => {
     try {
-      return sessionStorage.getItem("sstc-booking-kind") || "regular";
+      return sessionStorage.getItem("sstc-booking-kind") || "flash";
     } catch (e) {
-      return "regular";
+      return "flash";
     }
   });
   const pickKind = k => {
@@ -6339,7 +6801,7 @@ function BookingTab({
       borderRadius: 999,
       padding: 4
     }
-  }, [["regular", "정기 모임", "calendar"], ["flash", "번개 모임", "zap"]].map(([k, l, ic]) => {
+  }, [["flash", "번개 모임", "zap"], ["regular", "정기 모임", "calendar"]].map(([k, l, ic]) => {
     const on = kind === k,
       n = upAll.filter(m => m.kind === k).length;
     return /*#__PURE__*/React.createElement("button", {
@@ -7396,7 +7858,7 @@ function NotiSheet({
       gap: 8
     }
   }, items.map(n => {
-    const go = n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin || n.type === "admin" && (n.meetingId || n.action);
+    const go = MEETING_NOTI.includes(n.type) && n.meetingId || n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin || n.type === "admin" && (n.meetingId || n.action);
     return /*#__PURE__*/React.createElement("button", {
       key: n.id,
       type: "button",
@@ -7664,7 +8126,8 @@ function MeetingForm({
     guestCap: String(initial.info.guestCap || 0),
     openAt: initial.info.openAt || "",
     repeat: "none",
-    applyFuture: false
+    applyFuture: false,
+    scope: "one"
   } : (() => {
     const date = nextSaturday();
     return {
@@ -7784,13 +8247,17 @@ function MeetingForm({
         createdAt: editing ? initial.info.createdAt || Date.now() : Date.now(),
         ...(editing ? {
           updatedAt: Date.now()
+        } : {}),
+        ...(editing && initial.info.seriesId ? {
+          onlyThis: f.scope === "one" ? true : null
         } : {})
       };
       job = saveMeetingPath("m" + id + "/info", JSON.parse(JSON.stringify(info))).then(() => {
         const sid = editing && initial.info.seriesId;
-        if (!(sid && f.applyFuture)) return;
+        if (!(sid && f.scope === "future")) return;
         // 이후 반복 모임에도 적용: 반복 설정과 이미 만들어진 다음 모임들의 시간·장소·정원·설명을 바꿔요
-        const later = Object.keys(RAW_MEETINGS).filter(k => /^m\d+$/.test(k) && RAW_MEETINGS[k] && RAW_MEETINGS[k].info && RAW_MEETINGS[k].info.seriesId === sid && RAW_MEETINGS[k].info.date > f.date);
+        // 이 날짜만 따로 고친 모임(onlyThis)은 건드리지 않아요
+        const later = Object.keys(RAW_MEETINGS).filter(k => /^m\d+$/.test(k) && RAW_MEETINGS[k] && RAW_MEETINGS[k].info && RAW_MEETINGS[k].info.seriesId === sid && RAW_MEETINGS[k].info.date > f.date && !RAW_MEETINGS[k].info.onlyThis);
         const {
           kind,
           ...tmpl
@@ -7896,7 +8363,22 @@ function MeetingForm({
       flexDirection: "column",
       gap: 16
     }
+  }, editing && initial.info.seriesId && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 18,
+      padding: 14,
+      border: `1.5px solid ${BLUE}`
+    }
   }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC5B4\uB514\uAE4C\uC9C0 \uACE0\uCE60\uAE4C\uC694?",
+    required: true
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uC218\uC815 \uBC94\uC704",
+    value: f.scope,
+    onChange: v => set("scope", v),
+    options: [["one", "이 날짜만"], ["future", "이후 반복 전체"]]
+  }), hint(f.scope === "one" ? `${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.` : `${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`))), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC885\uB958",
     required: true
   }, /*#__PURE__*/React.createElement(Pills, {
@@ -8150,20 +8632,7 @@ function MeetingForm({
       borderRadius: 18,
       resize: "none"
     }
-  })), editing && initial.info.seriesId && /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      fontSize: 13,
-      color: "#4A5578",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: !!f.applyFuture,
-    onChange: e => set("applyFuture", e.target.checked)
-  }), "\uC774\uD6C4 \uBC18\uBCF5 \uBAA8\uC784\uC5D0\uB3C4 \uC2DC\uAC04\xB7\uC7A5\uC18C\xB7\uC815\uC6D0\xB7\uC124\uBA85 \uC801\uC6A9"), err && /*#__PURE__*/React.createElement("p", {
+  })), err && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -9542,8 +10011,10 @@ function App() {
     let kind = typeof k === "string" ? k : null;
     if (!kind && tab === "booking") {
       try {
-        kind = sessionStorage.getItem("sstc-booking-kind");
-      } catch (e) {}
+        kind = sessionStorage.getItem("sstc-booking-kind") || "flash";
+      } catch (e) {
+        kind = "flash";
+      }
     }
     setForm2({
       initial: null,
@@ -9922,7 +10393,7 @@ function App() {
     onClose: () => setNoti(null),
     onPick: n => {
       setNoti(null);
-      if ((n.type === "meeting" || n.type === "admin") && n.meetingId) openM(+n.meetingId, "info", "home");else if (n.type === "admin" && n.action === "profile") setMyInfo("edit");else if (n.type === "notice") {
+      if (MEETING_NOTI.includes(n.type) && n.meetingId) openM(+n.meetingId, "info", "home");else if (n.type === "admin" && n.action === "profile") setMyInfo("edit");else if (n.type === "notice") {
         if (openMeeting) {
           try {
             if (location.hash) history.replaceState(null, "", location.pathname + location.search);
