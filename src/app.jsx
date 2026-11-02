@@ -2789,18 +2789,18 @@ function MascotSvg({size}) {
       <path d="M76 70.5 Q 80 69.5 80 66" stroke="#0B1E5B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
       </g>
         </svg>
-        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"36.6% 50%"}} viewBox={V}><g transform="rotate(-7 60 60)"><g transform="rotate(8 44 58)"><ellipse cx="44" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
-      <circle cx="48" cy="59.5" r="4.2" fill="#0B1E5B"/>
-      <circle cx="49.5" cy="58" r="1.3" fill="#FFFFFF"/>
-      <path d="M35 57 Q 44 48 53 57 Z" fill="#D7F24A"/>
-      <path d="M35 57 Q 44 54.5 53 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <path d="M35.5 57 Q 32.5 55.6 31 52.8" stroke="#0B1E5B" strokeWidth="2.6" fill="none" strokeLinecap="round"/></g></g></svg>
-        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"63% 46.7%"}} viewBox={V}><g transform="rotate(-7 60 60)"><g transform="rotate(-5 76 58)"><ellipse cx="76" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
-      <circle cx="80" cy="59.5" r="4.2" fill="#0B1E5B"/>
-      <circle cx="81.5" cy="58" r="1.3" fill="#FFFFFF"/>
-      <path d="M67 57 Q 76 48 85 57 Z" fill="#D7F24A"/>
-      <path d="M67 57 Q 76 54.5 85 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <path d="M84.5 57 Q 87.5 55.6 89 52.8" stroke="#0B1E5B" strokeWidth="2.6" fill="none" strokeLinecap="round"/></g></g></svg>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"36.6% 50%"}} viewBox={V}><g transform="rotate(-7 60 60)"><path d="M33.5 51.8 L53 58 Q 51 64.5 44 65 Q 37 64 33.5 51.8 Z" fill="#FFFFFF"/>
+      <circle cx="46" cy="60.2" r="4.8" fill="#0B1E5B"/>
+      <circle cx="47.6" cy="58.9" r="1.3" fill="#FFFFFF"/>
+      <path d="M30 49 L56 49 L56 58.6 L53 58 L33.5 51.8 L30 50.8 Z" fill="#D7F24A"/>
+      <path d="M35 55 Q 38 64.3 44.5 64.8 Q 50 64.5 52.5 59.5" stroke="#0B1E5B" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+      <path d="M32.6 51.5 L53.5 58" stroke="#0B1E5B" strokeWidth="3.4" fill="none" strokeLinecap="round"/></g></svg>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"63% 46.7%"}} viewBox={V}><g transform="rotate(-7 60 60)"><path d="M86 54.5 L67 58 Q 69 64.5 76 65 Q 83 64.5 86 54.5 Z" fill="#FFFFFF"/>
+      <circle cx="78" cy="60.2" r="4.8" fill="#0B1E5B"/>
+      <circle cx="79.6" cy="58.9" r="1.3" fill="#FFFFFF"/>
+      <path d="M89 48.5 L64 48.5 L64 58.6 L67 58 L86 54.5 L89 53.6 Z" fill="#D7F24A"/>
+      <path d="M84.5 57.5 Q 82 64.5 75.5 64.8 Q 70 64.5 67.5 59.5" stroke="#0B1E5B" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+      <path d="M87 54.2 L66.5 58" stroke="#0B1E5B" strokeWidth="3.4" fill="none" strokeLinecap="round"/></g></svg>
       </div>
       <svg aria-hidden="true" style={L} viewBox={V}>
       <ellipse cx="32" cy="71" rx="8" ry="4.5" fill="#FF8FB1" opacity="0.75"/>
