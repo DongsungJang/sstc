@@ -8751,7 +8751,9 @@ const activeMembers = data => Object.entries(data && data.members || {}).map(([u
   ...m
 })).filter(m => m && m.nickname && !m.withdrawn && (data.approved[m.uid] || data.admins[m.uid]));
 const HAND_ORDER = ["오른손 (양손 백핸드)", "오른손 (한손 백핸드)", "왼손 (양손 백핸드)", "왼손 (한손 백핸드)"];
-function MembersTab() {
+function MembersTab({
+  onOpenMeeting
+}) {
   const data = useClubMembers();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState(() => {
@@ -8785,6 +8787,10 @@ function MembersTab() {
     const k = q.trim().toLowerCase();
     return !k || [m.nickname, m.region, m.court, m.ntrp, handOf(m)].some(v => String(v || "").toLowerCase().includes(k));
   }).sort((a, b) => a.nickname.localeCompare(b.nickname, "ko"));
+  // 구력순: 테니스 시작 일자가 오래된 사람부터 (미입력은 맨 뒤)
+  if (sort === "career") list.sort((a, b) => !a.tennisStart ? b.tennisStart ? 1 : 0 : !b.tennisStart ? -1 : a.tennisStart < b.tennisStart ? -1 : a.tennisStart > b.tennisStart ? 1 : 0);
+  // 회원이 참석을 누른 다가오는 모임 (가까운 순 3개까지)
+  const upcomingOf = uid => MEETINGS.filter(mt => mt.status === "upcoming" && mt.rec && mt.rec.votes && mt.rec.votes[uid] && mt.rec.votes[uid].status === "attend").slice(0, 3);
   // 동네별·손별은 묶어서 보여 줘요 (묶음 안은 이름순, 미입력은 맨 뒤)
   const groupKey = sort === "region" ? m => m.region || "" : sort === "hand" ? handOf : null;
   const groups = groupKey ? (() => {
@@ -8846,15 +8852,16 @@ function MembersTab() {
       display: "flex",
       gap: 6
     }
-  }, [["name", "이름순"], ["region", "동네별"], ["hand", "손별"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["name", "이름순"], ["career", "구력순"], ["region", "동네별"], ["hand", "손별"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     type: "button",
     "aria-pressed": sort === k,
     onClick: () => pickSort(k),
     style: {
-      padding: "6px 14px",
+      padding: "6px 12px",
       borderRadius: 999,
       fontSize: 13,
+      whiteSpace: "nowrap",
       fontWeight: sort === k ? 600 : 400,
       cursor: "pointer",
       border: `1.5px solid ${sort === k ? BLUE : "#D6DEF7"}`,
@@ -8993,7 +9000,79 @@ function MembersTab() {
         gap: 6,
         marginTop: 12
       }
-    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), hand && (sort === "hand" || open === m.uid) && chip("user", hand), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus)))));
+    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), hand && (sort === "hand" || open === m.uid) && chip("user", hand), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus))), open === m.uid && (() => {
+      const up = upcomingOf(m.uid);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: "1px solid #EEF1FA"
+        }
+      }, /*#__PURE__*/React.createElement("p", {
+        style: {
+          margin: "0 0 6px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#8A93B2"
+        }
+      }, "\uCC38\uAC00 \uC608\uC815 \uBAA8\uC784"), up.length === 0 ? /*#__PURE__*/React.createElement("p", {
+        style: {
+          margin: 0,
+          fontSize: 12,
+          color: "#A3AAC2"
+        }
+      }, "\uCC38\uC11D\uD558\uAE30\uB85C \uD55C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 4
+        }
+      }, up.map(mt => /*#__PURE__*/React.createElement("button", {
+        key: mt.id,
+        type: "button",
+        onClick: e => {
+          e.stopPropagation();
+          onOpenMeeting && onOpenMeeting(mt.id);
+        },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          width: "100%",
+          textAlign: "left",
+          padding: "6px 10px",
+          background: BLUE_LIGHT,
+          border: "none",
+          borderRadius: 10,
+          cursor: "pointer",
+          fontFamily: FONT
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: BLUE,
+          minWidth: 38
+        }
+      }, dDay(mt.iso)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#1B2559",
+          whiteSpace: "nowrap"
+        }
+      }, mt.date.slice(5)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          minWidth: 0,
+          fontSize: 12,
+          color: "#6B7493",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, mt.info && mt.info.start || "", " ", mt.placeName || mt.place)))));
+    })()));
   }))), list.length > 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
@@ -9001,7 +9080,7 @@ function MembersTab() {
       color: "#A3AAC2",
       textAlign: "center"
     }
-  }, "\uCE74\uB4DC\uB97C \uB204\uB974\uBA74 \uC190\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uB3C4 \uBCF4\uC5EC\uC694. \uBCF8\uBA85\xB7\uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
+  }, "\uCE74\uB4DC\uB97C \uB204\uB974\uBA74 \uC190\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uC640 \uCC38\uAC00 \uC608\uC815 \uBAA8\uC784\uB3C4 \uBCF4\uC5EC\uC694. \uBCF8\uBA85\xB7\uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
 }
 
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
@@ -9668,7 +9747,7 @@ function App() {
   };
   const afterClose = m => {
     setOpenMeeting(null);
-    if (m && m.from === "home") setTab("home");
+    if (m && (m.from === "home" || m.from === "members")) setTab(m.from);
   };
   const closeM = () => {
     let viaHistory = false;
@@ -10146,7 +10225,7 @@ function App() {
     name: "back",
     size: 20,
     stroke: 2.4
-  }), openMeeting.from === "home" ? "홈" : "목록") : /*#__PURE__*/React.createElement("span", {
+  }), openMeeting.from === "home" ? "홈" : openMeeting.from === "members" ? "회원" : "목록") : /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
       fontWeight: 600,
@@ -10393,7 +10472,9 @@ function App() {
     }),
     onDeleted: () => closeM(),
     onCreate: openCreate
-  }), tab === "members" && /*#__PURE__*/React.createElement(MembersTab, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "members" && /*#__PURE__*/React.createElement(MembersTab, {
+    onOpenMeeting: id => openM(id, "info", "members")
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",
