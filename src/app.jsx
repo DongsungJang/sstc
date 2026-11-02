@@ -632,9 +632,7 @@ function Empty({children,action,onAction}) {
   );
 }
 function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice}) {
-  const lastMeeting=myHeld()[0]||null;
-  const lastRec=lastMeeting&&lastMeeting.rec;
-  const mine=lastRec&&lastRec.bracket?myRecord(lastRec.bracket,lastRec.scores||{},ME):null;
+  const [goingN,setGoingN]=useState(3);
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
   const [exp,setExp]=useState(focusId);
   const noticeRef=useRef(null);
@@ -642,6 +640,13 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const delNotice=n=>{ if(window.confirm(`"${n.title}" 공지를 지울까요?`)) FB.club.child("notices/"+n.id).remove().catch(e=>alert(authMsg(e))); };
   const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
   const next=upcoming[0], nextNext=upcoming[1];
+  // 내가 참석 누른 다가오는 모임 (가까운 날짜·시간 순)
+  const going=upcoming.map(m=>{
+    const v=m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
+    if(!v||v.status!=="attend") return null;
+    const ci=(m.attendees||[]).findIndex(a=>a.isMe), wi=(m.waitlist||[]).findIndex(a=>a.isMe);
+    return {m,ok:ci>=0||wi<0,label:ci>=0||wi<0?"참석 확정":`대기 ${wi+1}번`};
+  }).filter(Boolean);
   const monthRank=rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
@@ -684,15 +689,25 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         )}
       </Card>
       <Card>
-        <SectionTitle action={lastMeeting?(mine?"대진·스코어":"결과 기록하기"):null} onAction={()=>lastMeeting&&onOpenMeeting(lastMeeting.id,"bracket")}>마지막 참석 모임</SectionTitle>
-        {!lastMeeting?<Empty>아직 참석한 모임이 없어요.</Empty>:(
-        <div style={{display:"flex",gap:8}}>
-          {[{label:"날짜",value:lastMeeting.date},{label:"장소",value:lastMeeting.place},{label:"내 결과",value:mine?mine.result:"기록 없음"},{label:"자주 친 파트너",value:mine?mine.partner:"-"}].map(item=>(
-            <div key={item.label} style={{flex:1,textAlign:"center",padding:"10px 4px",background:BLUE_LIGHT,borderRadius:10}}>
-              <p style={{margin:"0 0 4px",fontSize:10,color:"#6B7493"}}>{item.label}</p>
-              <p style={{margin:0,fontSize:11,fontWeight:700,color:"#1B2559",wordBreak:"keep-all"}}>{item.value}</p>
+        <SectionTitle>내가 참석할 모임{going.length>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{going.length}</span>}</SectionTitle>
+        {going.length===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {going.slice(0,goingN).map(({m,ok,label})=>(
+            <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
+              <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
+                <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
+                <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.place}</p>
+              </div>
+              <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,whiteSpace:"nowrap",background:ok?"#fff":"#FFF4E5",color:ok?BLUE:"#C2610C"}}>{label}</span>
             </div>
           ))}
+          {going.length>3&&(
+            <button type="button" onClick={()=>setGoingN(goingN>=going.length?3:goingN+3)} style={{marginTop:2,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              {goingN>=going.length?"접기":`더보기 (${Math.min(3,going.length-goingN)}개 더)`}
+            </button>
+          )}
         </div>)}
       </Card>
       <Card>
@@ -1095,22 +1110,6 @@ function standings(bracket, scores) {
     else { add(g.a,g.score.a,g.score.b,g.o==="a"?"w":"l"); add(g.b,g.score.b,g.score.a,g.o==="b"?"w":"l"); }
   });
   return Object.values(t).sort((x,y)=>y.w-x.w||(y.pf-y.pa)-(x.pf-x.pa)||x.l-y.l||x.rank-y.rank);
-}
-
-// 한 사람의 결과 요약 (홈 '마지막 참석 모임'에 사용)
-function myRecord(bracket, scores, me) {
-  if (!bracket||!bracket.players.includes(me)) return null;
-  let w=0,d=0,l=0; const partners={};
-  flatGames(bracket,scores).forEach(g=>{
-    const side=g.a.includes(me)?"a":g.b.includes(me)?"b":null;
-    if (!side) return;
-    const mate=g[side].find(n=>n!==me); partners[mate]=(partners[mate]||0)+1;
-    if (!g.o) return;
-    if (g.o==="draw") d++; else if (g.o===side) w++; else l++;
-  });
-  if (!w&&!d&&!l) return null;
-  const partner=Object.keys(partners).sort((x,y)=>partners[y]-partners[x])[0]||"-";
-  return {result:`${w}승 ${l}패${d?` ${d}무`:""}`,partner};
 }
 
 // ─── 저장소 ──────────────────────────────────────────────────────────────────
