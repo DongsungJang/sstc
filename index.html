@@ -316,6 +316,8 @@ const courtLabel = v => {
   v = String(v || "").trim();
   return /^[\d\s,·~\-]+$/.test(v) ? `${v.replace(/\s+/g, "")}번 코트` : v;
 };
+// 코트 바닥 종류 (선택): 장소 뒤에 "· 하드"처럼 붙어서 보여요
+const SURFACES = ["하드", "인조잔디", "카페트", "클레이"];
 const mapUrl = addr => "https://map.kakao.com/?q=" + encodeURIComponent(addr);
 const FLASH_TYPE = {
   game: "게임",
@@ -337,7 +339,8 @@ function toMeeting(id, rec, series) {
     date: fmtDate(info.date),
     iso: info.date,
     time: `${info.start} ~ ${info.end}`,
-    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : ""),
+    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : "") + (info.surface ? ` · ${info.surface}` : ""),
+    surface: info.surface || "",
     placeName: info.place,
     courtNo: info.courtNo || "",
     address: info.address || "",
@@ -8284,6 +8287,7 @@ function occInfo(sid, ser, i) {
     end: ser.end,
     place: ser.place,
     courtNo: ser.courtNo || "",
+    surface: ser.surface || "",
     address: ser.address || "",
     capacity: +ser.capacity,
     guestCap: +ser.guestCap || 0,
@@ -8520,6 +8524,7 @@ function MeetingForm({
       end: f.end,
       place: f.place.trim(),
       courtNo: String(f.courtNo || "").trim(),
+      surface: f.surface || "",
       address: (f.address || "").trim(),
       capacity: cap,
       guestCap: gcap,
@@ -8778,6 +8783,35 @@ function MeetingForm({
     placeholder: "\uC608: 3 \uB610\uB294 5, 6",
     style: inputStyle
   }), String(f.courtNo || "").trim() && hint(`모임 화면에는 "${courtLabel(f.courtNo)}"로 보여요`)), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uCF54\uD2B8 \uC885\uB958"
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "\uCF54\uD2B8 \uC885\uB958",
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, SURFACES.map(v => {
+    const on = f.surface === v;
+    return /*#__PURE__*/React.createElement("button", {
+      key: v,
+      type: "button",
+      role: "radio",
+      "aria-checked": on,
+      onClick: () => set("surface", on ? "" : v),
+      style: {
+        padding: "8px 14px",
+        borderRadius: 999,
+        fontSize: 13,
+        fontWeight: on ? 700 : 500,
+        cursor: "pointer",
+        border: `1.5px solid ${on ? BLUE : "#D6DEF7"}`,
+        background: on ? BLUE : "#fff",
+        color: on ? "#fff" : "#4A5578"
+      }
+    }, v);
+  })), hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C"
   }, /*#__PURE__*/React.createElement("div", {
     style: row

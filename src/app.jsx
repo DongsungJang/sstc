@@ -121,6 +121,8 @@ const goneLabel=m=>m&&m.cancelled?`무산 · ${m.cancelled.reason||"기타"}`:""
 const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
 // 코트 번호: 숫자만 쓰면 "3번 코트", 그 외엔 쓴 그대로
 const courtLabel=v=>{ v=String(v||"").trim(); return /^[\d\s,·~\-]+$/.test(v)?`${v.replace(/\s+/g,"")}번 코트`:v; };
+// 코트 바닥 종류 (선택): 장소 뒤에 "· 하드"처럼 붙어서 보여요
+const SURFACES=["하드","인조잔디","카페트","클레이"];
 const mapUrl=addr=>"https://map.kakao.com/?q="+encodeURIComponent(addr);
 const FLASH_TYPE={game:"게임",training:"훈련"};
 // 코트비 1인당: 참석 확정 인원(게스트 포함)으로 나누고 100원 단위 올림
@@ -130,7 +132,7 @@ const kindOf=info=>info&&info.kind==="flash"?"flash":"regular";
 function toMeeting(id,rec,series){
   const info=rec.info, today=todayYmd(), capacity=+info.capacity||0, guestCap=+info.guestCap||0;
   return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`,
-    place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:""), placeName:info.place, courtNo:info.courtNo||"", address:info.address||"",
+    place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:"")+(info.surface?` · ${info.surface}`:""), surface:info.surface||"", placeName:info.place, courtNo:info.courtNo||"", address:info.address||"",
     kind:kindOf(info), flashType:info.kind==="flash"?(info.flashType||"game"):"", courtFee:+info.courtFee||0, capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
     status:(info.date<today||(info.date===today&&info.end&&nowAt().slice(11,16)>=info.end))?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
@@ -2588,7 +2590,7 @@ const SERIES_AHEAD=3;   // 반복 모임은 앞으로 3회분을 미리 만들�
 const occDate=(ser,i)=>addDays(ser.startDate,7*(+ser.every||1)*i);
 function occInfo(sid,ser,i){
   const date=occDate(ser,i);
-  return {kind:"regular",date,start:ser.start,end:ser.end,place:ser.place,courtNo:ser.courtNo||"",address:ser.address||"",capacity:+ser.capacity,guestCap:+ser.guestCap||0,desc:ser.desc||"",
+  return {kind:"regular",date,start:ser.start,end:ser.end,place:ser.place,courtNo:ser.courtNo||"",surface:ser.surface||"",address:ser.address||"",capacity:+ser.capacity,guestCap:+ser.guestCap||0,desc:ser.desc||"",
     openAt:openFor(date,ser.openRule),seriesId:sid,createdBy:ser.createdBy||"",createdByUid:ser.createdByUid||"",createdAt:Date.now()};
 }
 // 다가오는 반복 모임이 SERIES_AHEAD개가 되도록 빠진 것만 만들어요. 지운 날짜(skip)는 다시 안 만들어요.
@@ -2673,7 +2675,7 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
     else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),address:(f.address||"").trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),capacity:cap,guestCap:gcap,desc:(f.desc||"").trim()};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -2750,6 +2752,12 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
           <FieldWrap label="코트 번호" required error={errors.courtNo}>
             <input type="text" aria-label="코트 번호" value={f.courtNo||""} onChange={e=>set("courtNo",e.target.value)} placeholder="예: 3 또는 5, 6" style={inputStyle}/>
             {String(f.courtNo||"").trim()&&hint(`모임 화면에는 "${courtLabel(f.courtNo)}"로 보여요`)}
+          </FieldWrap>
+          <FieldWrap label="코트 종류">
+            <div role="radiogroup" aria-label="코트 종류" style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {SURFACES.map(v=>{const on=f.surface===v;return <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>set("surface",on?"":v)} style={{padding:"8px 14px",borderRadius:999,fontSize:13,fontWeight:on?700:500,cursor:"pointer",border:`1.5px solid ${on?BLUE:"#D6DEF7"}`,background:on?BLUE:"#fff",color:on?"#fff":"#4A5578"}}>{v}</button>;})}
+            </div>
+            {hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")}
           </FieldWrap>
           <FieldWrap label="테니스장 주소">
             <div style={row}>
