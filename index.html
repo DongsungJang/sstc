@@ -1974,9 +1974,7 @@ function HomeTab({
   onWriteNotice,
   focusNotice
 }) {
-  const lastMeeting = myHeld()[0] || null;
-  const lastRec = lastMeeting && lastMeeting.rec;
-  const mine = lastRec && lastRec.bracket ? myRecord(lastRec.bracket, lastRec.scores || {}, ME) : null;
+  const [goingN, setGoingN] = useState(3);
   const focusId = focusNotice ? focusNotice.split("#")[0] : null;
   const [exp, setExp] = useState(focusId);
   const noticeRef = useRef(null);
@@ -1999,6 +1997,18 @@ function HomeTab({
   const upcoming = MEETINGS.filter(m => m.status === "upcoming");
   const next = upcoming[0],
     nextNext = upcoming[1];
+  // 내가 참석 누른 다가오는 모임 (가까운 날짜·시간 순)
+  const going = upcoming.map(m => {
+    const v = m.rec && m.rec.votes && m.rec.votes[myVoteKey()];
+    if (!v || v.status !== "attend") return null;
+    const ci = (m.attendees || []).findIndex(a => a.isMe),
+      wi = (m.waitlist || []).findIndex(a => a.isMe);
+    return {
+      m,
+      ok: ci >= 0 || wi < 0,
+      label: ci >= 0 || wi < 0 ? "참석 확정" : `대기 ${wi + 1}번`
+    };
+  }).filter(Boolean);
   const monthRank = rankingOf(heldMeetings().filter(m => m.iso.slice(0, 7) === todayYmd().slice(0, 7)));
   // 홈에서 바로 참석·불참 투표
   const myVote = next && next.rec && next.rec.votes && next.rec.votes[myVoteKey()];
@@ -2189,50 +2199,116 @@ function HomeTab({
       color: isFull(nextNext) ? FULL.c : "#A3AAC2",
       fontWeight: isFull(nextNext) ? 700 : 400
     }
-  }, isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명` : `${nextNext.attendees.length}명 참석예정`))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
-    action: lastMeeting ? mine ? "대진·스코어" : "결과 기록하기" : null,
-    onAction: () => lastMeeting && onOpenMeeting(lastMeeting.id, "bracket")
-  }, "\uB9C8\uC9C0\uB9C9 \uCC38\uC11D \uBAA8\uC784"), !lastMeeting ? /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uCC38\uC11D\uD55C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명` : `${nextNext.attendees.length}명 참석예정`))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB0B4\uAC00 \uCC38\uC11D\uD560 \uBAA8\uC784", going.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: BLUE,
+      marginLeft: 6
+    }
+  }, going.length)), going.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    action: "\uBAA8\uC784 \uB458\uB7EC\uBCF4\uAE30",
+    onAction: onGoBooking
+  }, "\uCC38\uC11D\uD558\uAE30\uB85C \uD55C \uBAA8\uC784\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
+      flexDirection: "column",
       gap: 8
     }
-  }, [{
-    label: "날짜",
-    value: lastMeeting.date
-  }, {
-    label: "장소",
-    value: lastMeeting.place
-  }, {
-    label: "내 결과",
-    value: mine ? mine.result : "기록 없음"
-  }, {
-    label: "자주 친 파트너",
-    value: mine ? mine.partner : "-"
-  }].map(item => /*#__PURE__*/React.createElement("div", {
-    key: item.label,
+  }, going.slice(0, goingN).map(({
+    m,
+    ok,
+    label
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    role: "button",
+    tabIndex: 0,
+    onClick: () => onOpenMeeting(m.id, "info"),
+    onKeyDown: e => {
+      if (e.key === "Enter") onOpenMeeting(m.id, "info");
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      background: BLUE_LIGHT,
+      borderRadius: 14,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      minWidth: 46,
+      textAlign: "center",
+      background: "#fff",
+      color: BLUE,
+      fontSize: 12,
+      fontWeight: 700,
+      padding: "6px 4px",
+      borderRadius: 10
+    }
+  }, dDay(m.iso)), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
-      textAlign: "center",
-      padding: "10px 4px",
-      background: BLUE_LIGHT,
-      borderRadius: 10
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 4px",
-      fontSize: 10,
-      color: "#6B7493"
-    }
-  }, item.label), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 11,
+      margin: "0 0 3px",
+      fontSize: 14,
       fontWeight: 700,
       color: "#1B2559",
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, m.date, /*#__PURE__*/React.createElement(KindBadge, {
+    m: m
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 1px",
+      fontSize: 12,
+      color: "#4A5578"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "clock",
+    s: 12
+  }), " ", m.time), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#4A5578",
       wordBreak: "keep-all"
     }
-  }, item.value))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC774\uB2EC\uC758 \uCC38\uC5EC \uB7AD\uD0B9"), monthRank.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC774\uBC88 \uB2EC \uCC38\uC11D \uAE30\uB85D\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 12
+  }), " ", m.place)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "3px 9px",
+      borderRadius: 999,
+      whiteSpace: "nowrap",
+      background: ok ? "#fff" : "#FFF4E5",
+      color: ok ? BLUE : "#C2610C"
+    }
+  }, label))), going.length > 3 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setGoingN(goingN >= going.length ? 3 : goingN + 3),
+    style: {
+      marginTop: 2,
+      padding: "9px 0",
+      background: "#fff",
+      color: BLUE,
+      border: "1.5px solid #D6DEF7",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, goingN >= going.length ? "접기" : `더보기 (${Math.min(3, going.length - goingN)}개 더)`))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC774\uB2EC\uC758 \uCC38\uC5EC \uB7AD\uD0B9"), monthRank.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC774\uBC88 \uB2EC \uCC38\uC11D \uAE30\uB85D\uC774 \uC544\uC9C1 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -3083,29 +3159,6 @@ function standings(bracket, scores) {
     }
   });
   return Object.values(t).sort((x, y) => y.w - x.w || y.pf - y.pa - (x.pf - x.pa) || x.l - y.l || x.rank - y.rank);
-}
-
-// 한 사람의 결과 요약 (홈 '마지막 참석 모임'에 사용)
-function myRecord(bracket, scores, me) {
-  if (!bracket || !bracket.players.includes(me)) return null;
-  let w = 0,
-    d = 0,
-    l = 0;
-  const partners = {};
-  flatGames(bracket, scores).forEach(g => {
-    const side = g.a.includes(me) ? "a" : g.b.includes(me) ? "b" : null;
-    if (!side) return;
-    const mate = g[side].find(n => n !== me);
-    partners[mate] = (partners[mate] || 0) + 1;
-    if (!g.o) return;
-    if (g.o === "draw") d++;else if (g.o === side) w++;else l++;
-  });
-  if (!w && !d && !l) return null;
-  const partner = Object.keys(partners).sort((x, y) => partners[y] - partners[x])[0] || "-";
-  return {
-    result: `${w}승 ${l}패${d ? ` ${d}무` : ""}`,
-    partner
-  };
 }
 
 // ─── 저장소 ──────────────────────────────────────────────────────────────────
