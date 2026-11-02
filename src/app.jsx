@@ -443,6 +443,9 @@ function Step1({data,onChange,onNext,isAdmin}) {
 }
 
 // ─── 회원가입 STEP 2 ──────────────────────────────────────────────────────────
+// 닉네임은 완성형 한글만 (띄어쓰기·영문·숫자·기호·자음만 쓰기 불가). 예전 닉네임은 바꾸지 않으면 그대로 둬요
+const NICK_RE=/^[가-힣]{1,10}$/;
+const nickRuleMsg=v=>NICK_RE.test(v.trim())?null:/[ㄱ-ㅎㅏ-ㅣ]/.test(v)?"자음·모음만 따로 쓸 수 없어요":v.trim().length>10?"닉네임은 10자까지예요":"닉네임은 한글로만 써 주세요 (띄어쓰기·영문·숫자 불가)";
 function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   const [errors,setErrors]=useState({});
   const [nickChecked,setNickChecked]=useState(false);
@@ -454,6 +457,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
     if(!data.nickname.trim()){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}
     const myUid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
     if(editing&&data.nickname.trim()===origNick){setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("지금 쓰는 닉네임이에요");return;}
+    const rule=nickRuleMsg(data.nickname); if(rule){setNickChecked(false);setNickMsg("");setErrors(p=>({...p,nickname:rule}));return;}
     if(FB){ try{ const owner=await once(FB.club.child("nicknames/"+nickKey(data.nickname))); if(owner&&owner!==myUid){setNickChecked(false);setNickMsg("");setErrors(p=>({...p,nickname:"이미 쓰는 닉네임이에요"}));return;} }
       catch(e){ setErrors(p=>({...p,nickname:authMsg(e)})); return; } }
     setNickChecked(true);setErrors(p=>({...p,nickname:undefined}));setNickMsg("✓ 사용 가능한 닉네임이에요");};
@@ -463,6 +467,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
     const e={};
     if(!(data.realName||"").trim()) e.realName="본명을 입력해주세요";
     if(!data.nickname||!data.nickname.trim()) e.nickname="닉네임을 입력해주세요";
+    else if(!(editing&&data.nickname.trim()===origNick)&&nickRuleMsg(data.nickname)) e.nickname=nickRuleMsg(data.nickname);
     else if(editing&&data.nickname.trim()!==origNick&&!nickChecked) e.nickname="바꾼 닉네임은 중복확인을 해주세요";
     if(!data.birthdate) e.birthdate="생년월일을 입력해주세요";
     if(!data.phone) e.phone="연락처를 입력해주세요";
@@ -486,7 +491,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
       </FieldWrap>
       <FieldWrap label="닉네임" required={!isAdmin} error={errors.nickname}>
         <div style={{display:"flex",gap:8}}>
-          <input type="text" value={data.nickname} style={inputStyle} onChange={e=>{onChange("nickname",e.target.value);setNickChecked(false);setNickMsg("");}} placeholder="모임에서 쓸 이름"/>
+          <input type="text" value={data.nickname} style={inputStyle} onChange={e=>{onChange("nickname",e.target.value);setNickChecked(false);setNickMsg("");}} placeholder="한글만 (예: 동토리)" maxLength={10}/>
           <button type="button" onClick={checkNick} style={btnSmall}>중복확인</button>
         </div>
         {nickMsg&&<p style={{fontSize:12,color:BLUE,fontWeight:600,margin:0}}>{nickMsg}</p>}
