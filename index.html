@@ -297,7 +297,15 @@ const FULL = {
   line: "#FBD5D5",
   bar: "linear-gradient(90deg,#FF8A8A,#E5484D)"
 };
-const isFull = m => !!m && m.total > 0 && m.attendees.length >= m.total;
+const isFull = m => !!m && !m.cancelled && m.total > 0 && m.attendees.length >= m.total;
+// 무산된 모임 (우천 등): 지우지 않고 info.cancel={reason,memo,by,byUid,at}로 남겨요. 회색으로 보이고 투표·참석 횟수·랭킹에서 빠져요
+const CANCEL_REASONS = ["우천", "코트 사정", "인원 부족", "기타"];
+const GONE = {
+  c: "#6B7280",
+  bg: "#F1F2F5",
+  line: "#D9DCE3"
+};
+const goneLabel = m => m && m.cancelled ? `무산 · ${m.cancelled.reason || "기타"}` : "";
 // 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
 const KIND_LABEL = {
   regular: "정기 모임",
@@ -347,6 +355,7 @@ function toMeeting(id, rec, series) {
     status: info.date < today || info.date === today && info.end && nowAt().slice(11, 16) >= info.end ? "past" : "upcoming",
     createdBy: info.createdBy || "",
     createdByUid: info.createdByUid || "",
+    cancelled: info.cancel && info.cancel.at ? info.cancel : null,
     votes: votesFromRec(rec)
   };
 }
@@ -373,7 +382,7 @@ function refreshAttendance() {
   });
 }
 // 이미 열린(오늘 포함) 모임, 참석 횟수, 랭킹 — 홈·통계에서 씀 (게스트 제외)
-const heldMeetings = () => MEETINGS.filter(m => m.iso <= todayYmd());
+const heldMeetings = () => MEETINGS.filter(m => m.iso <= todayYmd() && !m.cancelled);
 const myHeld = () => heldMeetings().filter(m => (m.attendees || []).some(a => a.isMe));
 function rankingOf(list) {
   const c = {};
@@ -396,7 +405,7 @@ const dDay = iso => {
   const d = Math.round((new Date(iso + "T00:00:00") - new Date(todayYmd() + "T00:00:00")) / 86400000);
   return d === 0 ? "D-DAY" : `D-${d}`;
 };
-const isOpen = m => m.kind === "flash" || !m.openAt || nowAt().slice(0, 16) >= m.openAt; // 번개 모임은 만들자마자 투표 가능
+const isOpen = m => !m.cancelled && (m.kind === "flash" || !m.openAt || nowAt().slice(0, 16) >= m.openAt); // 번개 모임은 만들자마자 투표 가능
 
 // ─── 참석 투표 우선순위 ───────────────────────────────────────────────────────
 // 정기 모임: 이 모임 전까지 그 달 정기 모임에 덜 참석한 회원이 항상 먼저, 같은 횟수면 투표 시각 순.
@@ -413,7 +422,7 @@ const byTime = (a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0;
 // 이 모임 전에 같은 달 정기 모임에서 참석 확정된 횟수 (게스트 제외)
 function monthCountsBefore(meeting) {
   const counts = {};
-  MEETINGS.filter(m => m.kind !== "flash" && monthKey(m) === monthKey(meeting) && dayKey(m) < dayKey(meeting)).sort((a, b) => dayKey(a) < dayKey(b) ? -1 : 1).forEach(m => resolveVotes(m, m.votes).confirmed.forEach(v => {
+  MEETINGS.filter(m => m.kind !== "flash" && !m.cancelled && monthKey(m) === monthKey(meeting) && dayKey(m) < dayKey(meeting)).sort((a, b) => dayKey(a) < dayKey(b) ? -1 : 1).forEach(m => resolveVotes(m, m.votes).confirmed.forEach(v => {
     if (!v.isGuest) counts[v.name] = (counts[v.name] || 0) + 1;
   }));
   return counts;
@@ -2019,6 +2028,12 @@ function HomeTab({
     if (!v || v.status !== "attend") return null;
     const ci = (m.attendees || []).findIndex(a => a.isMe),
       wi = (m.waitlist || []).findIndex(a => a.isMe);
+    if (m.cancelled) return {
+      m,
+      ok: false,
+      gone: true,
+      label: goneLabel(m)
+    };
     return {
       m,
       ok: ci >= 0 || wi < 0,
@@ -2048,8 +2063,8 @@ function HomeTab({
     onAction: onCreate
   }, "\uC544\uC9C1 \uC7A1\uD78C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
-      background: isFull(next) ? FULL.bg : BLUE_LIGHT,
-      border: isFull(next) ? `1.5px solid ${FULL.line}` : "1.5px solid transparent",
+      background: next.cancelled ? GONE.bg : isFull(next) ? FULL.bg : BLUE_LIGHT,
+      border: next.cancelled ? `1.5px solid ${GONE.line}` : isFull(next) ? `1.5px solid ${FULL.line}` : "1.5px solid transparent",
       borderRadius: 18,
       padding: 16
     }
@@ -2103,7 +2118,29 @@ function HomeTab({
       borderRadius: 20,
       boxShadow: SHADOW_BTN
     }
-  }, dDay(next.iso))), /*#__PURE__*/React.createElement("div", {
+  }, dDay(next.iso))), next.cancelled ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#374151",
+      textAlign: "center",
+      background: "#fff",
+      borderRadius: 12,
+      padding: "10px 8px"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "x",
+    s: 14
+  }), " ", goneLabel(next), next.cancelled.memo && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      marginTop: 3,
+      fontSize: 12,
+      fontWeight: 500,
+      color: "#6B7280"
+    }
+  }, next.cancelled.memo)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -2181,7 +2218,7 @@ function HomeTab({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "calendar",
     s: 13
-  }), " \uC608\uC57D\uC740 ", next.openDate, "\uC5D0 \uC5F4\uB824\uC694")), nextNext && /*#__PURE__*/React.createElement("div", {
+  }), " \uC608\uC57D\uC740 ", next.openDate, "\uC5D0 \uC5F4\uB824\uC694"))), nextNext && /*#__PURE__*/React.createElement("div", {
     onClick: () => onOpenMeeting(nextNext.id, "info"),
     style: {
       marginTop: 10,
@@ -2212,10 +2249,10 @@ function HomeTab({
   }), " ", nextNext.place)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
-      color: isFull(nextNext) ? FULL.c : "#A3AAC2",
-      fontWeight: isFull(nextNext) ? 700 : 400
+      color: nextNext.cancelled ? GONE.c : isFull(nextNext) ? FULL.c : "#A3AAC2",
+      fontWeight: isFull(nextNext) || nextNext.cancelled ? 700 : 400
     }
-  }, isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명` : `${nextNext.attendees.length}명 참석예정`))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB0B4\uAC00 \uCC38\uC11D\uD560 \uBAA8\uC784", going.length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, nextNext.cancelled ? goneLabel(nextNext) : isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명` : `${nextNext.attendees.length}명 참석예정`))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB0B4\uAC00 \uCC38\uC11D\uD560 \uBAA8\uC784", going.length > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       fontWeight: 600,
@@ -2234,6 +2271,7 @@ function HomeTab({
   }, going.slice(0, goingN).map(({
     m,
     ok,
+    gone,
     label
   }) => /*#__PURE__*/React.createElement("div", {
     key: m.id,
@@ -2307,8 +2345,8 @@ function HomeTab({
       padding: "3px 9px",
       borderRadius: 999,
       whiteSpace: "nowrap",
-      background: ok ? "#fff" : "#FFF4E5",
-      color: ok ? BLUE : "#C2610C"
+      background: gone ? GONE.c : ok ? "#fff" : "#FFF4E5",
+      color: gone ? "#fff" : ok ? BLUE : "#C2610C"
     }
   }, label))), going.length > 3 && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -3454,10 +3492,11 @@ const NOTI_ICON = {
   approved: "checkCircle",
   admin: "bell",
   attend: "check",
-  mention: "message"
+  mention: "message",
+  cancel: "x"
 };
 // 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
-const MEETING_NOTI = ["meeting", "admin", "attend", "mention"];
+const MEETING_NOTI = ["meeting", "admin", "attend", "mention", "cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
 const notifyAttend = (m, prevStatus) => {
   if (!m || prevStatus === "attend" || !m.createdByUid || m.createdByUid === myUid()) return;
@@ -5843,6 +5882,7 @@ function MeetingDetail({
     counts
   } = resolveVotes(meeting, meeting.votes);
   const total = confirmed.length;
+  const votes0 = meeting.rec && meeting.rec.votes || {};
   const fill = Math.round(total / Math.max(1, meeting.total) * 100),
     prio = meeting.kind !== "flash";
   const setMyStatus = val => {
@@ -5867,8 +5907,39 @@ function MeetingDetail({
     ...voteValue("attend", mine),
     guests: guests.filter((_, idx) => idx !== i)
   });
+  // 무산 처리: 기록은 남기고 info.cancel 저장, 참석 누른 회원에게 알림
+  const gone = meeting.cancelled;
+  const [goneForm, setGoneForm] = useState(null); // {reason,memo}
+  const attendUids = () => Object.keys(votes0).filter(k => votes0[k] && votes0[k].status === "attend" && k !== myVoteKey());
+  const saveGone = () => {
+    const c = {
+      reason: goneForm.reason,
+      memo: (goneForm.memo || "").trim() || null,
+      by: ME,
+      byUid: myUid() || null,
+      at: Date.now()
+    };
+    saveMeetingPath(`m${meeting.id}/info/cancel`, c).then(() => {
+      setGoneForm(null);
+      attendUids().forEach(u => postFeed({
+        type: "cancel",
+        to: u,
+        meetingId: meeting.id,
+        text: `${meeting.date} ${meeting.placeName || meeting.place} 모임이 ${c.reason === "기타" ? "" : c.reason + "으로 "}무산됐어요${c.memo ? `: ${c.memo}` : ""}`
+      }));
+    }).catch(e => alert(authMsg(e)));
+  };
+  const undoGone = () => {
+    if (!window.confirm("무산을 되돌릴까요? 다시 참석 투표를 받을 수 있어요.")) return;
+    saveMeetingPath(`m${meeting.id}/info/cancel`, null).then(() => attendUids().forEach(u => postFeed({
+      type: "cancel",
+      to: u,
+      meetingId: meeting.id,
+      text: `${meeting.date} ${meeting.placeName || meeting.place} 모임 무산이 취소됐어요. 예정대로 진행해요`
+    }))).catch(e => alert(authMsg(e)));
+  };
   const remove = () => {
-    if (!window.confirm(`${meeting.date} 모임을 지울까요? 투표·대진표·점수도 함께 지워져요.${meeting.seriesId ? "\n반복 모임은 이 날짜만 빠지고 다음 모임은 계속 만들어져요." : ""}`)) return;
+    if (!window.confirm(`${meeting.date} 모임을 완전히 지울까요? 투표·대진표·점수·댓글 기록까지 모두 사라져요.\n비나 코트 사정으로 못 하게 된 거라면 '무산 처리'를 써 주세요.${meeting.seriesId ? "\n반복 모임은 이 날짜만 빠지고 다음 모임은 계속 만들어져요." : ""}`)) return;
     (meeting.seriesId ? saveMeetingPath(`series/s${meeting.seriesId}/skip/${meeting.iso}`, true) : Promise.resolve()).then(() => saveMeetingPath("m" + meeting.id, null)).then(onDeleted).catch(e => alert(authMsg(e)));
   };
   const ser = meeting.series,
@@ -5878,7 +5949,6 @@ function MeetingDetail({
     saveMeetingPath(`series/s${meeting.seriesId}/active`, false).catch(e => alert(authMsg(e)));
   };
   const myCount = counts[ME] || 0;
-  const votes0 = meeting.rec && meeting.rec.votes || {};
   const kick = isAdmin ? v => () => {
     if (!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${votes0[v.key] && (votes0[v.key].guests || []).length ? " 이 회원이 초대한 게스트도 함께 빠져요." : ""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`, null).catch(e => alert(authMsg(e)));
@@ -5974,7 +6044,17 @@ function MeetingDetail({
     }
   }, meeting.date), /*#__PURE__*/React.createElement(KindBadge, {
     m: meeting
-  })), isPast ? /*#__PURE__*/React.createElement("span", {
+  })), gone ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: GONE.c,
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 700,
+      padding: "4px 12px",
+      borderRadius: 20,
+      whiteSpace: "nowrap"
+    }
+  }, goneLabel(meeting)) : isPast ? /*#__PURE__*/React.createElement("span", {
     style: {
       background: "#EEF1FA",
       color: "#A3AAC2",
@@ -6102,7 +6182,7 @@ function MeetingDetail({
       fontWeight: 500,
       color: "#1B2559"
     }
-  }, r.value)))), /*#__PURE__*/React.createElement("div", {
+  }, r.value)))), !gone && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -6136,7 +6216,43 @@ function MeetingDetail({
       background: fill >= 100 ? FULL.bar : BLUE,
       borderRadius: 10
     }
-  }))), isPast && /*#__PURE__*/React.createElement("p", {
+  }))), gone && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: GONE.bg,
+      border: `1px solid ${GONE.line}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#374151",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 16,
+    stroke: 2.4
+  }), gone.reason && gone.reason !== "기타" ? `${gone.reason}으로 무산된 모임이에요` : "무산된 모임이에요"), gone.memo && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 13,
+      color: "#4B5563",
+      whiteSpace: "pre-wrap"
+    }
+  }, gone.memo), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#9CA3AF"
+    }
+  }, gone.by ? `${gone.by} · ` : "", ago(gone.at), " \xB7 \uCC38\uC11D \uD69F\uC218\uC5D0 \uC138\uC9C0 \uC54A\uC544\uC694")), !gone && isPast && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
@@ -6155,7 +6271,7 @@ function MeetingDetail({
     name: "clock",
     size: 16,
     stroke: 1.9
-  }), "\uC885\uB8CC\uB41C \uBAA8\uC784"), !isPast && !open && /*#__PURE__*/React.createElement("p", {
+  }), "\uC885\uB8CC\uB41C \uBAA8\uC784"), !gone && !isPast && !open && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -6168,7 +6284,7 @@ function MeetingDetail({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "calendar",
     s: 13
-  }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !isPast && open && /*#__PURE__*/React.createElement("div", {
+  }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !gone && !isPast && open && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -6482,9 +6598,83 @@ function MeetingDetail({
   }, "\uC790\uB9AC\uAC00 \uB098\uBA74 \uB300\uAE30 \uC21C\uC11C\uB300\uB85C \uCC38\uC11D \uD655\uC815\uB3FC\uC694.")), /*#__PURE__*/React.createElement(MeetingComments, {
     meeting: meeting,
     isAdmin: isAdmin
-  }), isAdmin && /*#__PURE__*/React.createElement(AdminAttend, {
+  }), isAdmin && !gone && /*#__PURE__*/React.createElement(AdminAttend, {
     meeting: meeting
-  }), canManage && /*#__PURE__*/React.createElement("div", {
+  }), canManage && goneForm && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uBB34\uC0B0 \uCC98\uB9AC"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 12,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, "\uBAA8\uC784 \uAE30\uB85D\uC740 \uB0A8\uAE30\uACE0 \uD68C\uC0C9\uC73C\uB85C \"\uBB34\uC0B0\"\uC774\uB77C\uACE0 \uD45C\uC2DC\uD574\uC694. \uCC38\uC11D \uD22C\uD45C\uAC00 \uB9C9\uD788\uACE0, \uCC38\uC11D \uD69F\uC218\xB7\uB7AD\uD0B9\uC5D0\uC11C \uBE60\uC838\uC694. \uCC38\uC11D \uB204\uB978 \uD68C\uC6D0\uC5D0\uAC8C \uC54C\uB9BC\uC774 \uAC00\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 10
+    }
+  }, CANCEL_REASONS.map(r => /*#__PURE__*/React.createElement("button", {
+    key: r,
+    type: "button",
+    "aria-pressed": goneForm.reason === r,
+    onClick: () => setGoneForm(f => ({
+      ...f,
+      reason: r
+    })),
+    style: {
+      padding: "7px 14px",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: goneForm.reason === r ? 700 : 500,
+      cursor: "pointer",
+      border: `1.5px solid ${goneForm.reason === r ? GONE.c : "#D6DEF7"}`,
+      background: goneForm.reason === r ? GONE.c : "#fff",
+      color: goneForm.reason === r ? "#fff" : "#4A5578"
+    }
+  }, r))), /*#__PURE__*/React.createElement("textarea", {
+    value: goneForm.memo,
+    onChange: e => setGoneForm(f => ({
+      ...f,
+      memo: e.target.value
+    })),
+    placeholder: "\uBA54\uBAA8 (\uC120\uD0DD) \uC608: \uCF54\uD2B8 \uBB3C\uC6C5\uB369\uC774\uB85C \uC0AC\uC6A9 \uBD88\uAC00",
+    rows: 2,
+    maxLength: 200,
+    style: {
+      ...inputStyle,
+      resize: "vertical",
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setGoneForm(null),
+    style: {
+      ...btnSecondary,
+      flex: 1
+    }
+  }, "\uB2EB\uAE30"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: saveGone,
+    style: {
+      ...btnSecondary,
+      flex: 1,
+      background: GONE.c,
+      color: "#fff",
+      borderColor: GONE.c
+    }
+  }, "\uBB34\uC0B0\uC73C\uB85C \uD45C\uC2DC"))), canManage && !goneForm && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -6496,16 +6686,37 @@ function MeetingDetail({
       ...btnSecondary,
       flex: 1
     }
-  }, "\uBAA8\uC784 \uC218\uC815"), /*#__PURE__*/React.createElement("button", {
+  }, "\uBAA8\uC784 \uC218\uC815"), gone ? /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: remove,
+    onClick: undoGone,
+    style: {
+      ...btnSecondary,
+      flex: 1
+    }
+  }, "\uBB34\uC0B0 \uB418\uB3CC\uB9AC\uAE30") : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setGoneForm({
+      reason: "우천",
+      memo: ""
+    }),
     style: {
       ...btnSecondary,
       flex: 1,
-      color: "#ef4444",
-      borderColor: "#FBD5D5"
+      color: "#374151",
+      borderColor: GONE.line
     }
-  }, "\uBAA8\uC784 \uC0AD\uC81C")), canManage && serActive && /*#__PURE__*/React.createElement("button", {
+  }, "\uBB34\uC0B0 \uCC98\uB9AC")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: remove,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 12,
+      color: "#ef4444",
+      cursor: "pointer",
+      padding: "4px 0"
+    }
+  }, "\uBAA8\uC784 \uC0AD\uC81C (\uAE30\uB85D\uAE4C\uC9C0 \uC9C0\uC6C0)")), canManage && serActive && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: stopSeries,
     style: {
@@ -6676,8 +6887,10 @@ function MiniCalendar({
       style: {
         width: 5,
         height: 5,
+        boxSizing: "border-box",
         borderRadius: 999,
-        background: KIND_DOT[m.kind] || BLUE,
+        background: m.cancelled ? "transparent" : KIND_DOT[m.kind] || BLUE,
+        border: m.cancelled ? `1.2px solid ${GONE.c}` : "none",
         opacity: past ? 0.45 : 1
       }
     })), list.length > 3 && /*#__PURE__*/React.createElement("span", {
@@ -6711,7 +6924,21 @@ function MiniCalendar({
       borderRadius: 999,
       background: KIND_DOT[k]
     }
-  }), l))), picked && /*#__PURE__*/React.createElement("div", {
+  }), l)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 6,
+      height: 6,
+      boxSizing: "border-box",
+      borderRadius: 999,
+      border: `1.2px solid ${GONE.c}`
+    }
+  }), "\uBB34\uC0B0")), picked && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       paddingTop: 10,
@@ -6729,7 +6956,8 @@ function MiniCalendar({
     }
   }, fmtDate(pick), " \uBAA8\uC784 ", picked.length, "\uAC1C"), picked.map(m => {
     const full = isFull(m),
-      isAtt = (m.attendees || []).some(a => a.isMe);
+      isAtt = (m.attendees || []).some(a => a.isMe),
+      gone = m.cancelled;
     return /*#__PURE__*/React.createElement("button", {
       key: m.id,
       type: "button",
@@ -6740,8 +6968,8 @@ function MiniCalendar({
         gap: 6,
         padding: "12px 14px",
         borderRadius: 16,
-        border: `1.5px solid ${full ? FULL.line : "#E4E9F7"}`,
-        background: full ? FULL.bg : "#fff",
+        border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "#E4E9F7"}`,
+        background: gone ? GONE.bg : full ? FULL.bg : "#fff",
         cursor: "pointer",
         textAlign: "left",
         boxShadow: "0 2px 8px rgba(33,82,230,0.06)",
@@ -6763,7 +6991,18 @@ function MiniCalendar({
         color: "#1B2559",
         fontVariantNumeric: "tabular-nums"
       }
-    }, m.time), /*#__PURE__*/React.createElement("span", {
+    }, m.time), gone ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "3px 10px",
+        borderRadius: 999,
+        background: GONE.c,
+        color: "#fff",
+        whiteSpace: "nowrap"
+      }
+    }, goneLabel(m)) : /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: "auto",
         fontSize: 12,
@@ -6794,10 +7033,10 @@ function MiniCalendar({
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        color: isAtt ? BLUE : "#A3AAC2",
-        fontWeight: isAtt ? 700 : 400
+        color: gone ? GONE.c : isAtt ? BLUE : "#A3AAC2",
+        fontWeight: isAtt || gone ? 700 : 400
       }
-    }, isAtt ? "참석 예정이에요" : m.status === "past" ? "지난 모임" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
+    }, gone ? "무산된 모임이에요" : isAtt ? "참석 예정이에요" : m.status === "past" ? "지난 모임" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
       style: {
         color: BLUE,
         fontWeight: 600
@@ -6929,13 +7168,15 @@ function BookingTab({
   }, upcoming.map(m => {
     const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.total) * 100));
     const isAtt = m.attendees.some(a => a.isMe),
-      full = isFull(m);
+      full = isFull(m),
+      gone = m.cancelled;
     return /*#__PURE__*/React.createElement("div", {
       key: m.id,
       onClick: () => setSelId(m.id),
       style: {
-        background: full ? FULL.bg : "#fff",
-        border: `1.5px solid ${full ? FULL.line : "transparent"}`,
+        background: gone ? GONE.bg : full ? FULL.bg : "#fff",
+        border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "transparent"}`,
+        opacity: gone ? 0.85 : 1,
         borderRadius: 22,
         padding: 18,
         boxShadow: SHADOW,
@@ -6986,7 +7227,17 @@ function BookingTab({
         alignItems: "flex-end",
         gap: 6
       }
-    }, full ? /*#__PURE__*/React.createElement("span", {
+    }, gone ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: GONE.c,
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "3px 10px",
+        borderRadius: 20,
+        whiteSpace: "nowrap"
+      }
+    }, goneLabel(m)) : full ? /*#__PURE__*/React.createElement("span", {
       style: {
         background: FULL.c,
         color: "#fff",
@@ -7004,7 +7255,7 @@ function BookingTab({
         padding: "3px 10px",
         borderRadius: 20
       }
-    }, m.attendees.length, "/", m.total, "\uBA85"), isAtt && /*#__PURE__*/React.createElement("span", {
+    }, m.attendees.length, "/", m.total, "\uBA85"), isAtt && !gone && /*#__PURE__*/React.createElement("span", {
       style: {
         background: GRAD,
         color: "#fff",
@@ -7013,7 +7264,7 @@ function BookingTab({
         padding: "3px 10px",
         borderRadius: 20
       }
-    }, "\uCC38\uC11D \uC608\uC815"))), /*#__PURE__*/React.createElement("div", {
+    }, "\uCC38\uC11D \uC608\uC815"))), !gone && /*#__PURE__*/React.createElement("div", {
       style: {
         height: 5,
         background: full ? FULL.line : "#E4E9F7",
@@ -7030,10 +7281,10 @@ function BookingTab({
       style: {
         margin: "8px 0 0",
         fontSize: 12,
-        color: full ? FULL.c : "#A3AAC2",
+        color: gone ? GONE.c : full ? FULL.c : "#A3AAC2",
         textAlign: "right"
       }
-    }, full ? "정원이 다 찼어요 · 참석하면 대기로 들어가요 →" : "탭해서 자세히 보기 →"));
+    }, gone ? `모임이 무산됐어요${gone.memo ? ` · ${gone.memo}` : ""}` : full ? "정원이 다 찼어요 · 참석하면 대기로 들어가요 →" : "탭해서 자세히 보기 →"));
   }))), past.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 10px",
@@ -7079,16 +7330,17 @@ function BookingTab({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "pin",
     s: 13
-  }), " ", m.place, " \xB7 ", m.attendees.length, "\uBA85 \uCC38\uC11D")), /*#__PURE__*/React.createElement("span", {
+  }), " ", m.place, m.cancelled ? "" : ` · ${m.attendees.length}명 참석`)), /*#__PURE__*/React.createElement("span", {
     style: {
-      background: "#E4E9F7",
-      color: "#A3AAC2",
+      background: m.cancelled ? GONE.c : "#E4E9F7",
+      color: m.cancelled ? "#fff" : "#A3AAC2",
       fontSize: 11,
       fontWeight: 600,
       padding: "3px 10px",
-      borderRadius: 20
+      borderRadius: 20,
+      whiteSpace: "nowrap"
     }
-  }, "\uC885\uB8CC")))))));
+  }, m.cancelled ? goneLabel(m) : "종료")))))));
 }
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
@@ -8804,7 +9056,7 @@ function MembersTab({
   // 구력순: 테니스 시작 일자가 오래된 사람부터 (미입력은 맨 뒤)
   if (sort === "career") list.sort((a, b) => !a.tennisStart ? b.tennisStart ? 1 : 0 : !b.tennisStart ? -1 : a.tennisStart < b.tennisStart ? -1 : a.tennisStart > b.tennisStart ? 1 : 0);
   // 회원이 참석을 누른 다가오는 모임 (가까운 순 3개까지)
-  const upcomingOf = uid => MEETINGS.filter(mt => mt.status === "upcoming" && mt.rec && mt.rec.votes && mt.rec.votes[uid] && mt.rec.votes[uid].status === "attend").slice(0, 3);
+  const upcomingOf = uid => MEETINGS.filter(mt => mt.status === "upcoming" && !mt.cancelled && mt.rec && mt.rec.votes && mt.rec.votes[uid] && mt.rec.votes[uid].status === "attend").slice(0, 3);
   // 동네별·손별은 묶어서 보여 줘요 (묶음 안은 이름순, 미입력은 맨 뒤)
   const groupKey = sort === "region" ? m => m.region || "" : sort === "hand" ? handOf : null;
   const groups = groupKey ? (() => {
