@@ -13,6 +13,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 const ICON_PATHS = {
   message:["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"], pencil:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"], send:["M22 2 11 13","M22 2l-7 20-4-9-9-4 20-7z"],
   chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
+  swap:["M7 16V4","M3 8l4-4 4 4","M17 8v12","M21 16l-4 4-4-4"],
   grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
   back:["M15 5l-7 7 7 7"],
@@ -285,7 +286,7 @@ function StepIndicator({current}) {
 // 아이디 저장: 이메일을 이 기기에 기억. 로그인 상태 유지: 마지막으로 앱을 연 날부터 30일 동안 유지(열 때마다 연장).
 // 유지를 끄면 브라우저(탭)를 닫을 때 로그아웃돼요.
 const KEEP_DAYS=30;
-const LS={email:"sstc-saved-email",keep:"sstc-keep-login",until:"sstc-login-until"};
+const LS={email:"sstc-saved-email",keep:"sstc-keep-login",until:"sstc-login-until",view:"sstc-admin-view"};
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet=(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} };
 const extendLogin=()=>{ if(lsGet(LS.keep)!=="0") lsSet(LS.until,String(Date.now()+KEEP_DAYS*86400000)); };
@@ -2774,7 +2775,7 @@ const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])
   .filter(m=>m&&m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]));
 
 const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
-function MembersTab(){
+function MembersTab({onOpenMeeting}){
   const data=useClubMembers();
   const [q,setQ]=useState("");
   const [sort,setSort]=useState(()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
@@ -2787,6 +2788,10 @@ function MembersTab(){
   const list=activeMembers(data)
     .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp,handOf(m)].some(v=>String(v||"").toLowerCase().includes(k)); })
     .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko"));
+  // 구력순: 테니스 시작 일자가 오래된 사람부터 (미입력은 맨 뒤)
+  if(sort==="career") list.sort((a,b)=>!a.tennisStart?(b.tennisStart?1:0):!b.tennisStart?-1:a.tennisStart<b.tennisStart?-1:a.tennisStart>b.tennisStart?1:0);
+  // 회원이 참석을 누른 다가오는 모임 (가까운 순 3개까지)
+  const upcomingOf=uid=>MEETINGS.filter(mt=>mt.status==="upcoming"&&mt.rec&&mt.rec.votes&&mt.rec.votes[uid]&&mt.rec.votes[uid].status==="attend").slice(0,3);
   // 동네별·손별은 묶어서 보여 줘요 (묶음 안은 이름순, 미입력은 맨 뒤)
   const groupKey=sort==="region"?m=>m.region||"":sort==="hand"?handOf:null;
   const groups=groupKey?(()=>{ const g=new Map(); list.forEach(m=>{const k=groupKey(m); if(!g.has(k)) g.set(k,[]); g.get(k).push(m);});
@@ -2799,8 +2804,8 @@ function MembersTab(){
       <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 동네, 코트로 찾기" style={inputStyle}/>
         <div style={{display:"flex",gap:6}}>
-          {[["name","이름순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
-            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
+          {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
+            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,whiteSpace:"nowrap",fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
           ))}
           <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"#A3AAC2"}}>{list.length}명</span>
         </div>
@@ -2837,11 +2842,25 @@ function MembersTab(){
                 {m.lessonStatus&&chip("users",m.lessonStatus)}
               </>}
             </div>
+            {open===m.uid&&(()=>{ const up=upcomingOf(m.uid); return(
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
+                <p style={{margin:"0 0 6px",fontSize:11,fontWeight:600,color:"#8A93B2"}}>참가 예정 모임</p>
+                {up.length===0?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>참석하기로 한 모임이 없어요.</p>:(
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {up.map(mt=>(
+                    <button key={mt.id} type="button" onClick={e=>{e.stopPropagation();onOpenMeeting&&onOpenMeeting(mt.id);}} style={{display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left",padding:"6px 10px",background:BLUE_LIGHT,border:"none",borderRadius:10,cursor:"pointer",fontFamily:FONT}}>
+                      <span style={{fontSize:11,fontWeight:700,color:BLUE,minWidth:38}}>{dDay(mt.iso)}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:"#1B2559",whiteSpace:"nowrap"}}>{mt.date.slice(5)}</span>
+                      <span style={{flex:1,minWidth:0,fontSize:12,color:"#6B7493",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(mt.info&&mt.info.start)||""} {mt.placeName||mt.place}</span>
+                    </button>
+                  ))}
+                </div>)}
+              </div>); })()}
           </Card></div>
         );
       })}
       </React.Fragment>))}
-      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수도 보여요. 본명·연락처는 보이지 않아요.</p>}
+      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 본명·연락처는 보이지 않아요.</p>}
     </div>
   );
 }
@@ -2998,6 +3017,7 @@ export default function App() {
   const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
+  const [memberView,setMemberView]=useState(()=>lsGet(LS.view)==="member"); // 관리자가 회원 화면으로 보기
   const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
   const [mForm,setForm2]=useState(null);      // 모임 만들기·수정 창: {initial} | null
   const [screen,setScreen]=useState("login");
@@ -3012,7 +3032,7 @@ export default function App() {
     try{ window.scrollTo(0,0); }catch(e){}
     try{ if(location.hash!=="#meeting-"+id) location.hash="meeting-"+id; }catch(e){}
   };
-  const afterClose=m=>{ setOpenMeeting(null); if(m&&m.from==="home") setTab("home"); };
+  const afterClose=m=>{ setOpenMeeting(null); if(m&&(m.from==="home"||m.from==="members")) setTab(m.from); };
   const closeM=()=>{
     let viaHistory=false;
     try{ if(location.hash.indexOf("#meeting-")===0){ viaHistory=true; history.back(); } }catch(e){}
@@ -3145,10 +3165,14 @@ export default function App() {
 
   // ── 메인 앱 화면 ──
   const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",stats:"통계",admin:"관리"};
-  const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
+  // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
+  const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
+  const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
+    if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
+  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
-  const isAdminUser=!!(account&&account.admin)||!FB;
+  const isAdminUser=adminOn||!FB;
   // 모임 수정·삭제: 관리자 또는 만든 사람
   const canManage=m=>isAdminUser||(!!m.createdByUid&&FB&&FB.auth.currentUser&&FB.auth.currentUser.uid===m.createdByUid);
   // 예약 탭에서 + 를 누르면 지금 보고 있는 종류(정기/번개)로 시작
@@ -3164,7 +3188,7 @@ export default function App() {
         <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.15)",top:-80,right:-60}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
-            ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",borderRadius:999,gap:2,fontSize:13,fontWeight:600}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":"목록"}</button>
+            ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",borderRadius:999,gap:2,fontSize:13,fontWeight:600}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":"목록"}</button>
             :<span style={{fontSize:14,fontWeight:600,opacity:0.9,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="ball" size={16} stroke={2}/>SSTC</span>}
           <div style={{display:"flex",gap:8}}>
             <button type="button" onClick={()=>{setNoti(club.items);club.markSeen();}} style={{...iconBtn,position:"relative"}} title="알림" aria-label={`알림${club.unread?` ${club.unread}개 안 읽음`:""}`}>
@@ -3179,7 +3203,9 @@ export default function App() {
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
             <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요</p>
-            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{account&&account.admin&&<span style={{fontSize:11,fontWeight:700,marginLeft:8,padding:"3px 9px",borderRadius:999,background:"rgba(255,255,255,0.22)",verticalAlign:"middle"}}>관리자</span>}</p>
+            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
+              style={{marginLeft:8,padding:"4px 10px 4px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,0.45)",background:adminOn?"rgba(255,255,255,0.22)":"transparent",color:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,verticalAlign:"middle",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}>
+              <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
           </div>
         ):(
           curMeeting?(
@@ -3213,12 +3239,12 @@ export default function App() {
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
-          notices={club.notices} isAdmin={!!(account&&account.admin)} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
+          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
-          canManage={canManage} isAdmin={!!(account&&account.admin)} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
-        {tab==="members"&&<MembersTab/>}
+          canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
+        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")}/>}
         {tab==="stats"&&<StatsTab/>}
-        {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
+        {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
       </div>
       {/* 모임 만들기 버튼: 탭바 바로 위 오른쪽 (모임 상세 화면에서는 숨김) */}
       {!curMeeting&&(
@@ -3235,12 +3261,12 @@ export default function App() {
                   ))}
                 </div>
               </>}
-      {noti&&<NotiSheet items={noti} isAdmin={!!(account&&account.admin)} onClose={()=>setNoti(null)} onPick={n=>{
+      {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
         if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
-        else if(n.type==="member"&&account&&account.admin){ setOpenMeeting(null); setTab("admin"); }
+        else if(n.type==="member"&&adminOn){ setOpenMeeting(null); setTab("admin"); }
       }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
