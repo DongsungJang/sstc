@@ -104,6 +104,7 @@ const ICON_PATHS = {
   send: ["M22 2 11 13", "M22 2l-7 20-4-9-9-4 20-7z"],
   chevL: ["M15 18l-6-6 6-6"],
   chevR: ["M9 18l6-6-6-6"],
+  swap: ["M7 16V4", "M3 8l4-4 4 4", "M17 8v12", "M21 16l-4 4-4-4"],
   grip: ["M9 6h.01", "M15 6h.01", "M9 12h.01", "M15 12h.01", "M9 18h.01", "M15 18h.01"],
   home: ["M3 10.5 12 3l9 7.5", "M5 9.5V20h5v-6h4v6h5V9.5"],
   back: ["M15 5l-7 7 7 7"],
@@ -696,7 +697,8 @@ const KEEP_DAYS = 30;
 const LS = {
   email: "sstc-saved-email",
   keep: "sstc-keep-login",
-  until: "sstc-login-until"
+  until: "sstc-login-until",
+  view: "sstc-admin-view"
 };
 const lsGet = k => {
   try {
@@ -9640,6 +9642,7 @@ function App() {
   const [loginNote, setLoginNote] = useState(null); // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list = useMeetingList(); // 모든 모임 (실시간)
   const [menu, setMenu] = useState(false); // 우측 상단 내 메뉴
+  const [memberView, setMemberView] = useState(() => lsGet(LS.view) === "member"); // 관리자가 회원 화면으로 보기
   const [myInfo, setMyInfo] = useState(false); // 내 정보 창 (false | true | "edit")
   const [mForm, setForm2] = useState(null); // 모임 만들기·수정 창: {initial} | null
   const [screen, setScreen] = useState("login");
@@ -10049,14 +10052,28 @@ function App() {
     stats: "통계",
     admin: "관리"
   };
-  const tabs = account && account.admin ? [...TABS, {
+  // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
+  const realAdmin = !!(account && account.admin),
+    adminOn = realAdmin && !memberView;
+  const toggleView = () => {
+    const next = !memberView;
+    setMemberView(next);
+    try {
+      localStorage.setItem(LS.view, next ? "member" : "admin");
+    } catch (e) {}
+    if (next && tab === "admin") {
+      setOpenMeeting(null);
+      setTab("home");
+    }
+  };
+  const tabs = adminOn ? [...TABS, {
     key: "admin",
     label: "관리",
     icon: "user"
   }] : TABS;
   const isHome = tab === "home";
   const curMeeting = tab === "booking" && openMeeting ? MEETINGS.find(m => m.id === openMeeting.id) : null;
-  const isAdminUser = !!(account && account.admin) || !FB;
+  const isAdminUser = adminOn || !FB;
   // 모임 수정·삭제: 관리자 또는 만든 사람
   const canManage = m => isAdminUser || !!m.createdByUid && FB && FB.auth.currentUser && FB.auth.currentUser.uid === m.createdByUid;
   // 예약 탭에서 + 를 누르면 지금 보고 있는 종류(정기/번개)로 시작
@@ -10212,17 +10229,32 @@ function App() {
       fontWeight: 700,
       letterSpacing: "-0.01em"
     }
-  }, ME, " \uB2D8", account && account.admin && /*#__PURE__*/React.createElement("span", {
+  }, ME, " \uB2D8", realAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: toggleView,
+    "aria-label": adminOn ? "회원 모드로 보기" : "관리자 모드로 보기",
+    title: "\uB20C\uB7EC\uC11C \uBAA8\uB4DC \uBC14\uAFB8\uAE30",
     style: {
+      marginLeft: 8,
+      padding: "4px 10px 4px 9px",
+      borderRadius: 999,
+      border: "1px solid rgba(255,255,255,0.45)",
+      background: adminOn ? "rgba(255,255,255,0.22)" : "transparent",
+      color: "#fff",
       fontSize: 11,
       fontWeight: 700,
-      marginLeft: 8,
-      padding: "3px 9px",
-      borderRadius: 999,
-      background: "rgba(255,255,255,0.22)",
-      verticalAlign: "middle"
+      fontFamily: FONT,
+      verticalAlign: "middle",
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4
     }
-  }, "\uAD00\uB9AC\uC790"))) : curMeeting ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "swap",
+    size: 12,
+    stroke: 2.2
+  }), adminOn ? "관리자 모드" : "회원 모드"))) : curMeeting ? /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       marginTop: 18
@@ -10347,7 +10379,7 @@ function App() {
     onOpenMeeting: (id, view) => openM(id, view, "home"),
     onCreate: openCreate,
     notices: club.notices,
-    isAdmin: !!(account && account.admin),
+    isAdmin: adminOn,
     onWriteNotice: () => setNoticeForm(true),
     focusNotice: focusNotice
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
@@ -10355,13 +10387,13 @@ function App() {
     onOpen: (id, view) => openM(id, view, "booking"),
     ready: list.ready,
     canManage: canManage,
-    isAdmin: !!(account && account.admin),
+    isAdmin: adminOn,
     onEdit: m => setForm2({
       initial: m
     }),
     onDeleted: () => closeM(),
     onCreate: openCreate
-  }), tab === "members" && /*#__PURE__*/React.createElement(MembersTab, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && account && account.admin && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "members" && /*#__PURE__*/React.createElement(MembersTab, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",
@@ -10442,7 +10474,7 @@ function App() {
     }
   }, l)))), noti && /*#__PURE__*/React.createElement(NotiSheet, {
     items: noti,
-    isAdmin: !!(account && account.admin),
+    isAdmin: adminOn,
     onClose: () => setNoti(null),
     onPick: n => {
       setNoti(null);
@@ -10455,7 +10487,7 @@ function App() {
         }
         setTab("home");
         setFocusNotice(n.noticeId + "#" + Date.now());
-      } else if (n.type === "member" && account && account.admin) {
+      } else if (n.type === "member" && adminOn) {
         setOpenMeeting(null);
         setTab("admin");
       }

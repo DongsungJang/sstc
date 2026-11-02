@@ -13,6 +13,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 const ICON_PATHS = {
   message:["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"], pencil:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"], send:["M22 2 11 13","M22 2l-7 20-4-9-9-4 20-7z"],
   chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
+  swap:["M7 16V4","M3 8l4-4 4 4","M17 8v12","M21 16l-4 4-4-4"],
   grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
   back:["M15 5l-7 7 7 7"],
@@ -285,7 +286,7 @@ function StepIndicator({current}) {
 // 아이디 저장: 이메일을 이 기기에 기억. 로그인 상태 유지: 마지막으로 앱을 연 날부터 30일 동안 유지(열 때마다 연장).
 // 유지를 끄면 브라우저(탭)를 닫을 때 로그아웃돼요.
 const KEEP_DAYS=30;
-const LS={email:"sstc-saved-email",keep:"sstc-keep-login",until:"sstc-login-until"};
+const LS={email:"sstc-saved-email",keep:"sstc-keep-login",until:"sstc-login-until",view:"sstc-admin-view"};
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet=(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} };
 const extendLogin=()=>{ if(lsGet(LS.keep)!=="0") lsSet(LS.until,String(Date.now()+KEEP_DAYS*86400000)); };
@@ -2998,6 +2999,7 @@ export default function App() {
   const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
+  const [memberView,setMemberView]=useState(()=>lsGet(LS.view)==="member"); // 관리자가 회원 화면으로 보기
   const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
   const [mForm,setForm2]=useState(null);      // 모임 만들기·수정 창: {initial} | null
   const [screen,setScreen]=useState("login");
@@ -3145,10 +3147,14 @@ export default function App() {
 
   // ── 메인 앱 화면 ──
   const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",stats:"통계",admin:"관리"};
-  const tabs=account&&account.admin?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
+  // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
+  const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
+  const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
+    if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
+  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
-  const isAdminUser=!!(account&&account.admin)||!FB;
+  const isAdminUser=adminOn||!FB;
   // 모임 수정·삭제: 관리자 또는 만든 사람
   const canManage=m=>isAdminUser||(!!m.createdByUid&&FB&&FB.auth.currentUser&&FB.auth.currentUser.uid===m.createdByUid);
   // 예약 탭에서 + 를 누르면 지금 보고 있는 종류(정기/번개)로 시작
@@ -3179,7 +3185,9 @@ export default function App() {
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
             <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요</p>
-            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{account&&account.admin&&<span style={{fontSize:11,fontWeight:700,marginLeft:8,padding:"3px 9px",borderRadius:999,background:"rgba(255,255,255,0.22)",verticalAlign:"middle"}}>관리자</span>}</p>
+            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
+              style={{marginLeft:8,padding:"4px 10px 4px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,0.45)",background:adminOn?"rgba(255,255,255,0.22)":"transparent",color:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,verticalAlign:"middle",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}>
+              <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
           </div>
         ):(
           curMeeting?(
@@ -3213,12 +3221,12 @@ export default function App() {
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
-          notices={club.notices} isAdmin={!!(account&&account.admin)} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
+          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
-          canManage={canManage} isAdmin={!!(account&&account.admin)} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
+          canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="members"&&<MembersTab/>}
         {tab==="stats"&&<StatsTab/>}
-        {tab==="admin"&&FB&&account&&account.admin&&<AdminTab/>}
+        {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
       </div>
       {/* 모임 만들기 버튼: 탭바 바로 위 오른쪽 (모임 상세 화면에서는 숨김) */}
       {!curMeeting&&(
@@ -3235,12 +3243,12 @@ export default function App() {
                   ))}
                 </div>
               </>}
-      {noti&&<NotiSheet items={noti} isAdmin={!!(account&&account.admin)} onClose={()=>setNoti(null)} onPick={n=>{
+      {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
         if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
-        else if(n.type==="member"&&account&&account.admin){ setOpenMeeting(null); setTab("admin"); }
+        else if(n.type==="member"&&adminOn){ setOpenMeeting(null); setTab("admin"); }
       }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
