@@ -2789,16 +2789,18 @@ function MascotSvg({size}) {
       <path d="M76 70.5 Q 80 69.5 80 66" stroke="#0B1E5B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
       </g>
         </svg>
-        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"36.6% 50%"}} viewBox={V}><g transform="rotate(-7 60 60)"><ellipse cx="44" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"36.6% 50%"}} viewBox={V}><g transform="rotate(-7 60 60)"><g transform="rotate(8 44 58)"><ellipse cx="44" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
       <circle cx="48" cy="59.5" r="4.2" fill="#0B1E5B"/>
       <circle cx="49.5" cy="58" r="1.3" fill="#FFFFFF"/>
       <path d="M35 57 Q 44 48 53 57 Z" fill="#D7F24A"/>
-      <path d="M35 57 Q 44 54.5 53 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/></g></svg>
-        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"63% 46.7%"}} viewBox={V}><g transform="rotate(-7 60 60)"><ellipse cx="76" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
+      <path d="M35 57 Q 44 54.5 53 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M35.5 57 Q 32.5 55.6 31 52.8" stroke="#0B1E5B" strokeWidth="2.6" fill="none" strokeLinecap="round"/></g></g></svg>
+        <svg aria-hidden="true" className="sp-wink" style={{...L,transformOrigin:"63% 46.7%"}} viewBox={V}><g transform="rotate(-7 60 60)"><g transform="rotate(-5 76 58)"><ellipse cx="76" cy="58" rx="8" ry="6" fill="#FFFFFF"/>
       <circle cx="80" cy="59.5" r="4.2" fill="#0B1E5B"/>
       <circle cx="81.5" cy="58" r="1.3" fill="#FFFFFF"/>
       <path d="M67 57 Q 76 48 85 57 Z" fill="#D7F24A"/>
-      <path d="M67 57 Q 76 54.5 85 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/></g></svg>
+      <path d="M67 57 Q 76 54.5 85 57" stroke="#0B1E5B" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d="M84.5 57 Q 87.5 55.6 89 52.8" stroke="#0B1E5B" strokeWidth="2.6" fill="none" strokeLinecap="round"/></g></g></svg>
       </div>
       <svg aria-hidden="true" style={L} viewBox={V}>
       <ellipse cx="32" cy="71" rx="8" ry="4.5" fill="#FF8FB1" opacity="0.75"/>
