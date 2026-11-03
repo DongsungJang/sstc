@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=a7f3e0c315">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=a7f3e0c315">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f49cef2db8">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f49cef2db8">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -3658,6 +3658,33 @@ const ago = t => {
   const x = new Date(t);
   return `${x.getMonth() + 1}/${x.getDate()}`;
 };
+// 마지막 접속: club/lastSeen/<uid> 에 시각을 남겨요 (관리자만 읽을 수 있음)
+const SEEN_EVERY = 10 * 60 * 1000;
+const seenText = t => {
+  if (!t) return "접속 기록 없음";
+  const a = ago(t);
+  return a === "방금" ? "방금 접속" : a + " 접속";
+};
+function useLastSeenRecorder(uid) {
+  useEffect(() => {
+    if (!FB || !uid) return;
+    let last = 0;
+    const mark = () => {
+      if (document.visibilityState === "hidden" || Date.now() - last < SEEN_EVERY) return;
+      last = Date.now();
+      FB.club.child("lastSeen/" + uid).set(last).catch(() => {
+        last = 0;
+      });
+    };
+    mark();
+    const t = setInterval(mark, 60 * 1000);
+    document.addEventListener("visibilitychange", mark);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", mark);
+    };
+  }, [uid]);
+}
 const toList = (obj, extra = {}) => Object.keys(obj || {}).map(id => ({
   id,
   ...extra,
@@ -3825,6 +3852,14 @@ function AdminTab() {
   const [busy, setBusy] = useState(false);
   const [showGone, setShowGone] = useState(false);
   const [nameEdit, setNameEdit] = useState(null); // {uid,value} 관리자가 본명 대신 입력
+  const [lastSeen, setLastSeen] = useState({}); // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
+  const [sortSeen, setSortSeen] = useState(false); // 정회원 목록 최근 접속순
+  useEffect(() => {
+    const r = FB.club.child("lastSeen");
+    const h = s => setLastSeen(s.val() || {});
+    r.on("value", h, () => setLastSeen(null));
+    return () => r.off("value", h);
+  }, []);
   useEffect(() => {
     const refs = [["members", v => setMembers(v || {})], ["approved", v => setApproved(v || {})], ["admins", v => setAdmins(v || {})]].map(([p, fn]) => {
       const r = FB.club.child(p);
@@ -3856,6 +3891,8 @@ function AdminTab() {
   const live = list.filter(m => !m.withdrawn || admins[m.uid]);
   const pending = live.filter(m => !approved[m.uid] && !admins[m.uid]);
   const active = live.filter(m => approved[m.uid] || admins[m.uid]);
+  const seenAt = uid => lastSeen && lastSeen[uid] || 0;
+  const activeShown = sortSeen ? [...active].sort((a, b) => seenAt(b.uid) - seenAt(a.uid)) : active;
   const fail = e => setErr(authMsg(e));
   const inbox = (uid, msg) => FB.club.child("inbox/" + uid + "/" + newId()).set({
     ...msg,
@@ -4070,7 +4107,18 @@ function AdminTab() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, m.email, m.tennisStart ? ` · 구력 ${calcCareer(m.tennisStart) || "-"}` : " · 구력 미입력"))), acts && /*#__PURE__*/React.createElement("div", {
+  }, m.email, m.tennisStart ? ` · 구력 ${calcCareer(m.tennisStart) || "-"}` : " · 구력 미입력"), lastSeen && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 11,
+      fontWeight: 600,
+      color: seenAt(m.uid) ? "#4A5578" : "#C0C6D9",
+      marginTop: 1
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "clock",
+    s: 11
+  }), " ", seenText(seenAt(m.uid))))), acts && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -4154,7 +4202,14 @@ function AdminTab() {
       cursor: "pointer",
       fontFamily: FONT
     }
-  }, m.realName ? "수정" : "입력")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["탈퇴일", m.withdrawnAt && new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]].filter(([, v]) => v).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+  }, m.realName ? "수정" : "입력")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["마지막 접속", seenAt(m.uid) && new Date(seenAt(m.uid)).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  })], ["탈퇴일", m.withdrawnAt && new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]].filter(([, v]) => v).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
     key: k
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -4271,13 +4326,23 @@ function AdminTab() {
       ...btnSmall,
       background: GRAD
     }
-  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778")))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC815\uD68C\uC6D0 (", active.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778")))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    action: lastSeen ? sortSeen ? "가입순" : "최근 접속순" : null,
+    onAction: () => setSortSeen(v => !v)
+  }, "\uC815\uD68C\uC6D0 (", active.length, "\uBA85)"), !lastSeen && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 12,
+      color: "#C2610C",
+      lineHeight: 1.6
+    }
+  }, "\uB9C8\uC9C0\uB9C9 \uC811\uC18D\uC744 \uBCF4\uB824\uBA74 README\uC758 \uC0C8 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uADDC\uCE59\uC744 \uCF58\uC194\uC5D0 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 6
     }
-  }, active.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement("p", {
+  }, activeShown.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
@@ -10678,7 +10743,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "a7f3e0c315";
+const BUILD_ID = "f49cef2db8";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -11600,6 +11665,7 @@ function App() {
     [key]: val
   }));
   const club = useClubFeed(account && account.user ? account.user.uid : null); // 알림·공지
+  useLastSeenRecorder(account && account.user ? account.user.uid : null); // 마지막 접속 기록 (10분에 한 번까지)
   const [noti, setNoti] = useState(null); // 알림함 (열 때의 목록)
   const [noticeForm, setNoticeForm] = useState(false);
   const [focusNotice, setFocusNotice] = useState(null);
