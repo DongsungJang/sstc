@@ -44,7 +44,7 @@
 - `votes/<회원 uid>`: 그 회원의 참석 투표(참석·미정·불참, 투표 시각, 게스트)
 - `bracket`, `scores`: 대진표와 게임 점수
 
-자유 게시판 글은 `club/board/<글 id>` 아래 `{uid, name, text, at, editedAt, mentions, likes/<uid>, comments/<댓글 id>}`로 저장돼요.
+소곤소곤 글은 `club/board/<글 id>` 아래 `{uid, name, text, at, editedAt, anon, mentions, likes/<uid>, comments/<댓글 id>}`로 저장돼요. 익명이면 `anon: true`, `name: "익명"`이에요.
 
 회원마다 자기 투표 칸에만 써서 여러 명이 동시에 투표해도 서로 덮어쓰지 않아요.
 파이어베이스 설정이 없으면 같은 모양으로 그 기기(브라우저)에만 저장돼요.
@@ -74,8 +74,8 @@
       }
     },
     "club": {
-      ".read": "auth != null",
       "members": {
+        ".read": "auth != null",
         "$uid": { ".write": "auth != null && (auth.uid === $uid || root.child('club/admins/' + auth.uid).exists())" }
       },
       "nicknames": {
@@ -83,22 +83,28 @@
         "$nick": { ".write": "auth != null && (!data.exists() || data.val() === auth.uid)" }
       },
       "approved": {
+        ".read": "auth != null",
         "$uid": { ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()" }
       },
-      "admins": { ".write": false },
+      "admins": { ".read": "auth != null", ".write": false },
       "feed": {
+        ".read": "auth != null",
         "$id": { ".write": "auth != null && !data.exists()" }
       },
       "inbox": {
+        ".read": "auth != null",
         "$uid": { ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()" }
       },
       "notices": {
+        ".read": "auth != null",
         ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
       },
       "meetings": {
+        ".read": "auth != null",
         ".write": "auth != null && (root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())"
       },
       "board": {
+        ".read": "auth != null && (root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())",
         "$pid": {
           ".write": "auth != null && ((root.child('club/admins/' + auth.uid).exists() && !newData.exists()) || ((root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists()) && (!data.exists() || data.child('uid').val() === auth.uid) && (!newData.exists() || newData.child('uid').val() === auth.uid)))",
           ".validate": "newData.hasChildren(['uid', 'name', 'text', 'at']) && newData.child('text').isString() && newData.child('text').val().length <= 1000",
@@ -113,17 +119,18 @@
             }
           }
         }
-      }
+      },
+      "$other": { ".read": "auth != null" }
     }
   }
 }
 ```
 
-- 로그인한 사람만 읽을 수 있어요. 닉네임 목록은 가입 전 중복 확인 때문에 누구나 읽을 수 있어요.
+- 로그인한 사람만 읽을 수 있어요. (소곤소곤만 정회원·관리자 전용이라 `club` 전체가 아니라 칸마다 읽기 규칙을 따로 둬요. 위에서 읽기를 허락하면 아래에서 막을 수 없는 파이어베이스 규칙 특성 때문이에요.) 닉네임 목록은 가입 전 중복 확인 때문에 누구나 읽을 수 있어요.
 - 자기 프로필은 본인과 관리자만, 승인은 관리자만, 모임 기록(투표·대진·점수)은 승인된 회원과 관리자만 써요.
 - 관리자 목록은 앱에서 아무도 못 바꿔요(콘솔에서만).
 - 알림(`feed`)은 로그인한 사람이 새로 쓰기만 하고 고치거나 지울 수 없어요. 개인 알림(`inbox`)과 공지(`notices`)는 관리자만 써요.
-- 자유 게시판(`board`, 회원 탭)은 정회원과 관리자가 글·댓글·좋아요를 써요. 글과 댓글은 쓴 사람만 고치고 지울 수 있고, 관리자는 남의 글·댓글을 지울 수만 있어요. 좋아요는 자기 칸(`likes/<uid>`)에만 눌러요. 글은 1000자까지예요.
+- 소곤소곤(`board`, 회원 탭 게시판)은 정회원과 관리자만 읽고 글·댓글·좋아요를 써요. 익명 글·댓글도 실제 uid는 저장돼요(본인 수정·삭제용). 앱 화면에는 안 보이지만 데이터베이스를 직접 들여다보면 알 수 있어요. 글과 댓글은 쓴 사람만 고치고 지울 수 있고, 관리자는 남의 글·댓글을 지울 수만 있어요. 좋아요는 자기 칸(`likes/<uid>`)에만 눌러요. 글은 1000자까지예요.
 
 ## 고치는 법
 앱 코드는 `src/app.jsx` 한 파일이에요. 고친 뒤 아래 명령으로 `index.html`을 다시 만들어요.

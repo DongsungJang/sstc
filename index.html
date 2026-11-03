@@ -3486,11 +3486,12 @@ const once = ref => ref.once("value").then(s => s.val());
 // 읽은 시각은 club/members/<uid>/notiSeenAt — 그보다 나중에 온 알림이 '안 읽음'
 const newId = () => Date.now() + "_" + Math.random().toString(36).slice(2, 7);
 const myUid = () => FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
-const postFeed = item => FB ? FB.club.child("feed/" + newId()).set({
+// anon: 소곤소곤 익명 글·댓글에서 보내는 알림은 보낸 사람을 남기지 않아요
+const postFeed = (item, anon) => FB ? FB.club.child("feed/" + newId()).set({
   ...item,
   at: Date.now(),
-  by: ME,
-  byUid: myUid()
+  by: anon ? "익명" : ME,
+  byUid: anon ? "" : myUid()
 }).catch(() => {}) : Promise.resolve();
 const NOTI_ICON = {
   member: "userPlus",
@@ -5638,6 +5639,7 @@ function useMentions() {
   };
 }
 const clip = (t, n = 40) => t.length > n ? t.slice(0, n) + "…" : t;
+// allowAnon: 익명으로 쓰기 선택 (소곤소곤), nameOf(c): 화면에 보일 이름 (익명 번호 등)
 function CommentBox({
   comments,
   save,
@@ -5646,7 +5648,9 @@ function CommentBox({
   isAdmin,
   canWrite = true,
   onAdded,
-  title = "댓글"
+  title = "댓글",
+  allowAnon = false,
+  nameOf
 }) {
   const {
     members,
@@ -5656,31 +5660,37 @@ function CommentBox({
   const [text, setText] = useState(""),
     [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState(null); // {id,text}
+  const [anon, setAnon] = useState(false);
   const uid = myUid() || myVoteKey();
   const all = toList(comments).filter(c => c && c.text).sort((a, b) => a.at - b.at);
-  const notify = (t, prev) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => postFeed({
+  const shown = c => nameOf ? nameOf(c) : c.name;
+  const notify = (t, prev, an) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => postFeed({
     type: "mention",
     to: u,
     ...link,
-    text: `${ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`
-  }));
+    text: `${an ? "익명" : ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`
+  }, an));
   const add = () => {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
     const mentions = mentionsOf(t);
+    const an = allowAnon && anon;
     save(newId(), {
       uid,
-      name: ME,
+      name: an ? "익명" : ME,
       text: t,
       at: Date.now(),
+      ...(an ? {
+        anon: true
+      } : {}),
       ...(Object.keys(mentions).length ? {
         mentions
       } : {})
     }).then(() => {
       setText("");
-      notify(t, null);
-      onAdded && onAdded(t, mentions);
+      notify(t, null, an);
+      onAdded && onAdded(t, mentions, an);
     }).catch(e => alert(authMsg(e))).finally(() => setBusy(false));
   };
   const saveEdit = c => {
@@ -5695,7 +5705,7 @@ function CommentBox({
       mentions: Object.keys(mentions).length ? mentions : null
     }).then(() => {
       setEdit(null);
-      notify(t, c.mentions);
+      notify(t, c.mentions, !!c.anon);
     }).catch(e => alert(authMsg(e)));
   };
   const del = c => {
@@ -5739,8 +5749,8 @@ function CommentBox({
         width: 32,
         height: 32,
         borderRadius: "50%",
-        background: mine ? GRAD : BLUE_LIGHT,
-        color: mine ? "#fff" : BLUE,
+        background: c.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+        color: c.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -5748,7 +5758,7 @@ function CommentBox({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, (c.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, c.anon ? "?" : (c.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -5764,9 +5774,14 @@ function CommentBox({
       style: {
         fontSize: 13,
         fontWeight: 700,
-        color: "#1B2559"
+        color: c.anon ? "#6B7493" : "#1B2559"
       }
-    }, c.name), /*#__PURE__*/React.createElement("span", {
+    }, shown(c)), c.anon && mine && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#A3AAC2"
+      }
+    }, "(\uB0B4 \uB313\uAE00)"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: "#A3AAC2"
@@ -5836,7 +5851,13 @@ function CommentBox({
       onClick: () => del(c),
       style: small
     }, "\uC0AD\uC81C")))));
-  })), canWrite ? /*#__PURE__*/React.createElement("div", {
+  })), canWrite && allowAnon && /*#__PURE__*/React.createElement(AnonToggle, {
+    on: anon,
+    onChange: setAnon,
+    style: {
+      marginBottom: 8
+    }
+  }), canWrite ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -9319,18 +9340,22 @@ const realNameOf = m => {
   return r && r !== m.nickname ? r : "";
 };
 const HAND_ORDER = ["오른손 (양손 백핸드)", "오른손 (한손 백핸드)", "왼손 (양손 백핸드)", "왼손 (한손 백핸드)"];
-// ─── 자유 게시판 (회원 탭) ─────────────────────────────────────────────────────
-// club/board/<pid> = {uid,name,text,at,editedAt,mentions:{uid:true},likes:{uid:true},comments:{<cid>:{uid,name,text,at,editedAt,mentions}}}
-// 정회원·관리자가 글·댓글을 써요. 내 글·댓글은 수정·삭제, 관리자는 삭제만.
-// @닉네임은 그 회원에게 알림, 내 글에 댓글이 달리면 나에게 알림 (feed, to=uid)
+// ─── 소곤소곤 (회원 탭 게시판) ─────────────────────────────────────────────────
+// club/board/<pid> = {uid,name,text,at,editedAt,anon,mentions:{uid:true},likes:{uid:true},comments:{<cid>:{uid,name,text,at,editedAt,anon,mentions}}}
+// 정회원·관리자만 읽고 써요. 내 글·댓글은 수정·삭제, 관리자는 삭제만.
+// 익명(anon:true)이면 name은 "익명"으로 저장하고 화면에도 닉네임을 안 보여 줘요. uid는 본인 수정·삭제와 규칙 확인용으로만 남아요.
+// 댓글의 익명은 글마다 익명1, 익명2…로 번호를 매기고, 익명 글쓴이가 익명 댓글을 달면 "익명(글쓴이)"로 보여요.
+// @닉네임은 그 회원에게 알림, 내 글에 댓글이 달리면 나에게 알림 (feed, to=uid; 익명이면 보낸 사람을 안 남김)
+const BOARD_NAME = "소곤소곤";
 const BOARD_MAX = 1000;
 const saveBoardPath = (path, value) => dbReady.then(db => {
   if (!db) throw new Error("저장소가 없어요");
   return db.doc("board/" + path).set(value);
 });
-function useBoard() {
+function useBoard(enabled) {
   const [posts, setPosts] = useState(null);
   useEffect(() => {
+    if (!enabled) return;
     let alive = true,
       unsub = null;
     dbReady.then(db => {
@@ -9345,8 +9370,56 @@ function useBoard() {
       alive = false;
       if (unsub) unsub();
     };
-  }, []);
+  }, [enabled]);
   return posts;
+}
+function AnonToggle({
+  on,
+  onChange,
+  style
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "switch",
+    "aria-checked": on,
+    onClick: () => onChange(!on),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      background: "none",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      fontWeight: 600,
+      color: on ? BLUE : "#6B7493",
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 20,
+      borderRadius: 999,
+      background: on ? BLUE : "#D6DEF7",
+      position: "relative",
+      transition: "background .15s",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: 2,
+      left: on ? 18 : 2,
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      background: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+      transition: "left .15s"
+    }
+  })), "\uC775\uBA85\uC73C\uB85C \uC4F0\uAE30");
 }
 function PostForm({
   initial,
@@ -9358,6 +9431,7 @@ function PostForm({
   } = useMentions();
   const [text, setText] = useState(initial ? initial.text : ""),
     [busy, setBusy] = useState(false);
+  const [anon, setAnon] = useState(!!(initial && initial.anon));
   const uid = myUid() || myVoteKey();
   const submit = () => {
     const t = text.trim();
@@ -9366,12 +9440,15 @@ function PostForm({
     const mentions = mentionsOf(t),
       pid = initial ? initial.id : newId();
     const ment = Object.keys(mentions).length ? mentions : null;
-    // 고칠 때는 글 내용 칸만 바꿔요 (그사이 달린 댓글·좋아요를 덮지 않게)
-    const write = initial ? Promise.all([saveBoardPath(pid + "/text", t), saveBoardPath(pid + "/editedAt", Date.now()), saveBoardPath(pid + "/mentions", ment)]) : saveBoardPath(pid, {
+    // 고칠 때는 글 칸만 바꿔요 (그사이 달린 댓글·좋아요를 덮지 않게)
+    const write = initial ? Promise.all([saveBoardPath(pid + "/text", t), saveBoardPath(pid + "/editedAt", Date.now()), saveBoardPath(pid + "/mentions", ment), saveBoardPath(pid + "/anon", anon || null), saveBoardPath(pid + "/name", anon ? "익명" : ME)]) : saveBoardPath(pid, {
       uid,
-      name: ME,
+      name: anon ? "익명" : ME,
       text: t,
       at: Date.now(),
+      ...(anon ? {
+        anon: true
+      } : {}),
       ...(ment ? {
         mentions
       } : {})
@@ -9382,8 +9459,8 @@ function PostForm({
         type: "mention",
         to: u,
         postId: pid,
-        text: `${ME} 님이 자유 게시판 글에서 회원님을 불렀어요: "${clip(t)}"`
-      }));
+        text: `${anon ? "익명" : ME} 님이 ${BOARD_NAME} 글에서 회원님을 불렀어요: "${clip(t)}"`
+      }, anon));
       onClose(pid);
     }).catch(e => {
       alert(authMsg(e));
@@ -9410,18 +9487,21 @@ function PostForm({
       marginTop: 12,
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(AnonToggle, {
+    on: anon,
+    onChange: setAnon
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: "#A3AAC2",
-      fontVariantNumeric: "tabular-nums"
+      fontVariantNumeric: "tabular-nums",
+      marginLeft: "auto"
     }
   }, text.length, "/", BOARD_MAX), /*#__PURE__*/React.createElement("button", {
     type: "button",
     disabled: !text.trim() || busy,
     onClick: submit,
     style: {
-      marginLeft: "auto",
       padding: "11px 22px",
       borderRadius: 999,
       border: "none",
@@ -9431,7 +9511,14 @@ function PostForm({
       fontWeight: 700,
       cursor: text.trim() ? "pointer" : "default"
     }
-  }, busy ? "올리는 중…" : initial ? "저장" : "올리기")));
+  }, busy ? "올리는 중…" : initial ? "저장" : "올리기")), anon && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 12,
+      color: "#8A93B2",
+      lineHeight: 1.5
+    }
+  }, "\uB2C9\uB124\uC784 \uB300\uC2E0 \"\uC775\uBA85\"\uC73C\uB85C \uBCF4\uC5EC\uC694. \uB0B4 \uAE00\uC740 \uB098\uB9CC \uC218\uC815\xB7\uC0AD\uC81C\uD560 \uC218 \uC788\uACE0, \uC6B4\uC601\uC9C4\uC740 \uC0AD\uC81C\uB9CC \uD560 \uC218 \uC788\uC5B4\uC694."));
 }
 function PostBody({
   p,
@@ -9474,12 +9561,21 @@ function PostBody({
     }
   }, "\uB354\uBCF4\uAE30"));
 }
+// 글 하나의 익명 댓글 이름: 익명 글쓴이 → "익명(글쓴이)", 나머지는 처음 나온 순서대로 익명1, 익명2…
+function anonNamer(post) {
+  const nums = new Map();
+  toList(post.comments).filter(c => c && c.text && c.anon).sort((a, b) => a.at - b.at).forEach(c => {
+    if (post.anon && c.uid === post.uid) return;
+    if (!nums.has(c.uid)) nums.set(c.uid, nums.size + 1);
+  });
+  return c => !c.anon ? c.name : post.anon && c.uid === post.uid ? "익명(글쓴이)" : `익명${nums.get(c.uid) || ""}`;
+}
 function FreeBoard({
   canWrite,
   isAdmin,
   focus
 }) {
-  const posts = useBoard();
+  const posts = useBoard(canWrite);
   const {
     names
   } = useMentions();
@@ -9495,13 +9591,49 @@ function FreeBoard({
   useEffect(() => {
     if (focus) go(focus.split("#")[0]);
   }, [focus]);
+  if (!canWrite) return /*#__PURE__*/React.createElement(Card, {
+    style: {
+      textAlign: "center",
+      padding: "28px 20px"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      width: 48,
+      height: 48,
+      borderRadius: "50%",
+      background: BLUE_LIGHT,
+      color: BLUE,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "message",
+    size: 22,
+    stroke: 1.9
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, BOARD_NAME, "\uC740 \uC815\uD68C\uC6D0 \uACF5\uAC04\uC774\uC5D0\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 13,
+      color: "#6B7493",
+      lineHeight: 1.5
+    }
+  }, "\uC6B4\uC601\uC9C4\uC774 \uAC00\uC785\uC744 \uC2B9\uC778\uD558\uBA74 \uAE00\uC744 \uC77D\uACE0 \uC4F8 \uC218 \uC788\uC5B4\uC694."));
   if (!posts) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 14,
       color: "#6B7493"
     }
-  }, "\uAC8C\uC2DC\uD310\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC774\uC5D0\uC694\u2026"));
+  }, BOARD_NAME, "\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC774\uC5D0\uC694\u2026"));
   const like = p => {
     const on = !!(p.likes && p.likes[uid]);
     saveBoardPath(`${p.id}/likes/${uid}`, on ? null : true).catch(e => alert(authMsg(e)));
@@ -9551,8 +9683,8 @@ function FreeBoard({
         width: 38,
         height: 38,
         borderRadius: "50%",
-        background: mine ? GRAD : BLUE_LIGHT,
-        color: mine ? "#fff" : BLUE,
+        background: p.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+        color: p.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -9560,7 +9692,7 @@ function FreeBoard({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, (p.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, p.anon ? "?" : (p.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -9570,19 +9702,19 @@ function FreeBoard({
         display: "block",
         fontSize: 14,
         fontWeight: 700,
-        color: "#1B2559"
+        color: p.anon ? "#6B7493" : "#1B2559"
       }
-    }, p.name, mine && /*#__PURE__*/React.createElement("span", {
+    }, p.anon ? "익명" : p.name, mine && /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: 6,
         fontSize: 10,
-        background: BLUE,
+        background: p.anon ? "#A3AAC2" : BLUE,
         color: "#fff",
         padding: "1px 6px",
         borderRadius: 10,
         verticalAlign: "2px"
       }
-    }, "\uB098")), /*#__PURE__*/React.createElement("span", {
+    }, p.anon ? "내 글" : "나")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: "#A3AAC2"
@@ -9607,7 +9739,6 @@ function FreeBoard({
       type: "button",
       "aria-pressed": on,
       "aria-label": on ? "좋아요 취소" : "좋아요",
-      disabled: !canWrite,
       onClick: e => {
         e.stopPropagation();
         like(p);
@@ -9615,8 +9746,7 @@ function FreeBoard({
       style: {
         ...small,
         fontSize: 13,
-        color: on ? "#ef4444" : "#8A93B2",
-        cursor: canWrite ? "pointer" : "default"
+        color: on ? "#ef4444" : "#8A93B2"
       }
     }, /*#__PURE__*/React.createElement("svg", {
       width: "17",
@@ -9677,22 +9807,24 @@ function FreeBoard({
       comments: open.comments,
       isAdmin: isAdmin,
       canWrite: canWrite,
+      allowAnon: true,
+      nameOf: anonNamer(open),
       save: (cid, v) => saveBoardPath(`${open.id}/comments/${cid}`, v),
-      where: `자유 게시판 "${clip(open.text, 15)}" 글 댓글`,
+      where: `${BOARD_NAME} "${clip(open.text, 15)}" 글 댓글`,
       link: {
         postId: open.id
       },
-      onAdded: (t, ment) => {
+      onAdded: (t, ment, an) => {
         if (open.uid && open.uid !== uid && !(ment && ment[open.uid])) postFeed({
           type: "boardComment",
           to: open.uid,
           postId: open.id,
-          text: `${ME} 님이 내 글에 댓글을 달았어요: "${clip(t)}"`
-        });
+          text: `${an ? "익명" : ME} 님이 내 글에 댓글을 달았어요: "${clip(t)}"`
+        }, an);
       }
     }));
   } else {
-    body = /*#__PURE__*/React.createElement(React.Fragment, null, canWrite ? /*#__PURE__*/React.createElement("button", {
+    body = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => setForm({}),
       style: {
@@ -9730,17 +9862,7 @@ function FreeBoard({
         fontSize: 14,
         color: "#A3AAC2"
       }
-    }, ME, " \uB2D8, \uC624\uB298 \uD14C\uB2C8\uC2A4 \uC5B4\uB560\uC5B4\uC694?")) : /*#__PURE__*/React.createElement(Card, {
-      style: {
-        padding: 14
-      }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: 0,
-        fontSize: 13,
-        color: "#6B7493"
-      }
-    }, "\uC815\uD68C\uC6D0\uC774 \uB418\uBA74 \uAE00\uACFC \uB313\uAE00\uC744 \uC4F8 \uC218 \uC788\uC5B4\uC694.")), posts.length === 0 && /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uAE00\uC774 \uC5C6\uC5B4\uC694. \uCCAB \uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694!"), posts.map(p => /*#__PURE__*/React.createElement("div", {
+    }, ME, " \uB2D8, \uC624\uB298 \uD14C\uB2C8\uC2A4 \uC5B4\uB560\uC5B4\uC694?")), posts.length === 0 && /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uAE00\uC774 \uC5C6\uC5B4\uC694. \uCCAB \uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694!"), posts.map(p => /*#__PURE__*/React.createElement("div", {
       key: p.id,
       role: "button",
       tabIndex: 0,
@@ -9800,7 +9922,7 @@ function MembersTab({
       padding: 4,
       boxShadow: "0 4px 16px rgba(40,70,180,0.08)"
     }
-  }, [["list", "회원 목록", "users"], ["board", "자유 게시판", "message"]].map(([k, l, ic]) => /*#__PURE__*/React.createElement("button", {
+  }, [["list", "회원 목록", "users"], ["board", BOARD_NAME, "message"]].map(([k, l, ic]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     type: "button",
     role: "tab",
