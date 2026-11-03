@@ -2364,7 +2364,7 @@ function MiniCalendar({onOpen}){
               {gone?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:GONE.c,color:"#fff",whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
                 :<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE}}>{full?"마감 ":""}{m.attendees.length}/{m.total}명</span>}
             </span>
-            <span style={{fontSize:14,color:"#4A5578",display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={14}/>{m.place}</span>
+            <span style={{fontSize:14,color:"#4A5578",display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={14}/>{m.placeName||m.place}</span>
             <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",fontSize:12}}>
               <span style={{color:gone?GONE.c:isAtt?BLUE:"#A3AAC2",fontWeight:isAtt||gone?700:400}}>{gone?"무산된 모임이에요":isAtt?"참석 예정이에요":m.status==="past"?"지난 모임":"아직 참석 안 했어요"}</span>
               <span style={{color:BLUE,fontWeight:600}}>자세히 보기 →</span>
