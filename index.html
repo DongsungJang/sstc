@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fce52e4183">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fce52e4183">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -10450,6 +10450,121 @@ function MemberList({
   }, "\uCE74\uB4DC\uB97C \uB204\uB974\uBA74 \uC190\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uC640 \uCC38\uAC00 \uC608\uC815 \uBAA8\uC784\uB3C4 \uBCF4\uC5EC\uC694. \uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
 }
 
+// ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
+// 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
+// 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
+const BUILD_ID = "fce52e4183";
+function useNewVersion() {
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (BUILD_ID === "dev" || typeof fetch === "undefined" || location.protocol === "file:") return;
+    let last = 0;
+    const check = () => {
+      if (document.visibilityState === "hidden" || Date.now() - last < 60000) return;
+      last = Date.now();
+      fetch("version.json?t=" + Date.now(), {
+        cache: "no-store"
+      }).then(r => r.ok ? r.json() : null).then(v => {
+        if (v && v.build && v.build !== BUILD_ID) setFresh(true);
+      }).catch(() => {});
+    };
+    check();
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, []);
+  return fresh;
+}
+// 업데이트: 주소에 ?v=를 바꿔 붙여서 저장된 예전 페이지 대신 새로 받아 오게 해요 (#meeting- 같은 주소 뒷부분은 유지)
+const reloadFresh = () => {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set("v", String(Date.now()));
+    location.replace(u.toString());
+  } catch (e) {
+    location.reload();
+  }
+};
+function UpdateBanner() {
+  const fresh = useNewVersion();
+  const [hide, setHide] = useState(false);
+  if (!fresh || hide) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    style: {
+      position: "fixed",
+      top: "calc(10px + env(safe-area-inset-top,0px))",
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "calc(100% - 24px)",
+      maxWidth: 416,
+      zIndex: 60,
+      background: "#0B1E5B",
+      color: "#fff",
+      borderRadius: 18,
+      boxShadow: "0 10px 28px rgba(11,30,91,0.35)",
+      padding: "12px 12px 12px 16px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      boxSizing: "border-box",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "\uC0C8 \uBC84\uC804\uC774 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 12,
+      opacity: 0.8,
+      lineHeight: 1.4
+    }
+  }, "\uC5C5\uB370\uC774\uD2B8\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694. \uADF8\uB798\uB3C4 \uADF8\uB300\uB85C\uBA74 \uC571\uC744 \uC644\uC804\uD788 \uAED0\uB2E4\uAC00 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694.")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: reloadFresh,
+    style: {
+      padding: "9px 14px",
+      background: "#D7F24A",
+      color: "#0B1E5B",
+      border: "none",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+      fontFamily: FONT
+    }
+  }, "\uC5C5\uB370\uC774\uD2B8"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setHide(true),
+    "aria-label": "\uC548\uB0B4 \uB2EB\uAE30",
+    style: {
+      background: "none",
+      border: "none",
+      color: "#fff",
+      opacity: 0.7,
+      padding: 4,
+      cursor: "pointer",
+      display: "flex"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 16
+  })));
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
 const TABS = [{
   key: "home",
@@ -11310,9 +11425,9 @@ function App() {
     list: newMembers.filter(isNew).length,
     board: newPosts.filter(isNew).length
   };
-  if (splash) return /*#__PURE__*/React.createElement(SplashScreen, {
+  if (splash) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
-  });
+  }), /*#__PURE__*/React.createElement(UpdateBanner, null));
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
   const pending = FB && screen === "main" && account && account.user && !account.admin && !account.approved;
@@ -11331,7 +11446,7 @@ function App() {
         margin: "0 auto",
         fontFamily: FONT
       }
-    }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement("div", {
       style: {
         background: GRAD,
         borderRadius: "0 0 36px 36px",
@@ -11598,7 +11713,7 @@ function App() {
       flexDirection: "column",
       fontFamily: FONT
     }
-  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement("div", {
     style: {
       background: GRAD,
       color: "#fff",
