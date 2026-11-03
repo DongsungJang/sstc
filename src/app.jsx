@@ -1357,6 +1357,7 @@ function AdminTab(){
   const [sent,setSent]=useState("");
   const [busy,setBusy]=useState(false);
   const [showGone,setShowGone]=useState(false);
+  const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
   useEffect(()=>{
     const refs=[["members",v=>setMembers(v||{})],["approved",v=>setApproved(v||{})],["admins",v=>setAdmins(v||{})]]
       .map(([p,fn])=>{const r=FB.club.child(p);const h=s=>fn(s.val());r.on("value",h,e=>setErr(authMsg(e)));return ()=>r.off("value",h);});
@@ -1380,6 +1381,15 @@ function AdminTab(){
       .then(()=>FB.club.child("members/"+m.uid).update({withdrawn:true,withdrawnAt:Date.now()})).catch(fail);
     setSel(s=>{const n={...s};delete n[m.uid];return n;}); };
   const restore=m=>FB.club.child("members/"+m.uid).update({withdrawn:null,withdrawnAt:null}).catch(fail);
+  // 본명 대신 입력·수정 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
+  const startName=m=>{ setOpen(m.uid); setNameEdit({uid:m.uid,value:m.realName||""}); };
+  const saveName=m=>{
+    const v=(nameEdit&&nameEdit.value||"").trim();
+    if(!v){ window.alert("본명을 입력해 주세요"); return; }
+    if(v.length>20){ window.alert("본명은 20자까지 넣을 수 있어요"); return; }
+    FB.club.child("members/"+m.uid).update({realName:v,realNameBy:ME,realNameAt:Date.now()})
+      .then(()=>setNameEdit(null)).catch(fail);
+  };
   // 알림 보내기
   const pick=list=>setSel(Object.fromEntries(list.map(m=>[m.uid,true])));
   const chosen=live.filter(m=>sel[m.uid]);
@@ -1404,7 +1414,8 @@ function AdminTab(){
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
-            <span style={{fontSize:12,color:m.realName?"#4A5578":"#C2610C"}}>{m.realName?`(${m.realName})`:"(본명 미입력)"}</span>
+            {m.realName?<span style={{fontSize:12,color:"#4A5578"}}>({m.realName})</span>
+              :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:999,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
             {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
           </div>
@@ -1414,6 +1425,21 @@ function AdminTab(){
       {acts&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>{acts}</div>}
       {open===m.uid&&(
         <div style={{marginTop:8,fontSize:12,color:"#4A5578",lineHeight:1.7}}>
+          {nameEdit&&nameEdit.uid===m.uid?(
+            <div style={{display:"flex",gap:6,alignItems:"center",margin:"2px 0 8px"}}>
+              <input type="text" aria-label={`${m.nickname} 본명`} autoFocus value={nameEdit.value} maxLength={20} placeholder="본명 입력"
+                onChange={e=>setNameEdit({uid:m.uid,value:e.target.value})} onKeyDown={e=>{if(e.key==="Enter")saveName(m);if(e.key==="Escape")setNameEdit(null);}}
+                style={{...inputStyle,flex:1,minWidth:0,padding:"8px 12px",fontSize:14}}/>
+              <button type="button" onClick={()=>saveName(m)} style={{...btnSmall,background:GRAD}}>저장</button>
+              {small("취소",()=>setNameEdit(null))}
+            </div>
+          ):(
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{color:"#A3AAC2",display:"inline-block",width:84}}>본명</span>
+              <span style={{flex:1,color:m.realName?"#4A5578":"#C2610C"}}>{m.realName||"미입력"}{m.realName&&m.realNameBy?<span style={{color:"#A3AAC2"}}> · {m.realNameBy} 님이 입력</span>:null}</span>
+              <button type="button" onClick={()=>startName(m)} style={{fontSize:12,fontWeight:600,color:BLUE,background:"none",border:"none",padding:"2px 4px",cursor:"pointer",fontFamily:FONT}}>{m.realName?"수정":"입력"}</button>
+            </div>
+          )}
           {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
             ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo],
             ["탈퇴일",m.withdrawnAt&&new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]]
@@ -1456,7 +1482,7 @@ function AdminTab(){
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {active.map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
-        <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
+        <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있고, 본명도 대신 넣거나 고칠 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
       {gone.length>0&&<Card>
         <SectionTitle action={showGone?"접기":"펼치기"} onAction={()=>setShowGone(v=>!v)}>탈퇴 회원 ({gone.length}명)</SectionTitle>
@@ -2460,6 +2486,7 @@ function ProfileEdit({account,onDone,onCancel}) {
     PROFILE_FIELDS.forEach(k=>{ patch[k]=data[k]===undefined?null:data[k]; });
     patch.region=data.region==="타지역"?(data.regionCustom||"타지역"):data.region;
     patch.realName=(data.realName||"").trim();
+    if(patch.realName!==(pr.realName||"")){ patch.realNameBy=null; patch.realNameAt=null; }   // 본인이 고치면 '관리자가 입력' 표시를 지워요
     patch.updatedAt=Date.now();
     const oldNick=pr.nickname||ME, newNick=(data.nickname||"").trim()||oldNick;
     if(newNick!==oldNick) patch.nickname=newNick;
