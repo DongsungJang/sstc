@@ -2782,6 +2782,20 @@ function AddressSearch({onPick}){
 }
 // 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
 const placeKey=v=>String(v||"").replace(/\s+/g,"").toLowerCase();
+// 한글을 자모로 풀어서 비교해요: 치는 중인 글자("올리" → "올림픽")도 맞고, 초성만 쳐도("ㅇㄹㅍ") 찾아요
+const CHO="ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", JUNG="ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ", JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const JAMO_SPLIT={"ㄳ":"ㄱㅅ","ㄵ":"ㄴㅈ","ㄶ":"ㄴㅎ","ㄺ":"ㄹㄱ","ㄻ":"ㄹㅁ","ㄼ":"ㄹㅂ","ㄽ":"ㄹㅅ","ㄾ":"ㄹㅌ","ㄿ":"ㄹㅍ","ㅀ":"ㄹㅎ","ㅄ":"ㅂㅅ","ㅘ":"ㅗㅏ","ㅙ":"ㅗㅐ","ㅚ":"ㅗㅣ","ㅝ":"ㅜㅓ","ㅞ":"ㅜㅔ","ㅟ":"ㅜㅣ","ㅢ":"ㅡㅣ"};
+const jamoOf=v=>[...placeKey(v)].map(c=>{ const n=c.charCodeAt(0)-0xAC00; const t=n<0||n>11171?c:CHO[Math.floor(n/588)]+JUNG[Math.floor(n%588/28)]+JONG[n%28]; return [...t].map(x=>JAMO_SPLIT[x]||x).join(""); }).join("");
+const choOf=v=>[...placeKey(v)].map(c=>{ const n=c.charCodeAt(0)-0xAC00; return n<0||n>11171?c:CHO[Math.floor(n/588)]; }).join("");
+// 0 = 앞글자가 같음, 1 = 중간에 들어 있음, 2 = 주소에 들어 있음, -1 = 안 맞음
+function placeMatch(p,q){
+  const jq=jamoOf(q), cq=choOf(q), choOnly=/^[ㄱ-ㅎ]+$/.test(cq)&&cq===placeKey(q);
+  const jn=jamoOf(p.name), cn=choOf(p.name);
+  if(jn.startsWith(jq)||(choOnly&&cn.startsWith(cq))) return 0;
+  if(jn.includes(jq)||(choOnly&&cn.includes(cq))) return 1;
+  if(p.address&&jamoOf(p.address).includes(jq)) return 2;
+  return -1;
+}
 function placeHistory(){
   const map={};
   MEETINGS.forEach(m=>{ const name=String(m.placeName||"").trim(); if(!name) return; const k=placeKey(name);
@@ -2797,12 +2811,13 @@ function PlaceInput({value,onChange,onPick}) {
   const [all]=useState(placeHistory);
   const [open,setOpen]=useState(false);
   const k=placeKey(value);
-  const list=all.filter(p=>!k||placeKey(p.name).includes(k)||placeKey(p.address).includes(k)).filter(p=>placeKey(p.name)!==k).slice(0,5);
+  // 빈칸일 땐 안 띄우고, 한 글자라도 치면 그걸로 시작하는 곳 → 들어 있는 곳 순 (같으면 자주·최근 쓴 곳 먼저)
+  const list=!k?[]:all.map(p=>({p,r:placeMatch(p,value)})).filter(x=>x.r>=0&&placeKey(x.p.name)!==k).sort((a,b)=>a.r-b.r).slice(0,5).map(x=>x.p);
   return <div style={{position:"relative"}}>
     <input type="text" aria-label="테니스장 이름" value={value} autoComplete="off" onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setOpen(false)}
       placeholder="예: 올림픽공원 테니스장" style={inputStyle}/>
     {open&&list.length>0&&<div role="listbox" aria-label="이전에 쓴 테니스장" style={{marginTop:6,border:"1px solid #E4E9F7",borderRadius:14,background:"#fff",overflow:"hidden",boxShadow:"0 6px 18px rgba(33,82,230,0.10)"}}>
-      <p style={{margin:0,padding:"8px 14px 4px",fontSize:11,color:"#A3AAC2"}}>{k?"이전에 쓴 테니스장":"자주 쓴 테니스장"}</p>
+      <p style={{margin:0,padding:"8px 14px 4px",fontSize:11,color:"#A3AAC2"}}>이전에 쓴 테니스장</p>
       {list.map(p=><button key={p.name} type="button" role="option" aria-selected={false} onMouseDown={e=>e.preventDefault()} onClick={()=>{onPick(p);setOpen(false);}}
         style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 14px",border:"none",borderTop:"1px solid #F1F4FB",background:"#fff",textAlign:"left",cursor:"pointer"}}>
         <Icon name="pin" size={16} stroke={2} color="#7C93E8"/>
