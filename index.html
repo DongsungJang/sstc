@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=13a039ddcf">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=13a039ddcf">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=67addd13b9">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=67addd13b9">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -8867,6 +8867,139 @@ function AddressSearch({
     }
   });
 }
+// 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
+const placeKey = v => String(v || "").replace(/\s+/g, "").toLowerCase();
+function placeHistory() {
+  const map = {};
+  MEETINGS.forEach(m => {
+    const name = String(m.placeName || "").trim();
+    if (!name) return;
+    const k = placeKey(name);
+    const at = Math.max(+(m.info && m.info.createdAt) || 0, Date.parse(m.iso) || 0);
+    const e = map[k] || (map[k] = {
+      name,
+      count: 0,
+      at: 0,
+      address: "",
+      surface: ""
+    });
+    e.count++;
+    if (at >= e.at) {
+      e.at = at;
+      e.name = name;
+      if (m.address) e.address = m.address;
+      if (m.surface) e.surface = m.surface;
+    } else {
+      if (!e.address && m.address) e.address = m.address;
+      if (!e.surface && m.surface) e.surface = m.surface;
+    }
+  });
+  return Object.values(map).sort((a, b) => b.count - a.count || b.at - a.at);
+}
+// 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요
+function PlaceInput({
+  value,
+  onChange,
+  onPick
+}) {
+  const [all] = useState(placeHistory);
+  const [open, setOpen] = useState(false);
+  const k = placeKey(value);
+  const list = all.filter(p => !k || placeKey(p.name).includes(k) || placeKey(p.address).includes(k)).filter(p => placeKey(p.name) !== k).slice(0, 5);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
+    value: value,
+    autoComplete: "off",
+    onChange: e => {
+      onChange(e.target.value);
+      setOpen(true);
+    },
+    onFocus: () => setOpen(true),
+    onBlur: () => setOpen(false),
+    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
+    style: inputStyle
+  }), open && list.length > 0 && /*#__PURE__*/React.createElement("div", {
+    role: "listbox",
+    "aria-label": "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5",
+    style: {
+      marginTop: 6,
+      border: "1px solid #E4E9F7",
+      borderRadius: 14,
+      background: "#fff",
+      overflow: "hidden",
+      boxShadow: "0 6px 18px rgba(33,82,230,0.10)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      padding: "8px 14px 4px",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, k ? "이전에 쓴 테니스장" : "자주 쓴 테니스장"), list.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.name,
+    type: "button",
+    role: "option",
+    "aria-selected": false,
+    onMouseDown: e => e.preventDefault(),
+    onClick: () => {
+      onPick(p);
+      setOpen(false);
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      width: "100%",
+      padding: "10px 14px",
+      border: "none",
+      borderTop: "1px solid #F1F4FB",
+      background: "#fff",
+      textAlign: "left",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pin",
+    size: 16,
+    stroke: 2,
+    color: "#7C93E8"
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#1B2547",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, p.name), p.address && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 11,
+      color: "#8A93B0",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, p.address)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2",
+      flexShrink: 0
+    }
+  }, p.count, "\uD68C")))));
+}
 function MeetingForm({
   initial,
   defaultKind,
@@ -9197,12 +9330,15 @@ function MeetingForm({
     label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
     required: true,
     error: errors.place
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
+  }, /*#__PURE__*/React.createElement(PlaceInput, {
     value: f.place,
-    onChange: e => set("place", e.target.value),
-    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
-    style: inputStyle
+    onChange: v => set("place", v),
+    onPick: p => setF(o => ({
+      ...o,
+      place: p.name,
+      address: o.address || p.address || "",
+      surface: o.surface || p.surface || ""
+    }))
   })), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uCF54\uD2B8 \uBC88\uD638",
     required: true,
@@ -10472,7 +10608,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "13a039ddcf";
+const BUILD_ID = "67addd13b9";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
