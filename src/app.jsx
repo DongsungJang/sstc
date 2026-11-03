@@ -3215,6 +3215,41 @@ function MemberList({onOpenMeeting}){
   );
 }
 
+// ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
+// 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
+// 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
+const BUILD_ID="dev";
+function useNewVersion(){
+  const [fresh,setFresh]=useState(false);
+  useEffect(()=>{
+    if(BUILD_ID==="dev"||typeof fetch==="undefined"||location.protocol==="file:") return;
+    let last=0;
+    const check=()=>{ if(document.visibilityState==="hidden"||Date.now()-last<60000) return; last=Date.now();
+      fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null)
+        .then(v=>{ if(v&&v.build&&v.build!==BUILD_ID) setFresh(true); }).catch(()=>{}); };
+    check();
+    document.addEventListener("visibilitychange",check); window.addEventListener("focus",check);
+    return ()=>{ document.removeEventListener("visibilitychange",check); window.removeEventListener("focus",check); };
+  },[]);
+  return fresh;
+}
+// 업데이트: 주소에 ?v=를 바꿔 붙여서 저장된 예전 페이지 대신 새로 받아 오게 해요 (#meeting- 같은 주소 뒷부분은 유지)
+const reloadFresh=()=>{ try{ const u=new URL(location.href); u.searchParams.set("v",String(Date.now())); location.replace(u.toString()); }catch(e){ location.reload(); } };
+function UpdateBanner(){
+  const fresh=useNewVersion();
+  const [hide,setHide]=useState(false);
+  if(!fresh||hide) return null;
+  return(
+    <div role="status" style={{position:"fixed",top:"calc(10px + env(safe-area-inset-top,0px))",left:"50%",transform:"translateX(-50%)",width:"calc(100% - 24px)",maxWidth:416,zIndex:60,background:"#0B1E5B",color:"#fff",borderRadius:18,boxShadow:"0 10px 28px rgba(11,30,91,0.35)",padding:"12px 12px 12px 16px",display:"flex",alignItems:"center",gap:10,boxSizing:"border-box",fontFamily:FONT}}>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{margin:0,fontSize:14,fontWeight:700}}>새 버전이 있어요</p>
+        <p style={{margin:"2px 0 0",fontSize:12,opacity:0.8,lineHeight:1.4}}>업데이트를 눌러 주세요. 그래도 그대로면 앱을 완전히 껐다가 다시 열어 주세요.</p>
+      </div>
+      <button type="button" onClick={reloadFresh} style={{padding:"9px 14px",background:"#D7F24A",color:"#0B1E5B",border:"none",borderRadius:999,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:FONT}}>업데이트</button>
+      <button type="button" onClick={()=>setHide(true)} aria-label="안내 닫기" style={{background:"none",border:"none",color:"#fff",opacity:0.7,padding:4,cursor:"pointer",display:"flex"}}><Icon name="x" size={16}/></button>
+    </div>);
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
 const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"stats",label:"통계",icon:"chart"}];
 
@@ -3475,7 +3510,7 @@ export default function App() {
     .filter(m=>m&&!m.withdrawn&&!clubData.approved[m.uid]&&!clubData.admins[m.uid]).map(pendingNewItem):[];
   const tabBadge={booking:tabNewCount("booking",newMeetings),members:tabNewCount("members",[...newMembers,...newPosts]),admin:tabNewCount("admin",newPending)};
   const membersNew={list:newMembers.filter(isNew).length,board:newPosts.filter(isNew).length};
-  if(splash) return <SplashScreen onStart={()=>setSplash(false)}/>;
+  if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
   const pending=FB&&screen==="main"&&account&&account.user&&!account.admin&&!account.approved;
@@ -3484,7 +3519,7 @@ export default function App() {
     const titles={login:"로그인",forgot:"비밀번호 찾기",signup:"회원가입"};
     return(
       <div style={{minHeight:"100vh",background:"#F3F5FB",maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
-        <style>{GLOBAL_CSS}</style>
+        <style>{GLOBAL_CSS}</style><UpdateBanner/>
         {/* 파란 히어로 */}
         <div style={{background:GRAD,borderRadius:"0 0 36px 36px",padding:`${screen==="login"?56:36}px 24px ${screen==="login"?88:72}px`,color:"#fff",textAlign:"center",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",width:220,height:220,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.18)",top:-90,right:-70}}/>
@@ -3552,7 +3587,7 @@ export default function App() {
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#F3F5FB",display:"flex",flexDirection:"column",fontFamily:FONT}}>
-      <style>{GLOBAL_CSS}</style>
+      <style>{GLOBAL_CSS}</style><UpdateBanner/>
       {/* 파란 헤더 */}
       <div style={{background:GRAD,color:"#fff",borderRadius:"0 0 32px 32px",padding:`18px 20px ${isHome?56:26}px`,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.15)",top:-80,right:-60}}/>
