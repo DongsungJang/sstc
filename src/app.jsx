@@ -131,6 +131,9 @@ const FLASH_TYPE={game:"게임",training:"훈련"};
 // 코트비 1인당: 참석 확정 인원(게스트 포함)으로 나누고 100원 단위 올림
 const perHead=(fee,n)=>n>0?Math.ceil(fee/n/100)*100:0;
 const won=n=>Number(n||0).toLocaleString("ko-KR")+"원";
+// 모임 종류별 색: 정기 파랑, 번개 게임 주황, 번개 훈련 초록 (달력 점·배지에 같이 씀)
+const KIND_COLOR={regular:{dot:BLUE,bg:BLUE_LIGHT,c:BLUE},game:{dot:"#F59E0B",bg:"#FFF4E5",c:"#C2610C"},training:{dot:"#12B76A",bg:"#E5F7EE",c:"#067647"}};
+const kindKey=m=>m&&m.kind==="flash"?(m.flashType==="training"?"training":"game"):"regular";
 const kindOf=info=>info&&info.kind==="flash"?"flash":"regular";
 function toMeeting(id,rec,series){
   const info=rec.info, today=todayYmd(), capacity=+info.capacity||0, guestCap=+info.guestCap||0;
@@ -2304,8 +2307,8 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
 }
 
 // ─── 작은 달력 (예약 탭 맨 위) ─────────────────────────────────────────────────
-// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 주황, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
-const KIND_DOT={regular:BLUE,flash:"#F59E0B"};
+// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 게임 주황, 번개 훈련 초록, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
+const KIND_DOT=Object.fromEntries(Object.entries(KIND_COLOR).map(([k,v])=>[k,v.dot]));
 function MiniCalendar({onOpen}){
   const today=todayYmd();
   const [ym,setYm]=useState(()=>today.slice(0,7));
@@ -2341,14 +2344,14 @@ function MiniCalendar({onOpen}){
               <span style={{width:22,height:22,lineHeight:"22px",borderRadius:999,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
                 background:isToday?GRAD:"transparent",color:isToday?"#fff":past?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:"#1B2559"}}>{d}</span>
               <span style={{display:"flex",gap:2,height:5,alignItems:"center"}}>
-                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:999,background:m.cancelled?"transparent":KIND_DOT[m.kind]||BLUE,border:m.cancelled?`1.2px solid ${GONE.c}`:"none",opacity:past?0.45:1}}/>)}
+                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:999,background:m.cancelled?"transparent":KIND_DOT[kindKey(m)],border:m.cancelled?`1.2px solid ${GONE.c}`:"none",opacity:past?0.45:1}}/>)}
                 {list.length>3&&<span style={{fontSize:8,lineHeight:"5px",color:"#6B7493",fontWeight:700}}>+{list.length-3}</span>}
               </span>
             </button>);
         })}
       </div>
       <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6,fontSize:11,color:"#6B7493"}}>
-        {[["regular","정기"],["flash","번개"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:999,background:KIND_DOT[k]}}/>{l}</span>)}
+        {[["regular","정기"],["game","번개 게임"],["training","번개 훈련"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:999,background:KIND_DOT[k]}}/>{l}</span>)}
         <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:999,border:`1.2px solid ${GONE.c}`}}/>무산</span>
       </div>
       {picked&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
@@ -2747,8 +2750,8 @@ function ensureSeries(all){
   return Promise.all(jobs);
 }
 function KindBadge({m}){
-  const flash=m.kind==="flash";
-  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:flash?"#FFF4E5":BLUE_LIGHT,color:flash?"#C2610C":BLUE,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
+  const flash=m.kind==="flash", col=KIND_COLOR[kindKey(m)];
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:col.bg,color:col.c,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
 }
 function Pills({value,options,onChange,label}){
   return(
@@ -2834,13 +2837,15 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
   const editing=!!initial;
   const [f,setF]=useState(()=>initial
     ?{...initial.info,kind:kindOf(initial.info),flashType:initial.info.flashType||"game",courtFee:initial.info.courtFee?String(initial.info.courtFee):"",capacity:String(initial.info.capacity),guestCap:String(initial.info.guestCap||0),openAt:initial.info.openAt||"",repeat:"none",applyFuture:false,scope:"one"}
-    :(()=>{const date=nextSaturday();return {kind:defaultKind==="flash"?"flash":"regular",flashType:"game",courtFee:"",date,start:"08:00",end:"12:00",place:"",capacity:"12",guestCap:"0",openAt:weekBefore(date),desc:"",
+    :(()=>{const date=nextSaturday();return {kind:defaultKind==="flash"?"flash":"regular",flashType:"game",courtFee:"",date,start:"08:00",end:"12:00",place:"",capacity:defaultKind==="flash"?"4":"12",guestCap:"0",openAt:weekBefore(date),desc:"",
       repeat:"none",openDow:"0",openTime:"21:00",endDate:""};})());
   const [errors,setErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [addrOpen,setAddrOpen]=useState(false);
-  const set=(k,v)=>setF(p=>{const n={...p,[k]:v}; if(k==="date"&&!editing&&v) n.openAt=weekBefore(v); if(k==="kind"&&v==="flash") n.repeat="none"; return n;});
+  const set=(k,v)=>setF(p=>{const n={...p,[k]:v}; if(k==="date"&&!editing&&v) n.openAt=weekBefore(v); if(k==="kind"&&v==="flash") n.repeat="none";
+    if(k==="kind"&&!editing){ if(v==="flash"&&p.capacity==="12") n.capacity="4"; if(v==="regular"&&p.capacity==="4") n.capacity="12"; }   // 기본 인원: 번개 4명, 정기 12명 (직접 바꾼 값은 그대로)
+    return n;});
   const repeating=!editing&&f.kind==="regular"&&f.repeat!=="none";
   const rule={dow:+f.openDow,time:f.openTime};
   const preview=repeating&&f.date&&f.openTime?[0,1,2].map(i=>addDays(f.date,7*(+f.repeat)*i)).filter(d=>!f.endDate||d<=f.endDate):[];

@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=735c6957f7">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=735c6957f7">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=a98de67f6c">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=a98de67f6c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -331,6 +331,25 @@ const FLASH_TYPE = {
 // 코트비 1인당: 참석 확정 인원(게스트 포함)으로 나누고 100원 단위 올림
 const perHead = (fee, n) => n > 0 ? Math.ceil(fee / n / 100) * 100 : 0;
 const won = n => Number(n || 0).toLocaleString("ko-KR") + "원";
+// 모임 종류별 색: 정기 파랑, 번개 게임 주황, 번개 훈련 초록 (달력 점·배지에 같이 씀)
+const KIND_COLOR = {
+  regular: {
+    dot: BLUE,
+    bg: BLUE_LIGHT,
+    c: BLUE
+  },
+  game: {
+    dot: "#F59E0B",
+    bg: "#FFF4E5",
+    c: "#C2610C"
+  },
+  training: {
+    dot: "#12B76A",
+    bg: "#E5F7EE",
+    c: "#067647"
+  }
+};
+const kindKey = m => m && m.kind === "flash" ? m.flashType === "training" ? "training" : "game" : "regular";
 const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
 function toMeeting(id, rec, series) {
   const info = rec.info,
@@ -7159,11 +7178,8 @@ function MeetingDetail({
 }
 
 // ─── 작은 달력 (예약 탭 맨 위) ─────────────────────────────────────────────────
-// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 주황, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
-const KIND_DOT = {
-  regular: BLUE,
-  flash: "#F59E0B"
-};
+// 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 게임 주황, 번개 훈련 초록, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
+const KIND_DOT = Object.fromEntries(Object.entries(KIND_COLOR).map(([k, v]) => [k, v.dot]));
 function MiniCalendar({
   onOpen
 }) {
@@ -7309,7 +7325,7 @@ function MiniCalendar({
         height: 5,
         boxSizing: "border-box",
         borderRadius: 999,
-        background: m.cancelled ? "transparent" : KIND_DOT[m.kind] || BLUE,
+        background: m.cancelled ? "transparent" : KIND_DOT[kindKey(m)],
         border: m.cancelled ? `1.2px solid ${GONE.c}` : "none",
         opacity: past ? 0.45 : 1
       }
@@ -7330,7 +7346,7 @@ function MiniCalendar({
       fontSize: 11,
       color: "#6B7493"
     }
-  }, [["regular", "정기"], ["flash", "번개"]].map(([k, l]) => /*#__PURE__*/React.createElement("span", {
+  }, [["regular", "정기"], ["game", "번개 게임"], ["training", "번개 훈련"]].map(([k, l]) => /*#__PURE__*/React.createElement("span", {
     key: k,
     style: {
       display: "inline-flex",
@@ -8758,15 +8774,16 @@ function ensureSeries(all) {
 function KindBadge({
   m
 }) {
-  const flash = m.kind === "flash";
+  const flash = m.kind === "flash",
+    col = KIND_COLOR[kindKey(m)];
   return /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       fontWeight: 700,
       padding: "2px 8px",
       borderRadius: 999,
-      background: flash ? "#FFF4E5" : BLUE_LIGHT,
-      color: flash ? "#C2610C" : BLUE,
+      background: col.bg,
+      color: col.c,
       whiteSpace: "nowrap"
     }
   }, flash ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
@@ -9077,7 +9094,7 @@ function MeetingForm({
       start: "08:00",
       end: "12:00",
       place: "",
-      capacity: "12",
+      capacity: defaultKind === "flash" ? "4" : "12",
       guestCap: "0",
       openAt: weekBefore(date),
       desc: "",
@@ -9098,6 +9115,10 @@ function MeetingForm({
     };
     if (k === "date" && !editing && v) n.openAt = weekBefore(v);
     if (k === "kind" && v === "flash") n.repeat = "none";
+    if (k === "kind" && !editing) {
+      if (v === "flash" && p.capacity === "12") n.capacity = "4";
+      if (v === "regular" && p.capacity === "4") n.capacity = "12";
+    } // 기본 인원: 번개 4명, 정기 12명 (직접 바꾼 값은 그대로)
     return n;
   });
   const repeating = !editing && f.kind === "regular" && f.repeat !== "none";
@@ -10657,7 +10678,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "735c6957f7";
+const BUILD_ID = "a98de67f6c";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
