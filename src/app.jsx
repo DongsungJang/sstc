@@ -1313,6 +1313,21 @@ const notifyAttend=(m,prevStatus)=>{ if(!m||prevStatus==="attend"||!m.createdByU
   postFeed({type:"attend",to:m.createdByUid,meetingId:m.id,text:`${ME} 님이 ${m.date} ${m.placeName||m.place} 모임에 참석을 눌렀어요`}); };
 const ago = t => { const m=Math.floor((Date.now()-t)/60000); if(m<1) return "방금"; if(m<60) return m+"분 전"; const h=Math.floor(m/60); if(h<24) return h+"시간 전";
   const d=Math.floor(h/24); if(d<7) return d+"일 전"; const x=new Date(t); return `${x.getMonth()+1}/${x.getDate()}`; };
+// 마지막 접속: club/lastSeen/<uid> 에 시각을 남겨요 (관리자만 읽을 수 있음)
+const SEEN_EVERY=10*60*1000;
+const seenText=t=>{ if(!t) return "접속 기록 없음"; const a=ago(t); return a==="방금"?"방금 접속":a+" 접속"; };
+function useLastSeenRecorder(uid){
+  useEffect(()=>{
+    if(!FB||!uid) return;
+    let last=0;
+    const mark=()=>{ if(document.visibilityState==="hidden"||Date.now()-last<SEEN_EVERY) return;
+      last=Date.now(); FB.club.child("lastSeen/"+uid).set(last).catch(()=>{ last=0; }); };
+    mark();
+    const t=setInterval(mark,60*1000);
+    document.addEventListener("visibilitychange",mark);
+    return ()=>{ clearInterval(t); document.removeEventListener("visibilitychange",mark); };
+  },[uid]);
+}
 const toList = (obj,extra={}) => Object.keys(obj||{}).map(id=>({id,...extra,...obj[id]}));
 // 로그인한 사람의 알림·공지를 실시간으로
 function useClubFeed(uid){
@@ -1394,6 +1409,13 @@ function AdminTab(){
   const [busy,setBusy]=useState(false);
   const [showGone,setShowGone]=useState(false);
   const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
+  const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
+  const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
+  useEffect(()=>{
+    const r=FB.club.child("lastSeen");const h=s=>setLastSeen(s.val()||{});
+    r.on("value",h,()=>setLastSeen(null));
+    return ()=>r.off("value",h);
+  },[]);
   useEffect(()=>{
     const refs=[["members",v=>setMembers(v||{})],["approved",v=>setApproved(v||{})],["admins",v=>setAdmins(v||{})]]
       .map(([p,fn])=>{const r=FB.club.child(p);const h=s=>fn(s.val());r.on("value",h,e=>setErr(authMsg(e)));return ()=>r.off("value",h);});
@@ -1406,6 +1428,8 @@ function AdminTab(){
   const live=list.filter(m=>!m.withdrawn||admins[m.uid]);
   const pending=live.filter(m=>!approved[m.uid]&&!admins[m.uid]);
   const active=live.filter(m=>approved[m.uid]||admins[m.uid]);
+  const seenAt=uid=>lastSeen&&lastSeen[uid]||0;
+  const activeShown=sortSeen?[...active].sort((a,b)=>seenAt(b.uid)-seenAt(a.uid)):active;
   const fail=e=>setErr(authMsg(e));
   const inbox=(uid,msg)=>FB.club.child("inbox/"+uid+"/"+newId()).set({...msg,at:Date.now()});
   const approve=uid=>FB.club.child("approved/"+uid).set(true)
@@ -1458,6 +1482,7 @@ function AdminTab(){
             {!approved[m.uid]&&!admins[m.uid]&&!m.withdrawn&&isNew(pendingNewItem(m))&&<NewTag/>}
           </div>
           <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.tennisStart?` · 구력 ${calcCareer(m.tennisStart)||"-"}`:" · 구력 미입력"}</span>
+          {lastSeen&&<span style={{display:"block",fontSize:11,fontWeight:600,color:seenAt(m.uid)?"#4A5578":"#C0C6D9",marginTop:1}}><Ic n="clock" s={11}/> {seenText(seenAt(m.uid))}</span>}
         </div>
       </div>
       {acts&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>{acts}</div>}
@@ -1480,6 +1505,7 @@ function AdminTab(){
           )}
           {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
             ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo],
+            ["마지막 접속",seenAt(m.uid)&&new Date(seenAt(m.uid)).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})],
             ["탈퇴일",m.withdrawnAt&&new Date(m.withdrawnAt).toLocaleDateString("ko-KR")]]
             .filter(([,v])=>v).map(([k,v])=><div key={k}><span style={{color:"#A3AAC2",display:"inline-block",width:84}}>{k}</span>{v}</div>)}
         </div>
@@ -1516,9 +1542,10 @@ function AdminTab(){
         )}
       </Card>
       <Card>
-        <SectionTitle>정회원 ({active.length}명)</SectionTitle>
+        <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={()=>setSortSeen(v=>!v)}>정회원 ({active.length}명)</SectionTitle>
+        {!lastSeen&&<p style={{margin:"0 0 8px",fontSize:12,color:"#C2610C",lineHeight:1.6}}>마지막 접속을 보려면 README의 새 파이어베이스 규칙을 콘솔에 붙여넣어 주세요.</p>}
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {active.map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
+          {activeShown.map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있고, 본명도 대신 넣거나 고칠 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
@@ -3549,6 +3576,7 @@ export default function App() {
   const onChange=(key,val)=>setForm(p=>({...p,[key]:val}));
 
   const club=useClubFeed(account&&account.user?account.user.uid:null);   // 알림·공지
+  useLastSeenRecorder(account&&account.user?account.user.uid:null);   // 마지막 접속 기록 (10분에 한 번까지)
   const [noti,setNoti]=useState(null);          // 알림함 (열 때의 목록)
   const [noticeForm,setNoticeForm]=useState(false);
   const [focusNotice,setFocusNotice]=useState(null);
