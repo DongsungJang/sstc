@@ -11,6 +11,7 @@ const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple S
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
+  heart:["M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"],
   message:["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"], pencil:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"], send:["M22 2 11 13","M22 2l-7 20-4-9-9-4 20-7z"],
   chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
   trash:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v6","M14 11v6"], refresh:["M3 12a9 9 0 0 1 15-6.7L21 8","M21 3v5h-5","M21 12a9 9 0 0 1-15 6.7L3 16","M3 21v-5h5"],
@@ -1270,7 +1271,7 @@ const once = ref => ref.once("value").then(s=>s.val());
 const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 const postFeed = item => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:ME,byUid:myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",attend:"check",mention:"message",cancel:"x"};
+const NOTI_ICON = {member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",attend:"check",mention:"message",cancel:"x",boardComment:"message"};
 // 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
 const MEETING_NOTI=["meeting","admin","attend","mention","cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
@@ -1856,7 +1857,7 @@ function CommentText({text,names}){
   parts.push(text.slice(last));
   return <span style={{whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{parts}</span>;
 }
-function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit}){
+function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,minRows=1,maxRows=4,enterSubmits=true,maxLength}){
   const ref=useRef(null);
   const [caret,setCaret]=useState(0);
   const [want,setWant]=useState(null);
@@ -1875,37 +1876,45 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit}){
           <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
-      <textarea ref={ref} value={value} autoFocus={autoFocus} rows={Math.min(4,Math.max(1,value.split("\n").length))} placeholder={placeholder}
+      <textarea ref={ref} value={value} autoFocus={autoFocus} rows={Math.min(maxRows,Math.max(minRows,value.split("\n").length))} placeholder={placeholder} maxLength={maxLength}
         onChange={e=>{onChange(e.target.value);setCaret(e.target.selectionStart);}} onSelect={e=>setCaret(e.target.selectionStart)} onKeyUp={e=>setCaret(e.target.selectionStart)}
-        onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing&&hits.length===0){ e.preventDefault(); onSubmit&&onSubmit(); } }}
-        style={{...inputStyle,borderRadius:18,resize:"none",lineHeight:1.5,padding:"10px 14px",display:"block"}}/>
+        onKeyDown={e=>{ if(enterSubmits&&e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing&&hits.length===0){ e.preventDefault(); onSubmit&&onSubmit(); } }}
+        style={{...inputStyle,borderRadius:minRows>1?16:18,resize:"none",lineHeight:1.5,padding:"10px 14px",display:"block"}}/>
     </div>
   );
 }
-function MeetingComments({meeting,isAdmin}){
+// 댓글 묶음 (모임 댓글·게시판 댓글이 같이 씀)
+// comments: {cid:{...}}, save(cid,value|null): Promise, where: 알림 문구에 넣을 위치 ("6/1 OO코트 모임 댓글"),
+// link: 알림을 누르면 열 곳 ({meetingId} 또는 {postId}), onAdded(text): 새 댓글이 올라간 뒤 (글쓴이 알림 등)
+function useMentions(){
   const data=useClubMembers();
   const members=data?activeMembers(data):[];
   const byNick=new Map(members.map(x=>[x.nickname,x.uid]));
   const names=new Set(members.map(x=>x.nickname));
+  const mentionsOf=t=>{ const out={}; String(t).replace(MENTION_RE,(m,nick)=>{ const u=byNick.get(nick); if(u) out[u]=true; return m; }); return out; };
+  return {members,names,mentionsOf};
+}
+const clip=(t,n=40)=>t.length>n?t.slice(0,n)+"…":t;
+function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,title="댓글"}){
+  const {members,names,mentionsOf}=useMentions();
   const [text,setText]=useState(""), [busy,setBusy]=useState(false);
   const [edit,setEdit]=useState(null);   // {id,text}
   const uid=myUid()||myVoteKey();
-  const all=toList(meeting.rec&&meeting.rec.comments).filter(c=>c&&c.text).sort((a,b)=>a.at-b.at);
-  const mentionsOf=t=>{ const out={}; String(t).replace(MENTION_RE,(m,nick)=>{ const u=byNick.get(nick); if(u) out[u]=true; return m; }); return out; };
+  const all=toList(comments).filter(c=>c&&c.text).sort((a,b)=>a.at-b.at);
   const notify=(t,prev)=>Object.keys(mentionsOf(t)).filter(u=>u!==uid&&!(prev&&prev[u])).forEach(u=>
-    postFeed({type:"mention",to:u,meetingId:meeting.id,text:`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} 모임 댓글에서 회원님을 불렀어요: "${t.length>40?t.slice(0,40)+"…":t}"`}));
+    postFeed({type:"mention",to:u,...link,text:`${ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`}));
   const add=()=>{ const t=text.trim(); if(!t||busy) return; setBusy(true);
     const mentions=mentionsOf(t);
-    saveMeetingPath(`m${meeting.id}/comments/${newId()}`,{uid,name:ME,text:t,at:Date.now(),...(Object.keys(mentions).length?{mentions}:{})})
-      .then(()=>{ setText(""); notify(t,null); }).catch(e=>alert(authMsg(e))).finally(()=>setBusy(false)); };
+    save(newId(),{uid,name:ME,text:t,at:Date.now(),...(Object.keys(mentions).length?{mentions}:{})})
+      .then(()=>{ setText(""); notify(t,null); onAdded&&onAdded(t,mentions); }).catch(e=>alert(authMsg(e))).finally(()=>setBusy(false)); };
   const saveEdit=c=>{ const t=edit.text.trim(); if(!t) return; const mentions=mentionsOf(t);
-    saveMeetingPath(`m${meeting.id}/comments/${c.id}`,{...c,id:null,text:t,editedAt:Date.now(),mentions:Object.keys(mentions).length?mentions:null})
+    save(c.id,{...c,id:null,text:t,editedAt:Date.now(),mentions:Object.keys(mentions).length?mentions:null})
       .then(()=>{ setEdit(null); notify(t,c.mentions); }).catch(e=>alert(authMsg(e))); };
-  const del=c=>{ if(!window.confirm("이 댓글을 지울까요?")) return; saveMeetingPath(`m${meeting.id}/comments/${c.id}`,null).catch(e=>alert(authMsg(e))); };
+  const del=c=>{ if(!window.confirm("이 댓글을 지울까요?")) return; save(c.id,null).catch(e=>alert(authMsg(e))); };
   const small={background:"none",border:"none",padding:0,fontSize:12,color:"#8A93B2",cursor:"pointer",fontFamily:FONT};
   return(
     <Card>
-      <SectionTitle>댓글 {all.length>0?all.length:""}</SectionTitle>
+      <SectionTitle>{title} {all.length>0?all.length:""}</SectionTitle>
       <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:all.length?14:6}}>
         {all.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>첫 댓글을 남겨 보세요. @로 회원을 부르면 알림이 가요.</p>}
         {all.map(c=>{ const mine=c.uid===uid, editing=edit&&edit.id===c.id; return(
@@ -1932,12 +1941,18 @@ function MeetingComments({meeting,isAdmin}){
             </div>
           </div>);})}
       </div>
+      {canWrite?(
       <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
         <MentionInput value={text} onChange={setText} members={members} placeholder="댓글 쓰기 · @닉네임으로 회원 부르기" onSubmit={add}/>
         <button type="button" aria-label="댓글 올리기" disabled={!text.trim()||busy} onClick={add} style={{width:42,height:42,flexShrink:0,borderRadius:"50%",border:"none",background:text.trim()?GRAD:"#E4E9F7",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:text.trim()?"pointer":"default"}}><Icon name="send" size={18} stroke={2}/></button>
-      </div>
+      </div>):<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>정회원이 되면 댓글을 쓸 수 있어요.</p>}
     </Card>
   );
+}
+function MeetingComments({meeting,isAdmin}){
+  return <CommentBox comments={meeting.rec&&meeting.rec.comments} isAdmin={isAdmin}
+    save={(cid,v)=>saveMeetingPath(`m${meeting.id}/comments/${cid}`,v)}
+    where={`${meeting.date} ${meeting.placeName||meeting.place} 모임 댓글`} link={{meetingId:meeting.id}}/>;
 }
 
 // 관리자가 회원 대신 참석 처리: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
@@ -2598,7 +2613,7 @@ function NotiSheet({items,onClose,onPick,isAdmin}) {
       {items.length===0?<Empty>새 알림이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {items.map(n=>{
-            const go=(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action));
+            const go=n.postId||(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action));
             return(
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
                 <span style={{width:34,height:34,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={NOTI_ICON[n.type]||"bell"} size={17} stroke={1.9}/></span>
@@ -2882,7 +2897,132 @@ const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])
 // 본명: 없거나 닉네임과 같으면 빈 값 (닉네임만 보여 줘요)
 const realNameOf=m=>{ const r=String((m&&m.realName)||"").trim(); return r&&r!==m.nickname?r:""; };
 const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
-function MembersTab({onOpenMeeting}){
+// ─── 자유 게시판 (회원 탭) ─────────────────────────────────────────────────────
+// club/board/<pid> = {uid,name,text,at,editedAt,mentions:{uid:true},likes:{uid:true},comments:{<cid>:{uid,name,text,at,editedAt,mentions}}}
+// 정회원·관리자가 글·댓글을 써요. 내 글·댓글은 수정·삭제, 관리자는 삭제만.
+// @닉네임은 그 회원에게 알림, 내 글에 댓글이 달리면 나에게 알림 (feed, to=uid)
+const BOARD_MAX=1000;
+const saveBoardPath=(path,value)=>dbReady.then(db=>{ if(!db) throw new Error("저장소가 없어요"); return db.doc("board/"+path).set(value); });
+function useBoard(){
+  const [posts,setPosts]=useState(null);
+  useEffect(()=>{ let alive=true, unsub=null;
+    dbReady.then(db=>{ if(!alive) return; if(!db){ setPosts([]); return; }
+      unsub=db.doc("board").onSnapshot(snap=>alive&&setPosts(toList(snap.exists?snap.data():{}).filter(p=>p&&p.text).sort((a,b)=>b.at-a.at)),()=>alive&&setPosts([])); });
+    return ()=>{ alive=false; if(unsub) unsub(); }; },[]);
+  return posts;
+}
+function PostForm({initial,onClose}){
+  const {members,mentionsOf}=useMentions();
+  const [text,setText]=useState(initial?initial.text:""), [busy,setBusy]=useState(false);
+  const uid=myUid()||myVoteKey();
+  const submit=()=>{ const t=text.trim(); if(!t||busy) return; setBusy(true);
+    const mentions=mentionsOf(t), pid=initial?initial.id:newId();
+    const ment=Object.keys(mentions).length?mentions:null;
+    // 고칠 때는 글 내용 칸만 바꿔요 (그사이 달린 댓글·좋아요를 덮지 않게)
+    const write=initial?Promise.all([saveBoardPath(pid+"/text",t),saveBoardPath(pid+"/editedAt",Date.now()),saveBoardPath(pid+"/mentions",ment)])
+      :saveBoardPath(pid,{uid,name:ME,text:t,at:Date.now(),...(ment?{mentions}:{})});
+    write.then(()=>{
+      const prev=(initial&&initial.mentions)||{};
+      Object.keys(mentions).filter(u=>u!==uid&&!prev[u]).forEach(u=>postFeed({type:"mention",to:u,postId:pid,text:`${ME} 님이 자유 게시판 글에서 회원님을 불렀어요: "${clip(t)}"`}));
+      onClose(pid);
+    }).catch(e=>{ alert(authMsg(e)); setBusy(false); }); };
+  return(
+    <Sheet title={initial?"글 수정":"글쓰기"} onClose={()=>onClose(null)}>
+      <MentionInput value={text} onChange={setText} members={members} autoFocus minRows={6} maxRows={14} enterSubmits={false} maxLength={BOARD_MAX}
+        placeholder={"오늘 테니스 어땠나요? 아무 얘기나 좋아요.\n@닉네임으로 회원을 부르면 알림이 가요."}/>
+      <div style={{display:"flex",alignItems:"center",marginTop:12,gap:10}}>
+        <span style={{fontSize:12,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{text.length}/{BOARD_MAX}</span>
+        <button type="button" disabled={!text.trim()||busy} onClick={submit} style={{marginLeft:"auto",padding:"11px 22px",borderRadius:999,border:"none",background:text.trim()?GRAD:"#E4E9F7",color:"#fff",fontSize:14,fontWeight:700,cursor:text.trim()?"pointer":"default"}}>{busy?"올리는 중…":initial?"저장":"올리기"}</button>
+      </div>
+    </Sheet>
+  );
+}
+function PostBody({p,names,full}){
+  const [more,setMore]=useState(false);
+  const long=!full&&(p.text.length>160||p.text.split("\n").length>4);
+  return(<>
+    <p style={{margin:0,fontSize:15,color:"#1B2559",lineHeight:1.6,...(long&&!more?{display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden"}:{})}}><CommentText text={p.text} names={names}/></p>
+    {long&&!more&&<button type="button" onClick={e=>{e.stopPropagation();setMore(true);}} style={{background:"none",border:"none",padding:0,marginTop:4,fontSize:13,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>더보기</button>}
+  </>);
+}
+function FreeBoard({canWrite,isAdmin,focus}){
+  const posts=useBoard();
+  const {names}=useMentions();
+  const [form,setForm]=useState(null);     // {initial} | {} | null
+  const [openId,setOpenId]=useState(null);
+  const uid=myUid()||myVoteKey();
+  const go=id=>{ setOpenId(id); try{window.scrollTo(0,0);}catch(e){} };
+  useEffect(()=>{ if(focus) go(focus.split("#")[0]); },[focus]);
+  if(!posts) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>게시판을 불러오는 중이에요…</p></Card>;
+  const like=p=>{ const on=!!(p.likes&&p.likes[uid]); saveBoardPath(`${p.id}/likes/${uid}`,on?null:true).catch(e=>alert(authMsg(e))); };
+  const del=p=>{ if(!window.confirm("이 글을 삭제할까요? 댓글도 같이 지워져요.")) return; saveBoardPath(p.id,null).then(()=>setOpenId(null)).catch(e=>alert(authMsg(e))); };
+  const small={background:"none",border:"none",padding:0,fontSize:12,color:"#8A93B2",cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4};
+  const back=<button type="button" onClick={()=>setOpenId(null)} style={{...small,fontSize:14,alignSelf:"flex-start",color:BLUE,fontWeight:600,padding:"2px 4px"}}><Ic n="chevL" s={16}/> 목록으로</button>;
+  const head=p=>{ const mine=p.uid===uid; return(
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+      <span style={{width:38,height:38,borderRadius:"50%",background:mine?GRAD:BLUE_LIGHT,color:mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{(p.name||"?").slice(0,1)}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <span style={{display:"block",fontSize:14,fontWeight:700,color:"#1B2559"}}>{p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>나</span>}</span>
+        <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
+      </div>
+    </div>); };
+  const foot=(p,inDetail)=>{ const n=toList(p.comments).filter(c=>c&&c.text).length, lk=Object.keys(p.likes||{}).length, on=!!(p.likes&&p.likes[uid]), mine=p.uid===uid; return(
+    <div style={{display:"flex",alignItems:"center",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
+      <button type="button" aria-pressed={on} aria-label={on?"좋아요 취소":"좋아요"} disabled={!canWrite} onClick={e=>{e.stopPropagation();like(p);}} style={{...small,fontSize:13,color:on?"#ef4444":"#8A93B2",cursor:canWrite?"pointer":"default"}}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={on?"#ef4444":"none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON_PATHS.heart[0]}/></svg>{lk?lk:"좋아요"}
+      </button>
+      <span style={{...small,fontSize:13,cursor:inDetail?"default":"pointer"}}><Ic n="message" s={16}/>{n?n:"댓글"}</span>
+      {(mine||isAdmin)&&inDetail&&<span style={{marginLeft:"auto",display:"flex",gap:14}}>
+        {mine&&<button type="button" onClick={()=>setForm({initial:p})} style={small}><Ic n="pencil" s={12}/> 수정</button>}
+        <button type="button" onClick={()=>del(p)} style={{...small,color:"#ef4444"}}><Ic n="trash" s={12}/> 삭제</button>
+      </span>}
+    </div>); };
+  const open=openId&&posts.find(p=>p.id===openId);
+  let body;
+  if(openId){
+    body=!open?<>{back}<Empty>지워진 글이에요.</Empty></>:(<>
+      {back}
+      <Card>{head(open)}<PostBody p={open} names={names} full/>{foot(open,true)}</Card>
+      <CommentBox comments={open.comments} isAdmin={isAdmin} canWrite={canWrite}
+        save={(cid,v)=>saveBoardPath(`${open.id}/comments/${cid}`,v)}
+        where={`자유 게시판 "${clip(open.text,15)}" 글 댓글`} link={{postId:open.id}}
+        onAdded={(t,ment)=>{ if(open.uid&&open.uid!==uid&&!(ment&&ment[open.uid])) postFeed({type:"boardComment",to:open.uid,postId:open.id,text:`${ME} 님이 내 글에 댓글을 달았어요: "${clip(t)}"`}); }}/>
+    </>);
+  } else {
+    body=(<>
+      {canWrite?(
+        <button type="button" onClick={()=>setForm({})} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"14px 16px",background:"#fff",border:"none",borderRadius:20,boxShadow:"0 4px 16px rgba(40,70,180,0.08)",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
+          <span style={{width:34,height:34,borderRadius:"50%",background:GRAD,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="pencil" size={16} stroke={2}/></span>
+          <span style={{fontSize:14,color:"#A3AAC2"}}>{ME} 님, 오늘 테니스 어땠어요?</span>
+        </button>):<Card style={{padding:14}}><p style={{margin:0,fontSize:13,color:"#6B7493"}}>정회원이 되면 글과 댓글을 쓸 수 있어요.</p></Card>}
+      {posts.length===0&&<Empty>아직 글이 없어요. 첫 글을 남겨 보세요!</Empty>}
+      {posts.map(p=>(
+        <div key={p.id} role="button" tabIndex={0} onClick={()=>go(p.id)} onKeyDown={e=>{if(e.key==="Enter")go(p.id);}} style={{cursor:"pointer"}}>
+          <Card>{head(p)}<PostBody p={p} names={names}/>{foot(p,false)}</Card>
+        </div>))}
+    </>);
+  }
+  return(<>
+    {body}
+    {form&&<PostForm initial={form.initial} onClose={()=>setForm(null)}/>}
+  </>);
+}
+
+function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus}){
+  const [view,setView]=useState(()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const pickView=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
+  useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:999,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
+        {[["list","회원 목록","users"],["board","자유 게시판","message"]].map(([k,l,ic])=>(
+          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:999,border:"none",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}</button>
+        ))}
+      </div>
+      {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
+    </div>);
+}
+function MemberList({onOpenMeeting}){
   const data=useClubMembers();
   const [q,setQ]=useState("");
   const [sort,setSort]=useState(()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
@@ -2907,7 +3047,7 @@ function MembersTab({onOpenMeeting}){
   const total=Object.values(data.members).filter(m=>m&&m.nickname&&!m.withdrawn).length;
   const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F5F7FE",borderRadius:999,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+    <>
       <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 본명, 동네, 코트로 찾기" style={inputStyle}/>
         <div style={{display:"flex",gap:6}}>
@@ -2969,7 +3109,7 @@ function MembersTab({onOpenMeeting}){
       })}
       </React.Fragment>))}
       {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
-    </div>
+    </>
   );
 }
 
@@ -3210,6 +3350,7 @@ export default function App() {
   const [noti,setNoti]=useState(null);          // 알림함 (열 때의 목록)
   const [noticeForm,setNoticeForm]=useState(false);
   const [focusNotice,setFocusNotice]=useState(null);
+  const [boardFocus,setBoardFocus]=useState(null);   // 알림으로 연 게시판 글 ("<pid>#<시각>")
   // 반복 모임: 모임 목록이 바뀔 때마다 다가오는 회차가 빠졌으면 만들어 둬요 (승인된 회원·관리자만 쓸 수 있음)
   const canWriteMeetings=!FB||!!(account&&(account.admin||account.approved));
   useEffect(()=>{ if(list.ready&&canWriteMeetings) ensureSeries(RAW_MEETINGS); },[list.meetings,list.ready,canWriteMeetings]);
@@ -3352,7 +3493,8 @@ export default function App() {
           notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
-        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")}/>}
+        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} isAdmin={adminOn} boardFocus={boardFocus}
+          canWrite={!FB||!!(account&&(account.admin||account.approved))}/>}
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
       </div>
@@ -3373,7 +3515,8 @@ export default function App() {
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
-        if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
+        if(n.postId){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setBoardFocus(n.postId+"#"+Date.now()); }
+        else if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
         else if(n.type==="member"&&adminOn){ setOpenMeeting(null); setTab("admin"); }
