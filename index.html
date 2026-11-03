@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fce52e4183">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fce52e4183">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=13a039ddcf">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=13a039ddcf">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -282,7 +282,8 @@ function votesFromRec(rec) {
       at: v.at,
       arrive: v.arrive || "",
       leave: v.leave || "",
-      by: v.by || ""
+      by: v.by || "",
+      byUid: v.byUid || ""
     });
     (v.guests || []).forEach(g => g && g.name && out.push({
       key,
@@ -5539,7 +5540,7 @@ function VoteRow({
       background: "#FEF9C3",
       color: "#A16207"
     }
-  }, "\uAD00\uB9AC\uC790 \uB4F1\uB85D"), v.bumped && /*#__PURE__*/React.createElement("span", {
+  }, "\uB300\uC2E0 \uB4F1\uB85D"), v.bumped && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
@@ -6033,28 +6034,43 @@ function MeetingComments({
   });
 }
 
-// 관리자가 회원 대신 참석 처리: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
-// 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산되고, by에 넣은 관리자 닉네임이 남아요.
-function AdminAttend({
-  meeting
+// 다른 회원 참석 등록: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
+// 정회원·관리자 모두 쓸 수 있고, 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산돼요. by/byUid에 등록한 사람이 남아요.
+// 관리자는 불참 투표한 회원도 넣을 수 있지만, 회원은 불참 누른 사람은 못 넣어요(본인 선택 존중). 등록된 회원에게 알림이 가요.
+function MemberAttend({
+  meeting,
+  isAdmin
 }) {
   const data = useClubMembers();
   const [q, setQ] = useState("");
   const [show, setShow] = useState(false);
   const votes = meeting.rec && meeting.rec.votes || {};
+  const me = myUid();
   const going = k => !!(votes[k] && votes[k].status === "attend" && votes[k].at);
-  const add = m => saveMeetingPath(`m${meeting.id}/votes/${m.uid}`, {
-    name: m.nickname,
-    ntrp: m.ntrp || "",
-    status: "attend",
-    at: nowAt(),
-    guests: [],
-    arrive: null,
-    leave: null,
-    by: ME
-  }).catch(e => alert(authMsg(e)));
+  const absent = k => !!(votes[k] && votes[k].status === "absent");
+  const add = m => {
+    if (!isAdmin && !window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
+    saveMeetingPath(`m${meeting.id}/votes/${m.uid}`, {
+      name: m.nickname,
+      ntrp: m.ntrp || "",
+      status: "attend",
+      at: nowAt(),
+      guests: [],
+      arrive: null,
+      leave: null,
+      by: ME,
+      byUid: me
+    }).then(() => {
+      if (m.uid !== me) postFeed({
+        type: "attend",
+        to: m.uid,
+        meetingId: meeting.id,
+        text: `${ME} 님이 ${meeting.date} ${meeting.placeName || meeting.place} 모임에 나를 참석으로 등록했어요`
+      });
+    }).catch(e => alert(authMsg(e)));
+  };
   const k = q.trim().toLowerCase();
-  const list = data ? activeMembers(data).filter(m => !going(m.uid) && (!k || [m.nickname, m.ntrp, m.region].some(v => String(v || "").toLowerCase().includes(k)))).sort((a, b) => a.nickname.localeCompare(b.nickname, "ko")) : [];
+  const list = data ? activeMembers(data).filter(m => !going(m.uid) && (isAdmin || m.uid !== me && !absent(m.uid)) && (!k || [m.nickname, m.ntrp, m.region].some(v => String(v || "").toLowerCase().includes(k)))).sort((a, b) => a.nickname.localeCompare(b.nickname, "ko")) : [];
   return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -6071,10 +6087,10 @@ function AdminAttend({
       gap: 6
     }
   }, /*#__PURE__*/React.createElement(Ic, {
-    n: "crown",
+    n: "userPlus",
     s: 15,
-    c: "#A16207"
-  }), "\uD68C\uC6D0 \uB300\uC2E0 \uCC38\uC11D"), /*#__PURE__*/React.createElement("button", {
+    c: BLUE
+  }), "\uB2E4\uB978 \uD68C\uC6D0 \uCC38\uC11D \uB4F1\uB85D"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShow(v => !v),
     style: {
@@ -6094,7 +6110,7 @@ function AdminAttend({
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uAD00\uB9AC\uC790\uB9CC \uBCF4\uC5EC\uC694. \uB123\uC740 \uC2DC\uAC01\uC73C\uB85C \uD22C\uD45C\uD55C \uAC83\uCC98\uB7FC \uC21C\uC11C\uAC00 \uC815\uD574\uC9C0\uACE0, \uBA85\uB2E8\uC5D0 '\uAD00\uB9AC\uC790 \uB4F1\uB85D'\uC73C\uB85C \uD45C\uC2DC\uB3FC\uC694. \uBE7C\uB824\uBA74 \uBA85\uB2E8\uC5D0\uC11C \uBE7C\uAE30\uB97C \uB20C\uB7EC\uC694."), show && /*#__PURE__*/React.createElement("div", {
+  }, "\uAC19\uC774 \uCE58\uAE30\uB85C \uD55C \uD68C\uC6D0\uC744 \uB300\uC2E0 \uB123\uC5B4 \uC904 \uC218 \uC788\uC5B4\uC694. \uB123\uC740 \uC2DC\uAC01\uC73C\uB85C \uD22C\uD45C\uD55C \uAC83\uCC98\uB7FC \uC21C\uC11C\uAC00 \uC815\uD574\uC9C0\uACE0, \uBA85\uB2E8\uC5D0 '\uB300\uC2E0 \uB4F1\uB85D'\uC73C\uB85C \uD45C\uC2DC\uB3FC\uC694. \uB4F1\uB85D\uB41C \uD68C\uC6D0\uC5D0\uAC8C \uC54C\uB9BC\uC774 \uAC00\uC694. ", isAdmin ? "빼려면 명단에서 빼기를 눌러요." : "내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."), show && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       display: "flex",
@@ -6130,7 +6146,7 @@ function AdminAttend({
       textAlign: "center",
       padding: "6px 0"
     }
-  }, k ? "찾는 회원이 없어요" : "모든 회원이 이미 참석으로 들어가 있어요"), list.map(m => /*#__PURE__*/React.createElement("div", {
+  }, k ? "찾는 회원이 없어요" : "더 넣을 수 있는 회원이 없어요"), list.map(m => /*#__PURE__*/React.createElement("div", {
     key: m.uid,
     style: {
       display: "flex",
@@ -6152,7 +6168,7 @@ function AdminAttend({
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, m.ntrp || ""), votes[m.uid] && votes[m.uid].status === "absent" && /*#__PURE__*/React.createElement("span", {
+  }, m.ntrp || ""), absent(m.uid) && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#ef4444"
@@ -6306,7 +6322,9 @@ function MeetingDetail({
     saveMeetingPath(`series/s${meeting.seriesId}/active`, false).catch(e => alert(authMsg(e)));
   };
   const myCount = counts[ME] || 0;
-  const kick = isAdmin ? v => () => {
+  // 관리자는 누구든, 회원은 자기가 대신 넣은 회원만 뺄 수 있어요(무산·종료된 모임 제외)
+  const canKick = v => !v.isGuest && (isAdmin || !gone && !isPast && !!v.byUid && v.byUid === myUid());
+  const kick = v => canKick(v) ? () => {
     if (!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${votes0[v.key] && (votes0[v.key].guests || []).length ? " 이 회원이 초대한 게스트도 함께 빠져요." : ""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`, null).catch(e => alert(authMsg(e)));
   } : null;
@@ -6971,8 +6989,9 @@ function MeetingDetail({
   }, "\uC790\uB9AC\uAC00 \uB098\uBA74 \uB300\uAE30 \uC21C\uC11C\uB300\uB85C \uCC38\uC11D \uD655\uC815\uB3FC\uC694.")), /*#__PURE__*/React.createElement(MeetingComments, {
     meeting: meeting,
     isAdmin: isAdmin
-  }), isAdmin && !gone && /*#__PURE__*/React.createElement(AdminAttend, {
-    meeting: meeting
+  }), !gone && (isAdmin || open && !isPast) && /*#__PURE__*/React.createElement(MemberAttend, {
+    meeting: meeting,
+    isAdmin: isAdmin
   }), canManage && goneForm && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uBB34\uC0B0 \uCC98\uB9AC"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 10px",
@@ -10453,7 +10472,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "fce52e4183";
+const BUILD_ID = "13a039ddcf";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

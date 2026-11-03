@@ -108,7 +108,7 @@ function votesFromRec(rec){
     const v=rec.votes[key];
     if(!v||v.status!=="attend"||!v.at) return;
     if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
-    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:v.by||""});
+    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:v.by||"",byUid:v.byUid||""});
     (v.guests||[]).forEach(g=>g&&g.name&&out.push({key,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
   });
   return out;
@@ -1898,7 +1898,7 @@ function VoteRow({v,idx,wait,onRemove}) {
           {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:tag.bg,color:tag.c}}>{tag.t}</span>}
           {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
           {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
-          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF9C3",color:"#A16207"}}>관리자 등록</span>}
+          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF9C3",color:"#A16207"}}>대신 등록</span>}
           {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
         <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} {v.by&&!v.isGuest?`${v.by} 님이 등록`:"투표"}</span>
@@ -2021,34 +2021,41 @@ function MeetingComments({meeting,isAdmin}){
     where={`${meeting.date} ${meeting.placeName||meeting.place} 모임 댓글`} link={{meetingId:meeting.id}}/>;
 }
 
-// 관리자가 회원 대신 참석 처리: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
-// 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산되고, by에 넣은 관리자 닉네임이 남아요.
-function AdminAttend({meeting}){
+// 다른 회원 참석 등록: 그 회원의 투표 자리(votes/<uid>)에 지금 시각으로 참석을 넣어요.
+// 정회원·관리자 모두 쓸 수 있고, 순서·정원·우선순위는 직접 투표한 것과 똑같이 계산돼요. by/byUid에 등록한 사람이 남아요.
+// 관리자는 불참 투표한 회원도 넣을 수 있지만, 회원은 불참 누른 사람은 못 넣어요(본인 선택 존중). 등록된 회원에게 알림이 가요.
+function MemberAttend({meeting,isAdmin}){
   const data=useClubMembers();
   const [q,setQ]=useState("");
   const [show,setShow]=useState(false);
   const votes=(meeting.rec&&meeting.rec.votes)||{};
+  const me=myUid();
   const going=k=>!!(votes[k]&&votes[k].status==="attend"&&votes[k].at);
-  const add=m=>saveMeetingPath(`m${meeting.id}/votes/${m.uid}`,{name:m.nickname,ntrp:m.ntrp||"",status:"attend",at:nowAt(),guests:[],arrive:null,leave:null,by:ME})
-    .catch(e=>alert(authMsg(e)));
+  const absent=k=>!!(votes[k]&&votes[k].status==="absent");
+  const add=m=>{
+    if(!isAdmin&&!window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
+    saveMeetingPath(`m${meeting.id}/votes/${m.uid}`,{name:m.nickname,ntrp:m.ntrp||"",status:"attend",at:nowAt(),guests:[],arrive:null,leave:null,by:ME,byUid:me})
+      .then(()=>{ if(m.uid!==me) postFeed({type:"attend",to:m.uid,meetingId:meeting.id,text:`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} 모임에 나를 참석으로 등록했어요`}); })
+      .catch(e=>alert(authMsg(e)));
+  };
   const k=q.trim().toLowerCase();
-  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(!k||[m.nickname,m.ntrp,m.region].some(v=>String(v||"").toLowerCase().includes(k))))
+  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(isAdmin||(m.uid!==me&&!absent(m.uid)))&&(!k||[m.nickname,m.ntrp,m.region].some(v=>String(v||"").toLowerCase().includes(k))))
     .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko")):[];
   return(
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:15,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6}}><Ic n="crown" s={15} c="#A16207"/>회원 대신 참석</span>
+        <span style={{fontSize:15,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6}}><Ic n="userPlus" s={15} c={BLUE}/>다른 회원 참석 등록</span>
         <button type="button" onClick={()=>setShow(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:999,color:BLUE,fontSize:12,fontWeight:600,padding:"5px 12px",cursor:"pointer"}}>{show?"닫기":"+ 회원 추가"}</button>
       </div>
-      <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>관리자만 보여요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '관리자 등록'으로 표시돼요. 빼려면 명단에서 빼기를 눌러요.</p>
+      <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>같이 치기로 한 회원을 대신 넣어 줄 수 있어요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '대신 등록'으로 표시돼요. 등록된 회원에게 알림이 가요. {isAdmin?"빼려면 명단에서 빼기를 눌러요.":"내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."}</p>
       {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
         <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임으로 찾기" style={inputStyle}/>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
           {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
-          {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"모든 회원이 이미 참석으로 들어가 있어요"}</p>}
+          {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"더 넣을 수 있는 회원이 없어요"}</p>}
           {list.map(m=>(
             <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F5F7FE"}}>
-              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{votes[m.uid]&&votes[m.uid].status==="absent"&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
+              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
               <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px"}}>참석</button>
             </div>
           ))}
@@ -2124,7 +2131,9 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const stopSeries=()=>{ if(!window.confirm("이 반복 모임을 멈출까요? 이미 만들어진 모임은 그대로 남아요.")) return;
     saveMeetingPath(`series/s${meeting.seriesId}/active`,false).catch(e=>alert(authMsg(e))); };
   const myCount=counts[ME]||0;
-  const kick=isAdmin?v=>()=>{ if(!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${(votes0[v.key]&&(votes0[v.key].guests||[]).length)?" 이 회원이 초대한 게스트도 함께 빠져요.":""}`)) return;
+  // 관리자는 누구든, 회원은 자기가 대신 넣은 회원만 뺄 수 있어요(무산·종료된 모임 제외)
+  const canKick=v=>!v.isGuest&&(isAdmin||(!gone&&!isPast&&!!v.byUid&&v.byUid===myUid()));
+  const kick=v=>canKick(v)?()=>{ if(!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${(votes0[v.key]&&(votes0[v.key].guests||[]).length)?" 이 회원이 초대한 게스트도 함께 빠져요.":""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`,null).catch(e=>alert(authMsg(e))); }:null;
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
@@ -2256,7 +2265,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         </Card>
       )}
       <MeetingComments meeting={meeting} isAdmin={isAdmin}/>
-      {isAdmin&&!gone&&<AdminAttend meeting={meeting}/>}
+      {!gone&&(isAdmin||(open&&!isPast))&&<MemberAttend meeting={meeting} isAdmin={isAdmin}/>}
       {canManage&&goneForm&&(
         <Card>
           <SectionTitle>모임 무산 처리</SectionTitle>
