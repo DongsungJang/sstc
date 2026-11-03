@@ -14,6 +14,7 @@ const ICON_PATHS = {
   message:["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"], pencil:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"], send:["M22 2 11 13","M22 2l-7 20-4-9-9-4 20-7z"],
   chevL:["M15 18l-6-6 6-6"], chevR:["M9 18l6-6-6-6"],
   trash:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v6","M14 11v6"], refresh:["M3 12a9 9 0 0 1 15-6.7L21 8","M21 3v5h-5","M21 12a9 9 0 0 1-15 6.7L3 16","M3 21v-5h5"],
+  share:["M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8","M16 6l-4-4-4 4","M12 2v13"],
   swap:["M7 16V4","M3 8l4-4 4 4","M17 8v12","M21 16l-4 4-4-4"],
   grip:["M9 6h.01","M15 6h.01","M9 12h.01","M15 12h.01","M9 18h.01","M15 18h.01"],
   home:["M3 10.5 12 3l9 7.5","M5 9.5V20h5v-6h4v6h5V9.5"],
@@ -1976,6 +1977,37 @@ function AdminAttend({meeting}){
   );
 }
 
+// 공유 링크(#meeting-<id>)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임을 열어요
+const DEEP_LINK={id:0};
+try{ const mm=/^#meeting-(\d+)$/.exec(location.hash); if(mm){ DEEP_LINK.id=+mm[1]; history.replaceState(null,"",location.pathname+location.search); } }catch(e){}
+// ─── 카톡 공유 ────────────────────────────────────────────────────────────────
+// 카카오톡 자동 발송은 사업자 채널이 필요해서, 폰의 공유창(카카오톡 선택)으로 안내문을 보내요. 공유창이 없으면 복사.
+function meetingShareText(m){
+  const {confirmed,waitlist}=resolveVotes(m,m.votes);
+  const d=Math.round((new Date(m.iso+"T00:00:00")-new Date(todayYmd()+"T00:00:00"))/86400000);
+  const when=d===0?"오늘":d===1?"내일":d===2?"모레":d>0?`D-${d}`:"지난";
+  const nm=v=>v.isGuest?`${v.name}(게스트)`:v.name;
+  const url=location.origin+location.pathname+"#meeting-"+m.id;
+  const L=[`[SSTC] ${m.cancelled?"모임 무산 안내":`${when} ${m.kind==="flash"?"번개":"정기"} 모임 안내`}`,
+    `${m.date} ${m.time}`, m.place, m.address?`주소: ${m.address}`:null];
+  if(m.cancelled){ L.push(`사유: ${m.cancelled.reason||"기타"}${m.cancelled.memo?` · ${m.cancelled.memo}`:""}`); }
+  else{
+    L.push("",`참석 ${confirmed.length}/${m.total}명`+(confirmed.length?`: ${confirmed.map(nm).join(", ")}`:""));
+    if(waitlist.length) L.push(`대기 ${waitlist.length}명: ${waitlist.map(nm).join(", ")}`);
+    if(m.kind==="flash"&&m.courtFee) L.push(`코트비 ${won(m.courtFee)}${confirmed.length?` · 1인 ${won(perHead(m.courtFee,confirmed.length))}`:""}`);
+  }
+  L.push("",`참석·자세히 보기: ${url}`);
+  return L.filter(x=>x!==null).join("\n");
+}
+function shareMeeting(m){
+  const text=meetingShareText(m);
+  const copy=()=>{ const done=()=>alert("안내문을 복사했어요. 카카오톡 대화방에 붙여넣어 주세요.");
+    if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(done).catch(()=>window.prompt("아래 안내문을 복사해 주세요",text));
+    window.prompt("아래 안내문을 복사해 주세요",text); };
+  if(navigator.share) return navigator.share({title:"SSTC 모임 안내",text}).catch(e=>{ if(!e||e.name!=="AbortError") copy(); });
+  copy();
+}
+
 function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDeleted}) {
   const [view,setView]=useState(initialView);
   const store=useMeetingRecord(meeting);
@@ -2118,6 +2150,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           </div>
         )}
       </Card>
+      <button type="button" onClick={()=>shareMeeting(meeting)} style={{...btnSecondary,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>카톡으로 공유</button>
       {meeting.desc&&<Card><SectionTitle>모임 설명</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
       <Card>
         <SectionTitle>참석 확정 ({total}/{meeting.total}명)</SectionTitle>
@@ -3177,6 +3210,8 @@ export default function App() {
   // 반복 모임: 모임 목록이 바뀔 때마다 다가오는 회차가 빠졌으면 만들어 둬요 (승인된 회원·관리자만 쓸 수 있음)
   const canWriteMeetings=!FB||!!(account&&(account.admin||account.approved));
   useEffect(()=>{ if(list.ready&&canWriteMeetings) ensureSeries(RAW_MEETINGS); },[list.meetings,list.ready,canWriteMeetings]);
+  // 공유 링크(#meeting-<id>)로 들어오면 로그인 후 그 모임을 바로 열어요
+  useEffect(()=>{ if(screen==="main"&&list.ready&&DEEP_LINK.id){ const id=DEEP_LINK.id; if(MEETINGS.some(m=>m.id===id)){ DEEP_LINK.id=0; openM(id,"info","home"); } } },[screen,list.ready,list.meetings]);
   if(splash) return <SplashScreen onStart={()=>setSplash(false)}/>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
