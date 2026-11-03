@@ -300,6 +300,36 @@ const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } 
 const lsSet=(k,v)=>{ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} };
 const extendLogin=()=>{ if(lsGet(LS.keep)!=="0") lsSet(LS.until,String(Date.now()+KEEP_DAYS*86400000)); };
 const loginExpired=()=>{ const u=+lsGet(LS.until); return lsGet(LS.keep)!=="0"&&u>0&&Date.now()>u; };
+// ─── 새 모임·새 회원·새 글 표시 (이 기기에 저장) ───────────────────────────────
+// 하단 탭: 그 탭을 마지막으로 연 뒤에 올라온 것 개수를 "+n"으로. 탭을 열면 사라져요.
+// 목록의 NEW: 그 항목을 직접 열어 볼 때까지 (최대 NEW_DAYS일). 내가 만든 건 빼요.
+// 처음 쓰는 기기는 그때부터 새로 올라온 것만 쳐요 (예전 글이 한꺼번에 NEW가 되지 않게).
+// sstc-seen-<uid> = {base: 처음 쓴 시각, t:{탭: 마지막으로 연 시각}, i:{항목 id: 항목 시각}}
+// 항목 id: m<모임 id>, p<글 id>, u<회원 uid>(정회원이 된 회원), a<회원 uid>(승인 대기, 관리자용)
+const NEW_DAYS=14;
+const SEEN={uid:null,d:null,subs:new Set()};
+const seenSave=()=>{ const cut=Date.now()-NEW_DAYS*864e5; Object.keys(SEEN.d.i).forEach(k=>{ if(SEEN.d.i[k]<cut) delete SEEN.d.i[k]; });
+  lsSet("sstc-seen-"+(SEEN.uid||"local"),JSON.stringify(SEEN.d)); SEEN.subs.forEach(f=>f()); };
+function seenLoad(uid){
+  if(SEEN.d&&SEEN.uid===uid) return;
+  SEEN.uid=uid; let d=null; try{ d=JSON.parse(lsGet("sstc-seen-"+(uid||"local"))||"null"); }catch(e){}
+  SEEN.d=d&&d.base?{base:d.base,t:d.t||{},i:d.i||{}}:{base:Date.now(),t:{},i:{}}; seenSave();
+}
+const isNewItem=(id,at,byUid)=>{ const d=SEEN.d; if(!d||!at) return false;
+  return at>d.base&&at>Date.now()-NEW_DAYS*864e5&&!(byUid&&byUid===SEEN.uid)&&!d.i[id]; };
+const markItemSeen=(id,at)=>{ if(!SEEN.d||SEEN.d.i[id]) return; SEEN.d.i[id]=at||Date.now(); seenSave(); };
+const markTabSeen=k=>{ if(!SEEN.d) return; SEEN.d.t[k]=Date.now(); seenSave(); };
+// 탭 배지 개수: NEW인 것 중 그 탭을 마지막으로 연 뒤에 올라온 것
+const tabNewCount=(k,items)=>{ const d=SEEN.d; if(!d) return 0; const t=d.t[k]||0; return items.filter(x=>x.at>t&&isNewItem(x.id,x.at,x.by)).length; };
+function useSeen(){ const [,setN]=useState(0);
+  useEffect(()=>{ const f=()=>setN(n=>n+1); SEEN.subs.add(f); return ()=>{ SEEN.subs.delete(f); }; },[]); }
+// 목록에서 쓰는 항목 모양 {id, at, by}
+const meetingNewItem=m=>({id:"m"+m.id,at:(m.info&&+m.info.createdAt)||0,by:m.createdByUid});
+const postNewItem=p=>({id:"p"+p.id,at:+p.at||0,by:p.uid});
+const memberNewItem=m=>({id:"u"+m.uid,at:m.uid===SEEN.uid?0:(+m.approvedAt||+m.createdAt||0),by:m.approvedByUid||""});
+const pendingNewItem=m=>({id:"a"+m.uid,at:+m.createdAt||0,by:m.uid});
+const isNew=x=>isNewItem(x.id,x.at,x.by);
+function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:999,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
 function LoginScreen({notice,onSignup,onForgot,onLogin}) {
   const [email,setEmail]=useState(()=>lsGet(LS.email)||"");
@@ -1346,6 +1376,7 @@ const ADMIN_MSG=[
   ["custom","직접 쓰기",()=>""],
 ];
 function AdminTab(){
+  useSeen();
   const [members,setMembers]=useState(null);
   const [approved,setApproved]=useState({});
   const [admins,setAdmins]=useState({});
@@ -1375,6 +1406,7 @@ function AdminTab(){
   const fail=e=>setErr(authMsg(e));
   const inbox=(uid,msg)=>FB.club.child("inbox/"+uid+"/"+newId()).set({...msg,at:Date.now()});
   const approve=uid=>FB.club.child("approved/"+uid).set(true)
+    .then(()=>FB.club.child("members/"+uid).update({approvedAt:Date.now(),approvedByUid:myUid()}))   // 회원 탭 NEW 표시용
     .then(()=>inbox(uid,{type:"approved",text:"정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요"})).catch(fail);
   const demote=m=>{ if(!window.confirm(`${m.nickname} 님을 준회원으로 바꿀까요? 모임 투표를 못 하게 돼요.`)) return;
     FB.club.child("approved/"+m.uid).remove().catch(fail); };
@@ -1413,13 +1445,14 @@ function AdminTab(){
     <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F5F7FE",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
-        <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setOpen(open===m.uid?null:m.uid)}>
+        <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
             {m.realName?<span style={{fontSize:12,color:"#4A5578"}}>({m.realName})</span>
               :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:999,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
             {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
+            {!approved[m.uid]&&!admins[m.uid]&&!m.withdrawn&&isNew(pendingNewItem(m))&&<NewTag/>}
           </div>
           <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.tennisStart?` · 구력 ${calcCareer(m.tennisStart)||"-"}`:" · 구력 미입력"}</span>
         </div>
@@ -2332,6 +2365,7 @@ function MiniCalendar({onOpen}){
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
 function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate}) {
+  useSeen();
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"flash";}catch(e){return "flash";}});
   const pickKind=k=>{setKind(k);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
   const setSelId=id=>onOpen(id,"info");
@@ -2346,9 +2380,9 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
       <MiniCalendar onOpen={setSelId}/>
       <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
-        {[["flash","번개 모임","zap"],["regular","정기 모임","calendar"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length;return(
+        {[["flash","번개 모임","zap"],["regular","정기 모임","calendar"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length,fresh=upAll.some(m=>m.kind===k&&!m.cancelled&&isNew(meetingNewItem(m)));return(
           <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?GRAD:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            <Icon name={ic} size={15} stroke={2}/>{l}{n>0&&<span style={{fontSize:11,fontWeight:700,minWidth:18,padding:"1px 6px",borderRadius:999,background:on?"rgba(255,255,255,0.25)":"#fff",color:on?"#fff":BLUE}}>{n}</span>}
+            <Icon name={ic} size={15} stroke={2}/>{l}{n>0&&<span style={{fontSize:11,fontWeight:700,minWidth:18,padding:"1px 6px",borderRadius:999,background:on?"rgba(255,255,255,0.25)":"#fff",color:on?"#fff":BLUE}}>{n}</span>}{fresh&&<span aria-label="새 모임 있음" style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",marginLeft:-2}}/>}
           </button>);})}
       </div>
       <div>
@@ -2362,7 +2396,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
               <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:gone?GONE.bg:full?FULL.bg:"#fff",border:`1.5px solid ${gone?GONE.line:full?FULL.line:"transparent"}`,opacity:gone?0.85:1,borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                   <div>
-                    <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
+                    <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/>{!gone&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
                     <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}><Ic n="clock" s={13}/> {m.time}</p>
                     <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.place}</p>
                   </div>
@@ -2911,9 +2945,10 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
 // 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
 // 닉네임 옆에 본명을 (본명)으로 같이 보여 줘요. 연락처·이메일·생년월일은 보여주지 않아요.
 // 회원 프로필·승인·관리자 목록 실시간 구독 (회원 탭, 관리자 대신 참석에서 같이 씀)
-function useClubMembers(){
+function useClubMembers(enabled=true){
   const [data,setData]=useState(null);
   useEffect(()=>{
+    if(!enabled) return;
     if(!FB){ setData({members:{},approved:{},admins:{}}); return; }
     let st={members:null,approved:{},admins:{}};
     const subs=[["members","members"],["approved","approved"],["admins","admins"]].map(([p,k])=>{
@@ -2921,7 +2956,7 @@ function useClubMembers(){
       r.on("value",h,()=>{ st={...st,[k]:{}}; if(st.members) setData(st); }); return ()=>r.off("value",h);
     });
     return ()=>subs.forEach(f=>f());
-  },[]);
+  },[enabled]);
   return data;
 }
 // 승인된(탈퇴 안 한) 회원만
@@ -3003,12 +3038,15 @@ function anonNamer(post){
   return c=>!c.anon?c.name:(post.anon&&c.uid===post.uid)?"익명(글쓴이)":`익명${nums.get(c.uid)||""}`;
 }
 function FreeBoard({canWrite,isAdmin,focus}){
+  useSeen();
   const posts=useBoard(canWrite);
   const {names}=useMentions();
   const [form,setForm]=useState(null);     // {initial} | {} | null
   const [openId,setOpenId]=useState(null);
   const uid=myUid()||myVoteKey();
   const go=id=>{ setOpenId(id); try{window.scrollTo(0,0);}catch(e){} };
+  // 글을 열면 NEW가 사라져요 (알림으로 열어도 같음)
+  useEffect(()=>{ if(openId&&posts){ const p=posts.find(x=>x.id===openId); if(p) markItemSeen("p"+p.id,p.at); } },[openId,posts]);
   useEffect(()=>{ if(focus) go(focus.split("#")[0]); },[focus]);
   if(!canWrite) return(
     <Card style={{textAlign:"center",padding:"28px 20px"}}>
@@ -3025,7 +3063,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
       <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(p.name||"?").slice(0,1)}</span>
       <div style={{flex:1,minWidth:0}}>
-        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":"#1B2559"}}>{p.anon?"익명":p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}</span>
+        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":"#1B2559"}}>{p.anon?"익명":p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
         <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
       </div>
     </div>); };
@@ -3070,21 +3108,22 @@ function FreeBoard({canWrite,isAdmin,focus}){
   </>);
 }
 
-function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus}){
+function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
   const [view,setView]=useState(()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const pickView=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:999,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
-        {[["list","회원 목록","users"],["board",BOARD_NAME,"message"]].map(([k,l,ic])=>(
-          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:999,border:"none",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}</button>
-        ))}
+        {[["list","회원 목록","users"],["board",BOARD_NAME,"message"]].map(([k,l,ic])=>{ const n=newCounts[k]||0; return(
+          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:999,border:"none",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{fontSize:10,fontWeight:800,lineHeight:"16px",padding:"0 6px",borderRadius:999,background:"#ef4444",color:"#fff"}}>NEW {n}</span>}</button>
+        );})}
       </div>
       {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
     </div>);
 }
 function MemberList({onOpenMeeting}){
+  useSeen();
   const data=useClubMembers();
   const [q,setQ]=useState("");
   const [sort,setSort]=useState(()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
@@ -3125,7 +3164,7 @@ function MemberList({onOpenMeeting}){
       {gr.items.map(m=>{
         const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
         return(
-          <div key={m.uid} role="button" tabIndex={0} onClick={()=>setOpen(open===m.uid?null:m.uid)} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+          <div key={m.uid} role="button" tabIndex={0} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:44,height:44,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:700,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
               <div style={{flex:1,minWidth:0}}>
@@ -3134,6 +3173,7 @@ function MemberList({onOpenMeeting}){
                   {realNameOf(m)&&<span style={{fontSize:13,fontWeight:500,color:"#4A5578"}}>({realNameOf(m)})</span>}
                   {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
                   {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:999,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
+                  {isNew(memberNewItem(m))&&<NewTag/>}
                 </div>
                 <span style={{fontSize:12,color:"#A3AAC2"}}>{cnt?`이달 ${cnt}회 참석`:"이달 참석 기록 없음"}</span>
               </div>
@@ -3339,6 +3379,7 @@ export default function App() {
   // 모임을 열면 주소에 #meeting-<id>를 붙여서 폰·브라우저 뒤로가기로도 닫히게 함
   const openM=(id,view,from)=>{
     setOpenMeeting({id,view,from});setTab("booking");
+    { const m=MEETINGS.find(x=>x.id===id); if(m){ const x=meetingNewItem(m); markItemSeen(x.id,x.at); } }   // 열어 본 모임은 NEW 끄기
     try{ window.scrollTo(0,0); }catch(e){}
     try{ if(location.hash!=="#meeting-"+id) location.hash="meeting-"+id; }catch(e){}
   };
@@ -3418,6 +3459,22 @@ export default function App() {
   useEffect(()=>{ if(list.ready&&canWriteMeetings) ensureSeries(RAW_MEETINGS); },[list.meetings,list.ready,canWriteMeetings]);
   // 공유 링크(#meeting-<id>)로 들어오면 로그인 후 그 모임을 바로 열어요
   useEffect(()=>{ if(screen==="main"&&list.ready&&DEEP_LINK.id){ const id=DEEP_LINK.id; if(MEETINGS.some(m=>m.id===id)){ DEEP_LINK.id=0; openM(id,"info","home"); } } },[screen,list.ready,list.meetings]);
+  // ── 새 항목 배지: 예약(새 모임), 회원(새 정회원 + 소곤소곤 새 글), 관리(새 가입 신청, 관리자만) ──
+  useSeen();
+  const myId=account&&account.user?account.user.uid:"";
+  const inMain=screen==="main"&&(!FB||!!(account&&account.user&&(account.admin||account.approved)));
+  useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
+  const clubData=useClubMembers(inMain);
+  const boardPosts=useBoard(inMain);
+  // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
+  useEffect(()=>{ if(!inMain) return; markTabSeen(tab); return ()=>markTabSeen(tab); },[tab,inMain,myId]);
+  const newMeetings=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).map(meetingNewItem);
+  const newMembers=clubData?activeMembers(clubData).map(memberNewItem):[];
+  const newPosts=(boardPosts||[]).map(postNewItem);
+  const newPending=clubData?Object.entries(clubData.members).map(([uid,m])=>({uid,...m}))
+    .filter(m=>m&&!m.withdrawn&&!clubData.approved[m.uid]&&!clubData.admins[m.uid]).map(pendingNewItem):[];
+  const tabBadge={booking:tabNewCount("booking",newMeetings),members:tabNewCount("members",[...newMembers,...newPosts]),admin:tabNewCount("admin",newPending)};
+  const membersNew={list:newMembers.filter(isNew).length,board:newPosts.filter(isNew).length};
   if(splash) return <SplashScreen onStart={()=>setSplash(false)}/>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
@@ -3555,7 +3612,7 @@ export default function App() {
           notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view)=>openM(id,view,"booking")} ready={list.ready}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
-        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} isAdmin={adminOn} boardFocus={boardFocus}
+        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} isAdmin={adminOn} boardFocus={boardFocus} newCounts={membersNew}
           canWrite={!FB||!!(account&&(account.admin||account.approved))}/>}
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
@@ -3588,10 +3645,13 @@ export default function App() {
       {mForm&&<MeetingForm initial={mForm.initial} defaultKind={mForm.kind} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 파란 하단 탭바 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {tabs.map(t=>{const on=tab===t.key;return(
-          <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"12px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff",opacity:on?1:0.6}}>
-            <Icon name={t.icon} size={22} stroke={on?2.2:1.8}/>
-            <span style={{fontSize:11,fontWeight:on?700:500}}>{t.label}</span>
+        {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
+          <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"12px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
+            <span style={{position:"relative",display:"inline-flex"}}>
+              <span style={{display:"inline-flex",opacity:on?1:0.6}}><Icon name={t.icon} size={22} stroke={on?2.2:1.8}/></span>
+              {nb>0&&<span aria-label={`새 항목 ${nb}개`} style={{position:"absolute",top:-7,left:14,minWidth:20,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:999,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"14px",textAlign:"center",border:"2px solid #3B63F3",whiteSpace:"nowrap"}}>+{nb>99?99:nb}</span>}
+            </span>
+            <span style={{fontSize:11,fontWeight:on?700:500,opacity:on?1:0.6}}>{t.label}</span>
             <div style={{width:18,height:3,background:on?"#fff":"transparent",borderRadius:10}}/>
           </button>
         );})}
