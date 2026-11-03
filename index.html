@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=cecbcb236d">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=cecbcb236d">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=a7f3e0c315">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=a7f3e0c315">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -7667,7 +7667,7 @@ function BookingTab({
     }, /*#__PURE__*/React.createElement(Ic, {
       n: "pin",
       s: 13
-    }), " ", m.place)), /*#__PURE__*/React.createElement("div", {
+    }), " ", m.placeName || m.place)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -7777,7 +7777,7 @@ function BookingTab({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "pin",
     s: 13
-  }), " ", m.place, m.cancelled ? "" : ` · ${m.attendees.length}명 참석`)), /*#__PURE__*/React.createElement("span", {
+  }), " ", m.placeName || m.place, m.cancelled ? "" : ` · ${m.attendees.length}명 참석`)), /*#__PURE__*/React.createElement("span", {
     style: {
       background: m.cancelled ? GONE.c : "#E4E9F7",
       color: m.cancelled ? "#fff" : "#A3AAC2",
@@ -10678,7 +10678,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "cecbcb236d";
+const BUILD_ID = "a7f3e0c315";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

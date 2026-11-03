@@ -2410,7 +2410,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                   <div>
                     <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/>{!gone&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
                     <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}><Ic n="clock" s={13}/> {m.time}</p>
-                    <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.place}</p>
+                    <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                     {gone?<span style={{background:GONE.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
@@ -2435,7 +2435,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <p style={{margin:"0 0 3px",fontWeight:600,fontSize:14,color:"#6B7493"}}>{m.date}</p>
-                    <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.place}{m.cancelled?"":` · ${m.attendees.length}명 참석`}</p>
+                    <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}{m.cancelled?"":` · ${m.attendees.length}명 참석`}</p>
                   </div>
                   <span style={{background:m.cancelled?GONE.c:"#E4E9F7",color:m.cancelled?"#fff":"#A3AAC2",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{m.cancelled?goneLabel(m):"종료"}</span>
                 </div>
