@@ -2783,6 +2783,56 @@ function AddressSearch({onPick}){
   return fail?<p style={{margin:"8px 0 0",fontSize:12,color:"#ef4444"}}>주소 검색을 불러오지 못했어요. 주소를 직접 입력해 주세요.</p>
     :<div ref={box} style={{marginTop:8,height:420,border:"1px solid #E4E9F7",borderRadius:14,overflow:"hidden",background:"#fff"}}/>;
 }
+// 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
+const placeKey=v=>String(v||"").replace(/\s+/g,"").toLowerCase();
+// 한글을 자모로 풀어서 비교해요: 치는 중인 글자("올리" → "올림픽")도 맞고, 초성만 쳐도("ㅇㄹㅍ") 찾아요
+const CHO="ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", JUNG="ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ", JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const JAMO_SPLIT={"ㄳ":"ㄱㅅ","ㄵ":"ㄴㅈ","ㄶ":"ㄴㅎ","ㄺ":"ㄹㄱ","ㄻ":"ㄹㅁ","ㄼ":"ㄹㅂ","ㄽ":"ㄹㅅ","ㄾ":"ㄹㅌ","ㄿ":"ㄹㅍ","ㅀ":"ㄹㅎ","ㅄ":"ㅂㅅ","ㅘ":"ㅗㅏ","ㅙ":"ㅗㅐ","ㅚ":"ㅗㅣ","ㅝ":"ㅜㅓ","ㅞ":"ㅜㅔ","ㅟ":"ㅜㅣ","ㅢ":"ㅡㅣ"};
+const jamoOf=v=>[...placeKey(v)].map(c=>{ const n=c.charCodeAt(0)-0xAC00; const t=n<0||n>11171?c:CHO[Math.floor(n/588)]+JUNG[Math.floor(n%588/28)]+JONG[n%28]; return [...t].map(x=>JAMO_SPLIT[x]||x).join(""); }).join("");
+const choOf=v=>[...placeKey(v)].map(c=>{ const n=c.charCodeAt(0)-0xAC00; return n<0||n>11171?c:CHO[Math.floor(n/588)]; }).join("");
+// 0 = 앞글자가 같음, 1 = 중간에 들어 있음, 2 = 주소에 들어 있음, -1 = 안 맞음
+function placeMatch(p,q){
+  const jq=jamoOf(q), cq=choOf(q), choOnly=/^[ㄱ-ㅎ]+$/.test(cq)&&cq===placeKey(q);
+  const jn=jamoOf(p.name), cn=choOf(p.name);
+  if(jn.startsWith(jq)||(choOnly&&cn.startsWith(cq))) return 0;
+  if(jn.includes(jq)||(choOnly&&cn.includes(cq))) return 1;
+  if(p.address&&jamoOf(p.address).includes(jq)) return 2;
+  return -1;
+}
+function placeHistory(){
+  const map={};
+  MEETINGS.forEach(m=>{ const name=String(m.placeName||"").trim(); if(!name) return; const k=placeKey(name);
+    const at=Math.max(+(m.info&&m.info.createdAt)||0,Date.parse(m.iso)||0);
+    const e=map[k]||(map[k]={name,count:0,at:0,address:"",surface:""});
+    e.count++;
+    if(at>=e.at){ e.at=at; e.name=name; if(m.address) e.address=m.address; if(m.surface) e.surface=m.surface; }
+    else{ if(!e.address&&m.address) e.address=m.address; if(!e.surface&&m.surface) e.surface=m.surface; } });
+  return Object.values(map).sort((a,b)=>b.count-a.count||b.at-a.at);
+}
+// 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요
+function PlaceInput({value,onChange,onPick}) {
+  const [all]=useState(placeHistory);
+  const [open,setOpen]=useState(false);
+  const k=placeKey(value);
+  // 빈칸일 땐 안 띄우고, 한 글자라도 치면 그걸로 시작하는 곳 → 들어 있는 곳 순 (같으면 자주·최근 쓴 곳 먼저)
+  const list=!k?[]:all.map(p=>({p,r:placeMatch(p,value)})).filter(x=>x.r>=0&&placeKey(x.p.name)!==k).sort((a,b)=>a.r-b.r).slice(0,5).map(x=>x.p);
+  return <div style={{position:"relative"}}>
+    <input type="text" aria-label="테니스장 이름" value={value} autoComplete="off" onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setOpen(false)}
+      placeholder="예: 올림픽공원 테니스장" style={inputStyle}/>
+    {open&&list.length>0&&<div role="listbox" aria-label="이전에 쓴 테니스장" style={{marginTop:6,border:"1px solid #E4E9F7",borderRadius:14,background:"#fff",overflow:"hidden",boxShadow:"0 6px 18px rgba(33,82,230,0.10)"}}>
+      <p style={{margin:0,padding:"8px 14px 4px",fontSize:11,color:"#A3AAC2"}}>이전에 쓴 테니스장</p>
+      {list.map(p=><button key={p.name} type="button" role="option" aria-selected={false} onMouseDown={e=>e.preventDefault()} onClick={()=>{onPick(p);setOpen(false);}}
+        style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"10px 14px",border:"none",borderTop:"1px solid #F1F4FB",background:"#fff",textAlign:"left",cursor:"pointer"}}>
+        <Icon name="pin" size={16} stroke={2} color="#7C93E8"/>
+        <span style={{flex:1,minWidth:0}}>
+          <span style={{display:"block",fontSize:14,fontWeight:600,color:"#1B2547",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</span>
+          {p.address&&<span style={{display:"block",fontSize:11,color:"#8A93B0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.address}</span>}
+        </span>
+        <span style={{fontSize:11,color:"#A3AAC2",flexShrink:0}}>{p.count}회</span>
+      </button>)}
+    </div>}
+  </div>;
+}
 function MeetingForm({initial,defaultKind,onClose,onSaved}) {
   const editing=!!initial;
   const [f,setF]=useState(()=>initial
@@ -2884,7 +2934,7 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
             </div>
           </FieldWrap>
           <FieldWrap label="테니스장 이름" required error={errors.place}>
-            <input type="text" value={f.place} onChange={e=>set("place",e.target.value)} placeholder="예: 올림픽공원 테니스장" style={inputStyle}/>
+            <PlaceInput value={f.place} onChange={v=>set("place",v)} onPick={p=>setF(o=>({...o,place:p.name,address:o.address||p.address||"",surface:o.surface||p.surface||""}))}/>
           </FieldWrap>
           <FieldWrap label="코트 번호" required error={errors.courtNo}>
             <input type="text" aria-label="코트 번호" value={f.courtNo||""} onChange={e=>set("courtNo",e.target.value)} placeholder="예: 3 또는 5, 6" style={inputStyle}/>

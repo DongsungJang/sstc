@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f429397cfa">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f429397cfa">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=a98de67f6c">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=a98de67f6c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -8884,6 +8884,188 @@ function AddressSearch({
     }
   });
 }
+// 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
+const placeKey = v => String(v || "").replace(/\s+/g, "").toLowerCase();
+// 한글을 자모로 풀어서 비교해요: 치는 중인 글자("올리" → "올림픽")도 맞고, 초성만 쳐도("ㅇㄹㅍ") 찾아요
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ",
+  JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ",
+  JONG = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+const JAMO_SPLIT = {
+  "ㄳ": "ㄱㅅ",
+  "ㄵ": "ㄴㅈ",
+  "ㄶ": "ㄴㅎ",
+  "ㄺ": "ㄹㄱ",
+  "ㄻ": "ㄹㅁ",
+  "ㄼ": "ㄹㅂ",
+  "ㄽ": "ㄹㅅ",
+  "ㄾ": "ㄹㅌ",
+  "ㄿ": "ㄹㅍ",
+  "ㅀ": "ㄹㅎ",
+  "ㅄ": "ㅂㅅ",
+  "ㅘ": "ㅗㅏ",
+  "ㅙ": "ㅗㅐ",
+  "ㅚ": "ㅗㅣ",
+  "ㅝ": "ㅜㅓ",
+  "ㅞ": "ㅜㅔ",
+  "ㅟ": "ㅜㅣ",
+  "ㅢ": "ㅡㅣ"
+};
+const jamoOf = v => [...placeKey(v)].map(c => {
+  const n = c.charCodeAt(0) - 0xAC00;
+  const t = n < 0 || n > 11171 ? c : CHO[Math.floor(n / 588)] + JUNG[Math.floor(n % 588 / 28)] + JONG[n % 28];
+  return [...t].map(x => JAMO_SPLIT[x] || x).join("");
+}).join("");
+const choOf = v => [...placeKey(v)].map(c => {
+  const n = c.charCodeAt(0) - 0xAC00;
+  return n < 0 || n > 11171 ? c : CHO[Math.floor(n / 588)];
+}).join("");
+// 0 = 앞글자가 같음, 1 = 중간에 들어 있음, 2 = 주소에 들어 있음, -1 = 안 맞음
+function placeMatch(p, q) {
+  const jq = jamoOf(q),
+    cq = choOf(q),
+    choOnly = /^[ㄱ-ㅎ]+$/.test(cq) && cq === placeKey(q);
+  const jn = jamoOf(p.name),
+    cn = choOf(p.name);
+  if (jn.startsWith(jq) || choOnly && cn.startsWith(cq)) return 0;
+  if (jn.includes(jq) || choOnly && cn.includes(cq)) return 1;
+  if (p.address && jamoOf(p.address).includes(jq)) return 2;
+  return -1;
+}
+function placeHistory() {
+  const map = {};
+  MEETINGS.forEach(m => {
+    const name = String(m.placeName || "").trim();
+    if (!name) return;
+    const k = placeKey(name);
+    const at = Math.max(+(m.info && m.info.createdAt) || 0, Date.parse(m.iso) || 0);
+    const e = map[k] || (map[k] = {
+      name,
+      count: 0,
+      at: 0,
+      address: "",
+      surface: ""
+    });
+    e.count++;
+    if (at >= e.at) {
+      e.at = at;
+      e.name = name;
+      if (m.address) e.address = m.address;
+      if (m.surface) e.surface = m.surface;
+    } else {
+      if (!e.address && m.address) e.address = m.address;
+      if (!e.surface && m.surface) e.surface = m.surface;
+    }
+  });
+  return Object.values(map).sort((a, b) => b.count - a.count || b.at - a.at);
+}
+// 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요
+function PlaceInput({
+  value,
+  onChange,
+  onPick
+}) {
+  const [all] = useState(placeHistory);
+  const [open, setOpen] = useState(false);
+  const k = placeKey(value);
+  // 빈칸일 땐 안 띄우고, 한 글자라도 치면 그걸로 시작하는 곳 → 들어 있는 곳 순 (같으면 자주·최근 쓴 곳 먼저)
+  const list = !k ? [] : all.map(p => ({
+    p,
+    r: placeMatch(p, value)
+  })).filter(x => x.r >= 0 && placeKey(x.p.name) !== k).sort((a, b) => a.r - b.r).slice(0, 5).map(x => x.p);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
+    value: value,
+    autoComplete: "off",
+    onChange: e => {
+      onChange(e.target.value);
+      setOpen(true);
+    },
+    onFocus: () => setOpen(true),
+    onBlur: () => setOpen(false),
+    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
+    style: inputStyle
+  }), open && list.length > 0 && /*#__PURE__*/React.createElement("div", {
+    role: "listbox",
+    "aria-label": "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5",
+    style: {
+      marginTop: 6,
+      border: "1px solid #E4E9F7",
+      borderRadius: 14,
+      background: "#fff",
+      overflow: "hidden",
+      boxShadow: "0 6px 18px rgba(33,82,230,0.10)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      padding: "8px 14px 4px",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5"), list.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.name,
+    type: "button",
+    role: "option",
+    "aria-selected": false,
+    onMouseDown: e => e.preventDefault(),
+    onClick: () => {
+      onPick(p);
+      setOpen(false);
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      width: "100%",
+      padding: "10px 14px",
+      border: "none",
+      borderTop: "1px solid #F1F4FB",
+      background: "#fff",
+      textAlign: "left",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pin",
+    size: 16,
+    stroke: 2,
+    color: "#7C93E8"
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#1B2547",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, p.name), p.address && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 11,
+      color: "#8A93B0",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, p.address)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2",
+      flexShrink: 0
+    }
+  }, p.count, "\uD68C")))));
+}
 function MeetingForm({
   initial,
   defaultKind,
@@ -9218,12 +9400,15 @@ function MeetingForm({
     label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
     required: true,
     error: errors.place
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
+  }, /*#__PURE__*/React.createElement(PlaceInput, {
     value: f.place,
-    onChange: e => set("place", e.target.value),
-    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
-    style: inputStyle
+    onChange: v => set("place", v),
+    onPick: p => setF(o => ({
+      ...o,
+      place: p.name,
+      address: o.address || p.address || "",
+      surface: o.surface || p.surface || ""
+    }))
   })), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uCF54\uD2B8 \uBC88\uD638",
     required: true,
@@ -10493,7 +10678,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "f429397cfa";
+const BUILD_ID = "a98de67f6c";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
