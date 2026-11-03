@@ -119,6 +119,10 @@ const isFull=m=>!!m&&!m.cancelled&&m.total>0&&m.attendees.length>=m.total;
 // 무산된 모임 (우천 등): 지우지 않고 info.cancel={reason,memo,by,byUid,at}로 남겨요. 회색으로 보이고 투표·참석 횟수·랭킹에서 빠져요
 const CANCEL_REASONS=["우천","코트 사정","인원 부족","기타"];
 const GONE={c:"#6B7280",bg:"#F1F2F5",line:"#D9DCE3"};
+// 대기 인원 (무산된 모임은 0) · 0명이면 아무것도 안 보여요
+const waitN=m=>m&&!m.cancelled?(m.waitlist||[]).length:0;
+function WaitTag({m}){ const n=waitN(m); if(!n) return null;
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:"#FFF4E5",color:"#C2610C",whiteSpace:"nowrap"}}>대기 {n}명</span>; }
 const goneLabel=m=>m&&m.cancelled?`무산 · ${m.cancelled.reason||"기타"}`:"";
 // 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
 const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
@@ -724,7 +728,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           <div style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
               <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
-              <span style={{fontSize:12,fontWeight:isFull(next)?700:600,color:isFull(next)?FULL.c:BLUE}}>{next.attendees.length} / {next.total}명{isFull(next)?" · 마감":""}</span>
+              <span style={{fontSize:12,fontWeight:isFull(next)?700:600,color:isFull(next)?FULL.c:BLUE}}>{next.attendees.length} / {next.total}명{isFull(next)?" · 마감":""}{waitN(next)>0&&<span style={{color:"#C2610C"}}> · 대기 {waitN(next)}명</span>}</span>
             </div>
             <div style={{height:6,background:isFull(next)?FULL.line:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:GRAD,borderRadius:10}}/></div>
           </div>
@@ -739,7 +743,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         {nextNext&&(
           <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
             <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.placeName||nextNext.place}</p></div>
-            <span style={{fontSize:12,color:nextNext.cancelled?GONE.c:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)||nextNext.cancelled?700:400}}>{nextNext.cancelled?goneLabel(nextNext):isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명`:`${nextNext.attendees.length}명 참석예정`}</span>
+            <span style={{fontSize:12,color:nextNext.cancelled?GONE.c:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)||nextNext.cancelled?700:400}}>{nextNext.cancelled?goneLabel(nextNext):isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext)?` · 대기 ${waitN(nextNext)}명`:""}`:`${nextNext.attendees.length}명 참석예정`}</span>
           </div>
         )}
       </Card>
@@ -755,7 +759,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
                 <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
                 <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
               </div>
-              <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
+                {ok&&!gone&&<WaitTag m={m}/>}
+              </div>
             </div>
           ))}
           {going.length>3&&(
@@ -2167,7 +2174,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`,null).catch(e=>alert(authMsg(e))); }:null;
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
-    ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
+    ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번째 (대기 ${waitlist.length}명 중)${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
     :myStatus==="absent"?"불참으로 등록되었어요":myStatus==="maybe"?"미정으로 등록되었어요":"";
   // 대진표 참가자 = 참석 확정자
   const participants=confirmed.map(v=>({name:v.name,ntrp:v.ntrp,isGuest:v.isGuest,isMe:v.isMe,arrive:v.arrive||"",leave:v.leave||""}));
@@ -2208,7 +2215,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         {!gone&&<div style={{marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
             <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
-            <span style={{fontSize:12,fontWeight:700,color:fill>=100?FULL.c:BLUE}}>{total} / {meeting.total}명{fill>=100?" · 마감":""}</span>
+            <span style={{fontSize:12,fontWeight:700,color:fill>=100?FULL.c:BLUE}}>{total} / {meeting.total}명{fill>=100?" · 마감":""}{waitlist.length>0&&<span style={{color:"#C2610C"}}> · 대기 {waitlist.length}명</span>}</span>
           </div>
           <div style={{height:7,background:fill>=100?FULL.line:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${Math.min(fill,100)}%`,background:fill>=100?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>}
@@ -2287,7 +2294,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
       </Card>
       {waitlist.length>0&&(
         <Card>
-          <SectionTitle>예약 대기 ({waitlist.length}명)</SectionTitle>
+          <SectionTitle>예약 대기 ({waitlist.length}명){myWaitIdx>=0&&<span style={{fontSize:12,fontWeight:700,color:"#C2610C",marginLeft:6}}>내 순서 {myWaitIdx+1}번째</span>}</SectionTitle>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={kick&&!v.isGuest?kick(v):null}/>)}
           </div>
@@ -2443,6 +2450,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                     {gone?<span style={{background:GONE.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
                       :full?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20}}>마감 {m.attendees.length}/{m.total}명</span>
                       :<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{m.attendees.length}/{m.total}명</span>}
+                    <WaitTag m={m}/>
                     {isAtt&&!gone&&<span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>참석 예정</span>}
                   </div>
                 </div>
