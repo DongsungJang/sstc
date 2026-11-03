@@ -712,7 +712,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <div>
               <p style={{margin:"0 0 3px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{next.date}<KindBadge m={next}/></p>
               <p style={{margin:"0 0 2px",fontSize:13,color:"#4A5578"}}><Ic n="clock" s={13}/> {next.time}</p>
-              <p style={{margin:0,fontSize:13,color:"#4A5578"}}><Ic n="pin" s={13}/> {next.place}</p>
+              <p style={{margin:0,fontSize:13,color:"#4A5578"}}><Ic n="pin" s={13}/> {next.placeName||next.place}</p>
             </div>
             <span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,boxShadow:SHADOW_BTN}}>{dDay(next.iso)}</span>
           </div>
@@ -738,7 +738,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </div>)}
         {nextNext&&(
           <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.place}</p></div>
+            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.placeName||nextNext.place}</p></div>
             <span style={{fontSize:12,color:nextNext.cancelled?GONE.c:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)||nextNext.cancelled?700:400}}>{nextNext.cancelled?goneLabel(nextNext):isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명`:`${nextNext.attendees.length}명 참석예정`}</span>
           </div>
         )}
@@ -753,7 +753,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
                 <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
-                <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.place}</p>
+                <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
               </div>
               <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
             </div>
@@ -2620,7 +2620,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
           <SectionTitle>다가오는 모임 내 투표</SectionTitle>
           {mine.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>투표한 모임이 없어요.</p>:mine.map(({m,label,color})=>(
             <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #EEF1FA"}}>
-              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.place}</p></div>
+              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p></div>
               <span style={{fontSize:12,fontWeight:700,color}}>{label}</span>
             </div>
           ))}
