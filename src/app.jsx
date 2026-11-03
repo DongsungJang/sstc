@@ -2860,7 +2860,7 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
 }
 
 // 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
-// 본명·연락처·이메일·생년월일은 보여주지 않아요.
+// 닉네임 옆에 본명을 (본명)으로 같이 보여 줘요. 연락처·이메일·생년월일은 보여주지 않아요.
 // 회원 프로필·승인·관리자 목록 실시간 구독 (회원 탭, 관리자 대신 참석에서 같이 씀)
 function useClubMembers(){
   const [data,setData]=useState(null);
@@ -2879,6 +2879,8 @@ function useClubMembers(){
 const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])=>({uid,...m}))
   .filter(m=>m&&m.nickname&&!m.withdrawn&&(data.approved[m.uid]||data.admins[m.uid]));
 
+// 본명: 없거나 닉네임과 같으면 빈 값 (닉네임만 보여 줘요)
+const realNameOf=m=>{ const r=String((m&&m.realName)||"").trim(); return r&&r!==m.nickname?r:""; };
 const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
 function MembersTab({onOpenMeeting}){
   const data=useClubMembers();
@@ -2891,7 +2893,7 @@ function MembersTab({onOpenMeeting}){
   const monthCount={}; rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===ym)).forEach(r=>{monthCount[r.name]=r.count;});
   const handOf=m=>(Array.isArray(m.hand)?m.hand[0]:m.hand)||"";
   const list=activeMembers(data)
-    .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.region,m.court,m.ntrp,handOf(m)].some(v=>String(v||"").toLowerCase().includes(k)); })
+    .filter(m=>{ const k=q.trim().toLowerCase(); return !k||[m.nickname,m.realName,m.region,m.court,m.ntrp,handOf(m)].some(v=>String(v||"").toLowerCase().includes(k)); })
     .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko"));
   // 구력순: 테니스 시작 일자가 오래된 사람부터 (미입력은 맨 뒤)
   if(sort==="career") list.sort((a,b)=>!a.tennisStart?(b.tennisStart?1:0):!b.tennisStart?-1:a.tennisStart<b.tennisStart?-1:a.tennisStart>b.tennisStart?1:0);
@@ -2907,7 +2909,7 @@ function MembersTab({onOpenMeeting}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
-        <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 동네, 코트로 찾기" style={inputStyle}/>
+        <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 본명, 동네, 코트로 찾기" style={inputStyle}/>
         <div style={{display:"flex",gap:6}}>
           {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
             <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,whiteSpace:"nowrap",fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
@@ -2927,6 +2929,7 @@ function MembersTab({onOpenMeeting}){
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                   <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>{m.nickname}</span>
+                  {realNameOf(m)&&<span style={{fontSize:13,fontWeight:500,color:"#4A5578"}}>({realNameOf(m)})</span>}
                   {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
                   {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:999,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
                 </div>
@@ -2965,7 +2968,7 @@ function MembersTab({onOpenMeeting}){
         );
       })}
       </React.Fragment>))}
-      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 본명·연락처는 보이지 않아요.</p>}
+      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
     </div>
   );
 }
