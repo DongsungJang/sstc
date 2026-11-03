@@ -11894,7 +11894,7 @@ function App() {
     boardFocus: boardFocus,
     newCounts: membersNew,
     canWrite: !FB || !!(account && (account.admin || account.approved))
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), tab === "booking" && !curMeeting && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",

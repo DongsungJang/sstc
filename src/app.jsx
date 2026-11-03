@@ -3617,8 +3617,8 @@ export default function App() {
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
       </div>
-      {/* 모임 만들기 버튼: 탭바 바로 위 오른쪽 (모임 상세 화면에서는 숨김) */}
-      {!curMeeting&&(
+      {/* 모임 만들기 버튼: 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
+      {tab==="booking"&&!curMeeting&&(
         <button type="button" onClick={openCreate} aria-label="모임 만들기" title="모임 만들기"
           style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",width:58,height:58,borderRadius:"50%",border:"none",background:GRAD,color:"#fff",boxShadow:"0 8px 20px rgba(40,70,180,0.35)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
