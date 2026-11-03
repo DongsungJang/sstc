@@ -735,6 +735,117 @@ const loginExpired = () => {
   const u = +lsGet(LS.until);
   return lsGet(LS.keep) !== "0" && u > 0 && Date.now() > u;
 };
+// ─── 새 모임·새 회원·새 글 표시 (이 기기에 저장) ───────────────────────────────
+// 하단 탭: 그 탭을 마지막으로 연 뒤에 올라온 것 개수를 "+n"으로. 탭을 열면 사라져요.
+// 목록의 NEW: 그 항목을 직접 열어 볼 때까지 (최대 NEW_DAYS일). 내가 만든 건 빼요.
+// 처음 쓰는 기기는 그때부터 새로 올라온 것만 쳐요 (예전 글이 한꺼번에 NEW가 되지 않게).
+// sstc-seen-<uid> = {base: 처음 쓴 시각, t:{탭: 마지막으로 연 시각}, i:{항목 id: 항목 시각}}
+// 항목 id: m<모임 id>, p<글 id>, u<회원 uid>(정회원이 된 회원), a<회원 uid>(승인 대기, 관리자용)
+const NEW_DAYS = 14;
+const SEEN = {
+  uid: null,
+  d: null,
+  subs: new Set()
+};
+const seenSave = () => {
+  const cut = Date.now() - NEW_DAYS * 864e5;
+  Object.keys(SEEN.d.i).forEach(k => {
+    if (SEEN.d.i[k] < cut) delete SEEN.d.i[k];
+  });
+  lsSet("sstc-seen-" + (SEEN.uid || "local"), JSON.stringify(SEEN.d));
+  SEEN.subs.forEach(f => f());
+};
+function seenLoad(uid) {
+  if (SEEN.d && SEEN.uid === uid) return;
+  SEEN.uid = uid;
+  let d = null;
+  try {
+    d = JSON.parse(lsGet("sstc-seen-" + (uid || "local")) || "null");
+  } catch (e) {}
+  SEEN.d = d && d.base ? {
+    base: d.base,
+    t: d.t || {},
+    i: d.i || {}
+  } : {
+    base: Date.now(),
+    t: {},
+    i: {}
+  };
+  seenSave();
+}
+const isNewItem = (id, at, byUid) => {
+  const d = SEEN.d;
+  if (!d || !at) return false;
+  return at > d.base && at > Date.now() - NEW_DAYS * 864e5 && !(byUid && byUid === SEEN.uid) && !d.i[id];
+};
+const markItemSeen = (id, at) => {
+  if (!SEEN.d || SEEN.d.i[id]) return;
+  SEEN.d.i[id] = at || Date.now();
+  seenSave();
+};
+const markTabSeen = k => {
+  if (!SEEN.d) return;
+  SEEN.d.t[k] = Date.now();
+  seenSave();
+};
+// 탭 배지 개수: NEW인 것 중 그 탭을 마지막으로 연 뒤에 올라온 것
+const tabNewCount = (k, items) => {
+  const d = SEEN.d;
+  if (!d) return 0;
+  const t = d.t[k] || 0;
+  return items.filter(x => x.at > t && isNewItem(x.id, x.at, x.by)).length;
+};
+function useSeen() {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const f = () => setN(n => n + 1);
+    SEEN.subs.add(f);
+    return () => {
+      SEEN.subs.delete(f);
+    };
+  }, []);
+}
+// 목록에서 쓰는 항목 모양 {id, at, by}
+const meetingNewItem = m => ({
+  id: "m" + m.id,
+  at: m.info && +m.info.createdAt || 0,
+  by: m.createdByUid
+});
+const postNewItem = p => ({
+  id: "p" + p.id,
+  at: +p.at || 0,
+  by: p.uid
+});
+const memberNewItem = m => ({
+  id: "u" + m.uid,
+  at: m.uid === SEEN.uid ? 0 : +m.approvedAt || +m.createdAt || 0,
+  by: m.approvedByUid || ""
+});
+const pendingNewItem = m => ({
+  id: "a" + m.uid,
+  at: +m.createdAt || 0,
+  by: m.uid
+});
+const isNew = x => isNewItem(x.id, x.at, x.by);
+function NewTag({
+  style
+}) {
+  return /*#__PURE__*/React.createElement("span", {
+    "aria-label": "\uC0C8 \uD56D\uBAA9",
+    style: {
+      fontSize: 10,
+      fontWeight: 800,
+      letterSpacing: "0.04em",
+      lineHeight: "16px",
+      padding: "0 6px",
+      borderRadius: 999,
+      background: "#ef4444",
+      color: "#fff",
+      whiteSpace: "nowrap",
+      ...style
+    }
+  }, "NEW");
+}
 function LoginScreen({
   notice,
   onSignup,
@@ -3679,6 +3790,7 @@ function PendingScreen({
 // 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
 const ADMIN_MSG = [["vote", "모임 투표 독려", m => m ? `${m.date} ${m.place} 모임 참석 투표해 주세요!` : "다가오는 모임 참석 투표해 주세요!"], ["profile", "정보 수정 요청", () => "프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["realName", "본명 입력 요청", () => "본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."], ["career", "구력 확인 요청", () => "구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["custom", "직접 쓰기", () => ""]];
 function AdminTab() {
+  useSeen();
   const [members, setMembers] = useState(null);
   const [approved, setApproved] = useState({});
   const [admins, setAdmins] = useState({});
@@ -3729,7 +3841,11 @@ function AdminTab() {
     ...msg,
     at: Date.now()
   });
-  const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => inbox(uid, {
+  const approve = uid => FB.club.child("approved/" + uid).set(true).then(() => FB.club.child("members/" + uid).update({
+    approvedAt: Date.now(),
+    approvedByUid: myUid()
+  })) // 회원 탭 NEW 표시용
+  .then(() => inbox(uid, {
     type: "approved",
     text: "정회원이 됐어요! 이제 모임 예약과 대진표를 쓸 수 있어요"
   })).catch(fail);
@@ -3885,7 +4001,10 @@ function AdminTab() {
       minWidth: 0,
       cursor: "pointer"
     },
-    onClick: () => setOpen(open === m.uid ? null : m.uid)
+    onClick: () => {
+      markItemSeen("a" + m.uid, m.createdAt);
+      setOpen(open === m.uid ? null : m.uid);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -3926,7 +4045,7 @@ function AdminTab() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "NTRP ", m.ntrp), admins[m.uid] && tag("관리자", GRAD, "#fff")), /*#__PURE__*/React.createElement("span", {
+  }, "NTRP ", m.ntrp), admins[m.uid] && tag("관리자", GRAD, "#fff"), !approved[m.uid] && !admins[m.uid] && !m.withdrawn && isNew(pendingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2"
@@ -7338,6 +7457,7 @@ function BookingTab({
   onDeleted,
   onCreate
 }) {
+  useSeen();
   const [kind, setKind] = useState(() => {
     try {
       return sessionStorage.getItem("sstc-booking-kind") || "flash";
@@ -7393,7 +7513,8 @@ function BookingTab({
     }
   }, [["flash", "번개 모임", "zap"], ["regular", "정기 모임", "calendar"]].map(([k, l, ic]) => {
     const on = kind === k,
-      n = upAll.filter(m => m.kind === k).length;
+      n = upAll.filter(m => m.kind === k).length,
+      fresh = upAll.some(m => m.kind === k && !m.cancelled && isNew(meetingNewItem(m)));
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       type: "button",
@@ -7430,7 +7551,16 @@ function BookingTab({
         background: on ? "rgba(255,255,255,0.25)" : "#fff",
         color: on ? "#fff" : BLUE
       }
-    }, n));
+    }, n), fresh && /*#__PURE__*/React.createElement("span", {
+      "aria-label": "\uC0C8 \uBAA8\uC784 \uC788\uC74C",
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: "#ef4444",
+        marginLeft: -2
+      }
+    }));
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 10px",
@@ -7484,7 +7614,7 @@ function BookingTab({
       }
     }, m.date, /*#__PURE__*/React.createElement(KindBadge, {
       m: m
-    })), /*#__PURE__*/React.createElement("p", {
+    }), !gone && isNew(meetingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("p", {
       style: {
         margin: "0 0 2px",
         fontSize: 13,
@@ -9290,9 +9420,10 @@ function MeetingForm({
 // 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
 // 닉네임 옆에 본명을 (본명)으로 같이 보여 줘요. 연락처·이메일·생년월일은 보여주지 않아요.
 // 회원 프로필·승인·관리자 목록 실시간 구독 (회원 탭, 관리자 대신 참석에서 같이 씀)
-function useClubMembers() {
+function useClubMembers(enabled = true) {
   const [data, setData] = useState(null);
   useEffect(() => {
+    if (!enabled) return;
     if (!FB) {
       setData({
         members: {},
@@ -9325,7 +9456,7 @@ function useClubMembers() {
       return () => r.off("value", h);
     });
     return () => subs.forEach(f => f());
-  }, []);
+  }, [enabled]);
   return data;
 }
 // 승인된(탈퇴 안 한) 회원만
@@ -9575,6 +9706,7 @@ function FreeBoard({
   isAdmin,
   focus
 }) {
+  useSeen();
   const posts = useBoard(canWrite);
   const {
     names
@@ -9588,6 +9720,13 @@ function FreeBoard({
       window.scrollTo(0, 0);
     } catch (e) {}
   };
+  // 글을 열면 NEW가 사라져요 (알림으로 열어도 같음)
+  useEffect(() => {
+    if (openId && posts) {
+      const p = posts.find(x => x.id === openId);
+      if (p) markItemSeen("p" + p.id, p.at);
+    }
+  }, [openId, posts]);
   useEffect(() => {
     if (focus) go(focus.split("#")[0]);
   }, [focus]);
@@ -9714,7 +9853,12 @@ function FreeBoard({
         borderRadius: 10,
         verticalAlign: "2px"
       }
-    }, p.anon ? "내 글" : "나")), /*#__PURE__*/React.createElement("span", {
+    }, p.anon ? "내 글" : "나"), isNew(postNewItem(p)) && /*#__PURE__*/React.createElement(NewTag, {
+      style: {
+        marginLeft: 6,
+        verticalAlign: "2px"
+      }
+    })), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: "#A3AAC2"
@@ -9887,7 +10031,8 @@ function MembersTab({
   onOpenMeeting,
   canWrite,
   isAdmin,
-  boardFocus
+  boardFocus,
+  newCounts = {}
 }) {
   const [view, setView] = useState(() => {
     try {
@@ -9922,32 +10067,46 @@ function MembersTab({
       padding: 4,
       boxShadow: "0 4px 16px rgba(40,70,180,0.08)"
     }
-  }, [["list", "회원 목록", "users"], ["board", BOARD_NAME, "message"]].map(([k, l, ic]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    type: "button",
-    role: "tab",
-    "aria-selected": view === k,
-    onClick: () => pickView(k),
-    style: {
-      flex: 1,
-      padding: "9px 0",
-      borderRadius: 999,
-      border: "none",
-      background: view === k ? GRAD : "transparent",
-      color: view === k ? "#fff" : "#4A5578",
-      fontSize: 14,
-      fontWeight: view === k ? 700 : 500,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-      fontFamily: FONT
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: ic,
-    s: 15
-  }), l))), view === "board" ? /*#__PURE__*/React.createElement(FreeBoard, {
+  }, [["list", "회원 목록", "users"], ["board", BOARD_NAME, "message"]].map(([k, l, ic]) => {
+    const n = newCounts[k] || 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      role: "tab",
+      "aria-selected": view === k,
+      onClick: () => pickView(k),
+      style: {
+        flex: 1,
+        padding: "9px 0",
+        borderRadius: 999,
+        border: "none",
+        background: view === k ? GRAD : "transparent",
+        color: view === k ? "#fff" : "#4A5578",
+        fontSize: 14,
+        fontWeight: view === k ? 700 : 500,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        fontFamily: FONT
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: ic,
+      s: 15
+    }), l, n > 0 && /*#__PURE__*/React.createElement("span", {
+      "aria-label": `새 항목 ${n}개`,
+      style: {
+        fontSize: 10,
+        fontWeight: 800,
+        lineHeight: "16px",
+        padding: "0 6px",
+        borderRadius: 999,
+        background: "#ef4444",
+        color: "#fff"
+      }
+    }, "NEW ", n));
+  })), view === "board" ? /*#__PURE__*/React.createElement(FreeBoard, {
     canWrite: canWrite,
     isAdmin: isAdmin,
     focus: boardFocus
@@ -9958,6 +10117,7 @@ function MembersTab({
 function MemberList({
   onOpenMeeting
 }) {
+  useSeen();
   const data = useClubMembers();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState(() => {
@@ -10103,7 +10263,11 @@ function MemberList({
       key: m.uid,
       role: "button",
       tabIndex: 0,
-      onClick: () => setOpen(open === m.uid ? null : m.uid),
+      onClick: () => {
+        const x = memberNewItem(m);
+        markItemSeen(x.id, x.at);
+        setOpen(open === m.uid ? null : m.uid);
+      },
       style: {
         cursor: "pointer"
       }
@@ -10173,7 +10337,7 @@ function MemberList({
         background: BLUE_LIGHT,
         color: BLUE
       }
-    }, "\uC6B4\uC601\uC9C4")), /*#__PURE__*/React.createElement("span", {
+    }, "\uC6B4\uC601\uC9C4"), isNew(memberNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: "#A3AAC2"
@@ -10941,6 +11105,13 @@ function App() {
       from
     });
     setTab("booking");
+    {
+      const m = MEETINGS.find(x => x.id === id);
+      if (m) {
+        const x = meetingNewItem(m);
+        markItemSeen(x.id, x.at);
+      }
+    } // 열어 본 모임은 NEW 끄기
     try {
       window.scrollTo(0, 0);
     } catch (e) {}
@@ -11108,6 +11279,37 @@ function App() {
       }
     }
   }, [screen, list.ready, list.meetings]);
+  // ── 새 항목 배지: 예약(새 모임), 회원(새 정회원 + 소곤소곤 새 글), 관리(새 가입 신청, 관리자만) ──
+  useSeen();
+  const myId = account && account.user ? account.user.uid : "";
+  const inMain = screen === "main" && (!FB || !!(account && account.user && (account.admin || account.approved)));
+  useEffect(() => {
+    if (inMain) seenLoad(myId);
+  }, [inMain, myId]);
+  const clubData = useClubMembers(inMain);
+  const boardPosts = useBoard(inMain);
+  // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
+  useEffect(() => {
+    if (!inMain) return;
+    markTabSeen(tab);
+    return () => markTabSeen(tab);
+  }, [tab, inMain, myId]);
+  const newMeetings = MEETINGS.filter(m => m.status === "upcoming" && !m.cancelled).map(meetingNewItem);
+  const newMembers = clubData ? activeMembers(clubData).map(memberNewItem) : [];
+  const newPosts = (boardPosts || []).map(postNewItem);
+  const newPending = clubData ? Object.entries(clubData.members).map(([uid, m]) => ({
+    uid,
+    ...m
+  })).filter(m => m && !m.withdrawn && !clubData.approved[m.uid] && !clubData.admins[m.uid]).map(pendingNewItem) : [];
+  const tabBadge = {
+    booking: tabNewCount("booking", newMeetings),
+    members: tabNewCount("members", [...newMembers, ...newPosts]),
+    admin: tabNewCount("admin", newPending)
+  };
+  const membersNew = {
+    list: newMembers.filter(isNew).length,
+    board: newPosts.filter(isNew).length
+  };
   if (splash) return /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
   });
@@ -11690,8 +11892,9 @@ function App() {
     onOpenMeeting: id => openM(id, "info", "members"),
     isAdmin: adminOn,
     boardFocus: boardFocus,
+    newCounts: membersNew,
     canWrite: !FB || !!(account && (account.admin || account.approved))
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), tab === "booking" && !curMeeting && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",
@@ -11841,7 +12044,8 @@ function App() {
       paddingBottom: "env(safe-area-inset-bottom,0px)"
     }
   }, tabs.map(t => {
-    const on = tab === t.key;
+    const on = tab === t.key,
+      nb = on ? 0 : tabBadge[t.key] || 0;
     return /*#__PURE__*/React.createElement("button", {
       key: t.key,
       type: "button",
@@ -11864,17 +12068,47 @@ function App() {
         flexDirection: "column",
         alignItems: "center",
         gap: 4,
-        color: "#fff",
+        color: "#fff"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "relative",
+        display: "inline-flex"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
         opacity: on ? 1 : 0.6
       }
     }, /*#__PURE__*/React.createElement(Icon, {
       name: t.icon,
       size: 22,
       stroke: on ? 2.2 : 1.8
-    }), /*#__PURE__*/React.createElement("span", {
+    })), nb > 0 && /*#__PURE__*/React.createElement("span", {
+      "aria-label": `새 항목 ${nb}개`,
+      style: {
+        position: "absolute",
+        top: -7,
+        left: 14,
+        minWidth: 20,
+        height: 18,
+        padding: "0 5px",
+        boxSizing: "border-box",
+        borderRadius: 999,
+        background: "#ef4444",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        lineHeight: "14px",
+        textAlign: "center",
+        border: "2px solid #3B63F3",
+        whiteSpace: "nowrap"
+      }
+    }, "+", nb > 99 ? 99 : nb)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
-        fontWeight: on ? 700 : 500
+        fontWeight: on ? 700 : 500,
+        opacity: on ? 1 : 0.6
       }
     }, t.label), /*#__PURE__*/React.createElement("div", {
       style: {
