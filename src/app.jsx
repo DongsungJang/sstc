@@ -2310,9 +2310,9 @@ function MemberAttend({meeting,isAdmin}){
   );
 }
 
-// 공유 링크(#meeting-<id>)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임을 열어요
-const DEEP_LINK={id:0};
-try{ const mm=/^#meeting-(\d+)$/.exec(location.hash); if(mm){ DEEP_LINK.id=+mm[1]; history.replaceState(null,"",location.pathname+location.search); } }catch(e){}
+// 공유 링크(#meeting-<id>, 대진표 공유는 #meeting-<id>-bracket)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임(탭)을 열어요
+const DEEP_LINK={id:0,view:"info"};
+try{ const mm=/^#meeting-(\d+)(-bracket)?$/.exec(location.hash); if(mm){ DEEP_LINK.id=+mm[1]; DEEP_LINK.view=mm[2]?"bracket":"info"; history.replaceState(null,"",location.pathname+location.search); } }catch(e){}
 // ─── 카톡 공유 ────────────────────────────────────────────────────────────────
 // 카카오톡 자동 발송은 사업자 채널이 필요해서, 폰의 공유창(카카오톡 선택)으로 안내문을 보내요. 공유창이 없으면 복사.
 function meetingShareText(m){
@@ -2339,7 +2339,7 @@ function bracketShareText(m,bracket,scores){
   const res=g=>{ if(!g.o) return "";
     const sc=` ${g.score.a}:${g.score.b}`;
     return g.o==="draw"?sc+" 무":g.score.a===g.score.b?sc+` (가위바위보 ${pair(g.o==="a"?g.a:g.b)} 승)`:sc; };
-  const url=location.origin+location.pathname+"#meeting-"+m.id;
+  const url=location.origin+location.pathname+"#meeting-"+m.id+"-bracket";
   const done=games.filter(g=>g.o).length;
   const L=[`[SSTC] ${m.kind==="flash"?"번개":"정기"} 모임 ${done?(done===games.length?"경기 결과":"대진표·결과"):"대진표"}`,
     `${m.date} ${bracket.times[0]}~${bracket.ends[bracket.ends.length-1]}`,
@@ -4104,7 +4104,7 @@ export default function App() {
   const canWriteMeetings=!FB||!!(account&&(account.admin||account.approved));
   useEffect(()=>{ if(list.ready&&canWriteMeetings) ensureSeries(RAW_MEETINGS); },[list.meetings,list.ready,canWriteMeetings]);
   // 공유 링크(#meeting-<id>)로 들어오면 로그인 후 그 모임을 바로 열어요
-  useEffect(()=>{ if(screen==="main"&&list.ready&&DEEP_LINK.id){ const id=DEEP_LINK.id; if(MEETINGS.some(m=>m.id===id)){ DEEP_LINK.id=0; openM(id,"info","home"); } } },[screen,list.ready,list.meetings]);
+  useEffect(()=>{ if(screen==="main"&&list.ready&&DEEP_LINK.id){ const id=DEEP_LINK.id; if(MEETINGS.some(m=>m.id===id)){ const v=DEEP_LINK.view; DEEP_LINK.id=0; openM(id,v,"home"); } } },[screen,list.ready,list.meetings]);
   // ── 새 항목 배지: 예약(새 모임), 회원(새 정회원 + 소곤소곤 새 글), 관리(새 가입 신청, 관리자만) ──
   useSeen();
   const myId=account&&account.user?account.user.uid:"";
