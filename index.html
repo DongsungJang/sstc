@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=212654afc0">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=212654afc0">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=3e58231a35">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=3e58231a35">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -7763,7 +7763,8 @@ function CourtMap({
     mapRef = useRef(null),
     overlays = useRef([]),
     fitted = useRef(!!MAP_VIEW),
-    strip = useRef(null);
+    strip = useRef(null),
+    relayoutRef = useRef(null);
   const [status, setStatus] = useState("loading"); // loading | ready | fail
   const [filter, setFilter] = useState(() => MAP_VIEW && MAP_VIEW.filter || "all");
   const [sel, setSel] = useState(() => MAP_VIEW && MAP_VIEW.sel || null);
@@ -7816,6 +7817,20 @@ function CourtMap({
       k.maps.event.addListener(map, "click", () => setSel(null));
       mapRef.current = map;
       setStatus("ready");
+      // 폰에서 처음 그릴 때 크기를 잘못 잡으면 바탕 지도가 비어 보여서, 잠깐 뒤에 크기를 다시 맞춰 다시 그려요
+      const fix = () => {
+        const m = mapRef.current;
+        if (!m) return;
+        try {
+          const c = m.getCenter();
+          m.relayout();
+          m.setCenter(c);
+        } catch (e) {}
+      };
+      [60, 400, 1200].forEach(t => setTimeout(fix, t));
+      relayoutRef.current = fix;
+      window.addEventListener("resize", fix);
+      window.addEventListener("orientationchange", fix);
     }).catch(() => alive && setStatus("fail"));
     return () => {
       alive = false;
@@ -7830,6 +7845,11 @@ function CourtMap({
             level: map.getLevel()
           };
         } catch (e) {}
+      }
+      if (relayoutRef.current) {
+        window.removeEventListener("resize", relayoutRef.current);
+        window.removeEventListener("orientationchange", relayoutRef.current);
+        relayoutRef.current = null;
       }
       overlays.current.forEach(o => o.setMap(null));
       overlays.current = [];
@@ -7985,7 +8005,8 @@ function CourtMap({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
-      height: "max(420px, calc(100vh - 330px))",
+      minHeight: 360,
+      height: "max(360px, calc(100svh - 430px))",
       borderRadius: 24,
       overflow: "hidden",
       background: "#E7ECF6",
@@ -11745,7 +11766,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "212654afc0";
+const BUILD_ID = "3e58231a35";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

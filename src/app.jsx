@@ -2445,7 +2445,7 @@ function MapCard({m,onOpen}){
   </div>;
 }
 function CourtMap({onOpen}){
-  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null);
+  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null), relayoutRef=useRef(null);
   const [status,setStatus]=useState("loading");   // loading | ready | fail
   const [filter,setFilter]=useState(()=>(MAP_VIEW&&MAP_VIEW.filter)||"all");
   const [sel,setSel]=useState(()=>(MAP_VIEW&&MAP_VIEW.sel)||null);
@@ -2472,9 +2472,14 @@ function CourtMap({onOpen}){
       const map=new k.maps.Map(box.current,{center:new k.maps.LatLng(v.lat,v.lng),level:v.level});
       k.maps.event.addListener(map,"click",()=>setSel(null));
       mapRef.current=map; setStatus("ready");
+      // 폰에서 처음 그릴 때 크기를 잘못 잡으면 바탕 지도가 비어 보여서, 잠깐 뒤에 크기를 다시 맞춰 다시 그려요
+      const fix=()=>{ const m=mapRef.current; if(!m) return; try{ const c=m.getCenter(); m.relayout(); m.setCenter(c); }catch(e){} };
+      [60,400,1200].forEach(t=>setTimeout(fix,t));
+      relayoutRef.current=fix; window.addEventListener("resize",fix); window.addEventListener("orientationchange",fix);
     }).catch(()=>alive&&setStatus("fail"));
     return ()=>{ alive=false; const map=mapRef.current;
       if(map){ try{ const c=map.getCenter(); MAP_VIEW={...(MAP_VIEW||{}),lat:c.getLat(),lng:c.getLng(),level:map.getLevel()}; }catch(e){} }
+      if(relayoutRef.current){ window.removeEventListener("resize",relayoutRef.current); window.removeEventListener("orientationchange",relayoutRef.current); relayoutRef.current=null; }
       overlays.current.forEach(o=>o.setMap(null)); overlays.current=[]; mapRef.current=null; };
   },[retry]);
   useEffect(()=>{ MAP_VIEW={...(MAP_VIEW||{}),filter,sel}; },[filter,sel]);
@@ -2524,7 +2529,7 @@ function CourtMap({onOpen}){
         background:on?"#0B1E5B":"#fff",color:on?"#fff":"#1B2559",boxShadow:"0 2px 8px rgba(11,30,91,0.14)"}}>
       {dot&&<span style={{width:7,height:7,borderRadius:"50%",background:dot}}/>}{l}{k==="all"?` ${counts.all}`:""}</button>; };
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
-    <div style={{position:"relative",height:"max(420px, calc(100vh - 330px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
+    <div style={{position:"relative",minHeight:360,height:"max(360px, calc(100svh - 430px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
       <div ref={box} aria-label="코트 지도" style={{position:"absolute",inset:0}}/>
       {status!=="ready"&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:24,textAlign:"center",color:"#6B7493",fontSize:13,lineHeight:1.6}}>
         <Icon name="map" size={30} stroke={1.6} color="#A3AAC2"/>
