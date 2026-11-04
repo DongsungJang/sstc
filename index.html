@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=191d41442c">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=191d41442c">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=5b050a9697">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=5b050a9697">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -6998,14 +6998,16 @@ function MemberAttend({
   }, "\uCC38\uC11D"))))));
 }
 
-// 공유 링크(#meeting-<id>)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임을 열어요
+// 공유 링크(#meeting-<id>, 대진표 공유는 #meeting-<id>-bracket)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임(탭)을 열어요
 const DEEP_LINK = {
-  id: 0
+  id: 0,
+  view: "info"
 };
 try {
-  const mm = /^#meeting-(\d+)$/.exec(location.hash);
+  const mm = /^#meeting-(\d+)(-bracket)?$/.exec(location.hash);
   if (mm) {
     DEEP_LINK.id = +mm[1];
+    DEEP_LINK.view = mm[2] ? "bracket" : "info";
     history.replaceState(null, "", location.pathname + location.search);
   }
 } catch (e) {}
@@ -7040,7 +7042,7 @@ function bracketShareText(m, bracket, scores) {
     const sc = ` ${g.score.a}:${g.score.b}`;
     return g.o === "draw" ? sc + " 무" : g.score.a === g.score.b ? sc + ` (가위바위보 ${pair(g.o === "a" ? g.a : g.b)} 승)` : sc;
   };
-  const url = location.origin + location.pathname + "#meeting-" + m.id;
+  const url = location.origin + location.pathname + "#meeting-" + m.id + "-bracket";
   const done = games.filter(g => g.o).length;
   const L = [`[SSTC] ${m.kind === "flash" ? "번개" : "정기"} 모임 ${done ? done === games.length ? "경기 결과" : "대진표·결과" : "대진표"}`, `${m.date} ${bracket.times[0]}~${bracket.ends[bracket.ends.length - 1]}`, `${m.place}${m.place ? " · " : ""}코트 ${bracket.courts || 2}면 · 게임당 ${bracket.dur || 30}분 · ${bracket.players.length}명`];
   bracket.sessions.forEach((ses, s) => {
@@ -12560,7 +12562,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "191d41442c";
+const BUILD_ID = "5b050a9697";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -13511,8 +13513,9 @@ function App() {
     if (screen === "main" && list.ready && DEEP_LINK.id) {
       const id = DEEP_LINK.id;
       if (MEETINGS.some(m => m.id === id)) {
+        const v = DEEP_LINK.view;
         DEEP_LINK.id = 0;
-        openM(id, "info", "home");
+        openM(id, v, "home");
       }
     }
   }, [screen, list.ready, list.meetings]);
