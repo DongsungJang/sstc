@@ -2415,7 +2415,7 @@ function MiniCalendar({onOpen}){
 const MAP_HOME={lat:37.5326,lng:126.99,level:9};   // 처음엔 수도권이 보이게
 let MAP_VIEW=null;   // 모임 상세에 갔다가 "지도"로 돌아오면 보던 위치·고른 코트 그대로
 const MAP_FILTERS=[["all","전체"],["regular","정기"],["game","번개 게임"],["training","번개 훈련"]];
-const pinSvg=(color,big)=>{ const w=big?44:34,h=big?56:44;
+const pinSvg=(color,big)=>{ const w=big?34:26,h=big?44:34;   // 기본은 작게, 고른 핀만 조금 크게
   return `<svg width="${w}" height="${h}" viewBox="0 0 34 44" aria-hidden="true"><path d="M17 43s14-14.2 14-26A14 14 0 0 0 3 17c0 11.8 14 26 14 26z" fill="${color}" stroke="#fff" stroke-width="2.4"/><circle cx="17" cy="17" r="8.2" fill="#D7F24A"/><path d="M11.3 12.2a8.2 8.2 0 0 1 0 9.6M22.7 12.2a8.2 8.2 0 0 0 0 9.6" fill="none" stroke="#fff" stroke-width="1.6"/></svg>`; };
 // 핀이 다 보이게 중심·레벨을 직접 계산해요 (일부 폰에서 setBounds 뒤 중심이 NaN이 되는 일이 있어서 안 써요)
 // 카카오 레벨 L ≈ 1픽셀에 127m × 2^(L-10)
@@ -2465,13 +2465,6 @@ function CourtMap({onOpen}){
   const [page,setPage]=useState(0);
   const [, setTick]=useState(0);
   const [locating,setLocating]=useState(false);
-  const [diag,setDiag]=useState("");
-  useEffect(()=>{ if(status!=="ready") return;
-    const t=setInterval(()=>{ const map=mapRef.current, el=box.current; if(!map||!el) return;
-      try{ const c=map.getCenter(), imgs=[...el.querySelectorAll("img")], ok=imgs.filter(i=>i.complete&&i.naturalWidth>0).length, bad=imgs.filter(i=>i.complete&&i.naturalWidth===0).length;
-        setDiag(`중심 ${c.getLat().toFixed(3)}, ${c.getLng().toFixed(3)} · 레벨 ${map.getLevel()} · 크기 ${el.clientWidth}×${el.clientHeight} · 그림 ${ok}/${imgs.length}${bad?` (실패 ${bad})`:""} · 핀 ${overlays.current.length} · 검색 ${GEO_STATS.ok}/${GEO_STATS.zero}/${GEO_STATS.err}${GEO_STATS.last?` ${GEO_STATS.last}`:""}`);
-      }catch(e){ setDiag("상태 읽기 실패: "+e.message); } },1500);
-    return ()=>clearInterval(t); },[status]);
   const all=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).sort((a,b)=>(a.iso+(a.info.start||"")).localeCompare(b.iso+(b.info.start||"")));
   const shown=all.filter(m=>filter==="all"||kindKey(m)===filter);
   // 좌표: 모임에 저장된 것 → 이 기기에 찾아 둔 것 → (지도 준비되면) 이름으로 검색
@@ -2522,11 +2515,11 @@ function CourtMap({onOpen}){
       const on=g.key===sel, color=KIND_COLOR[kindKey(g.list[0])].dot, n=g.list.length;
       const el=document.createElement("div");
       el.setAttribute("role","button"); el.setAttribute("aria-label",`${g.name} 모임 ${n}개`);
-      el.style.cssText=`position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:translateY(${on?-4:0}px);font-family:${FONT.replace(/"/g,"'")}`;
-      el.innerHTML=`<div style="position:relative;filter:drop-shadow(0 4px 6px rgba(11,30,91,0.25))">${pinSvg(color,on)}${n>1?`<span style="position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#0B1E5B;color:#fff;border:2px solid #fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${n}</span>`:""}</div>`
-        +`<span style="margin-top:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${on?"#0B1E5B":"#fff"};color:${on?"#fff":"#1B2559"};box-shadow:0 2px 6px rgba(11,30,91,0.18)">${escHtml(g.name)}</span>`;
+      el.style.cssText=`position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;font-family:${FONT.replace(/"/g,"'")}`;
+      // 코트 이름은 지도에 안 써요 (핀을 누르면 아래 카드에 나와요)
+      el.innerHTML=`<div style="position:relative;filter:drop-shadow(0 3px 4px rgba(11,30,91,0.25))">${pinSvg(color,on)}${n>1?`<span style="position:absolute;top:-5px;right:-7px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:#0B1E5B;color:#fff;border:1.5px solid #fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">${n}</span>`:""}</div>`;
       el.addEventListener("click",e=>{ e.stopPropagation(); setSel(g.key); setPage(0); try{ map.panTo(new k.maps.LatLng(g.lat,g.lng)); }catch(x){} });
-      const o=new k.maps.CustomOverlay({position:new k.maps.LatLng(g.lat,g.lng),content:el,yAnchor:on?0.82:0.78,xAnchor:0.5,clickable:true,zIndex:on?10:1});
+      const o=new k.maps.CustomOverlay({position:new k.maps.LatLng(g.lat,g.lng),content:el,yAnchor:1,xAnchor:0.5,clickable:true,zIndex:on?10:1});
       o.setMap(map); overlays.current.push(o);
     });
     // 처음 한 번은 핀이 다 보이게 맞춰요
@@ -2576,7 +2569,6 @@ function CourtMap({onOpen}){
         {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:999,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
       </div>}
     </div>
-    {diag&&<p style={{margin:"-6px 4px 0",fontSize:10,color:"#A3AAC2",lineHeight:1.5,wordBreak:"break-all"}}>{diag}</p>}
     {status==="ready"&&lost.length>0&&<div>
       <p style={{margin:"0 0 4px",fontSize:15,fontWeight:700,color:"#1B2559"}}>위치를 찾지 못한 모임 {lost.length}</p>
       <p style={{margin:"0 0 10px",fontSize:12,color:"#8A93B2"}}>모임 수정에서 테니스장을 카카오 장소 검색으로 고르면 지도에 나와요.</p>
