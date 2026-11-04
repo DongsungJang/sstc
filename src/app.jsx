@@ -1156,7 +1156,7 @@ function flatGames(bracket, scores) {
   if (!bracket) return out;
   bracket.sessions.forEach((ses,s)=>sessionCourts(ses).forEach((ct,c)=>{
     const key=gameKey(s,c), score=(scores||{})[key]||{a:0,b:0,rps:null};
-    out.push({s,c,key,a:ct.a.map(i=>bracket.players[i]),b:ct.b.map(i=>bracket.players[i]),score,o:outcome(score)});
+    out.push({s,c,key,court:ct.no||c+1,a:ct.a.map(i=>bracket.players[i]),b:ct.b.map(i=>bracket.players[i]),score,o:outcome(score)});
   }));
   return out;
 }
@@ -1262,7 +1262,8 @@ function useMeetingRecord(meeting) {
   const fail=e=>{ if(e&&(e.code==="invalid_argument"||/PERMISSION_DENIED|permission/i.test(String(e.code||e.message)))) setMode("readonly"); };
   const src=meeting.rec||{};
   const rec={...src,scores:{...(src.scores||{}),...pending}};
-  const saveBracket=bracket=>{ setPending({}); Promise.all([saveMeetingPath(base+"/bracket",bracket),saveMeetingPath(base+"/scores",null)]).catch(fail); };
+  // scores를 같이 넘기면 그 점수만 남기고(대진표 수정), 안 넘기면 점수를 모두 지워요
+  const saveBracket=(bracket,keep)=>{ setPending({}); Promise.all([saveMeetingPath(base+"/bracket",bracket),saveMeetingPath(base+"/scores",keep&&Object.keys(keep).length?keep:null)]).catch(fail); };
   const clearBracket=()=>saveBracket(null);
   const saveRsvp=v=>saveMeetingPath(base+"/votes/"+myVoteKey(),v).catch(fail);
   const saveScore=(key,val)=>{
@@ -1776,6 +1777,182 @@ const hhmmApp = m => Math.floor(m/60)+":"+("0"+m%60).slice(-2);
 const chipBtn={padding:"5px 0",width:52,borderRadius:999,fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0};
 const arrowBtn=dis=>({background:"none",border:"none",padding:"0 4px",fontSize:9,lineHeight:"13px",color:dis?"#D6DEF7":"#6B7493",cursor:dis?"default":"pointer"});
 
+// ─── 대진표 직접 작성·수정 ────────────────────────────────────────────────────
+// 자동 편성과 같은 모양으로 저장해요: players(이름), sessions[{courts:[{a:[i,i],b:[i,i],no}],rest:[i]}], times, ends …
+// 편집 중에는 번호 대신 이름으로 들고 있다가 저장할 때 번호로 바꿔요. 코트가 비어 있으면 그 코트는 빼고 저장해요.
+const emptyCourt=()=>({a:[null,null],b:[null,null]});
+const courtNames=ct=>[...ct.a,...ct.b];
+const courtFilled=ct=>courtNames(ct).filter(Boolean).length;
+// 저장된 대진표 → 편집용(세션마다 코트 courts면, 코트 번호 자리에 맞춰 놓음)
+function draftFromBracket(b){
+  const courts=b.courts||2;
+  return b.sessions.map(ses=>{
+    const row=Array.from({length:courts},emptyCourt);
+    sessionCourts(ses).forEach((ct,c)=>{ const at=(ct.no||c+1)-1; if(at<courts) row[at]={a:ct.a.map(i=>b.players[i]),b:ct.b.map(i=>b.players[i])}; });
+    return row;
+  });
+}
+function ManualBracket({meeting,participants,initial,onSave,onCancel}){
+  // 고를 수 있는 사람: 참석자(실력 순서) + 기존 대진표에만 있던 사람 + 직접 추가한 이름
+  const [pool,setPool]=useState(()=>{
+    const out=arrangeOrder(participants,initial&&initial.players).map(p=>({name:p.name,ntrp:p.ntrp||"",isGuest:!!p.isGuest}));
+    if(initial) initial.players.forEach((nm,i)=>{ if(!out.some(p=>p.name===nm)) out.push({name:nm,ntrp:(initial.ntrp||[])[i]||"",isGuest:!!(initial.guests||[])[i]}); });
+    return out;
+  });
+  const [start,setStart]=useState(()=>initial?initial.start||initial.times[0]:meeting.time.slice(0,5));
+  const [dur,setDur]=useState(()=>initial?initial.dur||30:30);
+  const [courts,setCourtsN]=useState(()=>initial?initial.courts||2:Math.max(1,Math.min(2,Math.floor(participants.length/4)||1)));
+  const [draft,setDraft]=useState(()=>initial?draftFromBracket(initial):[Array.from({length:courts},emptyCourt)]);
+  const [newName,setNewName]=useState("");
+  const [nameErr,setNameErr]=useState("");
+  const label={fontSize:14,fontWeight:600,color:"#2B3674"};
+  const rowS={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10};
+  const timeOf=s=>pad2(hhmmApp(toMin(start)+s*dur));
+  const setCourts=n=>{ setCourtsN(n); setDraft(d=>d.map(row=>row.length>=n?row.slice(0,n):[...row,...Array.from({length:n-row.length},emptyCourt)])); };
+  const setSlot=(s,c,side,k,name)=>setDraft(d=>d.map((row,si)=>si!==s?row:row.map((ct,ci)=>{
+    if(ci!==c) return ct; const n={a:ct.a.slice(),b:ct.b.slice()}; n[side][k]=name||null; return n; })));
+  const addSession=()=>setDraft(d=>[...d,Array.from({length:courts},emptyCourt)]);
+  const removeSession=s=>setDraft(d=>d.filter((_,i)=>i!==s));
+  const copyPrev=s=>setDraft(d=>d.map((row,i)=>i===s?d[s-1].map(ct=>({a:ct.a.slice(),b:ct.b.slice()})):row));
+  const clearSession=s=>setDraft(d=>d.map((row,i)=>i===s?row.map(emptyCourt):row));
+  const usedIn=row=>new Set(row.flatMap(courtNames).filter(Boolean));
+  // 지금까지 게임 수 (모든 세션)
+  const count={}; draft.forEach(row=>row.forEach(ct=>courtNames(ct).forEach(nm=>{ if(nm) count[nm]=(count[nm]||0)+1; })));
+  // 빈 자리 채우기: 이 세션에서 쉬는 사람 중 게임 수가 적은 사람부터(같으면 실력 순서대로)
+  const fillSession=s=>setDraft(d=>d.map((row,i)=>{
+    if(i!==s) return row;
+    const used=usedIn(row);
+    const cnt={}; d.forEach(r=>r.forEach(ct=>courtNames(ct).forEach(nm=>{ if(nm) cnt[nm]=(cnt[nm]||0)+1; })));
+    const free=pool.map((p,idx)=>({nm:p.name,idx})).filter(x=>!used.has(x.nm)).sort((x,y)=>(cnt[x.nm]||0)-(cnt[y.nm]||0)||x.idx-y.idx).map(x=>x.nm);
+    return row.map(ct=>({a:ct.a.map(v=>v||free.shift()||null),b:ct.b.map(v=>v||free.shift()||null)}));
+  }));
+  const addName=()=>{
+    const nm=newName.trim();
+    if(!nm) return;
+    if(nm.length>10){ setNameErr("이름은 10자까지 쓸 수 있어요"); return; }
+    if(pool.some(p=>p.name===nm)){ setNameErr("이미 목록에 있는 이름이에요"); return; }
+    setPool(p=>[...p,{name:nm,ntrp:"",isGuest:true,added:true}]); setNewName(""); setNameErr("");
+  };
+  const removeName=nm=>{ setPool(p=>p.filter(x=>x.name!==nm)); setDraft(d=>d.map(row=>row.map(ct=>({a:ct.a.map(v=>v===nm?null:v),b:ct.b.map(v=>v===nm?null:v)})))); };
+  // 문제 하나만 안내
+  let problem=null;
+  if(!draft.length) problem="세션을 하나 이상 만들어 주세요.";
+  draft.forEach((row,s)=>{ if(problem) return;
+    if(row.every(ct=>!courtFilled(ct))) problem=`${s+1}세션이 비어 있어요. 사람을 넣거나 세션을 지워 주세요.`;
+    else { const c=row.findIndex(ct=>courtFilled(ct)&&courtFilled(ct)<4); if(c>=0) problem=`${s+1}세션 코트 ${c+1}에 빈 자리가 있어요. 4명을 다 넣거나 모두 비워 주세요.`; }
+  });
+  if(!problem&&toMin(start)+draft.length*dur>=24*60) problem="끝나는 시간이 자정을 넘어요. 시작 시간이나 게임당 시간을 줄여 주세요.";
+  const save=()=>{
+    if(problem) return;
+    const used=new Set(Object.keys(count));
+    const players=pool.filter(p=>!p.added||used.has(p.name));
+    const idx=new Map(players.map((p,i)=>[p.name,i]));
+    const sessions=draft.map(row=>{
+      const on=usedIn(row);
+      return {courts:row.map((ct,c)=>({ct,c})).filter(x=>courtFilled(x.ct)).map(({ct,c})=>({a:ct.a.map(n=>idx.get(n)),b:ct.b.map(n=>idx.get(n)),no:c+1})),
+        rest:players.map((p,i)=>on.has(p.name)?-1:i).filter(i=>i>=0)};
+    });
+    const rests=players.map(p=>draft.length-(count[p.name]||0));
+    let triple=0; players.forEach(p=>{ let run=0,hit=false; draft.forEach(row=>{ run=usedIn(row).has(p.name)?run+1:0; if(run>=3) hit=true; }); if(hit) triple++; });
+    const times=draft.map((_,s)=>timeOf(s)), ends=draft.map((_,s)=>timeOf(s+1));
+    onSave({
+      players:players.map(p=>p.name), ntrp:players.map(p=>p.ntrp||""), guests:players.map(p=>!!p.isGuest),
+      games:players.map(p=>count[p.name]||0), excl:players.map(()=>0),
+      start, end:ends[ends.length-1], dur, courts, manual:true,
+      times, ends, sessions,
+      summary:{diffSum:0,restMin:rests.length?Math.min(...rests):0,restMax:rests.length?Math.max(...rests):0,triple},
+      createdAt:initial&&initial.createdAt||Date.now(), ...(initial?{editedAt:Date.now(),editedBy:ME}:{}),
+    });
+  };
+  const sel={...inputStyle,flex:1,minWidth:0,padding:"8px 8px",fontSize:13,borderRadius:12,appearance:"auto"};
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <Card>
+        <SectionTitle>시간 · 코트</SectionTitle>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={rowS}><span style={label}>시작 시간</span><TimeInput label="대진 시작" value={start} onChange={setStart} style={{width:190}}/></div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <span style={label}>게임당 시간</span>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {DUR_OPTIONS.map(m=><button key={m} type="button" onClick={()=>setDur(m)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,cursor:"pointer",fontWeight:dur===m?600:400,border:`1.5px solid ${dur===m?BLUE:"#D6DEF7"}`,background:dur===m?BLUE:"#fff",color:dur===m?"#fff":"#4A5578"}}>{m}분</button>)}
+            </div>
+          </div>
+          <div style={rowS}><span style={label}>코트 수</span><NumStepper value={courts} onChange={setCourts} min={1} max={8} unit="면"/></div>
+        </div>
+        <div style={{marginTop:14,background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
+          <b>{draft.length}세션</b> · {start} ~ {timeOf(draft.length)}
+        </div>
+      </Card>
+      <Card>
+        <SectionTitle>참가자</SectionTitle>
+        <p style={{margin:"0 0 10px",fontSize:12,color:"#6B7493",lineHeight:1.6}}>참석 확정자예요. 투표하지 않은 사람이 함께 치면 이름을 추가해 주세요. 숫자는 지금까지 넣은 게임 수예요.</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {pool.map(p=>(
+            <span key={p.name} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:999,fontSize:12,fontWeight:500,background:p.name===ME?BLUE_LIGHT:"#F5F7FE",color:"#1B2559",border:`1.5px solid ${p.name===ME?BLUE:"transparent"}`}}>
+              {p.name}<b style={{color:count[p.name]?BLUE:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{count[p.name]||0}</b>
+              {p.added&&<button type="button" onClick={()=>removeName(p.name)} aria-label={`${p.name} 빼기`} style={{background:"none",border:"none",padding:0,display:"flex",color:"#A3AAC2",cursor:"pointer"}}><Icon name="x" size={13}/></button>}
+            </span>
+          ))}
+          {!pool.length&&<span style={{fontSize:12,color:"#A3AAC2"}}>아직 참석 확정자가 없어요</span>}
+        </div>
+        <div style={{display:"flex",gap:6,marginTop:10}}>
+          <input value={newName} onChange={e=>{setNewName(e.target.value);setNameErr("");}} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addName();}}} placeholder="이름 추가 (게스트 등)" maxLength={10} style={{...inputStyle,flex:1,padding:"9px 14px"}}/>
+          <button type="button" onClick={addName} disabled={!newName.trim()} style={{...btnSmall,opacity:newName.trim()?1:0.45}}>추가</button>
+        </div>
+        {nameErr&&<p style={{margin:"6px 0 0",fontSize:12,color:"#ef4444"}}>{nameErr}</p>}
+      </Card>
+      {draft.map((row,s)=>{ const used=usedIn(row); const rest=pool.filter(p=>!used.has(p.name)).map(p=>p.name); return(
+        <Card key={s} style={{padding:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+            <span style={{fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{timeOf(s)}</span>
+            <span style={{flex:1,fontSize:12,color:"#A3AAC2"}}>~ {timeOf(s+1)} · {s+1}세션</span>
+            <button type="button" onClick={()=>removeSession(s)} aria-label={`${s+1}세션 지우기`} style={{background:"none",border:"none",color:"#A3AAC2",cursor:"pointer",display:"flex",padding:4}}><Icon name="trash" size={17}/></button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {row.map((ct,c)=>(
+              <div key={c} style={{display:"flex",flexDirection:"column",gap:6}}>
+                <span style={{fontSize:12,fontWeight:600,color:"#6B7493"}}>코트 {c+1}{!courtFilled(ct)&&<span style={{fontWeight:400,color:"#A3AAC2"}}> · 비워 두면 이 세션은 이 코트를 안 써요</span>}</span>
+                {["a","b"].map(side=>(
+                  <div key={side} style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:10,fontWeight:700,color:side==="a"?BLUE:"#6B7493",width:14,textAlign:"center"}}>{side.toUpperCase()}</span>
+                    {[0,1].map(k=>{ const v=ct[side][k]; return(
+                      <select key={k} aria-label={`${s+1}세션 코트 ${c+1} ${side.toUpperCase()}팀 ${k+1}번`} value={v||""} onChange={e=>setSlot(s,c,side,k,e.target.value)}
+                        style={{...sel,color:v?"#1B2559":"#A3AAC2",fontWeight:v?600:400,background:v?"#fff":"#F5F7FE"}}>
+                        <option value="">선택</option>
+                        {pool.map(p=><option key={p.name} value={p.name} disabled={p.name!==v&&used.has(p.name)}>{p.name} ({count[p.name]||0}게임){p.name!==v&&used.has(p.name)?" · 배정됨":""}</option>)}
+                      </select>);})}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p style={{margin:"12px 0 0",fontSize:12,color:"#6B7493"}}><Ic n="coffee" s={13}/> 휴식 · {rest.length?rest.join(", "):"없음"}</p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
+            {row.some(ct=>courtFilled(ct)<4)&&rest.length>0&&<button type="button" onClick={()=>fillSession(s)} style={{...btnSmall,padding:"7px 12px"}}>빈 자리 채우기</button>}
+            {s>0&&<button type="button" onClick={()=>copyPrev(s)} style={{...btnSmall,padding:"7px 12px",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"}}>앞 세션 그대로</button>}
+            {row.some(courtFilled)&&<button type="button" onClick={()=>clearSession(s)} style={{...btnSmall,padding:"7px 12px",background:"#fff",color:"#6B7493",border:"1.5px solid #E4E9F7"}}>모두 비우기</button>}
+          </div>
+        </Card>);})}
+      <button type="button" onClick={addSession} disabled={draft.length>=16} style={{...btnSecondary,flex:"none",width:"100%",borderStyle:"dashed",opacity:draft.length>=16?0.45:1}}>+ 세션 추가</button>
+      <div style={{background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":"#2B3674"}}>
+        {problem||<>게임 {draft.reduce((a,row)=>a+row.filter(courtFilled).length,0)}판 · 저장하면 바로 스코어를 입력할 수 있어요{initial?". 사람이 바뀐 경기의 점수는 지워져요":""}</>}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        {onCancel&&<button type="button" onClick={onCancel} style={btnSecondary}>취소</button>}
+        <button type="button" disabled={!!problem} onClick={save} style={{...btnPrimary,flex:1,width:"auto",opacity:problem?0.45:1,cursor:problem?"default":"pointer"}}>{initial?"수정 저장":"대진표 저장"}</button>
+      </div>
+    </div>
+  );
+}
+// 대진표를 고친 뒤에도 남길 점수: 같은 자리(세션_코트)에 같은 네 사람이 같은 편으로 있으면 그대로
+function keptScores(oldB,newB,scores){
+  const sig=g=>[g.a.slice().sort().join(","),g.b.slice().sort().join(",")].join("|");
+  const before=new Map(flatGames(oldB,scores).map(g=>[g.key,g]));
+  const out={};
+  flatGames(newB,{}).forEach(g=>{ const o=before.get(g.key); if(o&&sig(o)===sig(g)&&scores[g.key]) out[g.key]=scores[g.key]; });
+  return out;
+}
+
 // ─── 게임 한 판 (스코어 입력) ─────────────────────────────────────────────────
 function GameCard({game,court,onScore,me}) {
   const g=game.score, o=game.o;
@@ -1842,9 +2019,32 @@ function MeetingBracket({meeting,participants,store}) {
   const [prevOrder,setPrevOrder]=useState(null);
   const modeNote={shared:"모임 멤버 모두에게 실시간으로 저장돼요",local:"이 기기에 저장돼요",readonly:"저장 권한이 없어 이 기기에서만 보여요"}[mode];
   const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}><Ic n={mode==="shared"?"cloud":"phone"} s={12}/> {modeNote}</p>;
+  const [how,setHow]=useState("auto");          // 새로 만들 때: "auto" 자동 편성 | "manual" 직접 작성
+  const [editing,setEditing]=useState(false);   // 만든 대진표 수정 중
+  useEffect(()=>{ if(!bracket) setEditing(false); },[!!bracket]);
+  const howTabs=(
+    <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+      {[["auto","자동 편성"],["manual","직접 작성"]].map(([k,l])=>(
+        <button key={k} type="button" onClick={()=>setHow(k)} style={{flex:1,padding:"8px 0",borderRadius:999,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:how===k?"#fff":"transparent",color:how===k?BLUE:"#6B7493",boxShadow:how===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
+      ))}
+    </div>
+  );
   if(!bracket) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <BracketSetup meeting={meeting} participants={participants} onCreate={saveBracket} prevOrder={prevOrder}/>
+      {howTabs}
+      {how==="auto"
+        ?<BracketSetup meeting={meeting} participants={participants} onCreate={saveBracket} prevOrder={prevOrder}/>
+        :<ManualBracket meeting={meeting} participants={participants} onSave={saveBracket}/>}
+      {note}
+    </div>
+  );
+  if(editing) return (
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
+        <b>대진표 수정 중</b> · 자리를 바꾸고 아래 <b>수정 저장</b>을 눌러 주세요. 그대로인 경기의 점수는 남아요.
+      </div>
+      <ManualBracket meeting={meeting} participants={participants} initial={bracket} onCancel={()=>setEditing(false)}
+        onSave={nb=>{ saveBracket(nb,keptScores(bracket,nb,scores)); setEditing(false); }}/>
       {note}
     </div>
   );
@@ -1865,7 +2065,8 @@ function MeetingBracket({meeting,participants,store}) {
           </div>
         </div>
         <div style={{height:6,background:"#E4E9F7",borderRadius:10,marginBottom:10}}><div style={{height:"100%",width:`${games.length?done/games.length*100:0}%`,background:GRAD,borderRadius:10}}/></div>
-        <p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>실력 균형(순위 합 차이) {bracket.summary.diffSum} · 휴식 {bracket.summary.restMin===bracket.summary.restMax?bracket.summary.restMin:`${bracket.summary.restMin}~${bracket.summary.restMax}`}회 · 3연속 {bracket.summary.triple}명</p>
+        {bracket.manual?<p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>직접 작성한 대진표{bracket.editedBy?` · ${bracket.editedBy} 수정`:""} · 휴식 {bracket.summary.restMin===bracket.summary.restMax?bracket.summary.restMin:`${bracket.summary.restMin}~${bracket.summary.restMax}`}회</p>
+        :<p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>실력 균형(순위 합 차이) {bracket.summary.diffSum} · 휴식 {bracket.summary.restMin===bracket.summary.restMax?bracket.summary.restMin:`${bracket.summary.restMin}~${bracket.summary.restMax}`}회 · 3연속 {bracket.summary.triple}명</p>}
       </Card>
       <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
         {[["games","대진·스코어"],["table","개인 성적"]].map(([k,l])=>(
@@ -1879,7 +2080,7 @@ function MeetingBracket({meeting,participants,store}) {
             <span style={{fontSize:12,color:"#A3AAC2"}}>~ {bracket.ends[s]} · {s+1}세션</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {games.filter(g=>g.s===s).map(g=><GameCard key={g.key} court={g.c+1} game={g} onScore={saveScore} me={ME}/>)}
+            {games.filter(g=>g.s===s).map(g=><GameCard key={g.key} court={g.court} game={g} onScore={saveScore} me={ME}/>)}
           </div>
           {(ses.rest||[]).length>0&&<p style={{margin:"12px 0 0",fontSize:12,color:"#6B7493"}}><Ic n="coffee" s={13}/> 휴식 · {ses.rest.map(i=>bracket.players[i]).join(", ")}</p>}
         </Card>
@@ -1913,7 +2114,10 @@ function MeetingBracket({meeting,participants,store}) {
           </div>
         </div>
       ):(
-        <button type="button" onClick={()=>setConfirm(true)} style={{background:"none",border:"none",fontSize:13,color:"#6B7493",cursor:"pointer",textDecoration:"underline",textUnderlineOffset:3}}>대진표 다시 만들기</button>
+        <div style={{display:"flex",gap:8}}>
+          <button type="button" onClick={()=>{setEditing(true);window.scrollTo(0,0);}} style={{...btnSecondary,padding:"11px 0",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={15}/>대진표 수정</button>
+          <button type="button" onClick={()=>setConfirm(true)} style={{...btnSecondary,padding:"11px 0",fontSize:13,color:"#ef4444",borderColor:"#FCA5A5"}}>지우고 다시 만들기</button>
+        </div>
       )}
       {note}
     </div>
