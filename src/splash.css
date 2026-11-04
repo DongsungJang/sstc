@@ -55,3 +55,9 @@
 .sp-hand{transform-origin:50% 97.5%;animation:sp-hand 4.8s infinite}   /* 손만 그린 120×120 svg 상자: 손목 아래(60,117) 기준, 이동은 상자 크기의 % (16 = 13.33%) */
 @keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.25%) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,13.33%) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
 @media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,13.33%) rotate(0deg)}}
+
+/* 아이폰 사파리는 글자 크기가 16px보다 작은 입력창을 누르면 화면을 저절로 확대해요.
+   입력창 글자를 16px로 맞춰서 자동 확대를 없애요. 손가락으로 벌려 확대하는 건 그대로 돼요. */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
+textarea,
+select{font-size:16px!important}
