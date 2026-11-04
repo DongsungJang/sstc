@@ -2458,7 +2458,7 @@ function MapCard({m,onOpen}){
   </div>;
 }
 function CourtMap({onOpen}){
-  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null), relayoutRef=useRef(null);
+  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null), relayoutRef=useRef(null), cardRef=useRef(null);
   const [status,setStatus]=useState("loading");   // loading | ready | fail
   const [filter,setFilter]=useState(()=>(MAP_VIEW&&MAP_VIEW.filter)||"all");
   const [sel,setSel]=useState(()=>(MAP_VIEW&&MAP_VIEW.sel)||null);
@@ -2528,7 +2528,9 @@ function CourtMap({onOpen}){
     if(!llOk(map.getCenter())) fitPins(map,k,groups.length?groups:[MAP_HOME],box.current);
   },[status,sig,pending.length]);
   useEffect(()=>{ if(sel&&!cur) setSel(null); },[sel,!!cur]);
-  useEffect(()=>{ setPage(0); if(strip.current) strip.current.scrollLeft=0; },[sel]);
+  useEffect(()=>{ setPage(0); if(strip.current) strip.current.scrollLeft=0;
+    // 카드는 지도 아래에 나오니까, 화면 밖이면 보이게 살짝 내려줘요
+    if(sel) setTimeout(()=>{ try{ cardRef.current&&cardRef.current.scrollIntoView({behavior:"smooth",block:"nearest"}); }catch(e){} },50); },[sel]);
   const fitAll=()=>{ const map=mapRef.current,k=window.kakao; if(!map||!groups.length) return;
     fitPins(map,k,groups,box.current); };
   const locate=()=>{ const map=mapRef.current,k=window.kakao; if(!map) return;
@@ -2543,7 +2545,7 @@ function CourtMap({onOpen}){
         background:on?"#0B1E5B":"#fff",color:on?"#fff":"#1B2559",boxShadow:"0 2px 8px rgba(11,30,91,0.14)"}}>
       {dot&&<span style={{width:7,height:7,borderRadius:"50%",background:dot}}/>}{l}{k==="all"?` ${counts.all}`:""}</button>; };
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
-    <div style={{position:"relative",minHeight:360,height:"max(360px, calc(100svh - 430px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
+    <div style={{position:"relative",minHeight:320,height:"max(320px, calc(100svh - 500px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
       <div ref={box} aria-label="코트 지도" style={{position:"absolute",inset:0}}/>
       {status!=="ready"&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:24,textAlign:"center",color:"#6B7493",fontSize:13,lineHeight:1.6}}>
         <Icon name="map" size={30} stroke={1.6} color="#A3AAC2"/>
@@ -2551,24 +2553,25 @@ function CourtMap({onOpen}){
           <button type="button" onClick={()=>setRetry(n=>n+1)} style={{...btnSmall,marginTop:6,background:GRAD,padding:"9px 18px",fontSize:13}}>다시 시도</button></>}
       </div>}
       <div style={{position:"absolute",top:12,left:12,right:12,display:"flex",gap:6,overflowX:"auto",zIndex:5,paddingBottom:4,scrollbarWidth:"none"}}>{MAP_FILTERS.map(([k,l])=>chip(k,l))}</div>
-      {status==="ready"&&<button type="button" onClick={locate} aria-label="내 위치로" title="내 위치로" style={{position:"absolute",right:12,bottom:cur?232:16,width:42,height:42,borderRadius:"50%",border:"none",background:"#fff",color:BLUE,boxShadow:"0 4px 12px rgba(11,30,91,0.18)",cursor:"pointer",zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",opacity:locating?0.6:1}}>
+      {status==="ready"&&<button type="button" onClick={locate} aria-label="내 위치로" title="내 위치로" style={{position:"absolute",right:12,bottom:16,width:42,height:42,borderRadius:"50%",border:"none",background:"#fff",color:BLUE,boxShadow:"0 4px 12px rgba(11,30,91,0.18)",cursor:"pointer",zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",opacity:locating?0.6:1}}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>}
-      {status==="ready"&&!cur&&<div style={{position:"absolute",left:12,bottom:16,zIndex:5,background:"rgba(255,255,255,0.95)",borderRadius:14,padding:"8px 12px",boxShadow:"0 4px 12px rgba(11,30,91,0.14)",maxWidth:"calc(100% - 90px)"}}>
-        <p style={{margin:0,fontSize:12,fontWeight:700,color:"#1B2559"}}>{shown.length?`예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳`:"예정된 모임이 없어요"}{pending.length?" · 위치 찾는 중…":""}</p>
-        {groups.some(g=>g.list.length>1)&&<p style={{margin:"2px 0 0",fontSize:11,color:"#6B7493"}}>숫자 = 그 코트의 모임 수</p>}
-      </div>}
-      {cur&&<div style={{position:"absolute",left:10,right:10,bottom:10,zIndex:6,background:"#fff",borderRadius:20,boxShadow:"0 10px 30px rgba(11,30,91,0.22)",padding:"14px 14px 10px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
-          <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cur.name}</p>
-          <span style={{fontSize:12,color:"#8A93B2",whiteSpace:"nowrap",flexShrink:0}}>{cur.list.length>1?`모임 ${cur.list.length}개 · 옆으로 넘기기 ›`:"모임 1개"}</span>
-        </div>
-        <div ref={strip} onScroll={e=>{const el=e.currentTarget;setPage(Math.round(el.scrollLeft/Math.max(1,el.clientWidth)));}}
-          style={{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",scrollbarWidth:"none"}}>
-          {cur.list.map(m=><MapCard key={m.id} m={m} onOpen={onOpen}/>)}
-        </div>
-        {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:999,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
-      </div>}
     </div>
+    {/* 안내: 지도 위에 얹지 않고 지도 바로 아래 한 줄로 */}
+    {status==="ready"&&<div style={{background:"#fff",borderRadius:16,padding:"10px 14px",boxShadow:SHADOW,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+      <span style={{fontSize:13,fontWeight:700,color:"#1B2559"}}>{shown.length?`예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳`:"예정된 모임이 없어요"}{pending.length?" · 위치 찾는 중…":""}</span>
+      {groups.some(g=>g.list.length>1)&&<span style={{fontSize:12,color:"#6B7493"}}>숫자 = 그 코트의 모임 수</span>}
+    </div>}
+    {cur&&<div ref={cardRef} style={{background:"#fff",borderRadius:20,boxShadow:SHADOW,padding:"14px 14px 10px",scrollMarginBottom:100}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
+        <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cur.name}</p>
+        <span style={{fontSize:12,color:"#8A93B2",whiteSpace:"nowrap",flexShrink:0}}>{cur.list.length>1?`모임 ${cur.list.length}개 · 옆으로 넘기기 ›`:"모임 1개"}</span>
+      </div>
+      <div ref={strip} onScroll={e=>{const el=e.currentTarget;setPage(Math.round(el.scrollLeft/Math.max(1,el.clientWidth)));}}
+        style={{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",scrollbarWidth:"none"}}>
+        {cur.list.map(m=><MapCard key={m.id} m={m} onOpen={onOpen}/>)}
+      </div>
+      {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:999,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
+    </div>}
     {status==="ready"&&lost.length>0&&<div>
       <p style={{margin:"0 0 4px",fontSize:15,fontWeight:700,color:"#1B2559"}}>위치를 찾지 못한 모임 {lost.length}</p>
       <p style={{margin:"0 0 10px",fontSize:12,color:"#8A93B2"}}>모임 수정에서 테니스장을 카카오 장소 검색으로 고르면 지도에 나와요.</p>
