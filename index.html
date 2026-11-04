@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=8afa7e0fbf">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=8afa7e0fbf">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e1be33bde8">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e1be33bde8">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -70,6 +70,12 @@
 .sp-hand{transform-origin:50% 97.5%;animation:sp-hand 4.8s infinite}   /* 손만 그린 120×120 svg 상자: 손목 아래(60,117) 기준, 이동은 상자 크기의 % (16 = 13.33%) */
 @keyframes sp-hand{0%,8%{transform:translate(0,0) rotate(0deg)}14%{transform:translate(0,-1.25%) rotate(-3deg)}20%{transform:translate(0,0) rotate(3deg)}26%,40%{transform:translate(0,0) rotate(0deg)}48%,92%{transform:translate(0,13.33%) rotate(0deg)}100%{transform:translate(0,0) rotate(0deg)}}
 @media (prefers-reduced-motion:reduce){.sp-sorry{animation:none;opacity:0}.sp-smug{animation:none;opacity:1}.sp-hand{animation:none;transform:translate(0,13.33%) rotate(0deg)}}
+
+/* 아이폰 사파리는 글자 크기가 16px보다 작은 입력창을 누르면 화면을 저절로 확대해요.
+   입력창 글자를 16px로 맞춰서 자동 확대를 없애요. 손가락으로 벌려 확대하는 건 그대로 돼요. */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
+textarea,
+select{font-size:16px!important}
 </style>
 </head>
 <body>
@@ -12646,7 +12652,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "8afa7e0fbf";
+const BUILD_ID = "e1be33bde8";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
