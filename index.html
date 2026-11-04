@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f5840bc2cf">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f5840bc2cf">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=74646fef64">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=74646fef64">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -121,6 +121,7 @@ const ICON_PATHS = {
   users: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
   userPlus: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", "M19 8v6", "M22 11h-6"],
   map: ["M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z", "M9 3v15", "M15 6v15"],
+  list: ["M9 6h12", "M9 12h12", "M9 18h12", "M4 6h.01", "M4 12h.01", "M4 18h.01"],
   repeat: ["M17 1l4 4-4 4", "M3 11V9a4 4 0 0 1 4-4h14", "M7 23l-4-4 4-4", "M21 13v2a4 4 0 0 1-4 4H3"],
   zap: ["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
   check: ["M20 6 9 17l-5-5"],
@@ -387,6 +388,8 @@ function toMeeting(id, rec, series) {
     placeName: info.place,
     courtNo: info.courtNo || "",
     address: info.address || "",
+    lat: info.lat != null && Number.isFinite(+info.lat) ? +info.lat : null,
+    lng: info.lng != null && Number.isFinite(+info.lng) ? +info.lng : null,
     kind: kindOf(info),
     flashType: info.kind === "flash" ? info.flashType || "game" : "",
     courtFee: +info.courtFee || 0,
@@ -7590,6 +7593,708 @@ function MiniCalendar({
 }
 
 // ─── 예약 탭 ──────────────────────────────────────────────────────────────────
+// ── 예약 탭 · 코트 지도: 앞으로 열릴 모임(무산 제외)이 있는 코트를 핀으로 보여줘요 ──
+const MAP_HOME = {
+  lat: 37.5326,
+  lng: 126.99,
+  level: 9
+}; // 처음엔 수도권이 보이게
+let MAP_VIEW = null; // 모임 상세에 갔다가 "지도"로 돌아오면 보던 위치·고른 코트 그대로
+const MAP_FILTERS = [["all", "전체"], ["regular", "정기"], ["game", "번개 게임"], ["training", "번개 훈련"]];
+const pinSvg = (color, big) => {
+  const w = big ? 44 : 34,
+    h = big ? 56 : 44;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 34 44" aria-hidden="true"><path d="M17 43s14-14.2 14-26A14 14 0 0 0 3 17c0 11.8 14 26 14 26z" fill="${color}" stroke="#fff" stroke-width="2.4"/><circle cx="17" cy="17" r="8.2" fill="#D7F24A"/><path d="M11.3 12.2a8.2 8.2 0 0 1 0 9.6M22.7 12.2a8.2 8.2 0 0 0 0 9.6" fill="none" stroke="#fff" stroke-width="1.6"/></svg>`;
+};
+const escHtml = v => String(v || "").replace(/[&<>"']/g, c => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+})[c]);
+function myState(m) {
+  const wi = (m.waitlist || []).findIndex(a => a.isMe);
+  if ((m.attendees || []).some(a => a.isMe)) return {
+    t: "참석 예정",
+    bg: GRAD,
+    c: "#fff"
+  };
+  if (wi >= 0) return {
+    t: `대기 ${wi + 1}번`,
+    bg: "#FFF4E5",
+    c: "#C2610C"
+  };
+  if (isFull(m)) return {
+    t: "마감",
+    bg: FULL.bg,
+    c: FULL.c
+  };
+  if (!isOpen(m)) return {
+    t: "예약 전",
+    bg: "#EEF1FA",
+    c: "#6B7493"
+  };
+  return {
+    t: "참석 가능",
+    bg: BLUE_LIGHT,
+    c: BLUE
+  };
+}
+function MapCard({
+  m,
+  onOpen
+}) {
+  const col = KIND_COLOR[kindKey(m)],
+    st = myState(m),
+    full = isFull(m);
+  const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.total) * 100));
+  return /*#__PURE__*/React.createElement("div", {
+    role: "button",
+    tabIndex: 0,
+    onClick: () => onOpen(m.id),
+    onKeyDown: e => e.key === "Enter" && onOpen(m.id),
+    style: {
+      flex: "0 0 100%",
+      scrollSnapAlign: "center",
+      boxSizing: "border-box",
+      border: "1px solid #E4E9F7",
+      borderRadius: 16,
+      padding: "12px 14px",
+      cursor: "pointer",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#1B2559",
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, m.date, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 999,
+      background: col.bg,
+      color: col.c
+    }
+  }, m.kind === "flash" ? `번개 ${FLASH_TYPE[m.flashType]}` : "정기")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      padding: "3px 10px",
+      borderRadius: 999,
+      background: full ? FULL.c : BLUE_LIGHT,
+      color: full ? "#fff" : BLUE,
+      whiteSpace: "nowrap"
+    }
+  }, m.attendees.length, "/", m.total, "\uBA85")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#6B7493",
+      minWidth: 0,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "clock",
+    s: 13
+  }), " ", m.time, m.courtNo ? ` · ${courtLabel(m.courtNo)}` : ""), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "3px 10px",
+      borderRadius: 999,
+      background: st.bg,
+      color: st.c,
+      whiteSpace: "nowrap",
+      flexShrink: 0
+    }
+  }, st.t)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 5,
+      background: full ? FULL.line : "#E4E9F7",
+      borderRadius: 10,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      width: `${fill}%`,
+      background: full ? FULL.bar : GRAD,
+      borderRadius: 10
+    }
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 12,
+      fontWeight: 600,
+      color: BLUE,
+      textAlign: "right"
+    }
+  }, "\uD0ED\uD574\uC11C \uC790\uC138\uD788 \uBCF4\uAE30 \u2192"));
+}
+function CourtMap({
+  onOpen
+}) {
+  const box = useRef(null),
+    mapRef = useRef(null),
+    overlays = useRef([]),
+    fitted = useRef(!!MAP_VIEW),
+    strip = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | ready | fail
+  const [filter, setFilter] = useState(() => MAP_VIEW && MAP_VIEW.filter || "all");
+  const [sel, setSel] = useState(() => MAP_VIEW && MAP_VIEW.sel || null);
+  const [page, setPage] = useState(0);
+  const [, setTick] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const all = MEETINGS.filter(m => m.status === "upcoming" && !m.cancelled).sort((a, b) => (a.iso + (a.info.start || "")).localeCompare(b.iso + (b.info.start || "")));
+  const shown = all.filter(m => filter === "all" || kindKey(m) === filter);
+  // 좌표: 모임에 저장된 것 → 이 기기에 찾아 둔 것 → (지도 준비되면) 이름으로 검색
+  const llOf = m => hasLL(m) ? {
+    lat: m.lat,
+    lng: m.lng
+  } : geoCached(m);
+  const pending = shown.filter(m => llOf(m) === undefined);
+  const lost = shown.filter(m => llOf(m) === null);
+  const groups = [];
+  shown.forEach(m => {
+    const ll = llOf(m);
+    if (!ll) return;
+    const key = ll.lat.toFixed(4) + "," + ll.lng.toFixed(4);
+    let g = groups.find(x => x.key === key);
+    if (!g) groups.push(g = {
+      key,
+      lat: ll.lat,
+      lng: ll.lng,
+      name: m.placeName || m.place,
+      list: []
+    });
+    g.list.push(m);
+  });
+  const cur = groups.find(g => g.key === sel) || null;
+  // SDK 불러오고 지도 만들기
+  useEffect(() => {
+    let alive = true;
+    loadKakao().then(k => {
+      if (!alive || !box.current) return;
+      const v = MAP_VIEW || MAP_HOME;
+      const map = new k.maps.Map(box.current, {
+        center: new k.maps.LatLng(v.lat, v.lng),
+        level: v.level
+      });
+      k.maps.event.addListener(map, "click", () => setSel(null));
+      mapRef.current = map;
+      setStatus("ready");
+    }).catch(() => alive && setStatus("fail"));
+    return () => {
+      alive = false;
+      const map = mapRef.current;
+      if (map) {
+        try {
+          const c = map.getCenter();
+          MAP_VIEW = {
+            ...(MAP_VIEW || {}),
+            lat: c.getLat(),
+            lng: c.getLng(),
+            level: map.getLevel()
+          };
+        } catch (e) {}
+      }
+      overlays.current.forEach(o => o.setMap(null));
+      overlays.current = [];
+      mapRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    MAP_VIEW = {
+      ...(MAP_VIEW || {}),
+      filter,
+      sel
+    };
+  }, [filter, sel]);
+  // 좌표 없는 모임은 한 곳씩 찾아요 (같은 코트는 한 번만)
+  const pendKey = pending.map(geoKey).join("/");
+  useEffect(() => {
+    if (status !== "ready" || !pending.length) return;
+    let alive = true;
+    const seen = new Set();
+    const todo = pending.filter(m => {
+      const k = geoKey(m);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    todo.reduce((p, m) => p.then(() => alive && geoFind(m).catch(() => null).then(() => alive && setTick(t => t + 1))), Promise.resolve());
+    return () => {
+      alive = false;
+    };
+  }, [status, pendKey]);
+  // 핀 그리기
+  const sig = groups.map(g => g.key + ":" + g.list.map(m => m.id + kindKey(m)).join(".")).join("|") + "#" + sel;
+  useEffect(() => {
+    const map = mapRef.current,
+      k = window.kakao;
+    if (status !== "ready" || !map) return;
+    overlays.current.forEach(o => o.setMap(null));
+    overlays.current = [];
+    groups.forEach(g => {
+      const on = g.key === sel,
+        color = KIND_COLOR[kindKey(g.list[0])].dot,
+        n = g.list.length;
+      const el = document.createElement("div");
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", `${g.name} 모임 ${n}개`);
+      el.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:translateY(${on ? -4 : 0}px);font-family:${FONT.replace(/"/g, "'")}`;
+      el.innerHTML = `<div style="position:relative;filter:drop-shadow(0 4px 6px rgba(11,30,91,0.25))">${pinSvg(color, on)}${n > 1 ? `<span style="position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#0B1E5B;color:#fff;border:2px solid #fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${n}</span>` : ""}</div>` + `<span style="margin-top:2px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700;background:${on ? "#0B1E5B" : "#fff"};color:${on ? "#fff" : "#1B2559"};box-shadow:0 2px 6px rgba(11,30,91,0.18)">${escHtml(g.name)}</span>`;
+      el.addEventListener("click", e => {
+        e.stopPropagation();
+        setSel(g.key);
+        setPage(0);
+        try {
+          map.panTo(new k.maps.LatLng(g.lat, g.lng));
+        } catch (x) {}
+      });
+      const o = new k.maps.CustomOverlay({
+        position: new k.maps.LatLng(g.lat, g.lng),
+        content: el,
+        yAnchor: on ? 0.82 : 0.78,
+        xAnchor: 0.5,
+        clickable: true,
+        zIndex: on ? 10 : 1
+      });
+      o.setMap(map);
+      overlays.current.push(o);
+    });
+    // 처음 한 번은 핀이 다 보이게 맞춰요
+    if (!fitted.current && groups.length && !pending.length) {
+      fitted.current = true;
+      if (groups.length === 1) map.setCenter(new k.maps.LatLng(groups[0].lat, groups[0].lng)), map.setLevel(5);else {
+        const b = new k.maps.LatLngBounds();
+        groups.forEach(g => b.extend(new k.maps.LatLng(g.lat, g.lng)));
+        map.setBounds(b, 60, 40, 60, 40);
+      }
+    }
+  }, [status, sig, pending.length]);
+  useEffect(() => {
+    if (sel && !cur) setSel(null);
+  }, [sel, !!cur]);
+  useEffect(() => {
+    setPage(0);
+    if (strip.current) strip.current.scrollLeft = 0;
+  }, [sel]);
+  const fitAll = () => {
+    const map = mapRef.current,
+      k = window.kakao;
+    if (!map || !groups.length) return;
+    const b = new k.maps.LatLngBounds();
+    groups.forEach(g => b.extend(new k.maps.LatLng(g.lat, g.lng)));
+    map.setBounds(b, 60, 40, 60, 40);
+  };
+  const locate = () => {
+    const map = mapRef.current,
+      k = window.kakao;
+    if (!map) return;
+    if (!navigator.geolocation) return fitAll();
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(p => {
+      setLocating(false);
+      map.setLevel(6);
+      map.panTo(new k.maps.LatLng(p.coords.latitude, p.coords.longitude));
+    }, () => {
+      setLocating(false);
+      fitAll();
+    }, {
+      timeout: 8000,
+      maximumAge: 300000
+    });
+  };
+  const counts = Object.fromEntries(MAP_FILTERS.map(([k]) => [k, k === "all" ? all.length : all.filter(m => kindKey(m) === k).length]));
+  const chip = (k, l) => {
+    const on = filter === k,
+      dot = k !== "all" && KIND_COLOR[k].dot;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      "aria-pressed": on,
+      onClick: () => {
+        setFilter(k);
+        setSel(null);
+        fitted.current = false;
+      },
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "7px 12px",
+        borderRadius: 999,
+        border: "none",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        background: on ? "#0B1E5B" : "#fff",
+        color: on ? "#fff" : "#1B2559",
+        boxShadow: "0 2px 8px rgba(11,30,91,0.14)"
+      }
+    }, dot && /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: dot
+      }
+    }), l, k === "all" ? ` ${counts.all}` : "");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      height: "max(420px, calc(100vh - 330px))",
+      borderRadius: 24,
+      overflow: "hidden",
+      background: "#E7ECF6",
+      boxShadow: SHADOW
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: box,
+    "aria-label": "\uCF54\uD2B8 \uC9C0\uB3C4",
+    style: {
+      position: "absolute",
+      inset: 0
+    }
+  }), status !== "ready" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      inset: 0,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      padding: 24,
+      textAlign: "center",
+      color: "#6B7493",
+      fontSize: 13,
+      lineHeight: 1.6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "map",
+    size: 30,
+    stroke: 1.6,
+    color: "#A3AAC2"
+  }), status === "loading" ? "지도를 불러오는 중이에요…" : /*#__PURE__*/React.createElement(React.Fragment, null, "\uC9C0\uB3C4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.", /*#__PURE__*/React.createElement("br", null), "\uC778\uD130\uB137 \uC5F0\uACB0\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694.", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uADF8\uB3D9\uC548\uC740 \uBAA9\uB85D\uC73C\uB85C \uBCFC \uC218 \uC788\uC5B4\uC694."))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: 12,
+      left: 12,
+      right: 12,
+      display: "flex",
+      gap: 6,
+      overflowX: "auto",
+      zIndex: 5,
+      paddingBottom: 4,
+      scrollbarWidth: "none"
+    }
+  }, MAP_FILTERS.map(([k, l]) => chip(k, l))), status === "ready" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: locate,
+    "aria-label": "\uB0B4 \uC704\uCE58\uB85C",
+    title: "\uB0B4 \uC704\uCE58\uB85C",
+    style: {
+      position: "absolute",
+      right: 12,
+      bottom: cur ? 232 : 16,
+      width: 42,
+      height: 42,
+      borderRadius: "50%",
+      border: "none",
+      background: "#fff",
+      color: BLUE,
+      boxShadow: "0 4px 12px rgba(11,30,91,0.18)",
+      cursor: "pointer",
+      zIndex: 5,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      opacity: locating ? 0.6 : 1
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "3.2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "7.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"
+  }))), status === "ready" && !cur && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 12,
+      bottom: 16,
+      zIndex: 5,
+      background: "rgba(255,255,255,0.95)",
+      borderRadius: 14,
+      padding: "8px 12px",
+      boxShadow: "0 4px 12px rgba(11,30,91,0.14)",
+      maxWidth: "calc(100% - 90px)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, shown.length ? `예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳` : "예정된 모임이 없어요", pending.length ? " · 위치 찾는 중…" : ""), groups.some(g => g.list.length > 1) && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 11,
+      color: "#6B7493"
+    }
+  }, "\uC22B\uC790 = \uADF8 \uCF54\uD2B8\uC758 \uBAA8\uC784 \uC218")), cur && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 10,
+      right: 10,
+      bottom: 10,
+      zIndex: 6,
+      background: "#fff",
+      borderRadius: 20,
+      boxShadow: "0 10px 30px rgba(11,30,91,0.22)",
+      padding: "14px 14px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#1B2559",
+      minWidth: 0,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, cur.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#8A93B2",
+      whiteSpace: "nowrap",
+      flexShrink: 0
+    }
+  }, cur.list.length > 1 ? `모임 ${cur.list.length}개 · 옆으로 넘기기 ›` : "모임 1개")), /*#__PURE__*/React.createElement("div", {
+    ref: strip,
+    onScroll: e => {
+      const el = e.currentTarget;
+      setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+    },
+    style: {
+      display: "flex",
+      gap: 10,
+      overflowX: "auto",
+      scrollSnapType: "x mandatory",
+      scrollbarWidth: "none"
+    }
+  }, cur.list.map(m => /*#__PURE__*/React.createElement(MapCard, {
+    key: m.id,
+    m: m,
+    onOpen: onOpen
+  }))), cur.list.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 5,
+      marginTop: 8
+    }
+  }, cur.list.map((m, i) => /*#__PURE__*/React.createElement("span", {
+    key: m.id,
+    style: {
+      width: i === page ? 16 : 6,
+      height: 6,
+      borderRadius: 999,
+      background: i === page ? BLUE : "#D6DEF7",
+      transition: "width .2s"
+    }
+  }))))), status === "ready" && lost.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 4px",
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, "\uC704\uCE58\uB97C \uCC3E\uC9C0 \uBABB\uD55C \uBAA8\uC784 ", lost.length), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 12,
+      color: "#8A93B2"
+    }
+  }, "\uBAA8\uC784 \uC218\uC815\uC5D0\uC11C \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uCE74\uCE74\uC624 \uC7A5\uC18C \uAC80\uC0C9\uC73C\uB85C \uACE0\uB974\uBA74 \uC9C0\uB3C4\uC5D0 \uB098\uC640\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, lost.map(m => {
+    const col = KIND_COLOR[kindKey(m)];
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.id,
+      role: "button",
+      tabIndex: 0,
+      onClick: () => onOpen(m.id),
+      style: {
+        background: "#fff",
+        borderRadius: 16,
+        padding: "12px 14px",
+        boxShadow: SHADOW,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: col.dot,
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 14,
+        fontWeight: 600,
+        color: "#1B2559"
+      }
+    }, m.date, " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "#8A93B2",
+        fontWeight: 500
+      }
+    }, m.info.start)), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 12,
+        color: "#8A93B2",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "pin",
+      s: 12
+    }), " ", m.placeName || m.place)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: BLUE,
+        whiteSpace: "nowrap"
+      }
+    }, m.attendees.length, "/", m.total, "\uBA85"));
+  }))));
+}
+// 예약 탭 맨 위: 목록 / 지도 전환
+function ViewToggle({
+  view,
+  onView
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    role: "tablist",
+    "aria-label": "\uBCF4\uAE30 \uBC29\uC2DD",
+    style: {
+      display: "flex",
+      background: "#E4E9F7",
+      borderRadius: 999,
+      padding: 4
+    }
+  }, [["list", "목록", "list"], ["map", "지도", "map"]].map(([k, l, ic]) => {
+    const on = view === k;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      role: "tab",
+      "aria-selected": on,
+      onClick: () => onView(k),
+      style: {
+        flex: 1,
+        padding: "10px 0",
+        borderRadius: 999,
+        border: "none",
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        background: on ? GRAD : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        boxShadow: on ? SHADOW_BTN : "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: ic,
+      size: 15,
+      stroke: 2
+    }), l);
+  }));
+}
 function BookingTab({
   open,
   onOpen,
@@ -7598,7 +8303,9 @@ function BookingTab({
   isAdmin,
   onEdit,
   onDeleted,
-  onCreate
+  onCreate,
+  view,
+  onView
 }) {
   useSeen();
   const [kind, setKind] = useState(() => {
@@ -7636,6 +8343,19 @@ function BookingTab({
   const upcoming = upAll.filter(m => m.kind === kind);
   const past = MEETINGS.filter(m => m.status === "past" && m.kind === kind);
   const label = kind === "flash" ? "번개 모임" : "정기 모임";
+  if (view === "map") return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+      paddingBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement(ViewToggle, {
+    view: view,
+    onView: onView
+  }), /*#__PURE__*/React.createElement(CourtMap, {
+    onOpen: id => onOpen(id, "info", "map")
+  }));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -7643,7 +8363,10 @@ function BookingTab({
       gap: 20,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement(MiniCalendar, {
+  }, /*#__PURE__*/React.createElement(ViewToggle, {
+    view: view,
+    onView: onView
+  }), /*#__PURE__*/React.createElement(MiniCalendar, {
     onOpen: setSelId
   }), /*#__PURE__*/React.createElement("div", {
     role: "tablist",
@@ -8847,6 +9570,10 @@ function occInfo(sid, ser, i) {
     courtNo: ser.courtNo || "",
     surface: ser.surface || "",
     address: ser.address || "",
+    ...(Number.isFinite(+ser.lat) && ser.lat != null ? {
+      lat: +ser.lat,
+      lng: +ser.lng
+    } : {}),
     capacity: +ser.capacity,
     guestCap: +ser.guestCap || 0,
     desc: ser.desc || "",
@@ -9053,7 +9780,9 @@ function placeHistory() {
       count: 0,
       at: 0,
       address: "",
-      surface: ""
+      surface: "",
+      lat: null,
+      lng: null
     });
     e.count++;
     if (at >= e.at) {
@@ -9061,72 +9790,176 @@ function placeHistory() {
       e.name = name;
       if (m.address) e.address = m.address;
       if (m.surface) e.surface = m.surface;
+      if (hasLL(m)) {
+        e.lat = m.lat;
+        e.lng = m.lng;
+      }
     } else {
       if (!e.address && m.address) e.address = m.address;
       if (!e.surface && m.surface) e.surface = m.surface;
+      if (e.lat == null && hasLL(m)) {
+        e.lat = m.lat;
+        e.lng = m.lng;
+      }
     }
   });
   return Object.values(map).sort((a, b) => b.count - a.count || b.at - a.at);
 }
-// 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요
+// ── 카카오 지도 (JavaScript SDK + 장소 검색 services) ──
+// 웹 공개용 JavaScript 키예요. 카카오 개발자 콘솔에 등록한 도메인(https://dongsungjang.github.io)에서만 동작해요.
+const KAKAO_JS_KEY = "76dd4a003f7ef811316e87b6f7f54fef";
+let kakaoLoad = null;
+function loadKakao() {
+  if (window.kakao && window.kakao.maps && window.kakao.maps.services) return Promise.resolve(window.kakao);
+  if (!kakaoLoad) kakaoLoad = new Promise((ok, no) => {
+    const done = () => {
+      try {
+        window.kakao.maps.load(() => ok(window.kakao));
+      } catch (e) {
+        kakaoLoad = null;
+        no(e);
+      }
+    };
+    if (window.kakao && window.kakao.maps && window.kakao.maps.load) return done();
+    const sc = document.createElement("script");
+    sc.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&libraries=services&autoload=false`;
+    sc.onload = () => window.kakao && window.kakao.maps ? done() : (kakaoLoad = null, no(new Error("kakao")));
+    sc.onerror = () => {
+      kakaoLoad = null;
+      no(new Error("kakao"));
+    };
+    document.head.appendChild(sc);
+    setTimeout(() => {
+      if (!(window.kakao && window.kakao.maps)) {
+        kakaoLoad = null;
+        no(new Error("timeout"));
+      }
+    }, 12000);
+  });
+  return kakaoLoad;
+}
+// 카카오 장소 검색 결과 → {name, address, lat, lng}
+const kakaoPlace = d => ({
+  name: d.place_name,
+  address: d.road_address_name || d.address_name || "",
+  lat: +d.y,
+  lng: +d.x,
+  category: d.category_name || ""
+});
+function kakaoSearch(q, size = 6) {
+  return loadKakao().then(k => new Promise(ok => {
+    new k.maps.services.Places().keywordSearch(q, (data, status) => ok(status === k.maps.services.Status.OK ? (data || []).map(kakaoPlace) : []), {
+      size
+    });
+  }));
+}
+function kakaoAddress(addr) {
+  return loadKakao().then(k => new Promise(ok => {
+    new k.maps.services.Geocoder().addressSearch(addr, (data, status) => ok(status === k.maps.services.Status.OK && data && data[0] ? {
+      lat: +data[0].y,
+      lng: +data[0].x
+    } : null));
+  }));
+}
+// 좌표가 없는 예전 모임: 코트 이름(안 되면 주소)으로 찾아서 이 기기에 저장해 둬요. 못 찾은 곳은 하루 뒤에 다시 찾아봐요.
+const GEO_KEY = "sstc-geo";
+const geoCache = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(GEO_KEY) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+})();
+const geoSave = () => {
+  try {
+    localStorage.setItem(GEO_KEY, JSON.stringify(geoCache));
+  } catch (e) {}
+};
+const hasLL = m => Number.isFinite(m.lat) && Number.isFinite(m.lng) && !!(m.lat || m.lng);
+function geoKey(m) {
+  return placeKey(m.placeName) + "|" + placeKey(m.address);
+}
+function geoCached(m) {
+  const c = geoCache[geoKey(m)];
+  if (!c) return undefined;
+  if (c.miss) return Date.now() - c.at < 86400000 ? null : undefined;
+  return {
+    lat: c.lat,
+    lng: c.lng
+  };
+}
+function geoFind(m) {
+  const name = String(m.placeName || "").trim();
+  return (name ? kakaoSearch(name, 1) : Promise.resolve([])).then(r => r[0] ? {
+    lat: r[0].lat,
+    lng: r[0].lng
+  } : m.address ? kakaoAddress(m.address.replace(/\s*\(.*\)\s*$/, "")) : null).then(ll => {
+    geoCache[geoKey(m)] = ll ? {
+      lat: ll.lat,
+      lng: ll.lng
+    } : {
+      miss: true,
+      at: Date.now()
+    };
+    geoSave();
+    return ll;
+  });
+}
+// 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요: 위에는 이전에 쓴 테니스장, 아래에는 카카오 장소 검색 결과
+// 카카오 결과를 고르면 이름·주소·좌표가 같이 들어가서 예약 탭 지도에 핀으로 나와요
 function PlaceInput({
   value,
   onChange,
-  onPick
+  onPick,
+  picked
 }) {
   const [all] = useState(placeHistory);
   const [open, setOpen] = useState(false);
+  const [kq, setKq] = useState({
+    q: "",
+    list: [],
+    busy: false,
+    fail: false
+  });
   const k = placeKey(value);
   // 빈칸일 땐 안 띄우고, 한 글자라도 치면 그걸로 시작하는 곳 → 들어 있는 곳 순 (같으면 자주·최근 쓴 곳 먼저)
   const list = !k ? [] : all.map(p => ({
     p,
     r: placeMatch(p, value)
   })).filter(x => x.r >= 0 && placeKey(x.p.name) !== k).sort((a, b) => a.r - b.r).slice(0, 5).map(x => x.p);
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
-    value: value,
-    autoComplete: "off",
-    onChange: e => {
-      onChange(e.target.value);
-      setOpen(true);
-    },
-    onFocus: () => setOpen(true),
-    onBlur: () => setOpen(false),
-    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
-    style: inputStyle
-  }), open && list.length > 0 && /*#__PURE__*/React.createElement("div", {
-    role: "listbox",
-    "aria-label": "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5",
-    style: {
-      marginTop: 6,
-      border: "1px solid #E4E9F7",
-      borderRadius: 14,
-      background: "#fff",
-      overflow: "hidden",
-      boxShadow: "0 6px 18px rgba(33,82,230,0.10)"
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      padding: "8px 14px 4px",
-      fontSize: 11,
-      color: "#A3AAC2"
-    }
-  }, "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5"), list.map(p => /*#__PURE__*/React.createElement("button", {
-    key: p.name,
+  // 카카오 장소 검색: 두 글자부터, 치는 걸 멈추고 0.35초 뒤에
+  const q = String(value || "").trim();
+  useEffect(() => {
+    if (!open || q.length < 2 || /[ㄱ-ㅎㅏ-ㅣ]$/.test(q)) return;
+    let alive = true;
+    setKq(o => ({
+      ...o,
+      busy: true
+    }));
+    const t = setTimeout(() => kakaoSearch(q).then(r => alive && setKq({
+      q,
+      list: r,
+      busy: false,
+      fail: false
+    })).catch(() => alive && setKq({
+      q,
+      list: [],
+      busy: false,
+      fail: true
+    })), 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [q, open]);
+  const klist = q.length >= 2 && kq.q === q ? kq.list.filter(p => !(picked && placeKey(p.name) === k && p.address === picked.address)).slice(0, 6) : [];
+  const row = (key, p, sub, right, ic, onClick) => /*#__PURE__*/React.createElement("button", {
+    key: key,
     type: "button",
     role: "option",
     "aria-selected": false,
     onMouseDown: e => e.preventDefault(),
-    onClick: () => {
-      onPick(p);
-      setOpen(false);
-    },
+    onClick: onClick,
     style: {
       display: "flex",
       alignItems: "center",
@@ -9140,7 +9973,7 @@ function PlaceInput({
       cursor: "pointer"
     }
   }, /*#__PURE__*/React.createElement(Icon, {
-    name: "pin",
+    name: ic,
     size: 16,
     stroke: 2,
     color: "#7C93E8"
@@ -9159,7 +9992,7 @@ function PlaceInput({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, p.name), p.address && /*#__PURE__*/React.createElement("span", {
+  }, p.name), sub && /*#__PURE__*/React.createElement("span", {
     style: {
       display: "block",
       fontSize: 11,
@@ -9168,13 +10001,83 @@ function PlaceInput({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, p.address)), /*#__PURE__*/React.createElement("span", {
+  }, sub)), right && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: "#A3AAC2",
       flexShrink: 0
     }
-  }, p.count, "\uD68C")))));
+  }, right));
+  const head = t => /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      padding: "8px 14px 4px",
+      fontSize: 11,
+      color: "#A3AAC2",
+      borderTop: "1px solid #F1F4FB"
+    }
+  }, t);
+  const showK = q.length >= 2 && (klist.length > 0 || kq.busy || kq.q === q && !kq.busy);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984",
+    value: value,
+    autoComplete: "off",
+    onChange: e => {
+      onChange(e.target.value);
+      setOpen(true);
+    },
+    onFocus: () => {
+      setOpen(true);
+      loadKakao().catch(() => {});
+    },
+    onBlur: () => setOpen(false),
+    placeholder: "\uC608: \uC62C\uB9BC\uD53D\uACF5\uC6D0 \uD14C\uB2C8\uC2A4\uC7A5",
+    style: inputStyle
+  }), open && (list.length > 0 || showK) && /*#__PURE__*/React.createElement("div", {
+    role: "listbox",
+    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uCD94\uCC9C",
+    style: {
+      marginTop: 6,
+      border: "1px solid #E4E9F7",
+      borderRadius: 14,
+      background: "#fff",
+      overflow: "hidden",
+      boxShadow: "0 6px 18px rgba(33,82,230,0.10)"
+    }
+  }, list.length > 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      padding: "8px 14px 4px",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC774\uC804\uC5D0 \uC4F4 \uD14C\uB2C8\uC2A4\uC7A5"), list.map(p => row("h" + p.name, p, p.address, `${p.count}회`, "pin", () => {
+    onPick(p);
+    setOpen(false);
+  })), showK && head(kq.fail && kq.q === q ? "카카오 장소 검색을 불러오지 못했어요 · 이름만 써도 돼요" : kq.busy && kq.q !== q ? "카카오 장소 검색 중…" : klist.length ? "카카오 장소 검색 · 고르면 지도에 표시돼요" : "카카오 장소 검색 결과가 없어요"), klist.map((p, i) => row("k" + i + p.name, p, p.address, null, "map", () => {
+    onPick({
+      ...p,
+      kakao: true
+    });
+    setOpen(false);
+  }))), picked && placeKey(picked.name) === k && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#067647",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "check",
+    s: 12
+  }), "\uC9C0\uB3C4 \uC704\uCE58\uAC00 \uC800\uC7A5\uB3FC\uC694", picked.address ? ` · ${picked.address}` : ""));
 }
 function MeetingForm({
   initial,
@@ -9271,6 +10174,8 @@ function MeetingForm({
       courtNo: String(f.courtNo || "").trim(),
       surface: f.surface || "",
       address: (f.address || "").trim(),
+      lat: f.lat != null && f.lat !== "" && Number.isFinite(+f.lat) ? +f.lat : null,
+      lng: f.lng != null && f.lng !== "" && Number.isFinite(+f.lng) ? +f.lng : null,
       capacity: cap,
       guestCap: gcap,
       desc: (f.desc || "").trim()
@@ -9512,14 +10417,33 @@ function MeetingForm({
     error: errors.place
   }, /*#__PURE__*/React.createElement(PlaceInput, {
     value: f.place,
-    onChange: v => set("place", v),
-    onPick: p => setF(o => ({
+    picked: Number.isFinite(+f.lat) && f.lat != null && f.lat !== "" ? {
+      name: f.place,
+      address: f.address || ""
+    } : null,
+    onChange: v => setF(o => ({
+      ...o,
+      place: v,
+      ...(placeKey(v) !== placeKey(o.place) ? {
+        lat: null,
+        lng: null
+      } : {})
+    })),
+    onPick: p => setF(o => p.kakao ? {
+      ...o,
+      place: p.name,
+      address: p.address || o.address || "",
+      lat: p.lat,
+      lng: p.lng
+    } : {
       ...o,
       place: p.name,
       address: o.address || p.address || "",
-      surface: o.surface || p.surface || ""
-    }))
-  })), /*#__PURE__*/React.createElement(FieldWrap, {
+      surface: o.surface || p.surface || "",
+      lat: p.lat != null ? p.lat : null,
+      lng: p.lng != null ? p.lng : null
+    })
+  }), hint("두 글자 이상 쓰면 카카오 장소 검색 결과가 떠요. 골라 두면 예약 탭 지도에 핀으로 나와요.")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uCF54\uD2B8 \uBC88\uD638",
     required: true,
     error: errors.courtNo
@@ -10788,7 +11712,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "f5840bc2cf";
+const BUILD_ID = "74646fef64";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -11547,6 +12471,20 @@ function App() {
   const [tab, setTab] = useState("home");
   const [wink, setWink] = useState(false); // 로고를 누르면 SSTC의 속뜻이 보여요
   const [openMeeting, setOpenMeeting] = useState(null); // {id, view, from}
+  // 예약 탭 목록/지도 (모임 상세에서 돌아와도 보던 쪽 그대로)
+  const [bookView, setBookViewRaw] = useState(() => {
+    try {
+      return sessionStorage.getItem("sstc-booking-view") === "map" ? "map" : "list";
+    } catch (e) {
+      return "list";
+    }
+  });
+  const setBookView = v => {
+    setBookViewRaw(v);
+    try {
+      sessionStorage.setItem("sstc-booking-view", v);
+    } catch (e) {}
+  };
   // 모임을 열면 주소에 #meeting-<id>를 붙여서 폰·브라우저 뒤로가기로도 닫히게 함
   const openM = (id, view, from) => {
     setOpenMeeting({
@@ -12092,7 +13030,7 @@ function App() {
     name: "back",
     size: 20,
     stroke: 2.4
-  }), openMeeting.from === "home" ? "홈" : openMeeting.from === "members" ? "회원" : "목록") : /*#__PURE__*/React.createElement("span", {
+  }), openMeeting.from === "home" ? "홈" : openMeeting.from === "members" ? "회원" : openMeeting.from === "map" ? "지도" : "목록") : /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
       fontWeight: 600,
@@ -12330,8 +13268,10 @@ function App() {
     focusNotice: focusNotice
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
     open: openMeeting,
-    onOpen: (id, view) => openM(id, view, "booking"),
+    onOpen: (id, view, from) => openM(id, view, from || "booking"),
     ready: list.ready,
+    view: bookView,
+    onView: setBookView,
     canManage: canManage,
     isAdmin: adminOn,
     onEdit: m => setForm2({
@@ -12345,7 +13285,7 @@ function App() {
     boardFocus: boardFocus,
     newCounts: membersNew,
     canWrite: !FB || !!(account && (account.admin || account.approved))
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), tab === "booking" && !curMeeting && /*#__PURE__*/React.createElement("button", {
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), tab === "booking" && !curMeeting && bookView !== "map" && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     "aria-label": "\uBAA8\uC784 \uB9CC\uB4E4\uAE30",
