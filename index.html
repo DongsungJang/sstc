@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e3f22cc13e">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e3f22cc13e">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=124440b9b3">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=124440b9b3">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -3343,6 +3343,7 @@ function flatGames(bracket, scores) {
       s,
       c,
       key,
+      court: ct.no || c + 1,
       a: ct.a.map(i => bracket.players[i]),
       b: ct.b.map(i => bracket.players[i]),
       score,
@@ -3581,9 +3582,10 @@ function useMeetingRecord(meeting) {
       ...pending
     }
   };
-  const saveBracket = bracket => {
+  // scores를 같이 넘기면 그 점수만 남기고(대진표 수정), 안 넘기면 점수를 모두 지워요
+  const saveBracket = (bracket, keep) => {
     setPending({});
-    Promise.all([saveMeetingPath(base + "/bracket", bracket), saveMeetingPath(base + "/scores", null)]).catch(fail);
+    Promise.all([saveMeetingPath(base + "/bracket", bracket), saveMeetingPath(base + "/scores", keep && Object.keys(keep).length ? keep : null)]).catch(fail);
   };
   const clearBracket = () => saveBracket(null);
   const saveRsvp = v => saveMeetingPath(base + "/votes/" + myVoteKey(), v).catch(fail);
@@ -5017,6 +5019,593 @@ const arrowBtn = dis => ({
   cursor: dis ? "default" : "pointer"
 });
 
+// ─── 대진표 직접 작성·수정 ────────────────────────────────────────────────────
+// 자동 편성과 같은 모양으로 저장해요: players(이름), sessions[{courts:[{a:[i,i],b:[i,i],no}],rest:[i]}], times, ends …
+// 편집 중에는 번호 대신 이름으로 들고 있다가 저장할 때 번호로 바꿔요. 코트가 비어 있으면 그 코트는 빼고 저장해요.
+const emptyCourt = () => ({
+  a: [null, null],
+  b: [null, null]
+});
+const courtNames = ct => [...ct.a, ...ct.b];
+const courtFilled = ct => courtNames(ct).filter(Boolean).length;
+// 저장된 대진표 → 편집용(세션마다 코트 courts면, 코트 번호 자리에 맞춰 놓음)
+function draftFromBracket(b) {
+  const courts = b.courts || 2;
+  return b.sessions.map(ses => {
+    const row = Array.from({
+      length: courts
+    }, emptyCourt);
+    sessionCourts(ses).forEach((ct, c) => {
+      const at = (ct.no || c + 1) - 1;
+      if (at < courts) row[at] = {
+        a: ct.a.map(i => b.players[i]),
+        b: ct.b.map(i => b.players[i])
+      };
+    });
+    return row;
+  });
+}
+function ManualBracket({
+  meeting,
+  participants,
+  initial,
+  onSave,
+  onCancel
+}) {
+  // 고를 수 있는 사람: 참석자(실력 순서) + 기존 대진표에만 있던 사람 + 직접 추가한 이름
+  const [pool, setPool] = useState(() => {
+    const out = arrangeOrder(participants, initial && initial.players).map(p => ({
+      name: p.name,
+      ntrp: p.ntrp || "",
+      isGuest: !!p.isGuest
+    }));
+    if (initial) initial.players.forEach((nm, i) => {
+      if (!out.some(p => p.name === nm)) out.push({
+        name: nm,
+        ntrp: (initial.ntrp || [])[i] || "",
+        isGuest: !!(initial.guests || [])[i]
+      });
+    });
+    return out;
+  });
+  const [start, setStart] = useState(() => initial ? initial.start || initial.times[0] : meeting.time.slice(0, 5));
+  const [dur, setDur] = useState(() => initial ? initial.dur || 30 : 30);
+  const [courts, setCourtsN] = useState(() => initial ? initial.courts || 2 : Math.max(1, Math.min(2, Math.floor(participants.length / 4) || 1)));
+  const [draft, setDraft] = useState(() => initial ? draftFromBracket(initial) : [Array.from({
+    length: courts
+  }, emptyCourt)]);
+  const [newName, setNewName] = useState("");
+  const [nameErr, setNameErr] = useState("");
+  const label = {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#2B3674"
+  };
+  const rowS = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  };
+  const timeOf = s => pad2(hhmmApp(toMin(start) + s * dur));
+  const setCourts = n => {
+    setCourtsN(n);
+    setDraft(d => d.map(row => row.length >= n ? row.slice(0, n) : [...row, ...Array.from({
+      length: n - row.length
+    }, emptyCourt)]));
+  };
+  const setSlot = (s, c, side, k, name) => setDraft(d => d.map((row, si) => si !== s ? row : row.map((ct, ci) => {
+    if (ci !== c) return ct;
+    const n = {
+      a: ct.a.slice(),
+      b: ct.b.slice()
+    };
+    n[side][k] = name || null;
+    return n;
+  })));
+  const addSession = () => setDraft(d => [...d, Array.from({
+    length: courts
+  }, emptyCourt)]);
+  const removeSession = s => setDraft(d => d.filter((_, i) => i !== s));
+  const copyPrev = s => setDraft(d => d.map((row, i) => i === s ? d[s - 1].map(ct => ({
+    a: ct.a.slice(),
+    b: ct.b.slice()
+  })) : row));
+  const clearSession = s => setDraft(d => d.map((row, i) => i === s ? row.map(emptyCourt) : row));
+  const usedIn = row => new Set(row.flatMap(courtNames).filter(Boolean));
+  // 지금까지 게임 수 (모든 세션)
+  const count = {};
+  draft.forEach(row => row.forEach(ct => courtNames(ct).forEach(nm => {
+    if (nm) count[nm] = (count[nm] || 0) + 1;
+  })));
+  // 빈 자리 채우기: 이 세션에서 쉬는 사람 중 게임 수가 적은 사람부터(같으면 실력 순서대로)
+  const fillSession = s => setDraft(d => d.map((row, i) => {
+    if (i !== s) return row;
+    const used = usedIn(row);
+    const cnt = {};
+    d.forEach(r => r.forEach(ct => courtNames(ct).forEach(nm => {
+      if (nm) cnt[nm] = (cnt[nm] || 0) + 1;
+    })));
+    const free = pool.map((p, idx) => ({
+      nm: p.name,
+      idx
+    })).filter(x => !used.has(x.nm)).sort((x, y) => (cnt[x.nm] || 0) - (cnt[y.nm] || 0) || x.idx - y.idx).map(x => x.nm);
+    return row.map(ct => ({
+      a: ct.a.map(v => v || free.shift() || null),
+      b: ct.b.map(v => v || free.shift() || null)
+    }));
+  }));
+  const addName = () => {
+    const nm = newName.trim();
+    if (!nm) return;
+    if (nm.length > 10) {
+      setNameErr("이름은 10자까지 쓸 수 있어요");
+      return;
+    }
+    if (pool.some(p => p.name === nm)) {
+      setNameErr("이미 목록에 있는 이름이에요");
+      return;
+    }
+    setPool(p => [...p, {
+      name: nm,
+      ntrp: "",
+      isGuest: true,
+      added: true
+    }]);
+    setNewName("");
+    setNameErr("");
+  };
+  const removeName = nm => {
+    setPool(p => p.filter(x => x.name !== nm));
+    setDraft(d => d.map(row => row.map(ct => ({
+      a: ct.a.map(v => v === nm ? null : v),
+      b: ct.b.map(v => v === nm ? null : v)
+    }))));
+  };
+  // 문제 하나만 안내
+  let problem = null;
+  if (!draft.length) problem = "세션을 하나 이상 만들어 주세요.";
+  draft.forEach((row, s) => {
+    if (problem) return;
+    if (row.every(ct => !courtFilled(ct))) problem = `${s + 1}세션이 비어 있어요. 사람을 넣거나 세션을 지워 주세요.`;else {
+      const c = row.findIndex(ct => courtFilled(ct) && courtFilled(ct) < 4);
+      if (c >= 0) problem = `${s + 1}세션 코트 ${c + 1}에 빈 자리가 있어요. 4명을 다 넣거나 모두 비워 주세요.`;
+    }
+  });
+  if (!problem && toMin(start) + draft.length * dur >= 24 * 60) problem = "끝나는 시간이 자정을 넘어요. 시작 시간이나 게임당 시간을 줄여 주세요.";
+  const save = () => {
+    if (problem) return;
+    const used = new Set(Object.keys(count));
+    const players = pool.filter(p => !p.added || used.has(p.name));
+    const idx = new Map(players.map((p, i) => [p.name, i]));
+    const sessions = draft.map(row => {
+      const on = usedIn(row);
+      return {
+        courts: row.map((ct, c) => ({
+          ct,
+          c
+        })).filter(x => courtFilled(x.ct)).map(({
+          ct,
+          c
+        }) => ({
+          a: ct.a.map(n => idx.get(n)),
+          b: ct.b.map(n => idx.get(n)),
+          no: c + 1
+        })),
+        rest: players.map((p, i) => on.has(p.name) ? -1 : i).filter(i => i >= 0)
+      };
+    });
+    const rests = players.map(p => draft.length - (count[p.name] || 0));
+    let triple = 0;
+    players.forEach(p => {
+      let run = 0,
+        hit = false;
+      draft.forEach(row => {
+        run = usedIn(row).has(p.name) ? run + 1 : 0;
+        if (run >= 3) hit = true;
+      });
+      if (hit) triple++;
+    });
+    const times = draft.map((_, s) => timeOf(s)),
+      ends = draft.map((_, s) => timeOf(s + 1));
+    onSave({
+      players: players.map(p => p.name),
+      ntrp: players.map(p => p.ntrp || ""),
+      guests: players.map(p => !!p.isGuest),
+      games: players.map(p => count[p.name] || 0),
+      excl: players.map(() => 0),
+      start,
+      end: ends[ends.length - 1],
+      dur,
+      courts,
+      manual: true,
+      times,
+      ends,
+      sessions,
+      summary: {
+        diffSum: 0,
+        restMin: rests.length ? Math.min(...rests) : 0,
+        restMax: rests.length ? Math.max(...rests) : 0,
+        triple
+      },
+      createdAt: initial && initial.createdAt || Date.now(),
+      ...(initial ? {
+        editedAt: Date.now(),
+        editedBy: ME
+      } : {})
+    });
+  };
+  const sel = {
+    ...inputStyle,
+    flex: 1,
+    minWidth: 0,
+    padding: "8px 8px",
+    fontSize: 13,
+    borderRadius: 12,
+    appearance: "auto"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC2DC\uAC04 \xB7 \uCF54\uD2B8"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: rowS
+  }, /*#__PURE__*/React.createElement("span", {
+    style: label
+  }, "\uC2DC\uC791 \uC2DC\uAC04"), /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uB300\uC9C4 \uC2DC\uC791",
+    value: start,
+    onChange: setStart,
+    style: {
+      width: 190
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: label
+  }, "\uAC8C\uC784\uB2F9 \uC2DC\uAC04"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, DUR_OPTIONS.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m,
+    type: "button",
+    onClick: () => setDur(m),
+    style: {
+      padding: "6px 12px",
+      borderRadius: 999,
+      fontSize: 13,
+      cursor: "pointer",
+      fontWeight: dur === m ? 600 : 400,
+      border: `1.5px solid ${dur === m ? BLUE : "#D6DEF7"}`,
+      background: dur === m ? BLUE : "#fff",
+      color: dur === m ? "#fff" : "#4A5578"
+    }
+  }, m, "\uBD84")))), /*#__PURE__*/React.createElement("div", {
+    style: rowS
+  }, /*#__PURE__*/React.createElement("span", {
+    style: label
+  }, "\uCF54\uD2B8 \uC218"), /*#__PURE__*/React.createElement(NumStepper, {
+    value: courts,
+    onChange: setCourts,
+    min: 1,
+    max: 8,
+    unit: "\uBA74"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      background: BLUE_LIGHT,
+      borderRadius: 16,
+      padding: "12px 14px",
+      fontSize: 13,
+      lineHeight: 1.6,
+      color: "#2B3674"
+    }
+  }, /*#__PURE__*/React.createElement("b", null, draft.length, "\uC138\uC158"), " \xB7 ", start, " ~ ", timeOf(draft.length))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uCC38\uAC00\uC790"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 12,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, "\uCC38\uC11D \uD655\uC815\uC790\uC608\uC694. \uD22C\uD45C\uD558\uC9C0 \uC54A\uC740 \uC0AC\uB78C\uC774 \uD568\uAED8 \uCE58\uBA74 \uC774\uB984\uC744 \uCD94\uAC00\uD574 \uC8FC\uC138\uC694. \uC22B\uC790\uB294 \uC9C0\uAE08\uAE4C\uC9C0 \uB123\uC740 \uAC8C\uC784 \uC218\uC608\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, pool.map(p => /*#__PURE__*/React.createElement("span", {
+    key: p.name,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      padding: "5px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 500,
+      background: p.name === ME ? BLUE_LIGHT : "#F5F7FE",
+      color: "#1B2559",
+      border: `1.5px solid ${p.name === ME ? BLUE : "transparent"}`
+    }
+  }, p.name, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: count[p.name] ? BLUE : "#A3AAC2",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, count[p.name] || 0), p.added && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => removeName(p.name),
+    "aria-label": `${p.name} 빼기`,
+    style: {
+      background: "none",
+      border: "none",
+      padding: 0,
+      display: "flex",
+      color: "#A3AAC2",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 13
+  })))), !pool.length && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, "\uC544\uC9C1 \uCC38\uC11D \uD655\uC815\uC790\uAC00 \uC5C6\uC5B4\uC694")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: newName,
+    onChange: e => {
+      setNewName(e.target.value);
+      setNameErr("");
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addName();
+      }
+    },
+    placeholder: "\uC774\uB984 \uCD94\uAC00 (\uAC8C\uC2A4\uD2B8 \uB4F1)",
+    maxLength: 10,
+    style: {
+      ...inputStyle,
+      flex: 1,
+      padding: "9px 14px"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: addName,
+    disabled: !newName.trim(),
+    style: {
+      ...btnSmall,
+      opacity: newName.trim() ? 1 : 0.45
+    }
+  }, "\uCD94\uAC00")), nameErr && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12,
+      color: "#ef4444"
+    }
+  }, nameErr)), draft.map((row, s) => {
+    const used = usedIn(row);
+    const rest = pool.filter(p => !used.has(p.name)).map(p => p.name);
+    return /*#__PURE__*/React.createElement(Card, {
+      key: s,
+      style: {
+        padding: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: "#1B2559",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, timeOf(s)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 12,
+        color: "#A3AAC2"
+      }
+    }, "~ ", timeOf(s + 1), " \xB7 ", s + 1, "\uC138\uC158"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => removeSession(s),
+      "aria-label": `${s + 1}세션 지우기`,
+      style: {
+        background: "none",
+        border: "none",
+        color: "#A3AAC2",
+        cursor: "pointer",
+        display: "flex",
+        padding: 4
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "trash",
+      size: 17
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 12
+      }
+    }, row.map((ct, c) => /*#__PURE__*/React.createElement("div", {
+      key: c,
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: "#6B7493"
+      }
+    }, "\uCF54\uD2B8 ", c + 1, !courtFilled(ct) && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 400,
+        color: "#A3AAC2"
+      }
+    }, " \xB7 \uBE44\uC6CC \uB450\uBA74 \uC774 \uC138\uC158\uC740 \uC774 \uCF54\uD2B8\uB97C \uC548 \uC368\uC694")), ["a", "b"].map(side => /*#__PURE__*/React.createElement("div", {
+      key: side,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: side === "a" ? BLUE : "#6B7493",
+        width: 14,
+        textAlign: "center"
+      }
+    }, side.toUpperCase()), [0, 1].map(k => {
+      const v = ct[side][k];
+      return /*#__PURE__*/React.createElement("select", {
+        key: k,
+        "aria-label": `${s + 1}세션 코트 ${c + 1} ${side.toUpperCase()}팀 ${k + 1}번`,
+        value: v || "",
+        onChange: e => setSlot(s, c, side, k, e.target.value),
+        style: {
+          ...sel,
+          color: v ? "#1B2559" : "#A3AAC2",
+          fontWeight: v ? 600 : 400,
+          background: v ? "#fff" : "#F5F7FE"
+        }
+      }, /*#__PURE__*/React.createElement("option", {
+        value: ""
+      }, "\uC120\uD0DD"), pool.map(p => /*#__PURE__*/React.createElement("option", {
+        key: p.name,
+        value: p.name,
+        disabled: p.name !== v && used.has(p.name)
+      }, p.name, " (", count[p.name] || 0, "\uAC8C\uC784)", p.name !== v && used.has(p.name) ? " · 배정됨" : "")));
+    })))))), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "12px 0 0",
+        fontSize: 12,
+        color: "#6B7493"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "coffee",
+      s: 13
+    }), " \uD734\uC2DD \xB7 ", rest.length ? rest.join(", ") : "없음"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 10
+      }
+    }, row.some(ct => courtFilled(ct) < 4) && rest.length > 0 && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => fillSession(s),
+      style: {
+        ...btnSmall,
+        padding: "7px 12px"
+      }
+    }, "\uBE48 \uC790\uB9AC \uCC44\uC6B0\uAE30"), s > 0 && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => copyPrev(s),
+      style: {
+        ...btnSmall,
+        padding: "7px 12px",
+        background: "#fff",
+        color: BLUE,
+        border: "1.5px solid #D6DEF7"
+      }
+    }, "\uC55E \uC138\uC158 \uADF8\uB300\uB85C"), row.some(courtFilled) && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => clearSession(s),
+      style: {
+        ...btnSmall,
+        padding: "7px 12px",
+        background: "#fff",
+        color: "#6B7493",
+        border: "1.5px solid #E4E9F7"
+      }
+    }, "\uBAA8\uB450 \uBE44\uC6B0\uAE30")));
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: addSession,
+    disabled: draft.length >= 16,
+    style: {
+      ...btnSecondary,
+      flex: "none",
+      width: "100%",
+      borderStyle: "dashed",
+      opacity: draft.length >= 16 ? 0.45 : 1
+    }
+  }, "+ \uC138\uC158 \uCD94\uAC00"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: problem ? "#FFF4E5" : BLUE_LIGHT,
+      borderRadius: 16,
+      padding: "12px 14px",
+      fontSize: 13,
+      lineHeight: 1.6,
+      color: problem ? "#9A4A07" : "#2B3674"
+    }
+  }, problem || /*#__PURE__*/React.createElement(React.Fragment, null, "\uAC8C\uC784 ", draft.reduce((a, row) => a + row.filter(courtFilled).length, 0), "\uD310 \xB7 \uC800\uC7A5\uD558\uBA74 \uBC14\uB85C \uC2A4\uCF54\uC5B4\uB97C \uC785\uB825\uD560 \uC218 \uC788\uC5B4\uC694", initial ? ". 사람이 바뀐 경기의 점수는 지워져요" : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, onCancel && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onCancel,
+    style: btnSecondary
+  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: !!problem,
+    onClick: save,
+    style: {
+      ...btnPrimary,
+      flex: 1,
+      width: "auto",
+      opacity: problem ? 0.45 : 1,
+      cursor: problem ? "default" : "pointer"
+    }
+  }, initial ? "수정 저장" : "대진표 저장")));
+}
+// 대진표를 고친 뒤에도 남길 점수: 같은 자리(세션_코트)에 같은 네 사람이 같은 편으로 있으면 그대로
+function keptScores(oldB, newB, scores) {
+  const sig = g => [g.a.slice().sort().join(","), g.b.slice().sort().join(",")].join("|");
+  const before = new Map(flatGames(oldB, scores).map(g => [g.key, g]));
+  const out = {};
+  flatGames(newB, {}).forEach(g => {
+    const o = before.get(g.key);
+    if (o && sig(o) === sig(g) && scores[g.key]) out[g.key] = scores[g.key];
+  });
+  return out;
+}
+
 // ─── 게임 한 판 (스코어 입력) ─────────────────────────────────────────────────
 function GameCard({
   game,
@@ -5253,17 +5842,75 @@ function MeetingBracket({
     n: mode === "shared" ? "cloud" : "phone",
     s: 12
   }), " ", modeNote);
+  const [how, setHow] = useState("auto"); // 새로 만들 때: "auto" 자동 편성 | "manual" 직접 작성
+  const [editing, setEditing] = useState(false); // 만든 대진표 수정 중
+  useEffect(() => {
+    if (!bracket) setEditing(false);
+  }, [!!bracket]);
+  const howTabs = /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      background: "#E4E9F7",
+      borderRadius: 999,
+      padding: 4
+    }
+  }, [["auto", "자동 편성"], ["manual", "직접 작성"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    onClick: () => setHow(k),
+    style: {
+      flex: 1,
+      padding: "8px 0",
+      borderRadius: 999,
+      border: "none",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      background: how === k ? "#fff" : "transparent",
+      color: how === k ? BLUE : "#6B7493",
+      boxShadow: how === k ? "0 2px 8px rgba(40,70,180,0.12)" : "none"
+    }
+  }, l)));
   if (!bracket) return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement(BracketSetup, {
+  }, howTabs, how === "auto" ? /*#__PURE__*/React.createElement(BracketSetup, {
     meeting: meeting,
     participants: participants,
     onCreate: saveBracket,
     prevOrder: prevOrder
+  }) : /*#__PURE__*/React.createElement(ManualBracket, {
+    meeting: meeting,
+    participants: participants,
+    onSave: saveBracket
+  }), note);
+  if (editing) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: BLUE_LIGHT,
+      borderRadius: 16,
+      padding: "12px 14px",
+      fontSize: 13,
+      lineHeight: 1.6,
+      color: "#2B3674"
+    }
+  }, /*#__PURE__*/React.createElement("b", null, "\uB300\uC9C4\uD45C \uC218\uC815 \uC911"), " \xB7 \uC790\uB9AC\uB97C \uBC14\uAFB8\uACE0 \uC544\uB798 ", /*#__PURE__*/React.createElement("b", null, "\uC218\uC815 \uC800\uC7A5"), "\uC744 \uB20C\uB7EC \uC8FC\uC138\uC694. \uADF8\uB300\uB85C\uC778 \uACBD\uAE30\uC758 \uC810\uC218\uB294 \uB0A8\uC544\uC694."), /*#__PURE__*/React.createElement(ManualBracket, {
+    meeting: meeting,
+    participants: participants,
+    initial: bracket,
+    onCancel: () => setEditing(false),
+    onSave: nb => {
+      saveBracket(nb, keptScores(bracket, nb, scores));
+      setEditing(false);
+    }
   }), note);
   const games = flatGames(bracket, scores);
   const done = games.filter(g => g.o === "a" || g.o === "b" || g.o === "draw").length;
@@ -5335,7 +5982,13 @@ function MeetingBracket({
       background: GRAD,
       borderRadius: 10
     }
-  })), /*#__PURE__*/React.createElement("p", {
+  })), bracket.manual ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC9C1\uC811 \uC791\uC131\uD55C \uB300\uC9C4\uD45C", bracket.editedBy ? ` · ${bracket.editedBy} 수정` : "", " \xB7 \uD734\uC2DD ", bracket.summary.restMin === bracket.summary.restMax ? bracket.summary.restMin : `${bracket.summary.restMin}~${bracket.summary.restMax}`, "\uD68C") : /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
@@ -5396,7 +6049,7 @@ function MeetingBracket({
     }
   }, games.filter(g => g.s === s).map(g => /*#__PURE__*/React.createElement(GameCard, {
     key: g.key,
-    court: g.c + 1,
+    court: g.court,
     game: g,
     onScore: saveScore,
     me: ME
@@ -5543,19 +6196,40 @@ function MeetingBracket({
       color: "#fff",
       border: "none"
     }
-  }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30"))) : /*#__PURE__*/React.createElement("button", {
+  }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30"))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setEditing(true);
+      window.scrollTo(0, 0);
+    },
+    style: {
+      ...btnSecondary,
+      padding: "11px 0",
+      fontSize: 13,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pencil",
+    size: 15
+  }), "\uB300\uC9C4\uD45C \uC218\uC815"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setConfirm(true),
     style: {
-      background: "none",
-      border: "none",
+      ...btnSecondary,
+      padding: "11px 0",
       fontSize: 13,
-      color: "#6B7493",
-      cursor: "pointer",
-      textDecoration: "underline",
-      textUnderlineOffset: 3
+      color: "#ef4444",
+      borderColor: "#FCA5A5"
     }
-  }, "\uB300\uC9C4\uD45C \uB2E4\uC2DC \uB9CC\uB4E4\uAE30"), note);
+  }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30")), note);
 }
 
 // ─── 예약 상세 ────────────────────────────────────────────────────────────────
@@ -11830,7 +12504,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "e3f22cc13e";
+const BUILD_ID = "124440b9b3";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
