@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=a6222618f7">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=a6222618f7">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e3f22cc13e">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e3f22cc13e">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -7789,7 +7789,8 @@ function CourtMap({
     overlays = useRef([]),
     fitted = useRef(!!MAP_VIEW),
     strip = useRef(null),
-    relayoutRef = useRef(null);
+    relayoutRef = useRef(null),
+    cardRef = useRef(null);
   const [status, setStatus] = useState("loading"); // loading | ready | fail
   const [filter, setFilter] = useState(() => MAP_VIEW && MAP_VIEW.filter || "all");
   const [sel, setSel] = useState(() => MAP_VIEW && MAP_VIEW.sel || null);
@@ -7956,6 +7957,15 @@ function CourtMap({
   useEffect(() => {
     setPage(0);
     if (strip.current) strip.current.scrollLeft = 0;
+    // 카드는 지도 아래에 나오니까, 화면 밖이면 보이게 살짝 내려줘요
+    if (sel) setTimeout(() => {
+      try {
+        cardRef.current && cardRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest"
+        });
+      } catch (e) {}
+    }, 50);
   }, [sel]);
   const fitAll = () => {
     const map = mapRef.current,
@@ -8027,8 +8037,8 @@ function CourtMap({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
-      minHeight: 360,
-      height: "max(360px, calc(100svh - 430px))",
+      minHeight: 320,
+      height: "max(320px, calc(100svh - 500px))",
       borderRadius: 24,
       overflow: "hidden",
       background: "#E7ECF6",
@@ -8097,7 +8107,7 @@ function CourtMap({
     style: {
       position: "absolute",
       right: 12,
-      bottom: cur ? 232 : 16,
+      bottom: 16,
       width: 42,
       height: 42,
       borderRadius: "50%",
@@ -8131,42 +8141,37 @@ function CourtMap({
     r: "7.5"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"
-  }))), status === "ready" && !cur && /*#__PURE__*/React.createElement("div", {
+  })))), status === "ready" && /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "absolute",
-      left: 12,
-      bottom: 16,
-      zIndex: 5,
-      background: "rgba(255,255,255,0.95)",
-      borderRadius: 14,
-      padding: "8px 12px",
-      boxShadow: "0 4px 12px rgba(11,30,91,0.14)",
-      maxWidth: "calc(100% - 90px)"
+      background: "#fff",
+      borderRadius: 16,
+      padding: "10px 14px",
+      boxShadow: SHADOW,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      flexWrap: "wrap"
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
-      margin: 0,
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, shown.length ? `예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳` : "예정된 모임이 없어요", pending.length ? " · 위치 찾는 중…" : ""), groups.some(g => g.list.length > 1) && /*#__PURE__*/React.createElement("p", {
+  }, shown.length ? `예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳` : "예정된 모임이 없어요", pending.length ? " · 위치 찾는 중…" : ""), groups.some(g => g.list.length > 1) && /*#__PURE__*/React.createElement("span", {
     style: {
-      margin: "2px 0 0",
-      fontSize: 11,
+      fontSize: 12,
       color: "#6B7493"
     }
   }, "\uC22B\uC790 = \uADF8 \uCF54\uD2B8\uC758 \uBAA8\uC784 \uC218")), cur && /*#__PURE__*/React.createElement("div", {
+    ref: cardRef,
     style: {
-      position: "absolute",
-      left: 10,
-      right: 10,
-      bottom: 10,
-      zIndex: 6,
       background: "#fff",
       borderRadius: 20,
-      boxShadow: "0 10px 30px rgba(11,30,91,0.22)",
-      padding: "14px 14px 10px"
+      boxShadow: SHADOW,
+      padding: "14px 14px 10px",
+      scrollMarginBottom: 100
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8227,7 +8232,7 @@ function CourtMap({
       background: i === page ? BLUE : "#D6DEF7",
       transition: "width .2s"
     }
-  }))))), status === "ready" && lost.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  })))), status === "ready" && lost.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 4px",
       fontSize: 15,
@@ -11825,7 +11830,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "a6222618f7";
+const BUILD_ID = "e3f22cc13e";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
