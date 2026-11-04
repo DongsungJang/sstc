@@ -2114,9 +2114,12 @@ function MeetingBracket({meeting,participants,store}) {
           </div>
         </div>
       ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <button type="button" onClick={()=>shareBracket(meeting,bracket,scores)} style={{...btnPrimary,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>{done?"대진표·결과":"대진표"} 카톡으로 공유</button>
         <div style={{display:"flex",gap:8}}>
           <button type="button" onClick={()=>{setEditing(true);window.scrollTo(0,0);}} style={{...btnSecondary,padding:"11px 0",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={15}/>대진표 수정</button>
           <button type="button" onClick={()=>setConfirm(true)} style={{...btnSecondary,padding:"11px 0",fontSize:13,color:"#ef4444",borderColor:"#FCA5A5"}}>지우고 다시 만들기</button>
+        </div>
         </div>
       )}
       {note}
@@ -2329,14 +2332,41 @@ function meetingShareText(m){
   L.push("",`참석·자세히 보기: ${url}`);
   return L.filter(x=>x!==null).join("\n");
 }
-function shareMeeting(m){
-  const text=meetingShareText(m);
-  const copy=()=>{ const done=()=>alert("안내문을 복사했어요. 카카오톡 대화방에 붙여넣어 주세요.");
-    if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(done).catch(()=>window.prompt("아래 안내문을 복사해 주세요",text));
-    window.prompt("아래 안내문을 복사해 주세요",text); };
-  if(navigator.share) return navigator.share({title:"SSTC 모임 안내",text}).catch(e=>{ if(!e||e.name!=="AbortError") copy(); });
+// 대진표·결과 요약: 모임·시간·코트, 세션별 코트 A팀 vs B팀(점수 있으면 점수), 휴식, 끝난 게임이 있으면 개인 성적 전체
+function bracketShareText(m,bracket,scores){
+  const games=flatGames(bracket,scores);
+  const pair=t=>t.join("·");
+  const res=g=>{ if(!g.o) return "";
+    const sc=` ${g.score.a}:${g.score.b}`;
+    return g.o==="draw"?sc+" 무":g.score.a===g.score.b?sc+` (가위바위보 ${pair(g.o==="a"?g.a:g.b)} 승)`:sc; };
+  const url=location.origin+location.pathname+"#meeting-"+m.id;
+  const done=games.filter(g=>g.o).length;
+  const L=[`[SSTC] ${m.kind==="flash"?"번개":"정기"} 모임 ${done?(done===games.length?"경기 결과":"대진표·결과"):"대진표"}`,
+    `${m.date} ${bracket.times[0]}~${bracket.ends[bracket.ends.length-1]}`,
+    `${m.place}${m.place?" · ":""}코트 ${bracket.courts||2}면 · 게임당 ${bracket.dur||30}분 · ${bracket.players.length}명`];
+  bracket.sessions.forEach((ses,s)=>{
+    L.push("",`■ ${s+1}세션 ${bracket.times[s]}~${bracket.ends[s]}`);
+    games.filter(g=>g.s===s).forEach(g=>L.push(`${g.court}코트  ${pair(g.a)} vs ${pair(g.b)}${res(g)}`));
+    if((ses.rest||[]).length) L.push(`휴식  ${ses.rest.map(i=>bracket.players[i]).join(", ")}`);
+  });
+  if(done){
+    const rows=standings(bracket,scores).filter(r=>r.played);
+    L.push("",`■ 개인 성적 (끝난 게임 ${done}/${games.length})`);
+    rows.forEach((r,i)=>{const d=r.pf-r.pa; L.push(`${i+1}. ${r.name} ${r.w}승 ${r.d}무 ${r.l}패 (득실 ${d>0?"+":""}${d})`);});
+  }
+  L.push("",`대진표·점수 보기: ${url}`);
+  return L.join("\n");
+}
+// 폰 공유창(카카오톡 선택), 공유창이 없거나 실패하면 클립보드 복사
+function shareText(text,title,what){
+  const copy=()=>{ const done=()=>alert(`${what}을 복사했어요. 카카오톡 대화방에 붙여넣어 주세요.`);
+    if(navigator.clipboard&&navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(done).catch(()=>window.prompt(`아래 ${what}을 복사해 주세요`,text));
+    window.prompt(`아래 ${what}을 복사해 주세요`,text); };
+  if(navigator.share) return navigator.share({title,text}).catch(e=>{ if(!e||e.name!=="AbortError") copy(); });
   copy();
 }
+function shareMeeting(m){ shareText(meetingShareText(m),"SSTC 모임 안내","안내문"); }
+function shareBracket(m,bracket,scores){ shareText(bracketShareText(m,bracket,scores),"SSTC 대진표","대진표"); }
 
 function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDeleted}) {
   const [view,setView]=useState(initialView);

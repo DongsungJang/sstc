@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=124440b9b3">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=124440b9b3">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=191d41442c">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=191d41442c">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -6199,6 +6199,28 @@ function MeetingBracket({
   }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30"))) : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => shareBracket(meeting, bracket, scores),
+    style: {
+      ...btnPrimary,
+      padding: "12px 0",
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "share",
+    size: 16,
+    stroke: 2
+  }), done ? "대진표·결과" : "대진표", " \uCE74\uD1A1\uC73C\uB85C \uACF5\uC720"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
       gap: 8
     }
   }, /*#__PURE__*/React.createElement("button", {
@@ -6229,7 +6251,7 @@ function MeetingBracket({
       color: "#ef4444",
       borderColor: "#FCA5A5"
     }
-  }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30")), note);
+  }, "\uC9C0\uC6B0\uACE0 \uB2E4\uC2DC \uB9CC\uB4E4\uAE30"))), note);
 }
 
 // ─── 예약 상세 ────────────────────────────────────────────────────────────────
@@ -7009,20 +7031,54 @@ function meetingShareText(m) {
   L.push("", `참석·자세히 보기: ${url}`);
   return L.filter(x => x !== null).join("\n");
 }
-function shareMeeting(m) {
-  const text = meetingShareText(m);
+// 대진표·결과 요약: 모임·시간·코트, 세션별 코트 A팀 vs B팀(점수 있으면 점수), 휴식, 끝난 게임이 있으면 개인 성적 전체
+function bracketShareText(m, bracket, scores) {
+  const games = flatGames(bracket, scores);
+  const pair = t => t.join("·");
+  const res = g => {
+    if (!g.o) return "";
+    const sc = ` ${g.score.a}:${g.score.b}`;
+    return g.o === "draw" ? sc + " 무" : g.score.a === g.score.b ? sc + ` (가위바위보 ${pair(g.o === "a" ? g.a : g.b)} 승)` : sc;
+  };
+  const url = location.origin + location.pathname + "#meeting-" + m.id;
+  const done = games.filter(g => g.o).length;
+  const L = [`[SSTC] ${m.kind === "flash" ? "번개" : "정기"} 모임 ${done ? done === games.length ? "경기 결과" : "대진표·결과" : "대진표"}`, `${m.date} ${bracket.times[0]}~${bracket.ends[bracket.ends.length - 1]}`, `${m.place}${m.place ? " · " : ""}코트 ${bracket.courts || 2}면 · 게임당 ${bracket.dur || 30}분 · ${bracket.players.length}명`];
+  bracket.sessions.forEach((ses, s) => {
+    L.push("", `■ ${s + 1}세션 ${bracket.times[s]}~${bracket.ends[s]}`);
+    games.filter(g => g.s === s).forEach(g => L.push(`${g.court}코트  ${pair(g.a)} vs ${pair(g.b)}${res(g)}`));
+    if ((ses.rest || []).length) L.push(`휴식  ${ses.rest.map(i => bracket.players[i]).join(", ")}`);
+  });
+  if (done) {
+    const rows = standings(bracket, scores).filter(r => r.played);
+    L.push("", `■ 개인 성적 (끝난 게임 ${done}/${games.length})`);
+    rows.forEach((r, i) => {
+      const d = r.pf - r.pa;
+      L.push(`${i + 1}. ${r.name} ${r.w}승 ${r.d}무 ${r.l}패 (득실 ${d > 0 ? "+" : ""}${d})`);
+    });
+  }
+  L.push("", `대진표·점수 보기: ${url}`);
+  return L.join("\n");
+}
+// 폰 공유창(카카오톡 선택), 공유창이 없거나 실패하면 클립보드 복사
+function shareText(text, title, what) {
   const copy = () => {
-    const done = () => alert("안내문을 복사했어요. 카카오톡 대화방에 붙여넣어 주세요.");
-    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(done).catch(() => window.prompt("아래 안내문을 복사해 주세요", text));
-    window.prompt("아래 안내문을 복사해 주세요", text);
+    const done = () => alert(`${what}을 복사했어요. 카카오톡 대화방에 붙여넣어 주세요.`);
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(done).catch(() => window.prompt(`아래 ${what}을 복사해 주세요`, text));
+    window.prompt(`아래 ${what}을 복사해 주세요`, text);
   };
   if (navigator.share) return navigator.share({
-    title: "SSTC 모임 안내",
+    title,
     text
   }).catch(e => {
     if (!e || e.name !== "AbortError") copy();
   });
   copy();
+}
+function shareMeeting(m) {
+  shareText(meetingShareText(m), "SSTC 모임 안내", "안내문");
+}
+function shareBracket(m, bracket, scores) {
+  shareText(bracketShareText(m, bracket, scores), "SSTC 대진표", "대진표");
 }
 function MeetingDetail({
   meeting,
@@ -12504,7 +12560,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "124440b9b3";
+const BUILD_ID = "191d41442c";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
