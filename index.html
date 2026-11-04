@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=44a63c39e5">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=44a63c39e5">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=652a11b294">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=652a11b294">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -10457,22 +10457,7 @@ function MeetingForm({
       flexDirection: "column",
       gap: 16
     }
-  }, editing && initial.info.seriesId && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      borderRadius: 18,
-      padding: 14,
-      border: `1.5px solid ${BLUE}`
-    }
   }, /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uC5B4\uB514\uAE4C\uC9C0 \uACE0\uCE60\uAE4C\uC694?",
-    required: true
-  }, /*#__PURE__*/React.createElement(Pills, {
-    label: "\uC218\uC815 \uBC94\uC704",
-    value: f.scope,
-    onChange: v => set("scope", v),
-    options: [["one", "이 날짜만"], ["future", "이후 반복 전체"]]
-  }), hint(f.scope === "one" ? `${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.` : `${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`))), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC885\uB958",
     required: true
   }, /*#__PURE__*/React.createElement(Pills, {
@@ -10777,7 +10762,22 @@ function MeetingForm({
       borderRadius: 18,
       resize: "none"
     }
-  })), err && /*#__PURE__*/React.createElement("p", {
+  })), editing && initial.info.seriesId && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 18,
+      padding: 14,
+      border: `1.5px solid ${BLUE}`
+    }
+  }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC5B4\uB514\uAE4C\uC9C0 \uACE0\uCE60\uAE4C\uC694?",
+    required: true
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uC218\uC815 \uBC94\uC704",
+    value: f.scope,
+    onChange: v => set("scope", v),
+    options: [["one", "이 날짜만"], ["future", "이후 반복 전체"]]
+  }), hint(f.scope === "one" ? `${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.` : `${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`))), err && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -11830,7 +11830,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "44a63c39e5";
+const BUILD_ID = "652a11b294";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
