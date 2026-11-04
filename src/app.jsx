@@ -2307,9 +2307,11 @@ function MemberAttend({meeting,isAdmin}){
       .then(()=>{ if(m.uid!==me) postFeed({type:"attend",to:m.uid,meetingId:meeting.id,text:`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} 모임에 나를 참석으로 등록했어요`}); })
       .catch(e=>alert(authMsg(e)));
   };
-  const k=q.trim().toLowerCase();
-  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(isAdmin||(m.uid!==me&&!absent(m.uid)))&&(!k||[m.nickname,m.ntrp,m.region].some(v=>String(v||"").toLowerCase().includes(k))))
-    .sort((a,b)=>a.nickname.localeCompare(b.nickname,"ko")):[];
+  const k=searchKey(q);
+  // 닉네임·본명 일부만 쳐도 바로 후보가 나와요 (한글 치는 중에도). 앞부분이 맞는 회원이 먼저 나와요.
+  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(isAdmin||(m.uid!==me&&!absent(m.uid))))
+    .map(m=>({m,sc:hgMatch(q,[m.nickname,realNameOf(m)])})).filter(x=>x.sc>=0)
+    .sort((a,b)=>a.sc-b.sc||a.m.nickname.localeCompare(b.m.nickname,"ko")).map(x=>x.m):[];
   return(
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2318,13 +2320,14 @@ function MemberAttend({meeting,isAdmin}){
       </div>
       <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>같이 치기로 한 회원을 대신 넣어 줄 수 있어요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '대신 등록'으로 표시돼요. 등록된 회원에게 알림이 가요. {isAdmin?"빼려면 명단에서 빼기를 눌러요.":"내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."}</p>
       {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
-        <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임으로 찾기" style={inputStyle}/>
+        <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임 또는 본명으로 찾기" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search" style={{...inputStyle,fontSize:16}}/>
+        <p style={{margin:"-2px 0 2px 14px",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>닉네임이나 본명 일부만 써도 돼요. 예: 용빠(전용우)는 용빠, 전용우, 전용, 용우로 찾아져요.</p>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
           {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
           {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"더 넣을 수 있는 회원이 없어요"}</p>}
           {list.map(m=>(
             <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F5F7FE"}}>
-              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
+              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname}{realNameOf(m)&&<span style={{fontSize:13,color:"#4A5578"}}>({realNameOf(m)})</span>} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
               <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px"}}>참석</button>
             </div>
           ))}
@@ -3597,6 +3600,37 @@ const activeMembers=data=>Object.entries((data&&data.members)||{}).map(([uid,m])
 
 // 본명: 없거나 닉네임과 같으면 빈 값 (닉네임만 보여 줘요)
 const realNameOf=m=>{ const r=String((m&&m.realName)||"").trim(); return r&&r!==m.nickname?r:""; };
+// ─── 한글 부분 검색 ──────────────────────────────────────────────────────────
+// 글자를 자음·모음 낱자로 풀어서 비교해요. 그래서 한글을 치는 중간(예: "용ㅃ", "전요")에도 "용빠", "전용우"가 걸려요.
+// 초성만 쳐도(예: "ㅈㅇㅇ") 찾아요. 대소문자·띄어쓰기는 무시해요.
+const HG_CHO="ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const HG_JUNG=["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅗㅏ","ㅗㅐ","ㅗㅣ","ㅛ","ㅜ","ㅜㅓ","ㅜㅔ","ㅜㅣ","ㅠ","ㅡ","ㅡㅣ","ㅣ"];
+const HG_JONG=["","ㄱ","ㄲ","ㄱㅅ","ㄴ","ㄴㅈ","ㄴㅎ","ㄷ","ㄹ","ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅅ","ㄹㅌ","ㄹㅍ","ㄹㅎ","ㅁ","ㅂ","ㅂㅅ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+// 따로 친 겹모음·겹받침 낱자도 풀어 둬요 (ㅘ → ㅗㅏ, ㄳ → ㄱㅅ)
+const HG_SPLIT={"ㅘ":"ㅗㅏ","ㅙ":"ㅗㅐ","ㅚ":"ㅗㅣ","ㅝ":"ㅜㅓ","ㅞ":"ㅜㅔ","ㅟ":"ㅜㅣ","ㅢ":"ㅡㅣ","ㄳ":"ㄱㅅ","ㄵ":"ㄴㅈ","ㄶ":"ㄴㅎ","ㄺ":"ㄹㄱ","ㄻ":"ㄹㅁ","ㄼ":"ㄹㅂ","ㄽ":"ㄹㅅ","ㄾ":"ㄹㅌ","ㄿ":"ㄹㅍ","ㅀ":"ㄹㅎ","ㅄ":"ㅂㅅ"};
+const searchKey=v=>String(v||"").normalize("NFC").toLowerCase().replace(/\s+/g,"");
+const hgJamo=v=>Array.from(searchKey(v)).map(ch=>{
+  const c=ch.charCodeAt(0)-0xAC00;
+  if(c>=0&&c<11172) return HG_CHO[Math.floor(c/588)]+HG_JUNG[Math.floor(c%588/28)]+HG_JONG[c%28];
+  return HG_SPLIT[ch]||ch;
+}).join("");
+const hgCho=v=>Array.from(searchKey(v)).map(ch=>{ const c=ch.charCodeAt(0)-0xAC00; return c>=0&&c<11172?HG_CHO[Math.floor(c/588)]:ch; }).join("");
+const HG_ONLY_CHO=/^[ㄱ-ㅎ]+$/;
+// 찾는 말 q가 values 중 하나에 들어 있으면 점수(작을수록 앞), 없으면 -1
+// 0: 닉네임·본명이 그 말로 시작 / 1: 중간에 들어 있음 / 2: 초성으로 맞음
+const hgMatch=(q,values)=>{
+  const k=searchKey(q); if(!k) return 0;
+  const kj=hgJamo(k), onlyCho=HG_ONLY_CHO.test(k);
+  let best=-1;
+  values.forEach(v=>{
+    if(!v) return;
+    const j=hgJamo(v); let sc=-1;
+    if(j.startsWith(kj)) sc=0; else if(j.includes(kj)) sc=1;
+    else if(onlyCho&&k.length>1&&hgCho(v).includes(k)) sc=2;
+    if(sc>=0&&(best<0||sc<best)) best=sc;
+  });
+  return best;
+};
 const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
 // ─── 소곤소곤 (회원 탭 게시판) ─────────────────────────────────────────────────
 // club/board/<pid> = {uid,name,text,at,editedAt,anon,mentions:{uid:true},likes:{uid:true},comments:{<cid>:{uid,name,text,at,editedAt,anon,mentions}}}
