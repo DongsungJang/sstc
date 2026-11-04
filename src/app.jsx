@@ -2417,6 +2417,19 @@ let MAP_VIEW=null;   // 모임 상세에 갔다가 "지도"로 돌아오면 보�
 const MAP_FILTERS=[["all","전체"],["regular","정기"],["game","번개 게임"],["training","번개 훈련"]];
 const pinSvg=(color,big)=>{ const w=big?44:34,h=big?56:44;
   return `<svg width="${w}" height="${h}" viewBox="0 0 34 44" aria-hidden="true"><path d="M17 43s14-14.2 14-26A14 14 0 0 0 3 17c0 11.8 14 26 14 26z" fill="${color}" stroke="#fff" stroke-width="2.4"/><circle cx="17" cy="17" r="8.2" fill="#D7F24A"/><path d="M11.3 12.2a8.2 8.2 0 0 1 0 9.6M22.7 12.2a8.2 8.2 0 0 0 0 9.6" fill="none" stroke="#fff" stroke-width="1.6"/></svg>`; };
+// 핀이 다 보이게 중심·레벨을 직접 계산해요 (일부 폰에서 setBounds 뒤 중심이 NaN이 되는 일이 있어서 안 써요)
+// 카카오 레벨 L ≈ 1픽셀에 127m × 2^(L-10)
+const llOk=c=>{ try{ return Number.isFinite(c.getLat())&&Number.isFinite(c.getLng()); }catch(e){ return false; } };
+function fitPins(map,k,pts,el){
+  if(!pts.length) return;
+  const la=pts.map(p=>p.lat), ln=pts.map(p=>p.lng);
+  const mnA=Math.min(...la), mxA=Math.max(...la), mnN=Math.min(...ln), mxN=Math.max(...ln);
+  const mid=new k.maps.LatLng((mnA+mxA)/2,(mnN+mxN)/2);
+  const w=Math.max(120,((el&&el.clientWidth)||360)-90), h=Math.max(120,((el&&el.clientHeight)||400)-150);
+  const need=Math.max((mxA-mnA)*111000/h,(mxN-mnN)*111000*Math.cos(mid.getLat()*Math.PI/180)/w,1);
+  const level=Math.min(13,Math.max(4,Math.ceil(Math.log2(need/127)+10)));
+  map.setLevel(level); map.setCenter(mid);
+}
 const escHtml=v=>String(v||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function myState(m){
   const wi=(m.waitlist||[]).findIndex(a=>a.isMe);
@@ -2475,17 +2488,18 @@ function CourtMap({onOpen}){
     let alive=true; setStatus("loading");
     if(retry){ try{ document.querySelectorAll('script[src*="dapi.kakao.com"]').forEach(x=>x.remove()); if(window.kakao&&!(window.kakao.maps&&window.kakao.maps.services)) delete window.kakao; }catch(e){} }
     loadKakao().then(k=>{ if(!alive||!box.current) return;
-      const v=MAP_VIEW||MAP_HOME;
+      const v=MAP_VIEW&&Number.isFinite(MAP_VIEW.lat)&&Number.isFinite(MAP_VIEW.lng)?MAP_VIEW:MAP_HOME;
       const map=new k.maps.Map(box.current,{center:new k.maps.LatLng(v.lat,v.lng),level:v.level});
       k.maps.event.addListener(map,"click",()=>setSel(null));
       mapRef.current=map; setStatus("ready");
       // 폰에서 처음 그릴 때 크기를 잘못 잡으면 바탕 지도가 비어 보여서, 잠깐 뒤에 크기를 다시 맞춰 다시 그려요
-      const fix=()=>{ const m=mapRef.current; if(!m) return; try{ const c=m.getCenter(); m.relayout(); m.setCenter(c); }catch(e){} };
+      const fix=()=>{ const m=mapRef.current; if(!m) return; try{ const c=m.getCenter(); m.relayout();
+        m.setCenter(llOk(c)?c:new k.maps.LatLng(MAP_HOME.lat,MAP_HOME.lng)); if(!llOk(m.getCenter())) m.setCenter(new k.maps.LatLng(MAP_HOME.lat,MAP_HOME.lng)); }catch(e){} };
       [60,400,1200].forEach(t=>setTimeout(fix,t));
       relayoutRef.current=fix; window.addEventListener("resize",fix); window.addEventListener("orientationchange",fix);
     }).catch(()=>alive&&setStatus("fail"));
     return ()=>{ alive=false; const map=mapRef.current;
-      if(map){ try{ const c=map.getCenter(); MAP_VIEW={...(MAP_VIEW||{}),lat:c.getLat(),lng:c.getLng(),level:map.getLevel()}; }catch(e){} }
+      if(map){ try{ const c=map.getCenter(); if(llOk(c)) MAP_VIEW={...(MAP_VIEW||{}),lat:c.getLat(),lng:c.getLng(),level:map.getLevel()}; }catch(e){} }
       if(relayoutRef.current){ window.removeEventListener("resize",relayoutRef.current); window.removeEventListener("orientationchange",relayoutRef.current); relayoutRef.current=null; }
       overlays.current.forEach(o=>o.setMap(null)); overlays.current=[]; mapRef.current=null; };
   },[retry]);
@@ -2517,13 +2531,13 @@ function CourtMap({onOpen}){
     });
     // 처음 한 번은 핀이 다 보이게 맞춰요
     if(!fitted.current&&groups.length&&!pending.length){ fitted.current=true;
-      if(groups.length===1) map.setCenter(new k.maps.LatLng(groups[0].lat,groups[0].lng)),map.setLevel(5);
-      else{ const b=new k.maps.LatLngBounds(); groups.forEach(g=>b.extend(new k.maps.LatLng(g.lat,g.lng))); map.setBounds(b,60,40,60,40); } }
+      fitPins(map,k,groups,box.current); }
+    if(!llOk(map.getCenter())) fitPins(map,k,groups.length?groups:[MAP_HOME],box.current);
   },[status,sig,pending.length]);
   useEffect(()=>{ if(sel&&!cur) setSel(null); },[sel,!!cur]);
   useEffect(()=>{ setPage(0); if(strip.current) strip.current.scrollLeft=0; },[sel]);
   const fitAll=()=>{ const map=mapRef.current,k=window.kakao; if(!map||!groups.length) return;
-    const b=new k.maps.LatLngBounds(); groups.forEach(g=>b.extend(new k.maps.LatLng(g.lat,g.lng))); map.setBounds(b,60,40,60,40); };
+    fitPins(map,k,groups,box.current); };
   const locate=()=>{ const map=mapRef.current,k=window.kakao; if(!map) return;
     if(!navigator.geolocation) return fitAll();
     setLocating(true);
