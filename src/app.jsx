@@ -140,13 +140,17 @@ const won=n=>Number(n||0).toLocaleString("ko-KR")+"원";
 const KIND_COLOR={regular:{dot:BLUE,bg:BLUE_LIGHT,c:BLUE},game:{dot:"#F59E0B",bg:"#FFF4E5",c:"#C2610C"},training:{dot:"#12B76A",bg:"#E5F7EE",c:"#067647"}};
 const kindKey=m=>m&&m.kind==="flash"?(m.flashType==="training"?"training":"game"):"regular";
 const kindOf=info=>info&&info.kind==="flash"?"flash":"regular";
+// 한국 시간 기준 지금 "YYYY-MM-DDTHH:MM" (폰 시간대 설정과 상관없이)
+const kstNow=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,16);
+// 종료 시간이 지났으면 지난 모임 (종료 시간이 없으면 그날이 지나야 지난 모임)
+const isEnded=info=>{ const n=kstNow(), d=n.slice(0,10); return info.date<d||(info.date===d&&!!info.end&&n.slice(11,16)>=info.end); };
 function toMeeting(id,rec,series){
-  const info=rec.info, today=todayYmd(), capacity=+info.capacity||0, guestCap=+info.guestCap||0;
+  const info=rec.info, capacity=+info.capacity||0, guestCap=+info.guestCap||0;
   return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`,
     place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:"")+(info.surface?` · ${info.surface}`:""), surface:info.surface||"", placeName:info.place, courtNo:info.courtNo||"", address:info.address||"", lat:info.lat!=null&&Number.isFinite(+info.lat)?+info.lat:null, lng:info.lng!=null&&Number.isFinite(+info.lng)?+info.lng:null,
     kind:kindOf(info), flashType:info.kind==="flash"?(info.flashType||"game"):"", courtFee:+info.courtFee||0, capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
-    status:(info.date<today||(info.date===today&&info.end&&nowAt().slice(11,16)>=info.end))?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
+    status:isEnded(info)?"past":"upcoming", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
     cancelled:info.cancel&&info.cancel.at?info.cancel:null, votes:votesFromRec(rec) };
 }
 // 다가오는 모임은 가까운 날짜부터, 지난 모임은 최근 것부터
@@ -1249,6 +1253,13 @@ function useMeetingList(){
     });
     return ()=>{alive=false;if(unsub)unsub();};
   },[uid]);
+  // 앱을 켜 둔 채로 모임 종료 시간이 지나면 1분 안에 "지난 모임"으로 옮겨요 (다시 열었을 때도 바로)
+  useEffect(()=>{
+    const tick=()=>{ if(MEETINGS.some(m=>m.status==="upcoming"&&isEnded(m.info))) setState(s=>({...s,meetings:buildMeetings(RAW_MEETINGS)})); };
+    const t=setInterval(tick,60000), vis=()=>document.visibilityState==="visible"&&tick();
+    document.addEventListener("visibilitychange",vis); window.addEventListener("focus",tick);
+    return ()=>{clearInterval(t);document.removeEventListener("visibilitychange",vis);window.removeEventListener("focus",tick);};
+  },[]);
   return state;
 }
 
@@ -2638,17 +2649,18 @@ function MiniCalendar({onOpen}){
       </div>
       {picked&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:"#1B2559"}}>{fmtDate(pick)} 모임 {picked.length}개</p>
-        {picked.map(m=>{ const full=isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled; return(
-          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
+        {picked.map(m=>{ const past=m.status==="past", full=!past&&isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled; return(
+          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:past?"#F5F7FE":"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
             <span style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
               <KindBadge m={m}/>
               <span style={{fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{m.time}</span>
               {gone?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:GONE.c,color:"#fff",whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
+                :past?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:"#E4E9F7",color:"#6B7493",whiteSpace:"nowrap"}}>종료 · {m.attendees.length}명 참석</span>
                 :<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE}}>{full?"마감 ":""}{m.attendees.length}/{m.total}명</span>}
             </span>
             <span style={{fontSize:14,color:"#4A5578",display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={14}/>{m.placeName||m.place}</span>
             <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",fontSize:12}}>
-              <span style={{color:gone?GONE.c:isAtt?BLUE:"#A3AAC2",fontWeight:isAtt||gone?700:400}}>{gone?"무산된 모임이에요":isAtt?"참석 예정이에요":m.status==="past"?"지난 모임":"아직 참석 안 했어요"}</span>
+              <span style={{color:gone?GONE.c:isAtt?BLUE:"#A3AAC2",fontWeight:isAtt||gone?700:400}}>{gone?"무산된 모임이에요":past?(isAtt?"참석했어요":"지난 모임이에요"):isAtt?"참석 예정이에요":"아직 참석 안 했어요"}</span>
               <span style={{color:BLUE,fontWeight:600}}>자세히 보기 →</span>
             </span>
           </button>);})}
@@ -2911,7 +2923,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                     <p style={{margin:"0 0 3px",fontWeight:600,fontSize:14,color:"#6B7493"}}>{m.date}</p>
                     <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}{m.cancelled?"":` · ${m.attendees.length}명 참석`}</p>
                   </div>
-                  <span style={{background:m.cancelled?GONE.c:"#E4E9F7",color:m.cancelled?"#fff":"#A3AAC2",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{m.cancelled?goneLabel(m):"종료"}</span>
+                  <span style={{background:m.cancelled?GONE.c:"#E4E9F7",color:m.cancelled?"#fff":"#A3AAC2",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{m.cancelled?goneLabel(m):(m.attendees||[]).some(x=>x.isMe)?"참석했어요":"종료"}</span>
                 </div>
               </div>
             ))}

@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=93848f845a">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=93848f845a">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=8afa7e0fbf">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=8afa7e0fbf">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -371,9 +371,16 @@ const KIND_COLOR = {
 };
 const kindKey = m => m && m.kind === "flash" ? m.flashType === "training" ? "training" : "game" : "regular";
 const kindOf = info => info && info.kind === "flash" ? "flash" : "regular";
+// 한국 시간 기준 지금 "YYYY-MM-DDTHH:MM" (폰 시간대 설정과 상관없이)
+const kstNow = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16);
+// 종료 시간이 지났으면 지난 모임 (종료 시간이 없으면 그날이 지나야 지난 모임)
+const isEnded = info => {
+  const n = kstNow(),
+    d = n.slice(0, 10);
+  return info.date < d || info.date === d && !!info.end && n.slice(11, 16) >= info.end;
+};
 function toMeeting(id, rec, series) {
   const info = rec.info,
-    today = todayYmd(),
     capacity = +info.capacity || 0,
     guestCap = +info.guestCap || 0;
   return {
@@ -401,7 +408,7 @@ function toMeeting(id, rec, series) {
     desc: info.desc || "",
     openAt: info.openAt || "",
     openDate: fmtOpen(info.openAt),
-    status: info.date < today || info.date === today && info.end && nowAt().slice(11, 16) >= info.end ? "past" : "upcoming",
+    status: isEnded(info) ? "past" : "upcoming",
     createdBy: info.createdBy || "",
     createdByUid: info.createdByUid || "",
     cancelled: info.cancel && info.cancel.at ? info.cancel : null,
@@ -3557,6 +3564,24 @@ function useMeetingList() {
       if (unsub) unsub();
     };
   }, [uid]);
+  // 앱을 켜 둔 채로 모임 종료 시간이 지나면 1분 안에 "지난 모임"으로 옮겨요 (다시 열었을 때도 바로)
+  useEffect(() => {
+    const tick = () => {
+      if (MEETINGS.some(m => m.status === "upcoming" && isEnded(m.info))) setState(s => ({
+        ...s,
+        meetings: buildMeetings(RAW_MEETINGS)
+      }));
+    };
+    const t = setInterval(tick, 60000),
+      vis = () => document.visibilityState === "visible" && tick();
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("focus", tick);
+    };
+  }, []);
   return state;
 }
 
@@ -8281,7 +8306,8 @@ function MiniCalendar({
       color: "#1B2559"
     }
   }, fmtDate(pick), " \uBAA8\uC784 ", picked.length, "\uAC1C"), picked.map(m => {
-    const full = isFull(m),
+    const past = m.status === "past",
+      full = !past && isFull(m),
       isAtt = (m.attendees || []).some(a => a.isMe),
       gone = m.cancelled;
     return /*#__PURE__*/React.createElement("button", {
@@ -8295,7 +8321,7 @@ function MiniCalendar({
         padding: "12px 14px",
         borderRadius: 16,
         border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "#E4E9F7"}`,
-        background: gone ? GONE.bg : full ? FULL.bg : "#fff",
+        background: gone ? GONE.bg : full ? FULL.bg : past ? "#F5F7FE" : "#fff",
         cursor: "pointer",
         textAlign: "left",
         boxShadow: "0 2px 8px rgba(33,82,230,0.06)",
@@ -8328,7 +8354,18 @@ function MiniCalendar({
         color: "#fff",
         whiteSpace: "nowrap"
       }
-    }, goneLabel(m)) : /*#__PURE__*/React.createElement("span", {
+    }, goneLabel(m)) : past ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "3px 10px",
+        borderRadius: 999,
+        background: "#E4E9F7",
+        color: "#6B7493",
+        whiteSpace: "nowrap"
+      }
+    }, "\uC885\uB8CC \xB7 ", m.attendees.length, "\uBA85 \uCC38\uC11D") : /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: "auto",
         fontSize: 12,
@@ -8362,7 +8399,7 @@ function MiniCalendar({
         color: gone ? GONE.c : isAtt ? BLUE : "#A3AAC2",
         fontWeight: isAtt || gone ? 700 : 400
       }
-    }, gone ? "무산된 모임이에요" : isAtt ? "참석 예정이에요" : m.status === "past" ? "지난 모임" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
+    }, gone ? "무산된 모임이에요" : past ? isAtt ? "참석했어요" : "지난 모임이에요" : isAtt ? "참석 예정이에요" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
       style: {
         color: BLUE,
         fontWeight: 600
@@ -9465,7 +9502,7 @@ function BookingTab({
       borderRadius: 20,
       whiteSpace: "nowrap"
     }
-  }, m.cancelled ? goneLabel(m) : "종료")))))));
+  }, m.cancelled ? goneLabel(m) : (m.attendees || []).some(x => x.isMe) ? "참석했어요" : "종료")))))));
 }
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
@@ -12609,7 +12646,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "93848f845a";
+const BUILD_ID = "8afa7e0fbf";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
