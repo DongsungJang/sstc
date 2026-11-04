@@ -2452,6 +2452,13 @@ function CourtMap({onOpen}){
   const [page,setPage]=useState(0);
   const [, setTick]=useState(0);
   const [locating,setLocating]=useState(false);
+  const [diag,setDiag]=useState("");
+  useEffect(()=>{ if(status!=="ready") return;
+    const t=setInterval(()=>{ const map=mapRef.current, el=box.current; if(!map||!el) return;
+      try{ const c=map.getCenter(), imgs=[...el.querySelectorAll("img")], ok=imgs.filter(i=>i.complete&&i.naturalWidth>0).length, bad=imgs.filter(i=>i.complete&&i.naturalWidth===0).length;
+        setDiag(`중심 ${c.getLat().toFixed(3)}, ${c.getLng().toFixed(3)} · 레벨 ${map.getLevel()} · 크기 ${el.clientWidth}×${el.clientHeight} · 그림 ${ok}/${imgs.length}${bad?` (실패 ${bad})`:""} · 핀 ${overlays.current.length} · 검색 ${GEO_STATS.ok}/${GEO_STATS.zero}/${GEO_STATS.err}${GEO_STATS.last?` ${GEO_STATS.last}`:""}`);
+      }catch(e){ setDiag("상태 읽기 실패: "+e.message); } },1500);
+    return ()=>clearInterval(t); },[status]);
   const all=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).sort((a,b)=>(a.iso+(a.info.start||"")).localeCompare(b.iso+(b.info.start||"")));
   const shown=all.filter(m=>filter==="all"||kindKey(m)===filter);
   // 좌표: 모임에 저장된 것 → 이 기기에 찾아 둔 것 → (지도 준비되면) 이름으로 검색
@@ -2459,7 +2466,7 @@ function CourtMap({onOpen}){
   const pending=shown.filter(m=>llOf(m)===undefined);
   const lost=shown.filter(m=>llOf(m)===null);
   const groups=[];
-  shown.forEach(m=>{ const ll=llOf(m); if(!ll) return; const key=ll.lat.toFixed(4)+","+ll.lng.toFixed(4);
+  shown.forEach(m=>{ const ll=llOf(m); if(!ll||!Number.isFinite(ll.lat)||!Number.isFinite(ll.lng)) return; const key=ll.lat.toFixed(4)+","+ll.lng.toFixed(4);
     let g=groups.find(x=>x.key===key); if(!g) groups.push(g={key,lat:ll.lat,lng:ll.lng,name:m.placeName||m.place,list:[]}); g.list.push(m); });
   const cur=groups.find(g=>g.key===sel)||null;
   // SDK 불러오고 지도 만들기
@@ -2555,6 +2562,7 @@ function CourtMap({onOpen}){
         {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:999,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
       </div>}
     </div>
+    {diag&&<p style={{margin:"-6px 4px 0",fontSize:10,color:"#A3AAC2",lineHeight:1.5,wordBreak:"break-all"}}>{diag}</p>}
     {status==="ready"&&lost.length>0&&<div>
       <p style={{margin:"0 0 4px",fontSize:15,fontWeight:700,color:"#1B2559"}}>위치를 찾지 못한 모임 {lost.length}</p>
       <p style={{margin:"0 0 10px",fontSize:12,color:"#8A93B2"}}>모임 수정에서 테니스장을 카카오 장소 검색으로 고르면 지도에 나와요.</p>
@@ -3043,29 +3051,41 @@ function loadKakao(){
 }
 // 카카오 장소 검색 결과 → {name, address, lat, lng}
 const kakaoPlace=d=>({name:d.place_name,address:d.road_address_name||d.address_name||"",lat:+d.y,lng:+d.x,category:d.category_name||""});
-function kakaoSearch(q,size=6){
+// 지도 상태 확인용 (지도 아래 작은 줄에 보여줘요)
+const GEO_STATS={ok:0,zero:0,err:0,last:""};
+function kakaoSearchRaw(q,size){
   return loadKakao().then(k=>new Promise(ok=>{
-    new k.maps.services.Places().keywordSearch(q,(data,status)=>ok(status===k.maps.services.Status.OK?(data||[]).map(kakaoPlace):[]),{size});
+    new k.maps.services.Places().keywordSearch(q,(data,status)=>{
+      const S=k.maps.services.Status;
+      if(status===S.OK) GEO_STATS.ok++; else if(status===S.ZERO_RESULT) GEO_STATS.zero++; else { GEO_STATS.err++; GEO_STATS.last=String(status); }
+      ok({status:status===S.OK?"ok":status===S.ZERO_RESULT?"zero":"err",list:status===S.OK?(data||[]).map(kakaoPlace):[]});
+    },{size});
   }));
 }
+function kakaoSearch(q,size=6){ return kakaoSearchRaw(q,size).then(r=>{ if(r.status==="err") throw new Error("search"); return r.list; }); }
 function kakaoAddress(addr){
-  return loadKakao().then(k=>new Promise(ok=>{
-    new k.maps.services.Geocoder().addressSearch(addr,(data,status)=>ok(status===k.maps.services.Status.OK&&data&&data[0]?{lat:+data[0].y,lng:+data[0].x}:null));
+  return loadKakao().then(k=>new Promise((ok,no)=>{
+    new k.maps.services.Geocoder().addressSearch(addr,(data,status)=>{ const S=k.maps.services.Status;
+      if(status!==S.OK&&status!==S.ZERO_RESULT){ GEO_STATS.err++; GEO_STATS.last="주소 "+status; return no(new Error("geocode")); }
+      ok(status===S.OK&&data&&data[0]?{lat:+data[0].y,lng:+data[0].x}:null); });
   }));
 }
 // 좌표가 없는 예전 모임: 코트 이름(안 되면 주소)으로 찾아서 이 기기에 저장해 둬요. 못 찾은 곳은 하루 뒤에 다시 찾아봐요.
-const GEO_KEY="sstc-geo";
+const GEO_KEY="sstc-geo2";   // 예전 sstc-geo에는 검색 오류도 "못 찾음"으로 남았을 수 있어서 새로 시작해요
 const geoCache=(()=>{ try{ return JSON.parse(localStorage.getItem(GEO_KEY)||"{}")||{}; }catch(e){ return {}; } })();
 const geoSave=()=>{ try{ localStorage.setItem(GEO_KEY,JSON.stringify(geoCache)); }catch(e){} };
 const hasLL=m=>Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&!!(m.lat||m.lng);
 function geoKey(m){ return placeKey(m.placeName)+"|"+placeKey(m.address); }
-function geoCached(m){ const c=geoCache[geoKey(m)]; if(!c) return undefined;
+const geoFailed=new Set();   // 검색 오류(못 찾은 게 아니라 요청이 실패)는 이번 화면에서만 "못 찾음"으로, 저장은 안 해요
+function geoCached(m){ if(geoFailed.has(geoKey(m))) return null; const c=geoCache[geoKey(m)]; if(!c) return undefined;
   if(c.miss) return Date.now()-c.at<86400000?null:undefined;
   return {lat:c.lat,lng:c.lng}; }
 function geoFind(m){
   const name=String(m.placeName||"").trim();
   return (name?kakaoSearch(name,1):Promise.resolve([])).then(r=>r[0]?{lat:r[0].lat,lng:r[0].lng}:(m.address?kakaoAddress(m.address.replace(/\s*\(.*\)\s*$/,"")):null))
-    .then(ll=>{ geoCache[geoKey(m)]=ll?{lat:ll.lat,lng:ll.lng}:{miss:true,at:Date.now()}; geoSave(); return ll; });
+    .then(ll=>{ if(ll&&!(Number.isFinite(ll.lat)&&Number.isFinite(ll.lng))) ll=null;
+      geoCache[geoKey(m)]=ll?{lat:ll.lat,lng:ll.lng}:{miss:true,at:Date.now()}; geoSave(); return ll; },
+      e=>{ geoFailed.add(geoKey(m)); return null; });
 }
 // 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요: 위에는 이전에 쓴 테니스장, 아래에는 카카오 장소 검색 결과
 // 카카오 결과를 고르면 이름·주소·좌표가 같이 들어가서 예약 탭 지도에 핀으로 나와요
