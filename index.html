@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=5b050a9697">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=5b050a9697">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=ae409c9d5d">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=ae409c9d5d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -5844,9 +5844,11 @@ function MeetingBracket({
   }), " ", modeNote);
   const [how, setHow] = useState("auto"); // 새로 만들 때: "auto" 자동 편성 | "manual" 직접 작성
   const [editing, setEditing] = useState(false); // 만든 대진표 수정 중
+  // 대진표를 만들고·고치고·지우는 건 이 모임 참가자(참석 확정자, 또는 대진표에 이름이 있는 사람)만
+  const canManage = participants.some(p => p.isMe) || !!(bracket && (bracket.players || []).includes(ME));
   useEffect(() => {
-    if (!bracket) setEditing(false);
-  }, [!!bracket]);
+    if (!bracket || !canManage) setEditing(false);
+  }, [!!bracket, canManage]);
   const howTabs = /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5871,6 +5873,40 @@ function MeetingBracket({
       boxShadow: how === k ? "0 2px 8px rgba(40,70,180,0.12)" : "none"
     }
   }, l)));
+  if (!bracket && !canManage) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement(Card, {
+    style: {
+      textAlign: "center",
+      padding: "28px 18px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8,
+      color: BLUE
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "ball",
+    size: 36,
+    stroke: 1.6
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 4px",
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, "\uC544\uC9C1 \uB300\uC9C4\uD45C\uAC00 \uC5C6\uC5B4\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, "\uB300\uC9C4\uD45C\uB294 \uC774 \uBAA8\uC784 \uCC38\uAC00\uC790\uAC00 \uB9CC\uB4E4\uC5B4\uC694.", /*#__PURE__*/React.createElement("br", null), "\uB9CC\uB4E4\uC5B4\uC9C0\uBA74 \uC5EC\uAE30\uC5D0\uC11C \uBCFC \uC218 \uC788\uC5B4\uC694.")));
   if (!bracket) return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5887,7 +5923,7 @@ function MeetingBracket({
     participants: participants,
     onSave: saveBracket
   }), note);
-  if (editing) return /*#__PURE__*/React.createElement("div", {
+  if (editing && canManage) return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -6218,7 +6254,7 @@ function MeetingBracket({
     name: "share",
     size: 16,
     stroke: 2
-  }), done ? "대진표·결과" : "대진표", " \uCE74\uD1A1\uC73C\uB85C \uACF5\uC720"), /*#__PURE__*/React.createElement("div", {
+  }), done ? "대진표·결과" : "대진표", " \uCE74\uD1A1\uC73C\uB85C \uACF5\uC720"), canManage && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -12562,7 +12598,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "5b050a9697";
+const BUILD_ID = "ae409c9d5d";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

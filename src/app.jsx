@@ -2021,12 +2021,23 @@ function MeetingBracket({meeting,participants,store}) {
   const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}><Ic n={mode==="shared"?"cloud":"phone"} s={12}/> {modeNote}</p>;
   const [how,setHow]=useState("auto");          // 새로 만들 때: "auto" 자동 편성 | "manual" 직접 작성
   const [editing,setEditing]=useState(false);   // 만든 대진표 수정 중
-  useEffect(()=>{ if(!bracket) setEditing(false); },[!!bracket]);
+  // 대진표를 만들고·고치고·지우는 건 이 모임 참가자(참석 확정자, 또는 대진표에 이름이 있는 사람)만
+  const canManage=participants.some(p=>p.isMe)||!!(bracket&&(bracket.players||[]).includes(ME));
+  useEffect(()=>{ if(!bracket||!canManage) setEditing(false); },[!!bracket,canManage]);
   const howTabs=(
     <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
       {[["auto","자동 편성"],["manual","직접 작성"]].map(([k,l])=>(
         <button key={k} type="button" onClick={()=>setHow(k)} style={{flex:1,padding:"8px 0",borderRadius:999,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:how===k?"#fff":"transparent",color:how===k?BLUE:"#6B7493",boxShadow:how===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
       ))}
+    </div>
+  );
+  if(!bracket&&!canManage) return (
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <Card style={{textAlign:"center",padding:"28px 18px"}}>
+        <div style={{marginBottom:8,color:BLUE}}><Icon name="ball" size={36} stroke={1.6}/></div>
+        <p style={{margin:"0 0 4px",fontWeight:700,color:"#1B2559"}}>아직 대진표가 없어요</p>
+        <p style={{margin:0,fontSize:13,color:"#6B7493",lineHeight:1.6}}>대진표는 이 모임 참가자가 만들어요.<br/>만들어지면 여기에서 볼 수 있어요.</p>
+      </Card>
     </div>
   );
   if(!bracket) return (
@@ -2038,7 +2049,7 @@ function MeetingBracket({meeting,participants,store}) {
       {note}
     </div>
   );
-  if(editing) return (
+  if(editing&&canManage) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={{background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
         <b>대진표 수정 중</b> · 자리를 바꾸고 아래 <b>수정 저장</b>을 눌러 주세요. 그대로인 경기의 점수는 남아요.
@@ -2116,10 +2127,10 @@ function MeetingBracket({meeting,participants,store}) {
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
         <button type="button" onClick={()=>shareBracket(meeting,bracket,scores)} style={{...btnPrimary,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>{done?"대진표·결과":"대진표"} 카톡으로 공유</button>
-        <div style={{display:"flex",gap:8}}>
+        {canManage&&<div style={{display:"flex",gap:8}}>
           <button type="button" onClick={()=>{setEditing(true);window.scrollTo(0,0);}} style={{...btnSecondary,padding:"11px 0",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={15}/>대진표 수정</button>
           <button type="button" onClick={()=>setConfirm(true)} style={{...btnSecondary,padding:"11px 0",fontSize:13,color:"#ef4444",borderColor:"#FCA5A5"}}>지우고 다시 만들기</button>
-        </div>
+        </div>}
         </div>
       )}
       {note}
