@@ -2320,7 +2320,8 @@ function MemberAttend({meeting,isAdmin}){
       </div>
       <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>같이 치기로 한 회원을 대신 넣어 줄 수 있어요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '대신 등록'으로 표시돼요. 등록된 회원에게 알림이 가요. {isAdmin?"빼려면 명단에서 빼기를 눌러요.":"내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."}</p>
       {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
-        <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임 또는 본명으로 찾기 (예: 용빠, 전용)" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search" style={{...inputStyle,fontSize:16}}/>
+        <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임 또는 본명으로 찾기" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search" style={{...inputStyle,fontSize:16}}/>
+        <p style={{margin:"-2px 0 2px 14px",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>닉네임이나 본명 일부만 써도 돼요. 예: 용빠(전용우)는 용빠, 전용우, 전용, 용우로 찾아져요.</p>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
           {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
           {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"더 넣을 수 있는 회원이 없어요"}</p>}
