@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=3e58231a35">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=3e58231a35">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=652a11b294">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=652a11b294">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -7771,6 +7771,25 @@ function CourtMap({
   const [page, setPage] = useState(0);
   const [, setTick] = useState(0);
   const [locating, setLocating] = useState(false);
+  const [diag, setDiag] = useState("");
+  useEffect(() => {
+    if (status !== "ready") return;
+    const t = setInterval(() => {
+      const map = mapRef.current,
+        el = box.current;
+      if (!map || !el) return;
+      try {
+        const c = map.getCenter(),
+          imgs = [...el.querySelectorAll("img")],
+          ok = imgs.filter(i => i.complete && i.naturalWidth > 0).length,
+          bad = imgs.filter(i => i.complete && i.naturalWidth === 0).length;
+        setDiag(`중심 ${c.getLat().toFixed(3)}, ${c.getLng().toFixed(3)} · 레벨 ${map.getLevel()} · 크기 ${el.clientWidth}×${el.clientHeight} · 그림 ${ok}/${imgs.length}${bad ? ` (실패 ${bad})` : ""} · 핀 ${overlays.current.length} · 검색 ${GEO_STATS.ok}/${GEO_STATS.zero}/${GEO_STATS.err}${GEO_STATS.last ? ` ${GEO_STATS.last}` : ""}`);
+      } catch (e) {
+        setDiag("상태 읽기 실패: " + e.message);
+      }
+    }, 1500);
+    return () => clearInterval(t);
+  }, [status]);
   const all = MEETINGS.filter(m => m.status === "upcoming" && !m.cancelled).sort((a, b) => (a.iso + (a.info.start || "")).localeCompare(b.iso + (b.info.start || "")));
   const shown = all.filter(m => filter === "all" || kindKey(m) === filter);
   // 좌표: 모임에 저장된 것 → 이 기기에 찾아 둔 것 → (지도 준비되면) 이름으로 검색
@@ -7783,7 +7802,7 @@ function CourtMap({
   const groups = [];
   shown.forEach(m => {
     const ll = llOf(m);
-    if (!ll) return;
+    if (!ll || !Number.isFinite(ll.lat) || !Number.isFinite(ll.lng)) return;
     const key = ll.lat.toFixed(4) + "," + ll.lng.toFixed(4);
     let g = groups.find(x => x.key === key);
     if (!g) groups.push(g = {
@@ -8205,7 +8224,15 @@ function CourtMap({
       background: i === page ? BLUE : "#D6DEF7",
       transition: "width .2s"
     }
-  }))))), status === "ready" && lost.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }))))), diag && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "-6px 4px 0",
+      fontSize: 10,
+      color: "#A3AAC2",
+      lineHeight: 1.5,
+      wordBreak: "break-all"
+    }
+  }, diag), status === "ready" && lost.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 4px",
       fontSize: 15,
@@ -9900,23 +9927,54 @@ const kakaoPlace = d => ({
   lng: +d.x,
   category: d.category_name || ""
 });
-function kakaoSearch(q, size = 6) {
+// 지도 상태 확인용 (지도 아래 작은 줄에 보여줘요)
+const GEO_STATS = {
+  ok: 0,
+  zero: 0,
+  err: 0,
+  last: ""
+};
+function kakaoSearchRaw(q, size) {
   return loadKakao().then(k => new Promise(ok => {
-    new k.maps.services.Places().keywordSearch(q, (data, status) => ok(status === k.maps.services.Status.OK ? (data || []).map(kakaoPlace) : []), {
+    new k.maps.services.Places().keywordSearch(q, (data, status) => {
+      const S = k.maps.services.Status;
+      if (status === S.OK) GEO_STATS.ok++;else if (status === S.ZERO_RESULT) GEO_STATS.zero++;else {
+        GEO_STATS.err++;
+        GEO_STATS.last = String(status);
+      }
+      ok({
+        status: status === S.OK ? "ok" : status === S.ZERO_RESULT ? "zero" : "err",
+        list: status === S.OK ? (data || []).map(kakaoPlace) : []
+      });
+    }, {
       size
     });
   }));
 }
+function kakaoSearch(q, size = 6) {
+  return kakaoSearchRaw(q, size).then(r => {
+    if (r.status === "err") throw new Error("search");
+    return r.list;
+  });
+}
 function kakaoAddress(addr) {
-  return loadKakao().then(k => new Promise(ok => {
-    new k.maps.services.Geocoder().addressSearch(addr, (data, status) => ok(status === k.maps.services.Status.OK && data && data[0] ? {
-      lat: +data[0].y,
-      lng: +data[0].x
-    } : null));
+  return loadKakao().then(k => new Promise((ok, no) => {
+    new k.maps.services.Geocoder().addressSearch(addr, (data, status) => {
+      const S = k.maps.services.Status;
+      if (status !== S.OK && status !== S.ZERO_RESULT) {
+        GEO_STATS.err++;
+        GEO_STATS.last = "주소 " + status;
+        return no(new Error("geocode"));
+      }
+      ok(status === S.OK && data && data[0] ? {
+        lat: +data[0].y,
+        lng: +data[0].x
+      } : null);
+    });
   }));
 }
 // 좌표가 없는 예전 모임: 코트 이름(안 되면 주소)으로 찾아서 이 기기에 저장해 둬요. 못 찾은 곳은 하루 뒤에 다시 찾아봐요.
-const GEO_KEY = "sstc-geo";
+const GEO_KEY = "sstc-geo2"; // 예전 sstc-geo에는 검색 오류도 "못 찾음"으로 남았을 수 있어서 새로 시작해요
 const geoCache = (() => {
   try {
     return JSON.parse(localStorage.getItem(GEO_KEY) || "{}") || {};
@@ -9933,7 +9991,9 @@ const hasLL = m => Number.isFinite(m.lat) && Number.isFinite(m.lng) && !!(m.lat 
 function geoKey(m) {
   return placeKey(m.placeName) + "|" + placeKey(m.address);
 }
+const geoFailed = new Set(); // 검색 오류(못 찾은 게 아니라 요청이 실패)는 이번 화면에서만 "못 찾음"으로, 저장은 안 해요
 function geoCached(m) {
+  if (geoFailed.has(geoKey(m))) return null;
   const c = geoCache[geoKey(m)];
   if (!c) return undefined;
   if (c.miss) return Date.now() - c.at < 86400000 ? null : undefined;
@@ -9948,6 +10008,7 @@ function geoFind(m) {
     lat: r[0].lat,
     lng: r[0].lng
   } : m.address ? kakaoAddress(m.address.replace(/\s*\(.*\)\s*$/, "")) : null).then(ll => {
+    if (ll && !(Number.isFinite(ll.lat) && Number.isFinite(ll.lng))) ll = null;
     geoCache[geoKey(m)] = ll ? {
       lat: ll.lat,
       lng: ll.lng
@@ -9957,6 +10018,9 @@ function geoFind(m) {
     };
     geoSave();
     return ll;
+  }, e => {
+    geoFailed.add(geoKey(m));
+    return null;
   });
 }
 // 입력 아래에 추천 목록을 띄우고, 누르면 바로 채워요: 위에는 이전에 쓴 테니스장, 아래에는 카카오 장소 검색 결과
@@ -10393,22 +10457,7 @@ function MeetingForm({
       flexDirection: "column",
       gap: 16
     }
-  }, editing && initial.info.seriesId && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      borderRadius: 18,
-      padding: 14,
-      border: `1.5px solid ${BLUE}`
-    }
   }, /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uC5B4\uB514\uAE4C\uC9C0 \uACE0\uCE60\uAE4C\uC694?",
-    required: true
-  }, /*#__PURE__*/React.createElement(Pills, {
-    label: "\uC218\uC815 \uBC94\uC704",
-    value: f.scope,
-    onChange: v => set("scope", v),
-    options: [["one", "이 날짜만"], ["future", "이후 반복 전체"]]
-  }), hint(f.scope === "one" ? `${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.` : `${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`))), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC885\uB958",
     required: true
   }, /*#__PURE__*/React.createElement(Pills, {
@@ -10713,7 +10762,22 @@ function MeetingForm({
       borderRadius: 18,
       resize: "none"
     }
-  })), err && /*#__PURE__*/React.createElement("p", {
+  })), editing && initial.info.seriesId && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 18,
+      padding: 14,
+      border: `1.5px solid ${BLUE}`
+    }
+  }, /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC5B4\uB514\uAE4C\uC9C0 \uACE0\uCE60\uAE4C\uC694?",
+    required: true
+  }, /*#__PURE__*/React.createElement(Pills, {
+    label: "\uC218\uC815 \uBC94\uC704",
+    value: f.scope,
+    onChange: v => set("scope", v),
+    options: [["one", "이 날짜만"], ["future", "이후 반복 전체"]]
+  }), hint(f.scope === "one" ? `${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.` : `${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`))), err && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -11766,7 +11830,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "3e58231a35";
+const BUILD_ID = "652a11b294";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
