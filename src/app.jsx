@@ -2445,7 +2445,7 @@ function MapCard({m,onOpen}){
   </div>;
 }
 function CourtMap({onOpen}){
-  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null);
+  const box=useRef(null), mapRef=useRef(null), overlays=useRef([]), fitted=useRef(!!MAP_VIEW), strip=useRef(null), relayoutRef=useRef(null);
   const [status,setStatus]=useState("loading");   // loading | ready | fail
   const [filter,setFilter]=useState(()=>(MAP_VIEW&&MAP_VIEW.filter)||"all");
   const [sel,setSel]=useState(()=>(MAP_VIEW&&MAP_VIEW.sel)||null);
@@ -2463,18 +2463,25 @@ function CourtMap({onOpen}){
     let g=groups.find(x=>x.key===key); if(!g) groups.push(g={key,lat:ll.lat,lng:ll.lng,name:m.placeName||m.place,list:[]}); g.list.push(m); });
   const cur=groups.find(g=>g.key===sel)||null;
   // SDK 불러오고 지도 만들기
+  const [retry,setRetry]=useState(0);
   useEffect(()=>{
-    let alive=true;
+    let alive=true; setStatus("loading");
+    if(retry){ try{ document.querySelectorAll('script[src*="dapi.kakao.com"]').forEach(x=>x.remove()); if(window.kakao&&!(window.kakao.maps&&window.kakao.maps.services)) delete window.kakao; }catch(e){} }
     loadKakao().then(k=>{ if(!alive||!box.current) return;
       const v=MAP_VIEW||MAP_HOME;
       const map=new k.maps.Map(box.current,{center:new k.maps.LatLng(v.lat,v.lng),level:v.level});
       k.maps.event.addListener(map,"click",()=>setSel(null));
       mapRef.current=map; setStatus("ready");
+      // 폰에서 처음 그릴 때 크기를 잘못 잡으면 바탕 지도가 비어 보여서, 잠깐 뒤에 크기를 다시 맞춰 다시 그려요
+      const fix=()=>{ const m=mapRef.current; if(!m) return; try{ const c=m.getCenter(); m.relayout(); m.setCenter(c); }catch(e){} };
+      [60,400,1200].forEach(t=>setTimeout(fix,t));
+      relayoutRef.current=fix; window.addEventListener("resize",fix); window.addEventListener("orientationchange",fix);
     }).catch(()=>alive&&setStatus("fail"));
     return ()=>{ alive=false; const map=mapRef.current;
       if(map){ try{ const c=map.getCenter(); MAP_VIEW={...(MAP_VIEW||{}),lat:c.getLat(),lng:c.getLng(),level:map.getLevel()}; }catch(e){} }
+      if(relayoutRef.current){ window.removeEventListener("resize",relayoutRef.current); window.removeEventListener("orientationchange",relayoutRef.current); relayoutRef.current=null; }
       overlays.current.forEach(o=>o.setMap(null)); overlays.current=[]; mapRef.current=null; };
-  },[]);
+  },[retry]);
   useEffect(()=>{ MAP_VIEW={...(MAP_VIEW||{}),filter,sel}; },[filter,sel]);
   // 좌표 없는 모임은 한 곳씩 찾아요 (같은 코트는 한 번만)
   const pendKey=pending.map(geoKey).join("/");
@@ -2522,11 +2529,12 @@ function CourtMap({onOpen}){
         background:on?"#0B1E5B":"#fff",color:on?"#fff":"#1B2559",boxShadow:"0 2px 8px rgba(11,30,91,0.14)"}}>
       {dot&&<span style={{width:7,height:7,borderRadius:"50%",background:dot}}/>}{l}{k==="all"?` ${counts.all}`:""}</button>; };
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
-    <div style={{position:"relative",height:"max(420px, calc(100vh - 330px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
+    <div style={{position:"relative",minHeight:360,height:"max(360px, calc(100svh - 430px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
       <div ref={box} aria-label="코트 지도" style={{position:"absolute",inset:0}}/>
       {status!=="ready"&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:24,textAlign:"center",color:"#6B7493",fontSize:13,lineHeight:1.6}}>
         <Icon name="map" size={30} stroke={1.6} color="#A3AAC2"/>
-        {status==="loading"?"지도를 불러오는 중이에요…":<>지도를 불러오지 못했어요.<br/>인터넷 연결을 확인하고 다시 열어 주세요.<br/><span style={{fontSize:11,color:"#A3AAC2"}}>그동안은 목록으로 볼 수 있어요.</span></>}
+        {status==="loading"?"지도를 불러오는 중이에요…":<>지도를 불러오지 못했어요.<br/>인터넷 연결을 확인하고 다시 시도해 주세요.<br/><span style={{fontSize:11,color:"#A3AAC2"}}>그동안은 목록으로 볼 수 있어요.</span>
+          <button type="button" onClick={()=>setRetry(n=>n+1)} style={{...btnSmall,marginTop:6,background:GRAD,padding:"9px 18px",fontSize:13}}>다시 시도</button></>}
       </div>}
       <div style={{position:"absolute",top:12,left:12,right:12,display:"flex",gap:6,overflowX:"auto",zIndex:5,paddingBottom:4,scrollbarWidth:"none"}}>{MAP_FILTERS.map(([k,l])=>chip(k,l))}</div>
       {status==="ready"&&<button type="button" onClick={locate} aria-label="내 위치로" title="내 위치로" style={{position:"absolute",right:12,bottom:cur?232:16,width:42,height:42,borderRadius:"50%",border:"none",background:"#fff",color:BLUE,boxShadow:"0 4px 12px rgba(11,30,91,0.18)",cursor:"pointer",zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",opacity:locating?0.6:1}}>
@@ -3022,10 +3030,14 @@ function loadKakao(){
     if(window.kakao&&window.kakao.maps&&window.kakao.maps.load) return done();
     const sc=document.createElement("script");
     sc.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&libraries=services&autoload=false`;
-    sc.onload=()=>window.kakao&&window.kakao.maps?done():(kakaoLoad=null,no(new Error("kakao")));
-    sc.onerror=()=>{kakaoLoad=null;no(new Error("kakao"));};
+    let settled=false; const fail=e=>{ if(settled) return; settled=true; kakaoLoad=null; try{sc.remove();}catch(x){} no(e); };
+    const okk=k=>{ if(settled) return; settled=true; ok(k); };
+    const done2=()=>{ try{ window.kakao.maps.load(()=>okk(window.kakao)); }catch(e){ fail(e); } };
+    sc.onload=()=>window.kakao&&window.kakao.maps?done2():fail(new Error("kakao"));
+    sc.onerror=()=>fail(new Error("sdk"));
     document.head.appendChild(sc);
-    setTimeout(()=>{ if(!(window.kakao&&window.kakao.maps)){ kakaoLoad=null; no(new Error("timeout")); } },12000);
+    // 도메인이 등록 안 됐으면 SDK가 끝까지 안 뜰 때가 있어서 15초 뒤엔 실패로 봐요
+    setTimeout(()=>fail(new Error("timeout")),15000);
   });
   return kakaoLoad;
 }
