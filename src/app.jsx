@@ -1954,7 +1954,8 @@ function keptScores(oldB,newB,scores){
 }
 
 // ─── 게임 한 판 (스코어 입력) ─────────────────────────────────────────────────
-function GameCard({game,court,onScore,me}) {
+// readOnly면 점수만 보여 주고 고칠 수 없어요(모임 참가자가 아닌 사람)
+function GameCard({game,court,onScore,me,readOnly}) {
   const g=game.score, o=game.o;
   const [arm,setArm]=useState(false);
   useEffect(()=>{if(!arm)return;const t=setTimeout(()=>setArm(false),3000);return()=>clearTimeout(t);},[arm]);
@@ -1978,9 +1979,9 @@ function GameCard({game,court,onScore,me}) {
         <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:win?700:500,color:"#1B2559",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {names.map((nm,i)=><span key={i} style={nm===me?{color:BLUE,fontWeight:700}:null}>{i>0?" · ":""}{nm}</span>)}
         </span>
-        <button type="button" onClick={()=>set(side,-1)} disabled={g[side]<=0} aria-label={`${side.toUpperCase()}팀 1점 빼기`} style={stepBtn(false,g[side]<=0)}>−</button>
-        <span style={{width:22,textAlign:"center",fontSize:20,fontWeight:700,color:win?BLUE:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{g[side]}</span>
-        <button type="button" onClick={()=>set(side,1)} disabled={g[side]>=6} aria-label={`${side.toUpperCase()}팀 1점 더하기`} style={stepBtn(true,g[side]>=6)}>+</button>
+        {!readOnly&&<button type="button" onClick={()=>set(side,-1)} disabled={g[side]<=0} aria-label={`${side.toUpperCase()}팀 1점 빼기`} style={stepBtn(false,g[side]<=0)}>−</button>}
+        <span style={{width:22,marginRight:readOnly?6:0,textAlign:"center",fontSize:20,fontWeight:700,color:win?BLUE:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{g[side]}</span>
+        {!readOnly&&<button type="button" onClick={()=>set(side,1)} disabled={g[side]>=6} aria-label={`${side.toUpperCase()}팀 1점 더하기`} style={stepBtn(true,g[side]>=6)}>+</button>}
       </div>
     );
   };
@@ -1991,14 +1992,14 @@ function GameCard({game,court,onScore,me}) {
         <span style={{fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,background:chip.bg,color:chip.c}}>{chip.t}</span>
       </div>
       {row("a")}{row("b")}
-      {isTie(g)&&(
+      {isTie(g)&&!readOnly&&(
         <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#6B7493"}}>
           <span style={{flex:1}}>무승부 · 가위바위보 승자</span>
           {["a","b"].map(sd=><button key={sd} type="button" onClick={()=>onScore(game.key,{...g,rps:g.rps===sd?null:sd})}
             style={{padding:"5px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",border:`1.5px solid ${g.rps===sd?BLUE:"#D6DEF7"}`,background:g.rps===sd?BLUE:"#fff",color:g.rps===sd?"#fff":"#4A5578"}}>{sd.toUpperCase()}팀</button>)}
         </div>
       )}
-      {(g.a>0||g.b>0)&&(
+      {(g.a>0||g.b>0)&&!readOnly&&(
         <button type="button" onClick={()=>{if(arm){onScore(game.key,{a:0,b:0,rps:null});setArm(false);}else setArm(true);}}
           style={{alignSelf:"flex-end",background:"none",border:"none",fontSize:11,color:arm?"#ef4444":"#A3AAC2",cursor:"pointer",padding:"2px 0"}}>
           {arm?"한 번 더 누르면 0:0으로 돌아가요":"이 경기 초기화"}
@@ -2021,7 +2022,7 @@ function MeetingBracket({meeting,participants,store}) {
   const note=<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}><Ic n={mode==="shared"?"cloud":"phone"} s={12}/> {modeNote}</p>;
   const [how,setHow]=useState("auto");          // 새로 만들 때: "auto" 자동 편성 | "manual" 직접 작성
   const [editing,setEditing]=useState(false);   // 만든 대진표 수정 중
-  // 대진표를 만들고·고치고·지우는 건 이 모임 참가자(참석 확정자, 또는 대진표에 이름이 있는 사람)만
+  // 대진표를 만들고·고치고·지우고 점수를 넣는 건 이 모임 참가자(참석 확정자, 또는 대진표에 이름이 있는 사람)만
   const canManage=participants.some(p=>p.isMe)||!!(bracket&&(bracket.players||[]).includes(ME));
   useEffect(()=>{ if(!bracket||!canManage) setEditing(false); },[!!bracket,canManage]);
   const howTabs=(
@@ -2084,6 +2085,7 @@ function MeetingBracket({meeting,participants,store}) {
           <button key={k} type="button" onClick={()=>setShow(k)} style={{flex:1,padding:"8px 0",borderRadius:999,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:show===k?"#fff":"transparent",color:show===k?BLUE:"#6B7493",boxShadow:show===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
         ))}
       </div>
+      {show==="games"&&!canManage&&<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}>점수는 이 모임 참가자만 입력할 수 있어요</p>}
       {show==="games"&&bracket.sessions.map((ses,s)=>(
         <Card key={s} style={{padding:16}}>
           <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:12}}>
@@ -2091,7 +2093,7 @@ function MeetingBracket({meeting,participants,store}) {
             <span style={{fontSize:12,color:"#A3AAC2"}}>~ {bracket.ends[s]} · {s+1}세션</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {games.filter(g=>g.s===s).map(g=><GameCard key={g.key} court={g.court} game={g} onScore={saveScore} me={ME}/>)}
+            {games.filter(g=>g.s===s).map(g=><GameCard key={g.key} court={g.court} game={g} onScore={saveScore} me={ME} readOnly={!canManage}/>)}
           </div>
           {(ses.rest||[]).length>0&&<p style={{margin:"12px 0 0",fontSize:12,color:"#6B7493"}}><Ic n="coffee" s={13}/> 휴식 · {ses.rest.map(i=>bracket.players[i]).join(", ")}</p>}
         </Card>
