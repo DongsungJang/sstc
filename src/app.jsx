@@ -3179,13 +3179,6 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          {editing&&initial.info.seriesId&&<div style={{background:"#fff",borderRadius:18,padding:14,border:`1.5px solid ${BLUE}`}}>
-            <FieldWrap label="어디까지 고칠까요?" required>
-              <Pills label="수정 범위" value={f.scope} onChange={v=>set("scope",v)} options={[["one","이 날짜만"],["future","이후 반복 전체"]]}/>
-              {hint(f.scope==="one"?`${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.`
-                :`${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`)}
-            </FieldWrap>
-          </div>}
           <FieldWrap label="모임 종류" required>
             <Pills label="모임 종류" value={f.kind} onChange={v=>set("kind",v)} options={[["regular","정기 모임"],["flash","번개 모임"]]}/>
             {hint(f.kind==="regular"?"이달 정기 모임에 덜 참석한 회원이 먼저 확정돼요.":"번개 모임은 투표한 순서대로 확정되고, 참석 횟수에도 안 들어가요.")}
@@ -3277,6 +3270,13 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
           <FieldWrap label="모임 설명">
             <textarea value={f.desc} onChange={e=>set("desc",e.target.value)} rows={3} placeholder="진행 방식, 준비물 등" style={{...inputStyle,borderRadius:18,resize:"none"}}/>
           </FieldWrap>
+          {editing&&initial.info.seriesId&&<div style={{background:"#fff",borderRadius:18,padding:14,border:`1.5px solid ${BLUE}`}}>
+            <FieldWrap label="어디까지 고칠까요?" required>
+              <Pills label="수정 범위" value={f.scope} onChange={v=>set("scope",v)} options={[["one","이 날짜만"],["future","이후 반복 전체"]]}/>
+              {hint(f.scope==="one"?`${fmtDate(initial.info.date)} 모임만 바뀌고, 다음 반복 모임은 원래대로예요.`
+                :`${fmtDate(initial.info.date)} 모임과 그 뒤 반복 모임의 시간·장소·정원·설명이 같이 바뀌어요. '이 날짜만' 따로 고친 날은 그대로 둬요.`)}
+            </FieldWrap>
+          </div>}
           {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
           <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?"저장 중…":editing?"수정 완료":repeating?"반복 모임 만들기":"모임 만들기"}</button>
         </div>
