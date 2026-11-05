@@ -760,7 +760,9 @@ const adUrl=u=>{ u=String(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.t
 const adToday=()=>kstNow().slice(0,10);
 // 기간 상태: "live" 노출 중 / "before" 시작 전 / "after" 끝남 (날짜는 한국 시간 기준, 시작일·종료일 당일 포함)
 const adPhase=(a,d=adToday())=>a.start&&d<a.start?"before":a.end&&d>a.end?"after":"live";
-const adList=v=>Object.keys(v||{}).filter(k=>v[k]&&typeof v[k]==="object").map(k=>({id:k,...v[k]})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+// 순서: 관리 탭에서 옮기면 order(0,1,2…)가 생기고, 아직 안 옮긴 광고는 만든 순서대로 뒤에 붙어요
+const adKey=a=>Number.isFinite(+a.order)&&a.order!==""&&a.order!=null?+a.order:1e6+(a.createdAt||0)/1e7;
+const adList=v=>Object.keys(v||{}).filter(k=>v[k]&&typeof v[k]==="object").map(k=>({id:k,...v[k]})).sort((a,b)=>adKey(a)-adKey(b)||(a.createdAt||0)-(b.createdAt||0));
 const adPeriod=a=>!a.start&&!a.end?"기간 무제한":`${a.start?a.start.replace(/-/g,"."):"지금"} ~ ${a.end?a.end.replace(/-/g,"."):"계속"}`;
 function useAds(on){
   const [ads,setAds]=useState([]);
@@ -957,12 +959,19 @@ function AdSettings(){
     if(rangeBad){ setMsg("종료일은 시작일과 같거나 뒤여야 해요"); return; }
     const now=Date.now(), id=cur==="new"?"a"+now:cur;
     const v={tag:adTagOf(f.tag)[0],popup:String(f.popup||"").trim().slice(0,500),logo:f.logo.trim().slice(0,12),logoImg:adLogoOk(f.logoImg)?f.logoImg:"",bg:adHex(f.bg),top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
-      start:f.start||"",end:f.end||"",enabled:!!enabled,createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
+      start:f.start||"",end:f.end||"",enabled:!!enabled,order:saved&&saved.order!=null?saved.order:list.length+1000,createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
     setBusy(true);
     FB.club.child("ads/"+id).set(v).then(()=>{ setCur(id); setF({...AD_EMPTY,...v});
       const ph=adPhase(v);
       setMsg(!enabled?"저장했어요. 지금은 꺼져 있어요":ph==="live"?"켰어요. 홈 화면에 보여요":ph==="before"?`켰어요. ${v.start.replace(/-/g,".")}부터 보여요`:"켰지만 기간이 이미 끝났어요"); })
       .catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+  };
+  // 고른 광고를 앞(-1)/뒤(+1)로: 전체 순서를 0,1,2…로 다시 매겨 한 번에 저장
+  const move=d=>{
+    const k=list.findIndex(a=>a.id===cur), j=k+d; if(k<0||j<0||j>=list.length) return;
+    const ids=list.map(a=>a.id); [ids[k],ids[j]]=[ids[j],ids[k]];
+    const up={}; ids.forEach((id,n)=>{ up[id+"/order"]=n; });
+    setBusy(true); FB.club.child("ads").update(up).then(()=>setMsg(`광고${j+1}(으)로 옮겼어요`)).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
   };
   const remove=()=>{
     if(cur==="new"){ pick(list[0]?list[0].id:"new"); return; }
@@ -989,6 +998,14 @@ function AdSettings(){
         {cur==="new"?tabBtn("new",`광고${list.length+1}`,null)
           :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 광고 추가</button>}
       </div>
+      {saved&&list.length>1&&(()=>{ const k=list.findIndex(a=>a.id===cur);
+        const mv={padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT,background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"};
+        return <div style={{display:"flex",alignItems:"center",gap:6,margin:"-4px 0 12px",flexWrap:"wrap"}}>
+          <span style={{fontSize:12,color:"#6B7493",marginRight:2}}>순서</span>
+          <button type="button" disabled={busy||k<=0} onClick={()=>move(-1)} style={{...mv,opacity:k<=0?0.4:1}}>← 앞으로</button>
+          <button type="button" disabled={busy||k>=list.length-1} onClick={()=>move(1)} style={{...mv,opacity:k>=list.length-1?0.4:1}}>뒤로 →</button>
+          <span style={{fontSize:11,color:"#A3AAC2"}}>홈에서 이 순서대로 넘어가요</span>
+        </div>; })()}
       {ads!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
           <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{adPeriod(saved)}</p>; })()}

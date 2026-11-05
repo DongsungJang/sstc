@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=b5cff0072a">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=b5cff0072a">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e3571d39e0">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e3571d39e0">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2362,10 +2362,12 @@ const adUrl = u => {
 const adToday = () => kstNow().slice(0, 10);
 // 기간 상태: "live" 노출 중 / "before" 시작 전 / "after" 끝남 (날짜는 한국 시간 기준, 시작일·종료일 당일 포함)
 const adPhase = (a, d = adToday()) => a.start && d < a.start ? "before" : a.end && d > a.end ? "after" : "live";
+// 순서: 관리 탭에서 옮기면 order(0,1,2…)가 생기고, 아직 안 옮긴 광고는 만든 순서대로 뒤에 붙어요
+const adKey = a => Number.isFinite(+a.order) && a.order !== "" && a.order != null ? +a.order : 1e6 + (a.createdAt || 0) / 1e7;
 const adList = v => Object.keys(v || {}).filter(k => v[k] && typeof v[k] === "object").map(k => ({
   id: k,
   ...v[k]
-})).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+})).sort((a, b) => adKey(a) - adKey(b) || (a.createdAt || 0) - (b.createdAt || 0));
 const adPeriod = a => !a.start && !a.end ? "기간 무제한" : `${a.start ? a.start.replace(/-/g, ".") : "지금"} ~ ${a.end ? a.end.replace(/-/g, ".") : "계속"}`;
 function useAds(on) {
   const [ads, setAds] = useState([]);
@@ -3038,6 +3040,7 @@ function AdSettings() {
       start: f.start || "",
       end: f.end || "",
       enabled: !!enabled,
+      order: saved && saved.order != null ? saved.order : list.length + 1000,
       createdAt: saved && saved.createdAt || now,
       updatedAt: now,
       updatedByUid: myUid()
@@ -3052,6 +3055,20 @@ function AdSettings() {
       const ph = adPhase(v);
       setMsg(!enabled ? "저장했어요. 지금은 꺼져 있어요" : ph === "live" ? "켰어요. 홈 화면에 보여요" : ph === "before" ? `켰어요. ${v.start.replace(/-/g, ".")}부터 보여요` : "켰지만 기간이 이미 끝났어요");
     }).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+  };
+  // 고른 광고를 앞(-1)/뒤(+1)로: 전체 순서를 0,1,2…로 다시 매겨 한 번에 저장
+  const move = d => {
+    const k = list.findIndex(a => a.id === cur),
+      j = k + d;
+    if (k < 0 || j < 0 || j >= list.length) return;
+    const ids = list.map(a => a.id);
+    [ids[k], ids[j]] = [ids[j], ids[k]];
+    const up = {};
+    ids.forEach((id, n) => {
+      up[id + "/order"] = n;
+    });
+    setBusy(true);
+    FB.club.child("ads").update(up).then(() => setMsg(`광고${j + 1}(으)로 옮겼어요`)).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
   };
   const remove = () => {
     if (cur === "new") {
@@ -3159,7 +3176,56 @@ function AdSettings() {
       color: BLUE,
       fontFamily: FONT
     }
-  }, "+ \uAD11\uACE0 \uCD94\uAC00")), ads !== undefined && /*#__PURE__*/React.createElement("div", {
+  }, "+ \uAD11\uACE0 \uCD94\uAC00")), saved && list.length > 1 && (() => {
+    const k = list.findIndex(a => a.id === cur);
+    const mv = {
+      padding: "6px 12px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: FONT,
+      background: "#fff",
+      color: BLUE,
+      border: "1.5px solid #D6DEF7"
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        margin: "-4px 0 12px",
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "#6B7493",
+        marginRight: 2
+      }
+    }, "\uC21C\uC11C"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: busy || k <= 0,
+      onClick: () => move(-1),
+      style: {
+        ...mv,
+        opacity: k <= 0 ? 0.4 : 1
+      }
+    }, "\u2190 \uC55E\uC73C\uB85C"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: busy || k >= list.length - 1,
+      onClick: () => move(1),
+      style: {
+        ...mv,
+        opacity: k >= list.length - 1 ? 0.4 : 1
+      }
+    }, "\uB4A4\uB85C \u2192"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#A3AAC2"
+      }
+    }, "\uD648\uC5D0\uC11C \uC774 \uC21C\uC11C\uB300\uB85C \uB118\uC5B4\uAC00\uC694"));
+  })(), ads !== undefined && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -14247,7 +14313,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "b5cff0072a";
+const BUILD_ID = "e3571d39e0";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
