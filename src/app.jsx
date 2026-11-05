@@ -692,7 +692,7 @@ function Empty({children,action,onAction}) {
 // club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, order, createdAt, updatedAt, updatedByUid}
 // 모임 홍보 배너: club/ads/am<모임id> = {meetingId, enabled, tag, title(한마디, 비우면 시간·장소), bg, …}. 내용은 모임 정보로 그때그때 만들고,
 // 누르면 그 모임 참석 버튼으로 가요. 마감·종료·무산·삭제된 모임이면 홈에서 저절로 빠져요
-// 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
+// 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 정해 둔 시간(기본 5초)마다 옆으로 넘어가요.
 const AD_EMPTY={enabled:false,tag:"광고",logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",popup:"",start:"",end:""};
 const AD_FIELDS=["tag","logo","logoImg","bg","top","title","sub","url","popup","start","end"];
 // 배경색: 비우면 기본 아이보리. 고른 색으로 은은한 그라데이션을 만들고, 어두운 색이면 글자를 흰색으로 바꿔요
@@ -756,7 +756,9 @@ function shrinkLogo(file){
   });
 }
 const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=AD_LOGO_BYTES;
-const AD_INTERVAL=5000;
+// 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
+const AD_SEC_DEF=5, AD_SECS=[3,5,7,10];
+const adSec=v=>{ const n=Math.round(+v); return Number.isFinite(n)&&n>=2&&n<=30?n:AD_SEC_DEF; };
 // 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
 const adUrl=u=>{ u=String(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return /^https?:\/\/[^\s/]+\.[^\s]+/i.test(u)?u:""; };
 const adToday=()=>kstNow().slice(0,10);
@@ -768,15 +770,16 @@ const adList=v=>Object.keys(v||{}).filter(k=>v[k]&&typeof v[k]==="object").map(k
 const adPeriod=a=>!a.start&&!a.end?"기간 무제한":`${a.start?a.start.replace(/-/g,"."):"지금"} ~ ${a.end?a.end.replace(/-/g,"."):"계속"}`;
 function useAds(on){
   const [ads,setAds]=useState([]);
+  const [sec,setSec]=useState(AD_SEC_DEF);
   const [day,setDay]=useState(adToday());
   useEffect(()=>{
     if(!FB||!on){ setAds([]); return; }
-    const r=FB.club.child("ads"), h=s=>setAds(adList(s.val()));
+    const r=FB.club.child("ads"), h=s=>{ const v=s.val()||{}; setAds(adList(v)); setSec(adSec(v.interval)); };
     r.on("value",h,()=>setAds([])); return ()=>r.off("value",h);
   },[on]);
   // 앱을 켜 둔 채 날짜가 바뀌어도 기간을 다시 따져요
   useEffect(()=>{ const t=setInterval(()=>setDay(adToday()),60000); return ()=>clearInterval(t); },[]);
-  return ads.filter(a=>a.enabled&&(a.title||a.meetingId)&&adPhase(a,day)==="live");
+  return {list:ads.filter(a=>a.enabled&&(a.title||a.meetingId)&&adPhase(a,day)==="live"),sec};
 }
 // 모임 배너 → 화면에 보일 내용. 홈에 안 보이는 모임이면 hide에 이유를 넣어요
 const AD_KIND_NAME={regular:"정기 모임",game:"번개 게임",training:"번개 훈련"};
@@ -851,7 +854,7 @@ function AdBanner({ad,onOpen}){
   </>;
   return <div style={box}>{body}{tag}</div>;
 }
-// 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
+// 홈: 광고가 여러 개면 정해 둔 시간마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
 // 광고 노출·클릭 세기: club/adStats/<광고id>/<YYYY-MM-DD>/{views,clicks}/<uid> = true
 // 같은 회원이 같은 날 여러 번 봐도·눌러도 한 번으로 세요 (날짜는 한국 시간). 이미 센 건 이 기기에 적어 둬서 다시 안 써요
 const AD_TRACKED=(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("sstc-ad-tracked")||"[]")); }catch(e){ return new Set(); } })();
@@ -905,10 +908,11 @@ function AdStats({ad,label}){
       </>}
     </div>);
 }
-function AdCarousel({ads}){
+function AdCarousel({ads,sec=AD_SEC_DEF}){
+  const ms=adSec(sec)*1000;
   const ref=useRef(null);
   const [i,setI]=useState(0);
-  const hold=useRef(0);   // 손으로 만진 시각: 그 뒤 5초는 자동으로 안 넘김
+  const hold=useRef(0);   // 손으로 만진 시각: 그 뒤 한 번(넘어가는 시간)은 자동으로 안 넘김
   const n=ads.length;
   useEffect(()=>{ if(i>=n) setI(0); },[n]);
   const shownId=n?ads[Math.min(i,n-1)].id:"";
@@ -927,12 +931,12 @@ function AdCarousel({ads}){
   useEffect(()=>{
     if(n<2) return;
     const t=setInterval(()=>{
-      const el=ref.current; if(!el||Date.now()-hold.current<AD_INTERVAL||document.hidden) return;
+      const el=ref.current; if(!el||Date.now()-hold.current<ms||document.hidden) return;
       const next=(Math.round(el.scrollLeft/el.clientWidth)+1)%n;
       el.scrollTo({left:next*el.clientWidth,behavior:"smooth"});
-    },AD_INTERVAL);
+    },ms);
     return ()=>clearInterval(t);
-  },[n]);
+  },[n,ms]);
   if(!n) return null;
   if(n===1) return <div ref={wrap}><AdBanner ad={ads[0]} onOpen={()=>adTrack(ads[0].id,"clicks")}/></div>;
   const onScroll=e=>{ const el=e.currentTarget; const k=Math.round(el.scrollLeft/Math.max(1,el.clientWidth)); if(k!==i) setI(Math.max(0,Math.min(n-1,k))); };
@@ -957,8 +961,13 @@ function AdSettings(){
   const [f,setF]=useState(AD_EMPTY);
   const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState("");
+  const [sec,setSec]=useState(AD_SEC_DEF);   // 넘어가는 시간(초)
+  const [secIn,setSecIn]=useState("");       // 직접 넣는 칸
+  const [secMsg,setSecMsg]=useState("");
+  const saveSec=v=>{ const n=Math.round(+v); if(!(n>=2&&n<=30)){ setSecMsg("2~30초 사이로 넣어 주세요"); return; }
+    setSecMsg(""); FB.club.child("ads/interval").set(n).then(()=>{ setSecIn(""); setSecMsg(`${n}초마다 넘어가요`); }).catch(e=>setSecMsg(authMsg(e))); };
   useEffect(()=>{
-    const r=FB.club.child("ads"), h=s=>setAds(adList(s.val()));
+    const r=FB.club.child("ads"), h=s=>{ const v=s.val()||{}; setAds(adList(v)); setSec(adSec(v.interval)); };
     r.on("value",h,e=>{ setAds([]); setMsg(authMsg(e)); }); return ()=>r.off("value",h);
   },[]);
   const list=ads||[];
@@ -1114,12 +1123,26 @@ function AdSettings(){
         </div>
         {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 배너 취소":`배너${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
         {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
-        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 배너만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 인원이 덜 찬 모임은 모임 상세 아래 "홈 화면 배너에 추가하기"로 넣을 수 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
+        <div style={{borderTop:"1px solid #EEF1FA",paddingTop:12}}>
+          <p style={{margin:"0 0 6px",fontSize:13,fontWeight:600,color:"#2B3674"}}>넘어가는 시간 <span style={{fontWeight:500,color:"#6B7493"}}>· 모든 배너 공통 · 지금 {sec}초</span></p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
+            {AD_SECS.map(n=><button key={n} type="button" aria-pressed={sec===n} onClick={()=>saveSec(n)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,cursor:"pointer",fontFamily:FONT,
+              border:`1.5px solid ${sec===n?BLUE:"#D6DEF7"}`,background:sec===n?BLUE:"#fff",color:sec===n?"#fff":"#4A5578",fontWeight:sec===n?700:500}}>{n}초</button>)}
+            <span style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:2}}>
+              <input type="number" inputMode="numeric" min={2} max={30} aria-label="넘어가는 시간 직접 넣기" value={secIn} placeholder={AD_SECS.includes(sec)?"직접":String(sec)} onChange={e=>{ setSecIn(e.target.value); setSecMsg(""); }} onKeyDown={e=>{ if(e.key==="Enter") saveSec(secIn); }}
+                style={{...inputStyle,width:70,padding:"6px 10px",textAlign:"center",borderColor:!AD_SECS.includes(sec)&&!secIn?BLUE:undefined}}/>
+              <span style={{fontSize:13,color:"#4A5578"}}>초</span>
+              {secIn&&<button type="button" onClick={()=>saveSec(secIn)} style={{...btnSmall,padding:"6px 12px"}}>저장</button>}
+            </span>
+          </div>
+          <p style={{margin:"4px 0 0",fontSize:11,color:secMsg&&/사이|권한|오류|실패/.test(secMsg)?"#ef4444":secMsg?BLUE:"#A3AAC2"}}>{secMsg||"배너가 2개 이상일 때 홈에서 이 시간마다 옆으로 넘어가요. 2~30초, 모든 회원 홈에 같이 적용돼요."}</p>
+        </div>
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 배너만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 정해 둔 시간마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 인원이 덜 찬 모임은 모임 상세 아래 "홈 화면 배너에 추가하기"로 넣을 수 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
       </div>}
     </Card>);
 }
 
-function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ads=[]}) {
+function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ads=[],adSecs}) {
   const [goingN,setGoingN]=useState(3);
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
   const [exp,setExp]=useState(focusId);
@@ -1184,7 +1207,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           </div>
         )}
       </Card>
-      {ads.length>0&&<AdCarousel ads={ads}/>}
+      {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
       <Card>
         <SectionTitle>내가 참석할 모임{going.length>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{going.length}</span>}</SectionTitle>
         {going.length===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
@@ -4689,7 +4712,8 @@ export default function App() {
   const clubData=useClubMembers(inMain);
   const boardPosts=useBoard(inMain);
   // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
-  const ads=useAds(inMain).map(adMeeting).filter(a=>!a.hide).map(a=>a.meetingId?{...a,onGo:()=>{ FOCUS_ATTEND.id=+a.meetingId; openM(+a.meetingId,"info","home"); }}:a);
+  const adData=useAds(inMain);
+  const ads=adData.list.map(adMeeting).filter(a=>!a.hide).map(a=>a.meetingId?{...a,onGo:()=>{ FOCUS_ATTEND.id=+a.meetingId; openM(+a.meetingId,"info","home"); }}:a);
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(()=>{ if(!inMain) return; markTabSeen(tab); return ()=>markTabSeen(tab); },[tab,inMain,myId]);
   const newMeetings=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).map(meetingNewItem);
@@ -4833,7 +4857,7 @@ export default function App() {
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
-          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice} ads={ads}/>}
+          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice} ads={ads} adSecs={adData.sec}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view,from)=>openM(id,view,from||"booking")} ready={list.ready} view={bookView} onView={setBookView}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} isAdmin={adminOn} boardFocus={boardFocus} newCounts={membersNew}
