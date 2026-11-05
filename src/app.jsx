@@ -2223,7 +2223,8 @@ function useMentions(){
 }
 const clip=(t,n=40)=>t.length>n?t.slice(0,n)+"…":t;
 // allowAnon: 익명으로 쓰기 선택 (소곤소곤), nameOf(c): 화면에 보일 이름 (익명 번호 등)
-function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,title="댓글",allowAnon=false,nameOf}){
+// anonNotify: 알림에 쓴 사람·댓글 내용을 아예 안 남겨요 (소곤소곤: 실명으로 썼다 지우고 익명으로 다시 써도 누군지 모르게)
+function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,title="댓글",allowAnon=false,anonNotify=false,nameOf}){
   const {members,names,mentionsOf}=useMentions();
   const [text,setText]=useState(""), [busy,setBusy]=useState(false);
   const [edit,setEdit]=useState(null);   // {id,text}
@@ -2232,7 +2233,8 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
   const all=toList(comments).filter(c=>c&&c.text).sort((a,b)=>a.at-b.at);
   const shown=c=>nameOf?nameOf(c):c.name;
   const notify=(t,prev,an)=>Object.keys(mentionsOf(t)).filter(u=>u!==uid&&!(prev&&prev[u])).forEach(u=>
-    postFeed({type:"mention",to:u,...link,text:`${an?"익명":ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`},an));
+    anonNotify?postFeed({type:"mention",to:u,...link,text:`${where}에서 누군가 회원님을 불렀어요`},true)
+      :postFeed({type:"mention",to:u,...link,text:`${an?"익명":ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`},an));
   const add=()=>{ const t=text.trim(); if(!t||busy) return; setBusy(true);
     const mentions=mentionsOf(t);
     const an=allowAnon&&anon;
@@ -3769,10 +3771,10 @@ function FreeBoard({canWrite,isAdmin,focus}){
     body=!open?<>{back}<Empty>지워진 글이에요.</Empty></>:(<>
       {back}
       <Card>{head(open)}<PostBody p={open} names={names} full/>{foot(open,true)}</Card>
-      <CommentBox comments={open.comments} isAdmin={isAdmin} canWrite={canWrite} allowAnon nameOf={anonNamer(open)}
+      <CommentBox comments={open.comments} isAdmin={isAdmin} canWrite={canWrite} allowAnon anonNotify nameOf={anonNamer(open)}
         save={(cid,v)=>saveBoardPath(`${open.id}/comments/${cid}`,v)}
         where={`${BOARD_NAME} "${clip(open.text,15)}" 글 댓글`} link={{postId:open.id}}
-        onAdded={(t,ment,an)=>{ if(open.uid&&open.uid!==uid&&!(ment&&ment[open.uid])) postFeed({type:"boardComment",to:open.uid,postId:open.id,text:`${an?"익명":ME} 님이 내 글에 댓글을 달았어요: "${clip(t)}"`},an); }}/>
+        onAdded={(t,ment)=>{ if(open.uid&&open.uid!==uid&&!(ment&&ment[open.uid])) postFeed({type:"boardComment",to:open.uid,postId:open.id,text:`내 글 "${clip(open.text,15)}"에 새 댓글이 달렸어요`},true); }}/>
     </>);
   } else {
     body=(<>
