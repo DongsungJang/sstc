@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=1697ab2ad5">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1697ab2ad5">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=b66730377b">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=b66730377b">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2168,7 +2168,7 @@ function Empty({
 // club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, order, createdAt, updatedAt, updatedByUid}
 // 모임 홍보 배너: club/ads/am<모임id> = {meetingId, enabled, tag, title(한마디, 비우면 시간·장소), bg, …}. 내용은 모임 정보로 그때그때 만들고,
 // 누르면 그 모임 참석 버튼으로 가요. 마감·종료·무산·삭제된 모임이면 홈에서 저절로 빠져요
-// 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
+// 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 정해 둔 시간(기본 5초)마다 옆으로 넘어가요.
 const AD_EMPTY = {
   enabled: false,
   tag: "광고",
@@ -2353,7 +2353,13 @@ function shrinkLogo(file) {
   });
 }
 const adLogoOk = v => typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= AD_LOGO_BYTES;
-const AD_INTERVAL = 5000;
+// 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
+const AD_SEC_DEF = 5,
+  AD_SECS = [3, 5, 7, 10];
+const adSec = v => {
+  const n = Math.round(+v);
+  return Number.isFinite(n) && n >= 2 && n <= 30 ? n : AD_SEC_DEF;
+};
 // 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
 const adUrl = u => {
   u = String(u || "").trim();
@@ -2373,6 +2379,7 @@ const adList = v => Object.keys(v || {}).filter(k => v[k] && typeof v[k] === "ob
 const adPeriod = a => !a.start && !a.end ? "기간 무제한" : `${a.start ? a.start.replace(/-/g, ".") : "지금"} ~ ${a.end ? a.end.replace(/-/g, ".") : "계속"}`;
 function useAds(on) {
   const [ads, setAds] = useState([]);
+  const [sec, setSec] = useState(AD_SEC_DEF);
   const [day, setDay] = useState(adToday());
   useEffect(() => {
     if (!FB || !on) {
@@ -2380,7 +2387,11 @@ function useAds(on) {
       return;
     }
     const r = FB.club.child("ads"),
-      h = s => setAds(adList(s.val()));
+      h = s => {
+        const v = s.val() || {};
+        setAds(adList(v));
+        setSec(adSec(v.interval));
+      };
     r.on("value", h, () => setAds([]));
     return () => r.off("value", h);
   }, [on]);
@@ -2389,7 +2400,10 @@ function useAds(on) {
     const t = setInterval(() => setDay(adToday()), 60000);
     return () => clearInterval(t);
   }, []);
-  return ads.filter(a => a.enabled && (a.title || a.meetingId) && adPhase(a, day) === "live");
+  return {
+    list: ads.filter(a => a.enabled && (a.title || a.meetingId) && adPhase(a, day) === "live"),
+    sec
+  };
 }
 // 모임 배너 → 화면에 보일 내용. 홈에 안 보이는 모임이면 hide에 이유를 넣어요
 const AD_KIND_NAME = {
@@ -2732,7 +2746,7 @@ function AdBanner({
     style: box
   }, body, tag);
 }
-// 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
+// 홈: 광고가 여러 개면 정해 둔 시간마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
 // 광고 노출·클릭 세기: club/adStats/<광고id>/<YYYY-MM-DD>/{views,clicks}/<uid> = true
 // 같은 회원이 같은 날 여러 번 봐도·눌러도 한 번으로 세요 (날짜는 한국 시간). 이미 센 건 이 기기에 적어 둬서 다시 안 써요
 const AD_TRACKED = (() => {
@@ -2899,11 +2913,13 @@ function AdStats({
   }, "\uAE30\uC900: \uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uBC30\uB108\uAC00 \uD654\uBA74\uC5D0 \uB2E4 \uBCF4\uC600\uC744 \uB54C, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB098 \uC548\uB0B4 \uCC3D\uC744 \uC5F4\uC5C8\uC744 \uB54C \uC138\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 1\uBC88\uC73C\uB85C \uC138\uC694(\uD55C\uAD6D \uB0A0\uC9DC \uAE30\uC900).")));
 }
 function AdCarousel({
-  ads
+  ads,
+  sec = AD_SEC_DEF
 }) {
+  const ms = adSec(sec) * 1000;
   const ref = useRef(null);
   const [i, setI] = useState(0);
-  const hold = useRef(0); // 손으로 만진 시각: 그 뒤 5초는 자동으로 안 넘김
+  const hold = useRef(0); // 손으로 만진 시각: 그 뒤 한 번(넘어가는 시간)은 자동으로 안 넘김
   const n = ads.length;
   useEffect(() => {
     if (i >= n) setI(0);
@@ -2938,15 +2954,15 @@ function AdCarousel({
     if (n < 2) return;
     const t = setInterval(() => {
       const el = ref.current;
-      if (!el || Date.now() - hold.current < AD_INTERVAL || document.hidden) return;
+      if (!el || Date.now() - hold.current < ms || document.hidden) return;
       const next = (Math.round(el.scrollLeft / el.clientWidth) + 1) % n;
       el.scrollTo({
         left: next * el.clientWidth,
         behavior: "smooth"
       });
-    }, AD_INTERVAL);
+    }, ms);
     return () => clearInterval(t);
-  }, [n]);
+  }, [n, ms]);
   if (!n) return null;
   if (n === 1) return /*#__PURE__*/React.createElement("div", {
     ref: wrap
@@ -3028,9 +3044,28 @@ function AdSettings() {
   const [f, setF] = useState(AD_EMPTY);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [sec, setSec] = useState(AD_SEC_DEF); // 넘어가는 시간(초)
+  const [secIn, setSecIn] = useState(""); // 직접 넣는 칸
+  const [secMsg, setSecMsg] = useState("");
+  const saveSec = v => {
+    const n = Math.round(+v);
+    if (!(n >= 2 && n <= 30)) {
+      setSecMsg("2~30초 사이로 넣어 주세요");
+      return;
+    }
+    setSecMsg("");
+    FB.club.child("ads/interval").set(n).then(() => {
+      setSecIn("");
+      setSecMsg(`${n}초마다 넘어가요`);
+    }).catch(e => setSecMsg(authMsg(e)));
+  };
   useEffect(() => {
     const r = FB.club.child("ads"),
-      h = s => setAds(adList(s.val()));
+      h = s => {
+        const v = s.val() || {};
+        setAds(adList(v));
+        setSec(adSec(v.interval));
+      };
     r.on("value", h, e => {
       setAds([]);
       setMsg(authMsg(e));
@@ -3724,14 +3759,101 @@ function AdSettings() {
       color: /확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg) ? "#ef4444" : BLUE,
       textAlign: "center"
     }
-  }, msg), /*#__PURE__*/React.createElement("p", {
+  }, msg), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #EEF1FA",
+      paddingTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 6px",
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#2B3674"
+    }
+  }, "\uB118\uC5B4\uAC00\uB294 \uC2DC\uAC04 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 500,
+      color: "#6B7493"
+    }
+  }, "\xB7 \uBAA8\uB4E0 \uBC30\uB108 \uACF5\uD1B5 \xB7 \uC9C0\uAE08 ", sec, "\uCD08")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, AD_SECS.map(n => /*#__PURE__*/React.createElement("button", {
+    key: n,
+    type: "button",
+    "aria-pressed": sec === n,
+    onClick: () => saveSec(n),
+    style: {
+      padding: "6px 12px",
+      borderRadius: 999,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: FONT,
+      border: `1.5px solid ${sec === n ? BLUE : "#D6DEF7"}`,
+      background: sec === n ? BLUE : "#fff",
+      color: sec === n ? "#fff" : "#4A5578",
+      fontWeight: sec === n ? 700 : 500
+    }
+  }, n, "\uCD08")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      marginLeft: 2
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: 2,
+    max: 30,
+    "aria-label": "\uB118\uC5B4\uAC00\uB294 \uC2DC\uAC04 \uC9C1\uC811 \uB123\uAE30",
+    value: secIn,
+    placeholder: AD_SECS.includes(sec) ? "직접" : String(sec),
+    onChange: e => {
+      setSecIn(e.target.value);
+      setSecMsg("");
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter") saveSec(secIn);
+    },
+    style: {
+      ...inputStyle,
+      width: 70,
+      padding: "6px 10px",
+      textAlign: "center",
+      borderColor: !AD_SECS.includes(sec) && !secIn ? BLUE : undefined
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#4A5578"
+    }
+  }, "\uCD08"), secIn && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => saveSec(secIn),
+    style: {
+      ...btnSmall,
+      padding: "6px 12px"
+    }
+  }, "\uC800\uC7A5"))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 11,
+      color: secMsg && /사이|권한|오류|실패/.test(secMsg) ? "#ef4444" : secMsg ? BLUE : "#A3AAC2"
+    }
+  }, secMsg || "배너가 2개 이상일 때 홈에서 이 시간마다 옆으로 넘어가요. 2~30초, 모든 회원 홈에 같이 적용돼요.")), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uBC30\uB108\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uACF5\uC9C0 \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uC778\uC6D0\uC774 \uB35C \uCC2C \uBAA8\uC784\uC740 \uBAA8\uC784 \uC0C1\uC138 \uC544\uB798 \"\uD648 \uD654\uBA74 \uBC30\uB108\uC5D0 \uCD94\uAC00\uD558\uAE30\"\uB85C \uB123\uC744 \uC218 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
+  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uBC30\uB108\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uACF5\uC9C0 \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 \uC815\uD574 \uB454 \uC2DC\uAC04\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uC778\uC6D0\uC774 \uB35C \uCC2C \uBAA8\uC784\uC740 \uBAA8\uC784 \uC0C1\uC138 \uC544\uB798 \"\uD648 \uD654\uBA74 \uBC30\uB108\uC5D0 \uCD94\uAC00\uD558\uAE30\"\uB85C \uB123\uC744 \uC218 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
 }
 function HomeTab({
   onGoBooking,
@@ -3741,7 +3863,8 @@ function HomeTab({
   isAdmin,
   onWriteNotice,
   focusNotice,
-  ads = []
+  ads = [],
+  adSecs
 }) {
   const [goingN, setGoingN] = useState(3);
   const focusId = focusNotice ? focusNotice.split("#")[0] : null;
@@ -3995,7 +4118,8 @@ function HomeTab({
       fontWeight: isFull(nextNext) || nextNext.cancelled ? 700 : 400
     }
   }, nextNext.cancelled ? goneLabel(nextNext) : isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext) ? ` · 대기 ${waitN(nextNext)}명` : ""}` : `${nextNext.attendees.length}명 참석예정`))), ads.length > 0 && /*#__PURE__*/React.createElement(AdCarousel, {
-    ads: ads
+    ads: ads,
+    sec: adSecs
   }), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB0B4\uAC00 \uCC38\uC11D\uD560 \uBAA8\uC784", going.length > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
@@ -14541,7 +14665,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "1697ab2ad5";
+const BUILD_ID = "b66730377b";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -15509,7 +15633,8 @@ function App() {
   const clubData = useClubMembers(inMain);
   const boardPosts = useBoard(inMain);
   // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
-  const ads = useAds(inMain).map(adMeeting).filter(a => !a.hide).map(a => a.meetingId ? {
+  const adData = useAds(inMain);
+  const ads = adData.list.map(adMeeting).filter(a => !a.hide).map(a => a.meetingId ? {
     ...a,
     onGo: () => {
       FOCUS_ATTEND.id = +a.meetingId;
@@ -16105,7 +16230,8 @@ function App() {
     isAdmin: adminOn,
     onWriteNotice: () => setNoticeForm(true),
     focusNotice: focusNotice,
-    ads: ads
+    ads: ads,
+    adSecs: adData.sec
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
     open: openMeeting,
     onOpen: (id, view, from) => openM(id, view, from || "booking"),
