@@ -709,6 +709,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
   const myStatus=myVote&&myVote.status;
+  const myGoing=next&&myStatus==="attend"?(going.find(g=>g.m.id===next.id)||{ok:true,label:"참석 확정"}):null;
   const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).then(()=>{ if(status==="attend") notifyAttend(next,myStatus); }).catch(e=>alert(authMsg(e)));
   const fill=next?Math.min(100,Math.round((next.attendees.length/Math.max(1,next.total))*100)):0;
   return(
@@ -738,10 +739,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <div style={{height:6,background:isFull(next)?FULL.line:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:GRAD,borderRadius:10}}/></div>
           </div>
           {isOpen(next)?(
-          <div style={{display:"flex",gap:8}}>
-            <button type="button" onClick={()=>vote("attend")} style={{flex:1,padding:"9px 0",background:myStatus==="attend"?GRAD:"#fff",color:myStatus==="attend"?"#fff":BLUE,border:myStatus==="attend"?"none":`1.5px solid ${BLUE}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:myStatus==="attend"?SHADOW_BTN:"none"}}>{myStatus==="attend"?"참석 투표함 ✓":"참석하기 ✓"}</button>
-            <button type="button" onClick={()=>vote("absent")} style={{flex:1,padding:"8px 0",background:myStatus==="absent"?"#fef2f2":"#fff",color:myStatus==="absent"?"#ef4444":"#6B7493",border:`1.5px solid ${myStatus==="absent"?"#ef4444":"#D6DEF7"}`,borderRadius:999,fontSize:13,fontWeight:myStatus==="absent"?600:400,cursor:"pointer"}}>불참</button>
-          </div>
+          <><AttendButtons status={myStatus} onVote={vote}/>
+          {myGoing?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
+            :myStatus==="absent"?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
+            :<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
           ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}><Ic n="calendar" s={13}/> 예약은 {next.openDate}에 열려요</p>}
           </>}
         </div>)}
@@ -1223,6 +1224,21 @@ function localDb(){
 const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
   : Promise.resolve().then(()=>(window.firebase&&window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.databaseURL)?firebaseDb():localDb())
       .catch(()=>{ try{ return localDb(); }catch(e){ return null; } });
+// 참석·불참 버튼 (홈·모임 상세 공용). 고른 쪽만 꽉 찬 색 + 체크, 안 고른 쪽은 테두리만.
+// 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
+function AttendButtons({status,onVote}) {
+  const going=status==="attend", out=status==="absent";
+  const base={flex:1,padding:"9px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
+  return (
+    <div style={{display:"flex",gap:8}}>
+      <button type="button" aria-pressed={going} onClick={()=>onVote("attend")} style={{...base,
+        background:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:going?SHADOW_BTN:"none"}}>
+        {going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
+      <button type="button" aria-pressed={out} onClick={()=>onVote("absent")} style={{...base,
+        background:out?"#EF4444":"#fff",color:out?"#fff":"#6B7493",border:`1.5px solid ${out?"#EF4444":"#D6DEF7"}`}}>
+        {out?<><Ic n="check" s={15} w={2.6}/>불참</>:"불참"}</button>
+    </div>);
+}
 // club/meetings/<path>에 값 쓰기 (null이면 지움)
 const saveMeetingPath=(path,value)=>dbReady.then(db=>{ if(!db) throw new Error("저장소가 없어요"); return db.doc("meetings/"+path).set(value); });
 // 지금 로그인한 사람의 투표 키: 파이어베이스 계정이면 uid, 아니면 닉네임
@@ -2446,14 +2462,12 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
     ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번째 (대기 ${waitlist.length}명 중)${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
-    :myStatus==="absent"?"불참으로 등록되었어요":myStatus==="maybe"?"미정으로 등록되었어요":"";
+    :myStatus==="absent"?"불참으로 등록되었어요":myStatus==="maybe"?"미정으로 등록되었어요":"아직 참석 여부를 정하지 않았어요";
   // 대진표 참가자 = 참석 확정자
   const participants=confirmed.map(v=>({name:v.name,ntrp:v.ntrp,isGuest:v.isGuest,isMe:v.isMe,arrive:v.arrive||"",leave:v.leave||""}));
   // 늦게 도착·일찍 출발 (대진표 짤 때 첫판·막판 제외로 반영)
   const mStart=meeting.time.slice(0,5), mEnd=(meeting.time.split("~")[1]||"").trim().slice(0,5);
   const setTimeNote=(k,v)=>store.saveRsvp({...voteValue("attend",mine),[k]:v||null});
-  const C={attend:{border:BLUE,bg:BLUE,color:"#fff"},maybe:{border:"#f59e0b",bg:"#fffbeb",color:"#d97706"},absent:{border:"#ef4444",bg:"#fef2f2",color:"#ef4444"}};
-  const I={border:"#E4E9F7",bg:"#fff",color:"#6B7493"};
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14,paddingBottom:24}}>
       <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
@@ -2501,13 +2515,8 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         {!gone&&!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
         {!gone&&!isPast&&open&&(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"flex",gap:8}}>
-              {[{label:"✓ 참석",val:"attend"},{label:"✕ 불참",val:"absent"}].map(btn=>{
-                const active=myStatus===btn.val;const s=active?C[btn.val]:I;
-                return <button key={btn.val} type="button" onClick={()=>setMyStatus(btn.val)} style={{flex:1,padding:"9px 0",borderRadius:999,fontSize:13,cursor:"pointer",fontWeight:600,border:`1.5px solid ${s.border}`,background:s.bg,color:s.color}}>{btn.label}</button>;
-              })}
-            </div>
-            {myStatus&&<p style={{margin:0,fontSize:12,textAlign:"center",color:myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>}
+            <AttendButtons status={myStatus} onVote={setMyStatus}/>
+            <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {myStatus==="attend"&&(
               <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
                 <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}><Ic n="clock" s={14}/> 늦게 오거나 일찍 가나요?</span>
