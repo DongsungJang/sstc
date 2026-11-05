@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=6550ec5a05">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=6550ec5a05">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=83bfbf9e3d">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=83bfbf9e3d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2165,11 +2165,12 @@ function Empty({
   }, action));
 }
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, logo, top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// club/ads/a<만든 시각> = {enabled, logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY = {
   enabled: false,
   logo: "",
+  logoImg: "",
   top: "",
   title: "",
   sub: "",
@@ -2177,7 +2178,45 @@ const AD_EMPTY = {
   start: "",
   end: ""
 };
-const AD_FIELDS = ["logo", "top", "title", "sub", "url", "start", "end"];
+const AD_FIELDS = ["logo", "logoImg", "top", "title", "sub", "url", "start", "end"];
+// 로고 사진: 브라우저에서 가로세로 최대 160px로 줄여 data URL로 광고 데이터에 같이 저장 (파이어베이스 Storage 안 씀)
+// 투명 배경을 살리려고 webp → png 순으로, 그래도 크면 흰 바탕 jpeg로. 보통 5~20KB
+const AD_LOGO_MAX = 160,
+  AD_LOGO_BYTES = 60000;
+function shrinkLogo(file) {
+  return new Promise((res, rej) => {
+    if (!file || !/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img = new Image(),
+      src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(src);
+      const k = Math.min(1, AD_LOGO_MAX / Math.max(img.width, img.height)),
+        w = Math.max(1, Math.round(img.width * k)),
+        h = Math.max(1, Math.round(img.height * k));
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, 0, 0, w, h);
+      let out = c.toDataURL("image/webp", 0.9);
+      if (!/^data:image\/webp/.test(out) || out.length > AD_LOGO_BYTES) out = c.toDataURL("image/png");
+      if (out.length > AD_LOGO_BYTES) {
+        g.globalCompositeOperation = "destination-over";
+        g.fillStyle = "#fff";
+        g.fillRect(0, 0, w, h);
+        out = c.toDataURL("image/jpeg", 0.85);
+      }
+      out.length > AD_LOGO_BYTES ? rej(new Error("사진이 너무 복잡해요. 다른 사진으로 해 주세요")) : res(out);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(src);
+      rej(new Error("사진을 읽지 못했어요"));
+    };
+    img.src = src;
+  });
+}
+const adLogoOk = v => typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= AD_LOGO_BYTES;
 const AD_INTERVAL = 5000;
 // 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
 const adUrl = u => {
@@ -2228,7 +2267,32 @@ function AdBanner({
       height: "100%",
       boxSizing: "border-box"
     }
-  }, ad.logo && /*#__PURE__*/React.createElement("div", {
+  }, adLogoOk(ad.logoImg) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: 16,
+      background: "#fff",
+      border: "1px solid #EADFD2",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      overflow: "hidden",
+      padding: 4,
+      boxSizing: "border-box"
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: ad.logoImg,
+    alt: ad.logo || "로고",
+    draggable: false,
+    style: {
+      maxWidth: "100%",
+      maxHeight: "100%",
+      objectFit: "contain",
+      display: "block"
+    }
+  })) : ad.logo && /*#__PURE__*/React.createElement("div", {
     style: {
       width: 54,
       height: 54,
@@ -2466,6 +2530,14 @@ function AdSettings() {
     }));
     setMsg("");
   };
+  const [logoBusy, setLogoBusy] = useState(false);
+  const pickLogo = e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setLogoBusy(true);
+    shrinkLogo(file).then(d => set("logoImg", d)).catch(err => setMsg(err.message)).finally(() => setLogoBusy(false));
+  };
   const unlimited = !f.start && !f.end;
   const urlBad = !!f.url.trim() && !adUrl(f.url);
   const rangeBad = !!(f.start && f.end && f.end < f.start);
@@ -2491,6 +2563,7 @@ function AdSettings() {
       id = cur === "new" ? "a" + now : cur;
     const v = {
       logo: f.logo.trim().slice(0, 12),
+      logoImg: adLogoOk(f.logoImg) ? f.logoImg : "",
       top: f.top.trim().slice(0, 40),
       title: f.title.trim().slice(0, 40),
       sub: f.sub.trim().slice(0, 50),
@@ -2647,7 +2720,76 @@ function AdSettings() {
         color: st[2]
       }
     }, st[0]), adPeriod(saved));
-  })(), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
+  })(), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uB85C\uACE0 \uC0AC\uC9C4 (\uC120\uD0DD)"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: 16,
+      background: "#fff",
+      border: `1.5px ${f.logoImg ? "solid #EADFD2" : "dashed #D6DEF7"}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      padding: f.logoImg ? 4 : 0,
+      boxSizing: "border-box",
+      flexShrink: 0
+    }
+  }, f.logoImg ? /*#__PURE__*/React.createElement("img", {
+    src: f.logoImg,
+    alt: "\uB85C\uACE0 \uBBF8\uB9AC\uBCF4\uAE30",
+    style: {
+      maxWidth: "100%",
+      maxHeight: "100%",
+      objectFit: "contain"
+    }
+  }) : /*#__PURE__*/React.createElement(Icon, {
+    name: "camera",
+    size: 22,
+    color: "#A3AAC2",
+    stroke: 1.6
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: BLUE,
+      border: `1.5px solid ${BLUE}`,
+      display: "inline-flex",
+      alignItems: "center",
+      opacity: logoBusy ? 0.6 : 1
+    }
+  }, logoBusy ? "줄이는 중…" : f.logoImg ? "사진 바꾸기" : "사진 올리기", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    disabled: logoBusy,
+    onChange: pickLogo,
+    style: {
+      display: "none"
+    }
+  })), f.logoImg && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => set("logoImg", ""),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: "#ef4444",
+      border: "1.5px solid #FBD5D5"
+    }
+  }, "\uBE7C\uAE30")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC815\uC0AC\uAC01\uD615\uC774\uB098 \uBC30\uACBD\uC774 \uD22C\uBA85\uD55C \uB85C\uACE0\uAC00 \uC798 \uC5B4\uC6B8\uB824\uC694. \uC0AC\uC9C4\uC774 \uC788\uC73C\uBA74 \uC544\uB798 \uB85C\uACE0 \uAE00\uC790 \uB300\uC2E0 \uC0AC\uC9C4\uC774 \uBCF4\uC5EC\uC694.")), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB204\uB974\uBA74 \uC5F4 \uB9C1\uD06C (\uC120\uD0DD)",
     error: urlBad ? "주소를 확인해 주세요" : ""
   }, /*#__PURE__*/React.createElement("input", {
@@ -2797,7 +2939,7 @@ function AdSettings() {
     style: {
       margin: 0,
       fontSize: 13,
-      color: /확인|넣어|권한|오류|실패|뒤여야|끝났/.test(msg) ? "#ef4444" : BLUE,
+      color: /확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg) ? "#ef4444" : BLUE,
       textAlign: "center"
     }
   }, msg), /*#__PURE__*/React.createElement("p", {
@@ -13507,7 +13649,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "6550ec5a05";
+const BUILD_ID = "83bfbf9e3d";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
