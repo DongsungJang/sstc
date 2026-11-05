@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=d8223f0b28">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=d8223f0b28">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=1ce2af6fe6">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1ce2af6fe6">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2386,7 +2386,8 @@ function useAds(on) {
   return ads.filter(a => a.enabled && a.title && adPhase(a, day) === "live");
 }
 function AdBanner({
-  ad
+  ad,
+  onOpen
 }) {
   if (!ad || !ad.title) return null;
   const url = adUrl(ad.url),
@@ -2516,6 +2517,7 @@ function AdBanner({
     target: "_blank",
     rel: "noopener noreferrer",
     draggable: false,
+    onClick: onOpen,
     "aria-label": `광고: ${ad.title}`,
     style: box
   }, body, tag) : /*#__PURE__*/React.createElement("div", {
@@ -2523,6 +2525,171 @@ function AdBanner({
   }, body, tag);
 }
 // 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
+// 광고 노출·클릭 세기: club/adStats/<광고id>/<YYYY-MM-DD>/{views,clicks}/<uid> = true
+// 같은 회원이 같은 날 여러 번 봐도·눌러도 한 번으로 세요 (날짜는 한국 시간). 이미 센 건 이 기기에 적어 둬서 다시 안 써요
+const AD_TRACKED = (() => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem("sstc-ad-tracked") || "[]"));
+  } catch (e) {
+    return new Set();
+  }
+})();
+function adTrack(id, kind) {
+  const uid = myUid();
+  if (!FB || !uid || !id) return;
+  const day = adToday(),
+    key = `${day}|${id}|${kind}|${uid}`;
+  if (AD_TRACKED.has(key)) return;
+  AD_TRACKED.add(key);
+  try {
+    localStorage.setItem("sstc-ad-tracked", JSON.stringify([...AD_TRACKED].filter(k => k.slice(0, 10) === day)));
+  } catch (e) {}
+  FB.club.child(`adStats/${id}/${day}/${kind}/${uid}`).set(true).catch(() => AD_TRACKED.delete(key));
+}
+// 관리 탭: 광고 하나의 노출·클릭 (오늘 / 최근 7일 / 30일 / 전체)
+const AD_RANGES = [["today", "오늘", 1], ["7", "최근 7일", 7], ["30", "최근 30일", 30], ["all", "전체", 0]];
+function adSum(stats, days) {
+  const today = adToday(),
+    from = days ? new Date(Date.parse(today + "T00:00:00Z") - (days - 1) * 86400000).toISOString().slice(0, 10) : "";
+  let v = 0,
+    c = 0;
+  Object.keys(stats || {}).forEach(d => {
+    if (from && d < from) return;
+    const x = stats[d] || {};
+    v += Object.keys(x.views || {}).length;
+    c += Object.keys(x.clicks || {}).length;
+  });
+  return {
+    v,
+    c,
+    rate: v ? Math.round(c / v * 1000) / 10 : 0
+  };
+}
+function AdStats({
+  ad,
+  label
+}) {
+  const [stats, setStats] = useState(undefined);
+  const [range, setRange] = useState("7");
+  useEffect(() => {
+    setStats(undefined);
+    const r = FB.club.child("adStats/" + ad.id),
+      h = s => setStats(s.val() || {});
+    r.on("value", h, () => setStats(null));
+    return () => r.off("value", h);
+  }, [ad.id]);
+  const rg = AD_RANGES.find(x => x[0] === range),
+    sum = adSum(stats, rg[2]);
+  const copy = () => {
+    const lines = AD_RANGES.map(([, name, days]) => {
+      const x = adSum(stats, days);
+      return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`;
+    });
+    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g, ".")} 기준\n\n${lines.join("\n")}\n\n같은 회원이 같은 날 여러 번 보거나 눌러도 한 번으로 셌어요.`, "SSTC 광고 결과", "광고 결과");
+  };
+  const box = (name, val, c) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      background: "#fff",
+      borderRadius: 14,
+      padding: "10px 6px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 2px",
+      fontSize: 11,
+      color: "#6B7493"
+    }
+  }, name), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 700,
+      color: c || "#1B2559"
+    }
+  }, val));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F5F7FE",
+      borderRadius: 16,
+      padding: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#1B2559"
+    }
+  }, label, " \uBC18\uC751"), stats && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: copy,
+    style: {
+      background: "none",
+      border: "none",
+      fontSize: 12,
+      color: BLUE,
+      fontWeight: 600,
+      cursor: "pointer",
+      padding: 0,
+      fontFamily: FONT
+    }
+  }, "\uACB0\uACFC \uBCF5\uC0AC")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 8
+    }
+  }, AD_RANGES.map(([k, name]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    onClick: () => setRange(k),
+    style: {
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: FONT,
+      border: `1px solid ${range === k ? BLUE : "#D6DEF7"}`,
+      background: range === k ? BLUE : "#fff",
+      color: range === k ? "#fff" : "#4A5578",
+      fontWeight: range === k ? 700 : 500
+    }
+  }, name))), stats === null ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#C2610C",
+      lineHeight: 1.6
+    }
+  }, "\uC22B\uC790\uB97C \uBCF4\uB824\uBA74 README\uC758 \uC0C8 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uADDC\uCE59(adStats)\uC744 \uCF58\uC194\uC5D0 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694.") : stats === undefined ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, "\uBD88\uB7EC\uC624\uB294 \uC911\u2026") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, box("노출", sum.v), box("클릭", sum.c, BLUE), box("클릭률", sum.rate + "%")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.6
+    }
+  }, "\uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uAD11\uACE0\uAC00 \uD654\uBA74\uC5D0 \uB098\uC628 \uAC83, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB97C \uC5F0 \uAC70\uC608\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 \uD55C \uBC88\uC73C\uB85C \uC138\uC694.")));
+}
 function AdCarousel({
   ads
 }) {
@@ -2533,6 +2700,10 @@ function AdCarousel({
   useEffect(() => {
     if (i >= n) setI(0);
   }, [n]);
+  const shownId = n ? ads[Math.min(i, n - 1)].id : "";
+  useEffect(() => {
+    if (shownId && !document.hidden) adTrack(shownId, "views");
+  }, [shownId]); // 지금 화면에 나온 광고를 노출로 세요
   useEffect(() => {
     if (n < 2) return;
     const t = setInterval(() => {
@@ -2548,7 +2719,8 @@ function AdCarousel({
   }, [n]);
   if (!n) return null;
   if (n === 1) return /*#__PURE__*/React.createElement(AdBanner, {
-    ad: ads[0]
+    ad: ads[0],
+    onOpen: () => adTrack(ads[0].id, "clicks")
   });
   const onScroll = e => {
     const el = e.currentTarget;
@@ -2589,7 +2761,8 @@ function AdCarousel({
       scrollSnapStop: "always"
     }
   }, /*#__PURE__*/React.createElement(AdBanner, {
-    ad: a
+    ad: a,
+    onOpen: () => adTrack(a.id, "clicks")
   })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2722,7 +2895,7 @@ function AdSettings() {
     }
     if (!window.confirm(`광고${list.findIndex(a => a.id === cur) + 1} "${saved && saved.title || ""}"을(를) 지울까요?`)) return;
     setBusy(true);
-    FB.club.child("ads/" + cur).remove().then(() => setMsg("지웠어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+    FB.club.child("ads/" + cur).remove().then(() => FB.club.child("adStats/" + cur).remove().catch(() => {})).then(() => setMsg("지웠어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
   };
   const status = a => !a.enabled ? ["꺼짐", "#F1F2F5", "#6B7280"] : {
     live: ["노출 중", "#E5F7EE", "#067647"],
@@ -2849,7 +3022,10 @@ function AdSettings() {
         color: st[2]
       }
     }, st[0]), adPeriod(saved));
-  })(), /*#__PURE__*/React.createElement(FieldWrap, {
+  })(), saved && /*#__PURE__*/React.createElement(AdStats, {
+    ad: saved,
+    label: `광고${list.findIndex(a => a.id === cur) + 1}`
+  }), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB85C\uACE0 \uC0AC\uC9C4 (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13851,7 +14027,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "d8223f0b28";
+const BUILD_ID = "1ce2af6fe6";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
