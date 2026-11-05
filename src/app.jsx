@@ -688,8 +688,10 @@ function Empty({children,action,onAction}) {
     </div>
   );
 }
-// ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// ─── 홈 화면 배너 (홈 "다가오는 모임" 아래) ──────────────────────────────────
+// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, order, createdAt, updatedAt, updatedByUid}
+// 모임 홍보 배너: club/ads/am<모임id> = {meetingId, enabled, tag, title(한마디, 비우면 시간·장소), bg, …}. 내용은 모임 정보로 그때그때 만들고,
+// 누르면 그 모임 참석 버튼으로 가요. 마감·종료·무산·삭제된 모임이면 홈에서 저절로 빠져요
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY={enabled:false,tag:"광고",logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",popup:"",start:"",end:""};
 const AD_FIELDS=["tag","logo","logoImg","bg","top","title","sub","url","popup","start","end"];
@@ -774,8 +776,29 @@ function useAds(on){
   },[on]);
   // 앱을 켜 둔 채 날짜가 바뀌어도 기간을 다시 따져요
   useEffect(()=>{ const t=setInterval(()=>setDay(adToday()),60000); return ()=>clearInterval(t); },[]);
-  return ads.filter(a=>a.enabled&&a.title&&adPhase(a,day)==="live");
+  return ads.filter(a=>a.enabled&&(a.title||a.meetingId)&&adPhase(a,day)==="live");
 }
+// 모임 배너 → 화면에 보일 내용. 홈에 안 보이는 모임이면 hide에 이유를 넣어요
+const AD_KIND_NAME={regular:"정기 모임",game:"번개 게임",training:"번개 훈련"};
+const AD_KIND_BG={regular:"#DCEBFF",game:"#FFF0BF",training:"#D6F2E4"};
+const adMeetingId=m=>"am"+m.id;
+function adDday(iso){ const d=Math.round((Date.parse(iso+"T00:00:00Z")-Date.parse(adToday()+"T00:00:00Z"))/86400000); return d<=0?"오늘":d===1?"내일":`D-${d}`; }
+function adMeeting(a){
+  if(!a||!a.meetingId) return a;
+  const m=MEETINGS.find(x=>x.id===+a.meetingId);
+  if(!m) return {...a,title:a.title||"지워진 모임",hide:"모임이 지워졌어요"};
+  const k=kindKey(m), n=(m.attendees||[]).length, left=m.total-n;
+  const v={...a,tag:a.tag||"모집",bg:a.bg||AD_KIND_BG[k],logo:"",logoImg:"",url:"",popup:"",
+    top:`${AD_KIND_NAME[k]} · ${m.date} · ${adDday(m.iso)}`,
+    title:a.title||`${m.info.start} ${m.placeName||m.place}`,
+    sub:`${a.title?`${m.info.start} ${m.placeName||m.place} · `:""}${m.total>0?`${n}/${m.total}명 · ${left}자리 남았어요`:`${n}명 참석`}`,meeting:m};
+  if(m.cancelled) v.hide="무산된 모임이라 안 보여요";
+  else if(m.status==="past") v.hide="끝난 모임이라 안 보여요";
+  else if(isFull(m)) v.hide="자리가 다 차서 안 보여요 (자리가 나면 다시 보여요)";
+  return v;
+}
+// 모임 상세에서 "참석 버튼으로" 가라고 남겨 두는 표시
+const FOCUS_ATTEND={id:0};
 // 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 공지·모집·이벤트 ("알림"은 종 모양 알림과 헷갈려서 뺌)
 const AD_TAGS=[["광고","#8A7563","rgba(255,255,255,0.85)","#E6D9CA"],["공지","#D23C3C","#FFF1F1","#FBD5D5"],["모집","#067647","#E5F7EE","#B7E6CC"],["이벤트","#C2610C","#FFF4E5","#FAD9B0"]];
 const adTagOf=t=>AD_TAGS.find(x=>x[0]===t)||AD_TAGS[0];
@@ -802,7 +825,7 @@ function AdPopup({ad,onClose}){
 function AdBanner({ad,onOpen}){
   const [pop,setPop]=useState(false);
   if(!ad||!ad.title) return null;
-  const url=adUrl(ad.url), th=adTheme(ad.bg), popup=!url&&String(ad.popup||"").trim();
+  const url=adUrl(ad.url), th=adTheme(ad.bg), go=!url&&ad.onGo, popup=!url&&!go&&String(ad.popup||"").trim();
   const body=(
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
       {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,0.06)",flexShrink:0,overflow:"hidden"}}>
@@ -815,12 +838,13 @@ function AdBanner({ad,onOpen}){
         <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:th.title,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
         {ad.sub&&<p style={{margin:0,fontSize:12,color:th.sub,wordBreak:"keep-all"}}>{ad.sub}</p>}
       </div>
-      {(url||popup)&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
+      {(url||popup||go)&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
     </div>);
   const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
   const tag=<AdTag tag={ad.tag} style={{position:"absolute",top:8,right:10}}/>;
   const label=`${adTagOf(ad.tag)[0]}: ${ad.title}`;
   if(url) return <a href={url} target="_blank" rel="noopener noreferrer" draggable={false} onClick={onOpen} aria-label={label} style={box}>{body}{tag}</a>;
+  if(go) return <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ onOpen&&onOpen(); go(); }} onKeyDown={e=>{ if(e.key==="Enter"){ onOpen&&onOpen(); go(); } }} style={{...box,cursor:"pointer"}}>{body}{tag}</div>;
   if(popup) return <>
     <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ setPop(true); onOpen&&onOpen(); }} onKeyDown={e=>{ if(e.key==="Enter"){ setPop(true); onOpen&&onOpen(); } }} style={{...box,cursor:"pointer"}}>{body}{tag}</div>
     {pop&&<AdPopup ad={ad} onClose={()=>setPop(false)}/>}
@@ -857,7 +881,7 @@ function AdStats({ad,label}){
   const rg=AD_RANGES.find(x=>x[0]===range), sum=adSum(stats,rg[2]);
   const copy=()=>{
     const lines=AD_RANGES.map(([,name,days])=>{ const x=adSum(stats,days); return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`; });
-    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
+    shareText(`[SSTC 앱 배너 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 배너가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 배너 결과","배너 결과");
   };
   const box=(name,val,c)=>(
     <div style={{flex:1,background:"#fff",borderRadius:14,padding:"10px 6px",textAlign:"center"}}>
@@ -877,7 +901,7 @@ function AdStats({ad,label}){
       {stats===null?<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>숫자를 보려면 README의 새 파이어베이스 규칙(adStats)을 콘솔에 붙여넣어 주세요.</p>
       :stats===undefined?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>불러오는 중…</p>:<>
         <div style={{display:"flex",gap:6}}>{box("노출",sum.v)}{box("클릭",sum.c,BLUE)}{box("클릭률",sum.rate+"%")}</div>
-        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 배너가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
       </>}
     </div>);
 }
@@ -921,12 +945,12 @@ function AdCarousel({ads}){
         {ads.map(a=><div key={a.id} style={{flex:"0 0 100%",scrollSnapAlign:"start",scrollSnapStop:"always"}}><AdBanner ad={a} onOpen={()=>adTrack(a.id,"clicks")}/></div>)}
       </div>
       <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:8}}>
-        {ads.map((a,k)=><button key={a.id} type="button" aria-label={`광고 ${k+1}번 보기`} onClick={()=>go(k)}
+        {ads.map((a,k)=><button key={a.id} type="button" aria-label={`배너 ${k+1}번 보기`} onClick={()=>go(k)}
           style={{width:k===i?16:6,height:6,padding:0,border:"none",borderRadius:999,background:k===i?"#B9A28C":"#DCD2C6",cursor:"pointer",transition:"width .2s"}}/>)}
       </div>
     </div>);
 }
-// 관리 탭: 광고1·광고2… 탭으로 고르고, 내용·기간을 넣고 켜기/끄기, 추가·삭제
+// 관리 탭: 배너1·배너2… 탭으로 고르고, 내용·기간을 넣고 켜기/끄기, 추가·삭제
 function AdSettings(){
   const [ads,setAds]=useState(undefined);   // undefined: 불러오는 중
   const [cur,setCur]=useState(null);        // 고른 광고 id ("new": 아직 저장 안 한 새 광고)
@@ -939,6 +963,7 @@ function AdSettings(){
   },[]);
   const list=ads||[];
   const saved=list.find(a=>a.id===cur)||null;
+  const mtAd=saved&&saved.meetingId?adMeeting(saved):null;   // 모임 홍보 배너면 모임 정보로 만든 내용
   // 처음 열 때·지운 뒤: 첫 광고를 고름 (없으면 새 광고 칸). 방금 저장해서 목록에 아직 안 들어온 광고는 기다려요
   const seenIds=useRef(new Set());
   useEffect(()=>{ if(ads===undefined) return; list.forEach(a=>seenIds.current.add(a.id)); if(cur==="new"||saved) return;
@@ -953,6 +978,11 @@ function AdSettings(){
   const rangeBad=!!(f.start&&f.end&&f.end<f.start);
   const dirty=cur==="new"?AD_FIELDS.some(k=>f[k]):!!saved&&AD_FIELDS.some(k=>(f[k]||"")!==(saved[k]||""));
   const save=enabled=>{
+    if(mtAd){   // 모임 배너: 한마디·표시·배경색만 바꿔요
+      const v={...saved,tag:adTagOf(f.tag)[0],title:f.title.trim().slice(0,40),bg:adHex(f.bg),enabled:!!enabled,updatedAt:Date.now(),updatedByUid:myUid()}; delete v.id;
+      setBusy(true); FB.club.child("ads/"+cur).set(v).then(()=>setMsg(!enabled?"껐어요. 홈에 안 보여요":mtAd.hide?`켰어요. 다만 ${mtAd.hide}`:"켰어요. 홈 화면에 보여요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+      return;
+    }
     if(enabled&&!f.title.trim()){ setMsg("제목을 넣어야 켤 수 있어요"); return; }
     if(!f.title.trim()&&cur==="new"){ setMsg("제목을 넣어 주세요"); return; }
     if(urlBad){ setMsg("링크 주소를 확인해 주세요"); return; }
@@ -971,15 +1001,15 @@ function AdSettings(){
     const k=list.findIndex(a=>a.id===cur), j=k+d; if(k<0||j<0||j>=list.length) return;
     const ids=list.map(a=>a.id); [ids[k],ids[j]]=[ids[j],ids[k]];
     const up={}; ids.forEach((id,n)=>{ up[id+"/order"]=n; });
-    setBusy(true); FB.club.child("ads").update(up).then(()=>setMsg(`광고${j+1}(으)로 옮겼어요`)).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+    setBusy(true); FB.club.child("ads").update(up).then(()=>setMsg(`배너${j+1}(으)로 옮겼어요`)).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
   };
   const remove=()=>{
     if(cur==="new"){ pick(list[0]?list[0].id:"new"); return; }
-    if(!window.confirm(`광고${list.findIndex(a=>a.id===cur)+1} "${(saved&&saved.title)||""}"을(를) 지울까요?`)) return;
+    if(!window.confirm(`배너${list.findIndex(a=>a.id===cur)+1} "${(mtAd||saved||{}).title||""}"을(를) 지울까요?${mtAd?"\n모임은 그대로 있어요.":""}`)) return;
     setBusy(true); FB.club.child("ads/"+cur).remove().then(()=>FB.club.child("adStats/"+cur).remove().catch(()=>{})).then(()=>setMsg("지웠어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
   };
-  const status=a=>!a.enabled?["꺼짐","#F1F2F5","#6B7280"]:({live:["노출 중","#E5F7EE","#067647"],before:["시작 전","#FFF4E5","#C2610C"],after:["기간 끝남","#F1F2F5","#6B7280"]})[adPhase(a)];
-  const showing=list.filter(a=>a.enabled&&a.title&&adPhase(a)==="live").length;
+  const status=a=>!a.enabled?["꺼짐","#F1F2F5","#6B7280"]:a.meetingId&&adMeeting(a).hide?["숨김","#F1F2F5","#6B7280"]:({live:["노출 중","#E5F7EE","#067647"],before:["시작 전","#FFF4E5","#C2610C"],after:["기간 끝남","#F1F2F5","#6B7280"]})[adPhase(a)];
+  const showing=list.filter(a=>a.enabled&&(a.meetingId?!adMeeting(a).hide:a.title)&&adPhase(a)==="live").length;
   const on=!!(saved&&saved.enabled);
   const field=(k,label,ph,max)=>(
     <FieldWrap label={label}><input value={f[k]} maxLength={max} onChange={e=>set(k,e.target.value)} placeholder={ph} style={inputStyle}/></FieldWrap>);
@@ -990,13 +1020,13 @@ function AdSettings(){
   return (
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>광고 배너</span>
+        <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>홈 화면 배너</span>
         <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:999,background:showing?"#E5F7EE":"#F1F2F5",color:showing?"#067647":"#6B7280"}}>{ads===undefined?"불러오는 중":showing?`홈에 ${showing}개 보이는 중`:"홈에 안 보여요"}</span>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-        {list.map((a,k)=>tabBtn(a.id,`광고${k+1}`,a))}
-        {cur==="new"?tabBtn("new",`광고${list.length+1}`,null)
-          :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 광고 추가</button>}
+        {list.map((a,k)=>tabBtn(a.id,`배너${k+1}`,a))}
+        {cur==="new"?tabBtn("new",`배너${list.length+1}`,null)
+          :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 배너 추가</button>}
       </div>
       {saved&&list.length>1&&(()=>{ const k=list.findIndex(a=>a.id===cur);
         const mv={padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT,background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"};
@@ -1008,8 +1038,12 @@ function AdSettings(){
         </div>; })()}
       {ads!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{adPeriod(saved)}</p>; })()}
-        {saved&&<AdStats ad={saved} label={`광고${list.findIndex(a=>a.id===cur)+1}`}/>}
+          <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{mtAd?(mtAd.hide&&saved.enabled?mtAd.hide:"모임 홍보 배너"):adPeriod(saved)}</p>; })()}
+        {saved&&<AdStats ad={mtAd||saved} label={`배너${list.findIndex(a=>a.id===cur)+1}`}/>}
+        {mtAd&&<div style={{background:"#F5F7FE",borderRadius:14,padding:"10px 12px",fontSize:12,color:"#4A5578",lineHeight:1.6}}>
+          모임 상세에서 넣은 배너예요. 날짜·시간·장소·남은 자리는 모임 정보로 자동으로 채워지고, 누르면 그 모임 참석 버튼으로 가요. 자리가 다 차거나 모임이 끝나거나 무산되면 홈에서 저절로 빠져요.
+          {mtAd.meeting&&<p style={{margin:"4px 0 0",fontWeight:600,color:"#2B3674"}}>{mtAd.meeting.date} {mtAd.meeting.time} · {mtAd.meeting.placeName||mtAd.meeting.place}</p>}
+        </div>}
         <FieldWrap label="오른쪽 위 표시">
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {AD_TAGS.map(([name,c,bg,line])=>{ const on=adTagOf(f.tag)[0]===name; return (
@@ -1018,7 +1052,8 @@ function AdSettings(){
           </div>
           <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>업체 광고는 "광고", 우리 모임 소식은 공지(꼭 알아야 할 것)·모집(훈련팟 등)·이벤트 중에 골라요.</p>
         </FieldWrap>
-        <FieldWrap label="로고 사진 (선택)">
+        {mtAd&&<FieldWrap label="한마디 (선택)"><input value={f.title} maxLength={40} onChange={e=>set("title",e.target.value)} placeholder={`비우면 "${adMeeting({...saved,title:""}).title}"`} style={inputStyle}/></FieldWrap>}
+        {!mtAd&&<><FieldWrap label="로고 사진 (선택)">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:54,height:54,borderRadius:16,background:"#fff",border:f.logoImg?"none":"1.5px dashed #D6DEF7",boxShadow:f.logoImg?"0 0 0 1px rgba(0,0,0,0.06)":"none",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxSizing:"border-box",flexShrink:0}}>
               {f.logoImg?<img src={f.logoImg} alt="로고 미리보기" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<Icon name="camera" size={22} color="#A3AAC2" stroke={1.6}/>}
@@ -1031,12 +1066,12 @@ function AdSettings(){
           </div>
           <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>로고 둘레의 빈 배경은 올릴 때 자동으로 잘라 내요. 사진이 있으면 아래 로고 글자 대신 사진이 보여요.</p>
         </FieldWrap>
-        {field("logo","로고 글자 (선택)","예: ESSENT",12)}
+        {field("logo","로고 글자 (선택)","예: ESSENT",12)}</>}
         <FieldWrap label="배경색">
           <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
-            {AD_COLORS.map(([c,name])=>{ const on=adHex(f.bg)===adHex(c)&&(!!c||!adHex(f.bg)); return (
+            {(mtAd&&mtAd.meeting?[["","모임 종류 색"],...AD_COLORS.slice(1)]:AD_COLORS).map(([c,name])=>{ const on=adHex(f.bg)===adHex(c)&&(!!c||!adHex(f.bg)), look=c||(mtAd&&mtAd.meeting?AD_KIND_BG[kindKey(mtAd.meeting)]:""); return (
               <button key={name} type="button" title={name} aria-label={`배경색 ${name}`} aria-pressed={on} onClick={()=>set("bg",c)}
-                style={{width:34,height:34,borderRadius:"50%",cursor:"pointer",padding:0,background:adTheme(c).bg,border:`1.5px solid ${adTheme(c).line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}/>); })}
+                style={{width:34,height:34,borderRadius:"50%",cursor:"pointer",padding:0,background:adTheme(look).bg,border:`1.5px solid ${adTheme(look).line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}/>); })}
             {(()=>{ const custom=!!adHex(f.bg)&&!AD_COLORS.some(([c])=>adHex(c)===adHex(f.bg)); return (
               <label title="직접 고르기" style={{position:"relative",height:34,padding:"0 12px",borderRadius:999,display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:600,color:BLUE,background:"#fff",border:`1.5px solid ${custom?BLUE:"#D6DEF7"}`,boxShadow:custom?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}>
                 <span style={{width:16,height:16,borderRadius:"50%",background:custom?adHex(f.bg):"conic-gradient(#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171)",border:"1px solid rgba(0,0,0,0.1)"}}/>직접 고르기
@@ -1044,7 +1079,7 @@ function AdSettings(){
               </label>); })()}
           </div>
         </FieldWrap>
-        {field("top","윗줄 작은 글씨 (선택)","예: SSTC 회원이 운영해요 · 당산역 5분",40)}
+        {!mtAd&&<>{field("top","윗줄 작은 글씨 (선택)","예: SSTC 회원이 운영해요 · 당산역 5분",40)}
         {field("title","제목","예: 코트 위 햇볕에 지친 피부, 카밍 케어",40)}
         {field("sub","설명 (선택)","예: 에센트피부과 · 브라이트닝 · 리프팅",50)}
         <FieldWrap label="누르면 열 링크 (선택)" error={urlBad?"주소를 확인해 주세요":""}><input value={f.url} onChange={e=>set("url",e.target.value)} placeholder="예: essentskin.co.kr" inputMode="url" autoCapitalize="none" style={inputStyle}/></FieldWrap>
@@ -1063,10 +1098,10 @@ function AdSettings(){
             <input type="date" aria-label="종료일" value={f.end} min={f.start||undefined} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1,minWidth:0,padding:"10px 12px"}}/>
           </div>}
           {!unlimited&&<p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>시작일·종료일 당일도 보여요. 한쪽을 비우면 그쪽은 제한 없어요.</p>}
-        </FieldWrap>
-        {f.title.trim()&&<div>
+        </FieldWrap></>}
+        {(mtAd||f.title.trim())&&<div>
           <p style={{margin:"2px 0 6px",fontSize:12,color:"#6B7493"}}>미리보기</p>
-          <AdBanner ad={{...f,title:f.title.trim()}}/>
+          <AdBanner ad={mtAd?adMeeting({...saved,tag:f.tag,bg:f.bg,title:f.title.trim()}):{...f,title:f.title.trim()}}/>
         </div>}
         <div style={{display:"flex",gap:8,marginTop:4}}>
           {on?<>
@@ -1077,9 +1112,9 @@ function AdSettings(){
             <button type="button" disabled={busy} onClick={()=>save(true)} style={{...btnSecondary,background:GRAD,color:"#fff",border:"none"}}>켜기</button>
           </>}
         </div>
-        {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 광고 취소":`광고${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
+        {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 배너 취소":`배너${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
         {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
-        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 광고만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 배너만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 인원이 덜 찬 모임은 모임 상세 아래 "홈 화면 배너에 추가하기"로 넣을 수 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
       </div>}
     </Card>);
 }
@@ -2831,8 +2866,38 @@ function shareText(text,title,what){
 function shareMeeting(m){ shareText(meetingShareText(m),"SSTC 모임 안내","안내문"); }
 function shareBracket(m,bracket,scores){ shareText(bracketShareText(m,bracket,scores),"SSTC 대진표","대진표"); }
 
+// 모임 상세 (관리자): 인원이 덜 찬 모임을 홈 화면 배너에 넣고 빼기
+function MeetingBannerCard({meeting}){
+  const id=adMeetingId(meeting);
+  const [ad,setAd]=useState(undefined);
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState("");
+  useEffect(()=>{ const r=FB.club.child("ads/"+id), h=s=>setAd(s.val()); r.on("value",h,()=>setAd(null)); return ()=>r.off("value",h); },[id]);
+  if(ad===undefined) return null;
+  const add=()=>{ const now=Date.now(); setBusy(true); setMsg("");
+    FB.club.child("ads/"+id).set({meetingId:meeting.id,enabled:true,tag:"모집",title:"",bg:"",start:"",end:"",createdAt:now,updatedAt:now,updatedByUid:myUid()})
+      .then(()=>setMsg(isFull(meeting)?"넣었어요. 지금은 자리가 다 차서 홈에 안 보이고, 자리가 나면 보여요":"홈 화면 배너에 넣었어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false)); };
+  const del=()=>{ setBusy(true); setMsg(""); FB.club.child("ads/"+id).remove().then(()=>FB.club.child("adStats/"+id).remove().catch(()=>{})).then(()=>setMsg("홈 화면 배너에서 뺐어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false)); };
+  const shown=ad&&ad.enabled&&adPhase(ad)==="live"&&!isFull(meeting);
+  return (
+    <Card>
+      <SectionTitle>홈 화면 배너</SectionTitle>
+      {ad?<>
+        <p style={{margin:"0 0 10px",fontSize:13,color:shown?"#067647":"#6B7493",fontWeight:600}}>{!ad.enabled?"배너에 들어 있지만 꺼져 있어요":isFull(meeting)?"자리가 다 차서 지금은 홈에 안 보여요":"홈 화면에 이 모임 배너가 나오고 있어요"}</p>
+        <button type="button" disabled={busy} onClick={del} style={{...btnSecondary,width:"100%",color:"#ef4444",borderColor:"#FBD5D5"}}>홈 화면 배너에서 빼기</button>
+      </>:<>
+        <p style={{margin:"0 0 10px",fontSize:12,color:"#6B7493",lineHeight:1.6}}>인원이 덜 찼으면 홈 화면 배너에 넣어 홍보할 수 있어요. 누르면 이 모임 참석 버튼으로 바로 와요. 자리가 다 차거나 모임이 끝나거나 무산되면 홈에서 저절로 빠져요.</p>
+        <button type="button" disabled={busy} onClick={add} style={{...btnSecondary,width:"100%",background:GRAD,color:"#fff",border:"none"}}>홈 화면 배너에 추가하기</button>
+      </>}
+      {msg&&<p style={{margin:"8px 0 0",fontSize:12,color:/권한|오류|실패/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
+      {ad&&<p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2"}}>한마디·순서·반응은 관리 탭 홈 화면 배너에서 바꾸고 볼 수 있어요.</p>}
+    </Card>);
+}
 function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDeleted}) {
   const [view,setView]=useState(initialView);
+  // 홈 화면 배너로 들어왔으면 참석 버튼이 화면 가운데 오게
+  useEffect(()=>{ if(FOCUS_ATTEND.id!==meeting.id) return; FOCUS_ATTEND.id=0;
+    const t=setTimeout(()=>{ const el=document.querySelector("[data-attend]"); if(el) el.scrollIntoView({block:"center",behavior:"smooth"}); },150); return ()=>clearTimeout(t); },[]);
   const store=useMeetingRecord(meeting);
   const [guestInput,setGuestInput]=useState("");
   const [showGuest,setShowGuest]=useState(false);
@@ -2861,7 +2926,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
     ).catch(e=>alert(authMsg(e))); };
   const remove=()=>{ if(!window.confirm(`${meeting.date} 모임을 완전히 지울까요? 투표·대진표·점수·댓글 기록까지 모두 사라져요.\n비나 코트 사정으로 못 하게 된 거라면 '무산 처리'를 써 주세요.${meeting.seriesId?"\n반복 모임은 이 날짜만 빠지고 다음 모임은 계속 만들어져요.":""}`)) return;
     (meeting.seriesId?saveMeetingPath(`series/s${meeting.seriesId}/skip/${meeting.iso}`,true):Promise.resolve())
-      .then(()=>saveMeetingPath("m"+meeting.id,null)).then(onDeleted).catch(e=>alert(authMsg(e))); };
+      .then(()=>saveMeetingPath("m"+meeting.id,null)).then(()=>{ if(isAdmin&&FB) FB.club.child("ads/"+adMeetingId(meeting)).remove().catch(()=>{}); onDeleted(); }).catch(e=>alert(authMsg(e))); };
   const ser=meeting.series, serActive=!!(ser&&ser.active!==false);
   const stopSeries=()=>{ if(!window.confirm("이 반복 모임을 멈출까요? 이미 만들어진 모임은 그대로 남아요.")) return;
     saveMeetingPath(`series/s${meeting.seriesId}/active`,false).catch(e=>alert(authMsg(e))); };
@@ -2932,9 +2997,9 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           </div>
         )}
         {!gone&&isPast&&<p style={{margin:0,fontSize:14,fontWeight:600,textAlign:"center",color:"#8A93B2",background:"#EEF1FA",borderRadius:12,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="clock" size={16} stroke={1.9}/>종료된 모임</p>}
-        {!gone&&!isPast&&!open&&<p style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
+        {!gone&&!isPast&&!open&&<p data-attend="" style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
         {!gone&&!isPast&&open&&(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
             <AttendButtons status={myStatus} onVote={setMyStatus}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {myStatus==="attend"&&(
@@ -3003,6 +3068,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
       )}
       <MeetingComments meeting={meeting} isAdmin={isAdmin}/>
       {!gone&&(isAdmin||(open&&!isPast))&&<MemberAttend meeting={meeting} isAdmin={isAdmin}/>}
+      {isAdmin&&FB&&!gone&&!isPast&&<MeetingBannerCard meeting={meeting}/>}
       {canManage&&goneForm&&(
         <Card>
           <SectionTitle>모임 무산 처리</SectionTitle>
@@ -4622,7 +4688,8 @@ export default function App() {
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
   const boardPosts=useBoard(inMain);
-  const ads=useAds(inMain);   // 광고 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리)
+  // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
+  const ads=useAds(inMain).map(adMeeting).filter(a=>!a.hide).map(a=>a.meetingId?{...a,onGo:()=>{ FOCUS_ATTEND.id=+a.meetingId; openM(+a.meetingId,"info","home"); }}:a);
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(()=>{ if(!inMain) return; markTabSeen(tab); return ()=>markTabSeen(tab); },[tab,inMain,myId]);
   const newMeetings=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).map(meetingNewItem);

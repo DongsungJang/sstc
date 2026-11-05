@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e3571d39e0">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e3571d39e0">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=1697ab2ad5">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1697ab2ad5">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2164,8 +2164,10 @@ function Empty({
     }
   }, action));
 }
-// ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// ─── 홈 화면 배너 (홈 "다가오는 모임" 아래) ──────────────────────────────────
+// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, order, createdAt, updatedAt, updatedByUid}
+// 모임 홍보 배너: club/ads/am<모임id> = {meetingId, enabled, tag, title(한마디, 비우면 시간·장소), bg, …}. 내용은 모임 정보로 그때그때 만들고,
+// 누르면 그 모임 참석 버튼으로 가요. 마감·종료·무산·삭제된 모임이면 홈에서 저절로 빠져요
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY = {
   enabled: false,
@@ -2387,8 +2389,55 @@ function useAds(on) {
     const t = setInterval(() => setDay(adToday()), 60000);
     return () => clearInterval(t);
   }, []);
-  return ads.filter(a => a.enabled && a.title && adPhase(a, day) === "live");
+  return ads.filter(a => a.enabled && (a.title || a.meetingId) && adPhase(a, day) === "live");
 }
+// 모임 배너 → 화면에 보일 내용. 홈에 안 보이는 모임이면 hide에 이유를 넣어요
+const AD_KIND_NAME = {
+  regular: "정기 모임",
+  game: "번개 게임",
+  training: "번개 훈련"
+};
+const AD_KIND_BG = {
+  regular: "#DCEBFF",
+  game: "#FFF0BF",
+  training: "#D6F2E4"
+};
+const adMeetingId = m => "am" + m.id;
+function adDday(iso) {
+  const d = Math.round((Date.parse(iso + "T00:00:00Z") - Date.parse(adToday() + "T00:00:00Z")) / 86400000);
+  return d <= 0 ? "오늘" : d === 1 ? "내일" : `D-${d}`;
+}
+function adMeeting(a) {
+  if (!a || !a.meetingId) return a;
+  const m = MEETINGS.find(x => x.id === +a.meetingId);
+  if (!m) return {
+    ...a,
+    title: a.title || "지워진 모임",
+    hide: "모임이 지워졌어요"
+  };
+  const k = kindKey(m),
+    n = (m.attendees || []).length,
+    left = m.total - n;
+  const v = {
+    ...a,
+    tag: a.tag || "모집",
+    bg: a.bg || AD_KIND_BG[k],
+    logo: "",
+    logoImg: "",
+    url: "",
+    popup: "",
+    top: `${AD_KIND_NAME[k]} · ${m.date} · ${adDday(m.iso)}`,
+    title: a.title || `${m.info.start} ${m.placeName || m.place}`,
+    sub: `${a.title ? `${m.info.start} ${m.placeName || m.place} · ` : ""}${m.total > 0 ? `${n}/${m.total}명 · ${left}자리 남았어요` : `${n}명 참석`}`,
+    meeting: m
+  };
+  if (m.cancelled) v.hide = "무산된 모임이라 안 보여요";else if (m.status === "past") v.hide = "끝난 모임이라 안 보여요";else if (isFull(m)) v.hide = "자리가 다 차서 안 보여요 (자리가 나면 다시 보여요)";
+  return v;
+}
+// 모임 상세에서 "참석 버튼으로" 가라고 남겨 두는 표시
+const FOCUS_ATTEND = {
+  id: 0
+};
 // 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 공지·모집·이벤트 ("알림"은 종 모양 알림과 헷갈려서 뺌)
 const AD_TAGS = [["광고", "#8A7563", "rgba(255,255,255,0.85)", "#E6D9CA"], ["공지", "#D23C3C", "#FFF1F1", "#FBD5D5"], ["모집", "#067647", "#E5F7EE", "#B7E6CC"], ["이벤트", "#C2610C", "#FFF4E5", "#FAD9B0"]];
 const adTagOf = t => AD_TAGS.find(x => x[0] === t) || AD_TAGS[0];
@@ -2512,7 +2561,8 @@ function AdBanner({
   if (!ad || !ad.title) return null;
   const url = adUrl(ad.url),
     th = adTheme(ad.bg),
-    popup = !url && String(ad.popup || "").trim();
+    go = !url && ad.onGo,
+    popup = !url && !go && String(ad.popup || "").trim();
   const body = /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2598,7 +2648,7 @@ function AdBanner({
       color: th.sub,
       wordBreak: "keep-all"
     }
-  }, ad.sub)), (url || popup) && /*#__PURE__*/React.createElement("span", {
+  }, ad.sub)), (url || popup || go) && /*#__PURE__*/React.createElement("span", {
     "aria-hidden": "true",
     style: {
       fontSize: 20,
@@ -2636,6 +2686,25 @@ function AdBanner({
     onClick: onOpen,
     "aria-label": label,
     style: box
+  }, body, tag);
+  if (go) return /*#__PURE__*/React.createElement("div", {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": label,
+    onClick: () => {
+      onOpen && onOpen();
+      go();
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        onOpen && onOpen();
+        go();
+      }
+    },
+    style: {
+      ...box,
+      cursor: "pointer"
+    }
   }, body, tag);
   if (popup) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     role: "button",
@@ -2724,7 +2793,7 @@ function AdStats({
       const x = adSum(stats, days);
       return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`;
     });
-    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g, ".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`, "SSTC 광고 결과", "광고 결과");
+    shareText(`[SSTC 앱 배너 결과] ${ad.title}\n${adToday().replace(/-/g, ".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 배너가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`, "SSTC 배너 결과", "배너 결과");
   };
   const box = (name, val, c) => /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2827,7 +2896,7 @@ function AdStats({
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uAE30\uC900: \uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uAD11\uACE0\uAC00 \uD654\uBA74\uC5D0 \uB2E4 \uBCF4\uC600\uC744 \uB54C, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB098 \uC548\uB0B4 \uCC3D\uC744 \uC5F4\uC5C8\uC744 \uB54C \uC138\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 1\uBC88\uC73C\uB85C \uC138\uC694(\uD55C\uAD6D \uB0A0\uC9DC \uAE30\uC900).")));
+  }, "\uAE30\uC900: \uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uBC30\uB108\uAC00 \uD654\uBA74\uC5D0 \uB2E4 \uBCF4\uC600\uC744 \uB54C, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB098 \uC548\uB0B4 \uCC3D\uC744 \uC5F4\uC5C8\uC744 \uB54C \uC138\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 1\uBC88\uC73C\uB85C \uC138\uC694(\uD55C\uAD6D \uB0A0\uC9DC \uAE30\uC900).")));
 }
 function AdCarousel({
   ads
@@ -2938,7 +3007,7 @@ function AdCarousel({
   }, ads.map((a, k) => /*#__PURE__*/React.createElement("button", {
     key: a.id,
     type: "button",
-    "aria-label": `광고 ${k + 1}번 보기`,
+    "aria-label": `배너 ${k + 1}번 보기`,
     onClick: () => go(k),
     style: {
       width: k === i ? 16 : 6,
@@ -2952,7 +3021,7 @@ function AdCarousel({
     }
   }))));
 }
-// 관리 탭: 광고1·광고2… 탭으로 고르고, 내용·기간을 넣고 켜기/끄기, 추가·삭제
+// 관리 탭: 배너1·배너2… 탭으로 고르고, 내용·기간을 넣고 켜기/끄기, 추가·삭제
 function AdSettings() {
   const [ads, setAds] = useState(undefined); // undefined: 불러오는 중
   const [cur, setCur] = useState(null); // 고른 광고 id ("new": 아직 저장 안 한 새 광고)
@@ -2970,6 +3039,7 @@ function AdSettings() {
   }, []);
   const list = ads || [];
   const saved = list.find(a => a.id === cur) || null;
+  const mtAd = saved && saved.meetingId ? adMeeting(saved) : null; // 모임 홍보 배너면 모임 정보로 만든 내용
   // 처음 열 때·지운 뒤: 첫 광고를 고름 (없으면 새 광고 칸). 방금 저장해서 목록에 아직 안 들어온 광고는 기다려요
   const seenIds = useRef(new Set());
   useEffect(() => {
@@ -3009,6 +3079,22 @@ function AdSettings() {
   const rangeBad = !!(f.start && f.end && f.end < f.start);
   const dirty = cur === "new" ? AD_FIELDS.some(k => f[k]) : !!saved && AD_FIELDS.some(k => (f[k] || "") !== (saved[k] || ""));
   const save = enabled => {
+    if (mtAd) {
+      // 모임 배너: 한마디·표시·배경색만 바꿔요
+      const v = {
+        ...saved,
+        tag: adTagOf(f.tag)[0],
+        title: f.title.trim().slice(0, 40),
+        bg: adHex(f.bg),
+        enabled: !!enabled,
+        updatedAt: Date.now(),
+        updatedByUid: myUid()
+      };
+      delete v.id;
+      setBusy(true);
+      FB.club.child("ads/" + cur).set(v).then(() => setMsg(!enabled ? "껐어요. 홈에 안 보여요" : mtAd.hide ? `켰어요. 다만 ${mtAd.hide}` : "켰어요. 홈 화면에 보여요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+      return;
+    }
     if (enabled && !f.title.trim()) {
       setMsg("제목을 넣어야 켤 수 있어요");
       return;
@@ -3068,23 +3154,23 @@ function AdSettings() {
       up[id + "/order"] = n;
     });
     setBusy(true);
-    FB.club.child("ads").update(up).then(() => setMsg(`광고${j + 1}(으)로 옮겼어요`)).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+    FB.club.child("ads").update(up).then(() => setMsg(`배너${j + 1}(으)로 옮겼어요`)).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
   };
   const remove = () => {
     if (cur === "new") {
       pick(list[0] ? list[0].id : "new");
       return;
     }
-    if (!window.confirm(`광고${list.findIndex(a => a.id === cur) + 1} "${saved && saved.title || ""}"을(를) 지울까요?`)) return;
+    if (!window.confirm(`배너${list.findIndex(a => a.id === cur) + 1} "${(mtAd || saved || {}).title || ""}"을(를) 지울까요?${mtAd ? "\n모임은 그대로 있어요." : ""}`)) return;
     setBusy(true);
     FB.club.child("ads/" + cur).remove().then(() => FB.club.child("adStats/" + cur).remove().catch(() => {})).then(() => setMsg("지웠어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
   };
-  const status = a => !a.enabled ? ["꺼짐", "#F1F2F5", "#6B7280"] : {
+  const status = a => !a.enabled ? ["꺼짐", "#F1F2F5", "#6B7280"] : a.meetingId && adMeeting(a).hide ? ["숨김", "#F1F2F5", "#6B7280"] : {
     live: ["노출 중", "#E5F7EE", "#067647"],
     before: ["시작 전", "#FFF4E5", "#C2610C"],
     after: ["기간 끝남", "#F1F2F5", "#6B7280"]
   }[adPhase(a)];
-  const showing = list.filter(a => a.enabled && a.title && adPhase(a) === "live").length;
+  const showing = list.filter(a => a.enabled && (a.meetingId ? !adMeeting(a).hide : a.title) && adPhase(a) === "live").length;
   const on = !!(saved && saved.enabled);
   const field = (k, label, ph, max) => /*#__PURE__*/React.createElement(FieldWrap, {
     label: label
@@ -3141,7 +3227,7 @@ function AdSettings() {
       fontWeight: 700,
       color: "#1B2559"
     }
-  }, "\uAD11\uACE0 \uBC30\uB108"), /*#__PURE__*/React.createElement("span", {
+  }, "\uD648 \uD654\uBA74 \uBC30\uB108"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       fontWeight: 700,
@@ -3157,7 +3243,7 @@ function AdSettings() {
       gap: 6,
       marginBottom: 12
     }
-  }, list.map((a, k) => tabBtn(a.id, `광고${k + 1}`, a)), cur === "new" ? tabBtn("new", `광고${list.length + 1}`, null) : /*#__PURE__*/React.createElement("button", {
+  }, list.map((a, k) => tabBtn(a.id, `배너${k + 1}`, a)), cur === "new" ? tabBtn("new", `배너${list.length + 1}`, null) : /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
       setCur("new");
@@ -3176,7 +3262,7 @@ function AdSettings() {
       color: BLUE,
       fontFamily: FONT
     }
-  }, "+ \uAD11\uACE0 \uCD94\uAC00")), saved && list.length > 1 && (() => {
+  }, "+ \uBC30\uB108 \uCD94\uAC00")), saved && list.length > 1 && (() => {
     const k = list.findIndex(a => a.id === cur);
     const mv = {
       padding: "6px 12px",
@@ -3252,11 +3338,26 @@ function AdSettings() {
         background: st[1],
         color: st[2]
       }
-    }, st[0]), adPeriod(saved));
+    }, st[0]), mtAd ? mtAd.hide && saved.enabled ? mtAd.hide : "모임 홍보 배너" : adPeriod(saved));
   })(), saved && /*#__PURE__*/React.createElement(AdStats, {
-    ad: saved,
-    label: `광고${list.findIndex(a => a.id === cur) + 1}`
-  }), /*#__PURE__*/React.createElement(FieldWrap, {
+    ad: mtAd || saved,
+    label: `배너${list.findIndex(a => a.id === cur) + 1}`
+  }), mtAd && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F5F7FE",
+      borderRadius: 14,
+      padding: "10px 12px",
+      fontSize: 12,
+      color: "#4A5578",
+      lineHeight: 1.6
+    }
+  }, "\uBAA8\uC784 \uC0C1\uC138\uC5D0\uC11C \uB123\uC740 \uBC30\uB108\uC608\uC694. \uB0A0\uC9DC\xB7\uC2DC\uAC04\xB7\uC7A5\uC18C\xB7\uB0A8\uC740 \uC790\uB9AC\uB294 \uBAA8\uC784 \uC815\uBCF4\uB85C \uC790\uB3D9\uC73C\uB85C \uCC44\uC6CC\uC9C0\uACE0, \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784 \uCC38\uC11D \uBC84\uD2BC\uC73C\uB85C \uAC00\uC694. \uC790\uB9AC\uAC00 \uB2E4 \uCC28\uAC70\uB098 \uBAA8\uC784\uC774 \uB05D\uB098\uAC70\uB098 \uBB34\uC0B0\uB418\uBA74 \uD648\uC5D0\uC11C \uC800\uC808\uB85C \uBE60\uC838\uC694.", mtAd.meeting && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontWeight: 600,
+      color: "#2B3674"
+    }
+  }, mtAd.meeting.date, " ", mtAd.meeting.time, " \xB7 ", mtAd.meeting.placeName || mtAd.meeting.place)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC624\uB978\uCABD \uC704 \uD45C\uC2DC"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3290,7 +3391,18 @@ function AdSettings() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "\uC5C5\uCCB4 \uAD11\uACE0\uB294 \"\uAD11\uACE0\", \uC6B0\uB9AC \uBAA8\uC784 \uC18C\uC2DD\uC740 \uACF5\uC9C0(\uAF2D \uC54C\uC544\uC57C \uD560 \uAC83)\xB7\uBAA8\uC9D1(\uD6C8\uB828\uD31F \uB4F1)\xB7\uC774\uBCA4\uD2B8 \uC911\uC5D0 \uACE8\uB77C\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, "\uC5C5\uCCB4 \uAD11\uACE0\uB294 \"\uAD11\uACE0\", \uC6B0\uB9AC \uBAA8\uC784 \uC18C\uC2DD\uC740 \uACF5\uC9C0(\uAF2D \uC54C\uC544\uC57C \uD560 \uAC83)\xB7\uBAA8\uC9D1(\uD6C8\uB828\uD31F \uB4F1)\xB7\uC774\uBCA4\uD2B8 \uC911\uC5D0 \uACE8\uB77C\uC694.")), mtAd && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uD55C\uB9C8\uB514 (\uC120\uD0DD)"
+  }, /*#__PURE__*/React.createElement("input", {
+    value: f.title,
+    maxLength: 40,
+    onChange: e => set("title", e.target.value),
+    placeholder: `비우면 "${adMeeting({
+      ...saved,
+      title: ""
+    }).title}"`,
+    style: inputStyle
+  })), !mtAd && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB85C\uACE0 \uC0AC\uC9C4 (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3360,7 +3472,7 @@ function AdSettings() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "\uB85C\uACE0 \uB458\uB808\uC758 \uBE48 \uBC30\uACBD\uC740 \uC62C\uB9B4 \uB54C \uC790\uB3D9\uC73C\uB85C \uC798\uB77C \uB0B4\uC694. \uC0AC\uC9C4\uC774 \uC788\uC73C\uBA74 \uC544\uB798 \uB85C\uACE0 \uAE00\uC790 \uB300\uC2E0 \uC0AC\uC9C4\uC774 \uBCF4\uC5EC\uC694.")), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, "\uB85C\uACE0 \uB458\uB808\uC758 \uBE48 \uBC30\uACBD\uC740 \uC62C\uB9B4 \uB54C \uC790\uB3D9\uC73C\uB85C \uC798\uB77C \uB0B4\uC694. \uC0AC\uC9C4\uC774 \uC788\uC73C\uBA74 \uC544\uB798 \uB85C\uACE0 \uAE00\uC790 \uB300\uC2E0 \uC0AC\uC9C4\uC774 \uBCF4\uC5EC\uC694.")), field("logo", "로고 글자 (선택)", "예: ESSENT", 12)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC30\uACBD\uC0C9"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3369,8 +3481,9 @@ function AdSettings() {
       gap: 8,
       alignItems: "center"
     }
-  }, AD_COLORS.map(([c, name]) => {
-    const on = adHex(f.bg) === adHex(c) && (!!c || !adHex(f.bg));
+  }, (mtAd && mtAd.meeting ? [["", "모임 종류 색"], ...AD_COLORS.slice(1)] : AD_COLORS).map(([c, name]) => {
+    const on = adHex(f.bg) === adHex(c) && (!!c || !adHex(f.bg)),
+      look = c || (mtAd && mtAd.meeting ? AD_KIND_BG[kindKey(mtAd.meeting)] : "");
     return /*#__PURE__*/React.createElement("button", {
       key: name,
       type: "button",
@@ -3384,8 +3497,8 @@ function AdSettings() {
         borderRadius: "50%",
         cursor: "pointer",
         padding: 0,
-        background: adTheme(c).bg,
-        border: `1.5px solid ${adTheme(c).line}`,
+        background: adTheme(look).bg,
+        border: `1.5px solid ${adTheme(look).line}`,
         boxShadow: on ? `0 0 0 2px #fff,0 0 0 4px ${BLUE}` : "none"
       }
     });
@@ -3432,7 +3545,7 @@ function AdSettings() {
         padding: 0
       }
     }));
-  })())), field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
+  })())), !mtAd && /*#__PURE__*/React.createElement(React.Fragment, null, field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB204\uB974\uBA74 \uC5F4 \uB9C1\uD06C (\uC120\uD0DD)",
     error: urlBad ? "주소를 확인해 주세요" : ""
   }, /*#__PURE__*/React.createElement("input", {
@@ -3531,14 +3644,19 @@ function AdSettings() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "\uC2DC\uC791\uC77C\xB7\uC885\uB8CC\uC77C \uB2F9\uC77C\uB3C4 \uBCF4\uC5EC\uC694. \uD55C\uCABD\uC744 \uBE44\uC6B0\uBA74 \uADF8\uCABD\uC740 \uC81C\uD55C \uC5C6\uC5B4\uC694.")), f.title.trim() && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }, "\uC2DC\uC791\uC77C\xB7\uC885\uB8CC\uC77C \uB2F9\uC77C\uB3C4 \uBCF4\uC5EC\uC694. \uD55C\uCABD\uC744 \uBE44\uC6B0\uBA74 \uADF8\uCABD\uC740 \uC81C\uD55C \uC5C6\uC5B4\uC694."))), (mtAd || f.title.trim()) && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "2px 0 6px",
       fontSize: 12,
       color: "#6B7493"
     }
   }, "\uBBF8\uB9AC\uBCF4\uAE30"), /*#__PURE__*/React.createElement(AdBanner, {
-    ad: {
+    ad: mtAd ? adMeeting({
+      ...saved,
+      tag: f.tag,
+      bg: f.bg,
+      title: f.title.trim()
+    }) : {
       ...f,
       title: f.title.trim()
     }
@@ -3599,7 +3717,7 @@ function AdSettings() {
       padding: "2px 0",
       fontFamily: FONT
     }
-  }, cur === "new" ? "새 광고 취소" : `광고${list.findIndex(a => a.id === cur) + 1} 지우기`), msg && /*#__PURE__*/React.createElement("p", {
+  }, cur === "new" ? "새 배너 취소" : `배너${list.findIndex(a => a.id === cur) + 1} 지우기`), msg && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
@@ -3613,7 +3731,7 @@ function AdSettings() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uAD11\uACE0\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uACF5\uC9C0 \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
+  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uBC30\uB108\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uACF5\uC9C0 \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uC778\uC6D0\uC774 \uB35C \uCC2C \uBAA8\uC784\uC740 \uBAA8\uC784 \uC0C1\uC138 \uC544\uB798 \"\uD648 \uD654\uBA74 \uBC30\uB108\uC5D0 \uCD94\uAC00\uD558\uAE30\"\uB85C \uB123\uC744 \uC218 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
 }
 function HomeTab({
   onGoBooking,
@@ -8765,6 +8883,95 @@ function shareMeeting(m) {
 function shareBracket(m, bracket, scores) {
   shareText(bracketShareText(m, bracket, scores), "SSTC 대진표", "대진표");
 }
+
+// 모임 상세 (관리자): 인원이 덜 찬 모임을 홈 화면 배너에 넣고 빼기
+function MeetingBannerCard({
+  meeting
+}) {
+  const id = adMeetingId(meeting);
+  const [ad, setAd] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    const r = FB.club.child("ads/" + id),
+      h = s => setAd(s.val());
+    r.on("value", h, () => setAd(null));
+    return () => r.off("value", h);
+  }, [id]);
+  if (ad === undefined) return null;
+  const add = () => {
+    const now = Date.now();
+    setBusy(true);
+    setMsg("");
+    FB.club.child("ads/" + id).set({
+      meetingId: meeting.id,
+      enabled: true,
+      tag: "모집",
+      title: "",
+      bg: "",
+      start: "",
+      end: "",
+      createdAt: now,
+      updatedAt: now,
+      updatedByUid: myUid()
+    }).then(() => setMsg(isFull(meeting) ? "넣었어요. 지금은 자리가 다 차서 홈에 안 보이고, 자리가 나면 보여요" : "홈 화면 배너에 넣었어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+  };
+  const del = () => {
+    setBusy(true);
+    setMsg("");
+    FB.club.child("ads/" + id).remove().then(() => FB.club.child("adStats/" + id).remove().catch(() => {})).then(() => setMsg("홈 화면 배너에서 뺐어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+  };
+  const shown = ad && ad.enabled && adPhase(ad) === "live" && !isFull(meeting);
+  return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD648 \uD654\uBA74 \uBC30\uB108"), ad ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 13,
+      color: shown ? "#067647" : "#6B7493",
+      fontWeight: 600
+    }
+  }, !ad.enabled ? "배너에 들어 있지만 꺼져 있어요" : isFull(meeting) ? "자리가 다 차서 지금은 홈에 안 보여요" : "홈 화면에 이 모임 배너가 나오고 있어요"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: del,
+    style: {
+      ...btnSecondary,
+      width: "100%",
+      color: "#ef4444",
+      borderColor: "#FBD5D5"
+    }
+  }, "\uD648 \uD654\uBA74 \uBC30\uB108\uC5D0\uC11C \uBE7C\uAE30")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 10px",
+      fontSize: 12,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, "\uC778\uC6D0\uC774 \uB35C \uCC3C\uC73C\uBA74 \uD648 \uD654\uBA74 \uBC30\uB108\uC5D0 \uB123\uC5B4 \uD64D\uBCF4\uD560 \uC218 \uC788\uC5B4\uC694. \uB204\uB974\uBA74 \uC774 \uBAA8\uC784 \uCC38\uC11D \uBC84\uD2BC\uC73C\uB85C \uBC14\uB85C \uC640\uC694. \uC790\uB9AC\uAC00 \uB2E4 \uCC28\uAC70\uB098 \uBAA8\uC784\uC774 \uB05D\uB098\uAC70\uB098 \uBB34\uC0B0\uB418\uBA74 \uD648\uC5D0\uC11C \uC800\uC808\uB85C \uBE60\uC838\uC694."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: add,
+    style: {
+      ...btnSecondary,
+      width: "100%",
+      background: GRAD,
+      color: "#fff",
+      border: "none"
+    }
+  }, "\uD648 \uD654\uBA74 \uBC30\uB108\uC5D0 \uCD94\uAC00\uD558\uAE30")), msg && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 12,
+      color: /권한|오류|실패/.test(msg) ? "#ef4444" : BLUE,
+      textAlign: "center"
+    }
+  }, msg), ad && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uD55C\uB9C8\uB514\xB7\uC21C\uC11C\xB7\uBC18\uC751\uC740 \uAD00\uB9AC \uD0ED \uD648 \uD654\uBA74 \uBC30\uB108\uC5D0\uC11C \uBC14\uAFB8\uACE0 \uBCFC \uC218 \uC788\uC5B4\uC694."));
+}
 function MeetingDetail({
   meeting,
   initialView = "info",
@@ -8774,6 +8981,19 @@ function MeetingDetail({
   onDeleted
 }) {
   const [view, setView] = useState(initialView);
+  // 홈 화면 배너로 들어왔으면 참석 버튼이 화면 가운데 오게
+  useEffect(() => {
+    if (FOCUS_ATTEND.id !== meeting.id) return;
+    FOCUS_ATTEND.id = 0;
+    const t = setTimeout(() => {
+      const el = document.querySelector("[data-attend]");
+      if (el) el.scrollIntoView({
+        block: "center",
+        behavior: "smooth"
+      });
+    }, 150);
+    return () => clearTimeout(t);
+  }, []);
   const store = useMeetingRecord(meeting);
   const [guestInput, setGuestInput] = useState("");
   const [showGuest, setShowGuest] = useState(false);
@@ -8847,7 +9067,10 @@ function MeetingDetail({
   };
   const remove = () => {
     if (!window.confirm(`${meeting.date} 모임을 완전히 지울까요? 투표·대진표·점수·댓글 기록까지 모두 사라져요.\n비나 코트 사정으로 못 하게 된 거라면 '무산 처리'를 써 주세요.${meeting.seriesId ? "\n반복 모임은 이 날짜만 빠지고 다음 모임은 계속 만들어져요." : ""}`)) return;
-    (meeting.seriesId ? saveMeetingPath(`series/s${meeting.seriesId}/skip/${meeting.iso}`, true) : Promise.resolve()).then(() => saveMeetingPath("m" + meeting.id, null)).then(onDeleted).catch(e => alert(authMsg(e)));
+    (meeting.seriesId ? saveMeetingPath(`series/s${meeting.seriesId}/skip/${meeting.iso}`, true) : Promise.resolve()).then(() => saveMeetingPath("m" + meeting.id, null)).then(() => {
+      if (isAdmin && FB) FB.club.child("ads/" + adMeetingId(meeting)).remove().catch(() => {});
+      onDeleted();
+    }).catch(e => alert(authMsg(e)));
   };
   const ser = meeting.series,
     serActive = !!(ser && ser.active !== false);
@@ -9174,6 +9397,7 @@ function MeetingDetail({
     size: 16,
     stroke: 1.9
   }), "\uC885\uB8CC\uB41C \uBAA8\uC784"), !gone && !isPast && !open && /*#__PURE__*/React.createElement("p", {
+    "data-attend": "",
     style: {
       margin: 0,
       fontSize: 13,
@@ -9187,10 +9411,12 @@ function MeetingDetail({
     n: "calendar",
     s: 13
   }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !gone && !isPast && open && /*#__PURE__*/React.createElement("div", {
+    "data-attend": "",
     style: {
       display: "flex",
       flexDirection: "column",
-      gap: 10
+      gap: 10,
+      scrollMarginTop: 90
     }
   }, /*#__PURE__*/React.createElement(AttendButtons, {
     status: myStatus,
@@ -9499,6 +9725,8 @@ function MeetingDetail({
   }), !gone && (isAdmin || open && !isPast) && /*#__PURE__*/React.createElement(MemberAttend, {
     meeting: meeting,
     isAdmin: isAdmin
+  }), isAdmin && FB && !gone && !isPast && /*#__PURE__*/React.createElement(MeetingBannerCard, {
+    meeting: meeting
   }), canManage && goneForm && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uBAA8\uC784 \uBB34\uC0B0 \uCC98\uB9AC"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 10px",
@@ -14313,7 +14541,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "e3571d39e0";
+const BUILD_ID = "1697ab2ad5";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -15280,7 +15508,14 @@ function App() {
   }, [inMain, myId]);
   const clubData = useClubMembers(inMain);
   const boardPosts = useBoard(inMain);
-  const ads = useAds(inMain); // 광고 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리)
+  // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
+  const ads = useAds(inMain).map(adMeeting).filter(a => !a.hide).map(a => a.meetingId ? {
+    ...a,
+    onGo: () => {
+      FOCUS_ATTEND.id = +a.meetingId;
+      openM(+a.meetingId, "info", "home");
+    }
+  } : a);
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(() => {
     if (!inMain) return;
