@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e4893d8a82">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e4893d8a82">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=74bd1f8cbc">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=74bd1f8cbc">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2165,15 +2165,20 @@ function Empty({
   }, action));
 }
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ad = {enabled, logo, top, title, sub, url, updatedAt, updatedByUid}. 관리 탭에서 켜야만 홈에 보여요.
+// club/ads/a<만든 시각> = {enabled, logo, top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY = {
   enabled: false,
   logo: "",
   top: "",
   title: "",
   sub: "",
-  url: ""
+  url: "",
+  start: "",
+  end: ""
 };
+const AD_FIELDS = ["logo", "top", "title", "sub", "url", "start", "end"];
+const AD_INTERVAL = 5000;
 // 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
 const adUrl = u => {
   u = String(u || "").trim();
@@ -2181,19 +2186,33 @@ const adUrl = u => {
   if (!/^https?:\/\//i.test(u)) u = "https://" + u;
   return /^https?:\/\/[^\s/]+\.[^\s]+/i.test(u) ? u : "";
 };
-function useAd(on) {
-  const [ad, setAd] = useState(null);
+const adToday = () => kstNow().slice(0, 10);
+// 기간 상태: "live" 노출 중 / "before" 시작 전 / "after" 끝남 (날짜는 한국 시간 기준, 시작일·종료일 당일 포함)
+const adPhase = (a, d = adToday()) => a.start && d < a.start ? "before" : a.end && d > a.end ? "after" : "live";
+const adList = v => Object.keys(v || {}).filter(k => v[k] && typeof v[k] === "object").map(k => ({
+  id: k,
+  ...v[k]
+})).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+const adPeriod = a => !a.start && !a.end ? "기간 무제한" : `${a.start ? a.start.replace(/-/g, ".") : "지금"} ~ ${a.end ? a.end.replace(/-/g, ".") : "계속"}`;
+function useAds(on) {
+  const [ads, setAds] = useState([]);
+  const [day, setDay] = useState(adToday());
   useEffect(() => {
     if (!FB || !on) {
-      setAd(null);
+      setAds([]);
       return;
     }
-    const r = FB.club.child("ad"),
-      h = s => setAd(s.val() || null);
-    r.on("value", h, () => setAd(null));
+    const r = FB.club.child("ads"),
+      h = s => setAds(adList(s.val()));
+    r.on("value", h, () => setAds([]));
     return () => r.off("value", h);
   }, [on]);
-  return ad;
+  // 앱을 켜 둔 채 날짜가 바뀌어도 기간을 다시 따져요
+  useEffect(() => {
+    const t = setInterval(() => setDay(adToday()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  return ads.filter(a => a.enabled && a.title && adPhase(a, day) === "live");
 }
 function AdBanner({
   ad
@@ -2205,7 +2224,9 @@ function AdBanner({
       display: "flex",
       alignItems: "center",
       gap: 14,
-      padding: "14px 16px"
+      padding: "14px 16px",
+      height: "100%",
+      boxSizing: "border-box"
     }
   }, ad.logo && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2273,13 +2294,16 @@ function AdBanner({
   }, "\u203A"));
   const box = {
     display: "block",
+    height: "100%",
+    boxSizing: "border-box",
     textDecoration: "none",
     position: "relative",
     borderRadius: 20,
     overflow: "hidden",
     background: "linear-gradient(115deg,#FBF7F2 0%,#F3EAE0 100%)",
     border: "1px solid #EADFD2",
-    boxShadow: "0 4px 14px rgba(33,82,230,0.06)"
+    boxShadow: "0 4px 14px rgba(33,82,230,0.06)",
+    WebkitUserDrag: "none"
   };
   const tag = /*#__PURE__*/React.createElement("span", {
     style: {
@@ -2299,34 +2323,142 @@ function AdBanner({
     href: url,
     target: "_blank",
     rel: "noopener noreferrer",
+    draggable: false,
     "aria-label": `광고: ${ad.title}`,
     style: box
   }, body, tag) : /*#__PURE__*/React.createElement("div", {
     style: box
   }, body, tag);
 }
-// 관리 탭: 광고 내용 넣기 + 켜기/끄기
+// 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
+function AdCarousel({
+  ads
+}) {
+  const ref = useRef(null);
+  const [i, setI] = useState(0);
+  const hold = useRef(0); // 손으로 만진 시각: 그 뒤 5초는 자동으로 안 넘김
+  const n = ads.length;
+  useEffect(() => {
+    if (i >= n) setI(0);
+  }, [n]);
+  useEffect(() => {
+    if (n < 2) return;
+    const t = setInterval(() => {
+      const el = ref.current;
+      if (!el || Date.now() - hold.current < AD_INTERVAL || document.hidden) return;
+      const next = (Math.round(el.scrollLeft / el.clientWidth) + 1) % n;
+      el.scrollTo({
+        left: next * el.clientWidth,
+        behavior: "smooth"
+      });
+    }, AD_INTERVAL);
+    return () => clearInterval(t);
+  }, [n]);
+  if (!n) return null;
+  if (n === 1) return /*#__PURE__*/React.createElement(AdBanner, {
+    ad: ads[0]
+  });
+  const onScroll = e => {
+    const el = e.currentTarget;
+    const k = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (k !== i) setI(Math.max(0, Math.min(n - 1, k)));
+  };
+  const touch = () => {
+    hold.current = Date.now();
+  };
+  const go = k => {
+    touch();
+    const el = ref.current;
+    if (el) el.scrollTo({
+      left: k * el.clientWidth,
+      behavior: "smooth"
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    className: "sstc-adrow",
+    onScroll: onScroll,
+    onTouchStart: touch,
+    onPointerDown: touch,
+    onWheel: touch,
+    style: {
+      display: "flex",
+      overflowX: "auto",
+      scrollSnapType: "x mandatory",
+      scrollbarWidth: "none",
+      borderRadius: 20,
+      overscrollBehaviorX: "contain"
+    }
+  }, ads.map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.id,
+    style: {
+      flex: "0 0 100%",
+      scrollSnapAlign: "start",
+      scrollSnapStop: "always"
+    }
+  }, /*#__PURE__*/React.createElement(AdBanner, {
+    ad: a
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 6,
+      marginTop: 8
+    }
+  }, ads.map((a, k) => /*#__PURE__*/React.createElement("button", {
+    key: a.id,
+    type: "button",
+    "aria-label": `광고 ${k + 1}번 보기`,
+    onClick: () => go(k),
+    style: {
+      width: k === i ? 16 : 6,
+      height: 6,
+      padding: 0,
+      border: "none",
+      borderRadius: 999,
+      background: k === i ? "#B9A28C" : "#DCD2C6",
+      cursor: "pointer",
+      transition: "width .2s"
+    }
+  }))));
+}
+// 관리 탭: 광고1·광고2… 탭으로 고르고, 내용·기간을 넣고 켜기/끄기, 추가·삭제
 function AdSettings() {
-  const [saved, setSaved] = useState(undefined); // undefined: 불러오는 중, null: 아직 없음
+  const [ads, setAds] = useState(undefined); // undefined: 불러오는 중
+  const [cur, setCur] = useState(null); // 고른 광고 id ("new": 아직 저장 안 한 새 광고)
   const [f, setF] = useState(AD_EMPTY);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   useEffect(() => {
-    const r = FB.club.child("ad"),
-      h = s => {
-        const v = s.val() || null;
-        setSaved(v);
-        setF({
-          ...AD_EMPTY,
-          ...(v || {})
-        });
-      };
+    const r = FB.club.child("ads"),
+      h = s => setAds(adList(s.val()));
     r.on("value", h, e => {
-      setSaved(null);
+      setAds([]);
       setMsg(authMsg(e));
     });
     return () => r.off("value", h);
   }, []);
+  const list = ads || [];
+  const saved = list.find(a => a.id === cur) || null;
+  // 처음 열 때·지운 뒤: 첫 광고를 고름 (없으면 새 광고 칸). 방금 저장해서 목록에 아직 안 들어온 광고는 기다려요
+  const seenIds = useRef(new Set());
+  useEffect(() => {
+    if (ads === undefined) return;
+    list.forEach(a => seenIds.current.add(a.id));
+    if (cur === "new" || saved) return;
+    if (cur === null || seenIds.current.has(cur)) pick(list[0] ? list[0].id : "new");
+  }, [ads, cur]);
+  function pick(id) {
+    const a = list.find(x => x.id === id);
+    setCur(id);
+    setF({
+      ...AD_EMPTY,
+      ...(a || {}),
+      start: a && a.start || "",
+      end: a && a.end || ""
+    });
+    setMsg("");
+  }
   const set = (k, v) => {
     setF(p => ({
       ...p,
@@ -2334,30 +2466,68 @@ function AdSettings() {
     }));
     setMsg("");
   };
+  const unlimited = !f.start && !f.end;
   const urlBad = !!f.url.trim() && !adUrl(f.url);
-  const dirty = saved !== undefined && ["logo", "top", "title", "sub", "url"].some(k => (f[k] || "") !== (saved && saved[k] || ""));
+  const rangeBad = !!(f.start && f.end && f.end < f.start);
+  const dirty = cur === "new" ? AD_FIELDS.some(k => f[k]) : !!saved && AD_FIELDS.some(k => (f[k] || "") !== (saved[k] || ""));
   const save = enabled => {
     if (enabled && !f.title.trim()) {
       setMsg("제목을 넣어야 켤 수 있어요");
+      return;
+    }
+    if (!f.title.trim() && cur === "new") {
+      setMsg("제목을 넣어 주세요");
       return;
     }
     if (urlBad) {
       setMsg("링크 주소를 확인해 주세요");
       return;
     }
+    if (rangeBad) {
+      setMsg("종료일은 시작일과 같거나 뒤여야 해요");
+      return;
+    }
+    const now = Date.now(),
+      id = cur === "new" ? "a" + now : cur;
     const v = {
       logo: f.logo.trim().slice(0, 12),
       top: f.top.trim().slice(0, 40),
       title: f.title.trim().slice(0, 40),
       sub: f.sub.trim().slice(0, 50),
       url: adUrl(f.url),
+      start: f.start || "",
+      end: f.end || "",
       enabled: !!enabled,
-      updatedAt: Date.now(),
+      createdAt: saved && saved.createdAt || now,
+      updatedAt: now,
       updatedByUid: myUid()
     };
     setBusy(true);
-    FB.club.child("ad").set(v).then(() => setMsg(enabled ? "켰어요. 홈 화면에 보여요" : "저장했어요. 지금은 꺼져 있어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+    FB.club.child("ads/" + id).set(v).then(() => {
+      setCur(id);
+      setF({
+        ...AD_EMPTY,
+        ...v
+      });
+      const ph = adPhase(v);
+      setMsg(!enabled ? "저장했어요. 지금은 꺼져 있어요" : ph === "live" ? "켰어요. 홈 화면에 보여요" : ph === "before" ? `켰어요. ${v.start.replace(/-/g, ".")}부터 보여요` : "켰지만 기간이 이미 끝났어요");
+    }).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
   };
+  const remove = () => {
+    if (cur === "new") {
+      pick(list[0] ? list[0].id : "new");
+      return;
+    }
+    if (!window.confirm(`광고${list.findIndex(a => a.id === cur) + 1} "${saved && saved.title || ""}"을(를) 지울까요?`)) return;
+    setBusy(true);
+    FB.club.child("ads/" + cur).remove().then(() => setMsg("지웠어요")).catch(e => setMsg(authMsg(e))).finally(() => setBusy(false));
+  };
+  const status = a => !a.enabled ? ["꺼짐", "#F1F2F5", "#6B7280"] : {
+    live: ["노출 중", "#E5F7EE", "#067647"],
+    before: ["시작 전", "#FFF4E5", "#C2610C"],
+    after: ["기간 끝남", "#F1F2F5", "#6B7280"]
+  }[adPhase(a)];
+  const showing = list.filter(a => a.enabled && a.title && adPhase(a) === "live").length;
   const on = !!(saved && saved.enabled);
   const field = (k, label, ph, max) => /*#__PURE__*/React.createElement(FieldWrap, {
     label: label
@@ -2368,6 +2538,39 @@ function AdSettings() {
     placeholder: ph,
     style: inputStyle
   }));
+  const tabBtn = (id, label, a) => {
+    const sel = cur === id,
+      st = a && status(a);
+    return /*#__PURE__*/React.createElement("button", {
+      key: id,
+      type: "button",
+      onClick: () => pick(id),
+      style: {
+        padding: "7px 12px",
+        borderRadius: 999,
+        fontSize: 13,
+        fontWeight: sel ? 700 : 500,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        border: `1.5px solid ${sel ? BLUE : "#D6DEF7"}`,
+        background: sel ? BLUE : "#fff",
+        color: sel ? "#fff" : "#4A5578",
+        fontFamily: FONT
+      }
+    }, st && /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true",
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: st[0] === "노출 중" ? "#12B76A" : st[0] === "시작 전" ? "#F59E0B" : "#C4C9D4",
+        boxShadow: sel ? "0 0 0 1.5px #fff" : "none"
+      }
+    }), label);
+  };
   return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2387,16 +2590,64 @@ function AdSettings() {
       fontWeight: 700,
       padding: "3px 10px",
       borderRadius: 999,
-      background: on ? "#E5F7EE" : "#F1F2F5",
-      color: on ? "#067647" : "#6B7280"
+      background: showing ? "#E5F7EE" : "#F1F2F5",
+      color: showing ? "#067647" : "#6B7280"
     }
-  }, saved === undefined ? "불러오는 중" : on ? "켜짐 · 홈에 보여요" : "꺼짐")), /*#__PURE__*/React.createElement("div", {
+  }, ads === undefined ? "불러오는 중" : showing ? `홈에 ${showing}개 보이는 중` : "홈에 안 보여요")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 12
+    }
+  }, list.map((a, k) => tabBtn(a.id, `광고${k + 1}`, a)), cur === "new" ? tabBtn("new", `광고${list.length + 1}`, null) : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setCur("new");
+      setF(AD_EMPTY);
+      setMsg("");
+    },
+    style: {
+      padding: "7px 12px",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+      border: `1.5px dashed ${BLUE}`,
+      background: "#fff",
+      color: BLUE,
+      fontFamily: FONT
+    }
+  }, "+ \uAD11\uACE0 \uCD94\uAC00")), ads !== undefined && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 10
     }
-  }, field("logo", "로고 글자 (선택)", "예: ESSENT", 12), field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, saved && (() => {
+    const st = status(saved);
+    return /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 12,
+        color: "#6B7493",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        padding: "2px 9px",
+        borderRadius: 999,
+        background: st[1],
+        color: st[2]
+      }
+    }, st[0]), adPeriod(saved));
+  })(), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), field("top", "윗줄 작은 글씨 (선택)", "예: SSTC 회원이 운영해요 · 당산역 5분", 40), field("title", "제목", "예: 코트 위 햇볕에 지친 피부, 카밍 케어", 40), field("sub", "설명 (선택)", "예: 에센트피부과 · 브라이트닝 · 리프팅", 50), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB204\uB974\uBA74 \uC5F4 \uB9C1\uD06C (\uC120\uD0DD)",
     error: urlBad ? "주소를 확인해 주세요" : ""
   }, /*#__PURE__*/React.createElement("input", {
@@ -2406,7 +2657,75 @@ function AdSettings() {
     inputMode: "url",
     autoCapitalize: "none",
     style: inputStyle
-  })), f.title.trim() && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  })), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uBCF4\uC5EC \uC904 \uAE30\uAC04",
+    error: rangeBad ? "종료일은 시작일과 같거나 뒤여야 해요" : ""
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      color: "#2B3674",
+      cursor: "pointer",
+      padding: "2px 0 4px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: unlimited,
+    onChange: e => {
+      if (e.target.checked) {
+        set("start", "");
+        set("end", "");
+      } else {
+        set("start", adToday());
+      }
+    },
+    style: {
+      width: 18,
+      height: 18,
+      accentColor: BLUE
+    }
+  }), "\uAE30\uAC04 \uBB34\uC81C\uD55C (\uB04C \uB54C\uAE4C\uC9C0 \uACC4\uC18D)"), !unlimited && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    "aria-label": "\uC2DC\uC791\uC77C",
+    value: f.start,
+    onChange: e => set("start", e.target.value),
+    style: {
+      ...inputStyle,
+      flex: 1,
+      minWidth: 0,
+      padding: "10px 12px"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, "~"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    "aria-label": "\uC885\uB8CC\uC77C",
+    value: f.end,
+    min: f.start || undefined,
+    onChange: e => set("end", e.target.value),
+    style: {
+      ...inputStyle,
+      flex: 1,
+      minWidth: 0,
+      padding: "10px 12px"
+    }
+  })), !unlimited && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC2DC\uC791\uC77C\xB7\uC885\uB8CC\uC77C \uB2F9\uC77C\uB3C4 \uBCF4\uC5EC\uC694. \uD55C\uCABD\uC744 \uBE44\uC6B0\uBA74 \uADF8\uCABD\uC740 \uC81C\uD55C \uC5C6\uC5B4\uC694.")), f.title.trim() && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "2px 0 6px",
       fontSize: 12,
@@ -2437,7 +2756,6 @@ function AdSettings() {
     onClick: () => save(true),
     style: {
       ...btnSecondary,
-      flex: 1,
       background: GRAD,
       color: "#fff",
       border: "none",
@@ -2461,11 +2779,25 @@ function AdSettings() {
       color: "#fff",
       border: "none"
     }
-  }, "\uCF1C\uAE30"))), msg && /*#__PURE__*/React.createElement("p", {
+  }, "\uCF1C\uAE30"))), (saved || cur === "new") && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: remove,
+    style: {
+      background: "none",
+      border: "none",
+      color: "#ef4444",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      padding: "2px 0",
+      fontFamily: FONT
+    }
+  }, cur === "new" ? "새 광고 취소" : `광고${list.findIndex(a => a.id === cur) + 1} 지우기`), msg && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 13,
-      color: /확인|넣어야|권한|오류|실패/.test(msg) ? "#ef4444" : BLUE,
+      color: /확인|넣어|권한|오류|실패|뒤여야|끝났/.test(msg) ? "#ef4444" : BLUE,
       textAlign: "center"
     }
   }, msg), /*#__PURE__*/React.createElement("p", {
@@ -2475,7 +2807,7 @@ function AdSettings() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uCF1C\uBA74 \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \"\uAD11\uACE0\" \uD45C\uC2DC\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uACE0 \uD68C\uC6D0\uC5D0\uAC8C\uB294 \uC548 \uBCF4\uC5EC\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
+  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uAD11\uACE0\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \"\uAD11\uACE0\" \uD45C\uC2DC\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
 }
 function HomeTab({
   onGoBooking,
@@ -2485,7 +2817,7 @@ function HomeTab({
   isAdmin,
   onWriteNotice,
   focusNotice,
-  ad
+  ads = []
 }) {
   const [goingN, setGoingN] = useState(3);
   const focusId = focusNotice ? focusNotice.split("#")[0] : null;
@@ -2738,8 +3070,8 @@ function HomeTab({
       color: nextNext.cancelled ? GONE.c : isFull(nextNext) ? FULL.c : "#A3AAC2",
       fontWeight: isFull(nextNext) || nextNext.cancelled ? 700 : 400
     }
-  }, nextNext.cancelled ? goneLabel(nextNext) : isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext) ? ` · 대기 ${waitN(nextNext)}명` : ""}` : `${nextNext.attendees.length}명 참석예정`))), ad && ad.enabled && /*#__PURE__*/React.createElement(AdBanner, {
-    ad: ad
+  }, nextNext.cancelled ? goneLabel(nextNext) : isFull(nextNext) ? `마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext) ? ` · 대기 ${waitN(nextNext)}명` : ""}` : `${nextNext.attendees.length}명 참석예정`))), ads.length > 0 && /*#__PURE__*/React.createElement(AdCarousel, {
+    ads: ads
   }), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB0B4\uAC00 \uCC38\uC11D\uD560 \uBAA8\uC784", going.length > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
@@ -13096,7 +13428,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "e4893d8a82";
+const BUILD_ID = "74bd1f8cbc";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -13236,6 +13568,7 @@ button,input,select,textarea{font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 3px rgba(59,99,243,0.15)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
+.sstc-adrow::-webkit-scrollbar{display:none}
 `;
 const iconBtn = {
   width: 38,
@@ -14062,7 +14395,7 @@ function App() {
   }, [inMain, myId]);
   const clubData = useClubMembers(inMain);
   const boardPosts = useBoard(inMain);
-  const ad = useAd(inMain); // 광고 배너 (관리 탭에서 켜야 홈에 보여요)
+  const ads = useAds(inMain); // 광고 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리)
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(() => {
     if (!inMain) return;
@@ -14652,7 +14985,7 @@ function App() {
     isAdmin: adminOn,
     onWriteNotice: () => setNoticeForm(true),
     focusNotice: focusNotice,
-    ad: ad
+    ads: ads
   }), tab === "booking" && /*#__PURE__*/React.createElement(BookingTab, {
     open: openMeeting,
     onOpen: (id, view, from) => openM(id, view, from || "booking"),
