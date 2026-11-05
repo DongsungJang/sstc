@@ -110,7 +110,7 @@ function votesFromRec(rec){
     if(!v||v.status!=="attend"||!v.at) return;
     if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
     out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:v.by||"",byUid:v.byUid||""});
-    (v.guests||[]).forEach(g=>g&&g.name&&out.push({key,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
+    (v.guests||[]).forEach((g,gi)=>g&&g.name&&out.push({key,gi,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
   });
   return out;
 }
@@ -2434,6 +2434,15 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const canKick=v=>!v.isGuest&&(isAdmin||(!gone&&!isPast&&!!v.byUid&&v.byUid===myUid()));
   const kick=v=>canKick(v)?()=>{ if(!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${(votes0[v.key]&&(votes0[v.key].guests||[]).length)?" 이 회원이 초대한 게스트도 함께 빠져요.":""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`,null).catch(e=>alert(authMsg(e))); }:null;
+  // 게스트 빼기: 관리자는 누구 게스트든, 회원은 자기가 초대한 게스트만. 지난(종료된) 모임도 돼요
+  // (게스트였다가 정회원이 된 사람을 나중에 정리하려고). 참석 횟수·통계는 투표 기록에서 바로 다시 계산돼요.
+  const canKickGuest=v=>v.isGuest&&(isAdmin||v.key===myVoteKey());
+  const kickGuest=v=>canKickGuest(v)?()=>{
+    const host=votes0[v.key], list=(host&&host.guests)||[];
+    if(!list[v.gi]||list[v.gi].name!==v.name) return alert("게스트 정보가 바뀌었어요. 다시 열어 주세요.");
+    if(!window.confirm(`게스트 ${v.name} 님을 이 모임 참석에서 뺄까요?${isPast&&isAdmin?"\n정회원이 됐다면 빼고 나서 '다른 회원 참석 등록'으로 다시 넣어 주세요.":""}`)) return;
+    saveMeetingPath(`m${meeting.id}/votes/${v.key}/guests`,list.filter((g,i)=>g&&i!==v.gi)).catch(e=>alert(authMsg(e))); }:null;
+  const rowRemove=v=>v.isGuest?kickGuest(v):kick(v);
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
     ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번째 (대기 ${waitlist.length}명 중)${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
@@ -2549,7 +2558,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           ))}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} onRemove={kick&&!v.isGuest?kick(v):null}/>)}
+          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} onRemove={rowRemove(v)}/>)}
           {confirmed.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"8px 0"}}>아직 참석 투표가 없어요</p>}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>{prio?"정기 모임 참석 횟수는 달마다 새로 세요. 투표를 빨리 해도 이달 더 많이 참석했으면 덜 참석한 회원 뒤로 가요.":"번개 모임은 투표한 순서대로 확정돼요."}</p>
@@ -2558,7 +2567,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         <Card>
           <SectionTitle>예약 대기 ({waitlist.length}명){myWaitIdx>=0&&<span style={{fontSize:12,fontWeight:700,color:"#C2610C",marginLeft:6}}>내 순서 {myWaitIdx+1}번째</span>}</SectionTitle>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={kick&&!v.isGuest?kick(v):null}/>)}
+            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={rowRemove(v)}/>)}
           </div>
           <p style={{margin:"10px 0 0",fontSize:12,color:"#A3AAC2"}}>자리가 나면 대기 순서대로 참석 확정돼요.</p>
         </Card>
