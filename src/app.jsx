@@ -1607,6 +1607,22 @@ const ADMIN_MSG=[
   ["career","구력 확인 요청",()=>"구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
   ["custom","직접 쓰기",()=>""],
 ];
+// 관리 탭 회원 목록: 5명씩 끊어 보기 (이전 / 1 / 6 / 다음)
+const PAGE_SIZE=5;
+const pageCount=total=>Math.max(1,Math.ceil(total/PAGE_SIZE));
+// 승인·탈퇴로 목록이 줄어 지금 페이지가 비면 마지막 페이지를 보여 줘요
+const pageOf=(list,page)=>{ const p=Math.min(page,pageCount(list.length)-1); return list.slice(p*PAGE_SIZE,(p+1)*PAGE_SIZE); };
+function Pager({page,total,onChange,label}){
+  if(total<=PAGE_SIZE) return null;
+  const pages=pageCount(total), p=Math.min(page,pages-1);
+  const btn=(text,to,dis)=><button type="button" disabled={dis} onClick={()=>onChange(to)} aria-label={`${label} ${to<p?"이전":"다음"} 페이지`}
+    style={{padding:"8px 16px",borderRadius:999,fontSize:13,fontWeight:600,fontFamily:FONT,cursor:dis?"default":"pointer",border:"1.5px solid #D6DEF7",background:"#fff",color:dis?"#C0C6D9":BLUE,opacity:dis?0.6:1}}>{text}</button>;
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:10}}>
+    {btn("‹ 이전",p-1,p===0)}
+    <span style={{fontSize:13,fontWeight:700,color:"#4A5578"}}>{p+1} / {pages}</span>
+    {btn("다음 ›",p+1,p>=pages-1)}
+  </div>;
+}
 function AdminTab(){
   useSeen();
   const [members,setMembers]=useState(null);
@@ -1625,6 +1641,9 @@ function AdminTab(){
   const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
+  const [pg,setPg]=useState({pending:0,active:0,gone:0});   // 목록별 페이지 (5명씩)
+  const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
+  const toggleSortSeen=()=>{ setSortSeen(v=>!v); goPage("active",0); };   // 정렬 바꾸면 1페이지로
   useEffect(()=>{
     const r=FB.club.child("lastSeen");const h=s=>setLastSeen(s.val()||{});
     r.on("value",h,()=>setLastSeen(null));
@@ -1751,23 +1770,26 @@ function AdminTab(){
         <SectionTitle>준회원 · 승인 대기 ({pending.length}명)</SectionTitle>
         {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pending.map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
+            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
           </div>
         )}
+        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
       </Card>
       <Card>
-        <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={()=>setSortSeen(v=>!v)}>정회원 ({active.length}명)</SectionTitle>
+        <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={toggleSortSeen}>정회원 ({active.length}명)</SectionTitle>
         {!lastSeen&&<p style={{margin:"0 0 8px",fontSize:12,color:"#C2610C",lineHeight:1.6}}>마지막 접속을 보려면 README의 새 파이어베이스 규칙을 콘솔에 붙여넣어 주세요.</p>}
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {activeShown.map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
+          {pageOf(activeShown,pg.active).map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
+        <Pager page={pg.active} total={activeShown.length} onChange={n=>goPage("active",n)} label="정회원"/>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있고, 본명도 대신 넣거나 고칠 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
       {gone.length>0&&<Card>
         <SectionTitle action={showGone?"접기":"펼치기"} onAction={()=>setShowGone(v=>!v)}>탈퇴 회원 ({gone.length}명)</SectionTitle>
         {showGone&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {gone.map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
+          {pageOf(gone,pg.gone).map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
         </div>}
+        {showGone&&<Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>}
         {showGone&&<p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>}
       </Card>}
       <AdSettings/>
