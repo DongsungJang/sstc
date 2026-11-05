@@ -4855,10 +4855,10 @@ export default function App() {
             <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
               style={{padding:"5px 10px 5px 9px",borderRadius:10,border:"none",background:adminOn?BALL:"rgba(255,255,255,0.14)",color:adminOn?INK:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:0}}>
               <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
-            <div style={{display:"flex",gap:22,marginTop:16}}>
+            <div style={{display:"flex",gap:22,marginTop:16,alignItems:"flex-start"}}>
               {[{label:"NTRP",value:(account&&account.profile&&account.profile.ntrp)||MEMBER_NTRP[ME]||"-"},
                 {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"-"},{label:"올해(누적)",value:`${yearCount}회 (${myCount.length})`}].map(x=>(
-                <div key={x.label}><p style={{margin:0,fontSize:12,opacity:0.65}}>{x.label}</p><p style={{margin:"2px 0 0",fontSize:18,fontWeight:700,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{x.value}</p></div>
+                <div key={x.label}><p style={{margin:0,fontSize:12,lineHeight:"16px",opacity:0.65}}>{x.label}</p><p style={{margin:"2px 0 0",fontSize:18,lineHeight:"24px",fontWeight:700,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{x.value}</p></div>
               ))}
             </div>
           </div>
