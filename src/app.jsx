@@ -709,18 +709,44 @@ function adTheme(bg){
 // 로고 사진: 브라우저에서 가로세로 최대 160px로 줄여 data URL로 광고 데이터에 같이 저장 (파이어베이스 Storage 안 씀)
 // 투명 배경을 살리려고 webp → png 순으로, 그래도 크면 흰 바탕 jpeg로. 보통 5~20KB
 const AD_LOGO_MAX=160, AD_LOGO_BYTES=60000;
+// 로고만 남기기: 가장자리 색(벽·종이 배경)과 확실히 다른 부분을 찾아 그 둘레만 잘라 정사각형으로 맞춰요.
+// 모자라는 칸은 가장자리 색으로 채워서, 배너 칸을 꽉 채워도 로고가 잘리지 않아요
+function logoBox(img){
+  const A=Math.min(1,400/Math.max(img.width,img.height)), w=Math.max(1,Math.round(img.width*A)), h=Math.max(1,Math.round(img.height*A));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d"); g.drawImage(img,0,0,w,h);
+  let d; try{ d=g.getImageData(0,0,w,h).data; }catch(e){ return null; }
+  const at=(x,y)=>{ const i=(y*w+x)*4; return [d[i],d[i+1],d[i+2],d[i+3]]; };
+  const edge=[]; for(let x=0;x<w;x+=2){ edge.push(at(x,0),at(x,h-1)); } for(let y=0;y<h;y+=2){ edge.push(at(0,y),at(w-1,y)); }
+  const med=k=>{ const v=edge.map(p=>p[k]).sort((m,n)=>m-n); return v[v.length>>1]; };
+  const bg=[med(0),med(1),med(2),med(3)];
+  const rows=new Array(h).fill(0), cols=new Array(w).fill(0);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const p=at(x,y);
+    const diff=bg[3]<128?p[3]-bg[3]:(p[3]<128?255:Math.max(Math.abs(p[0]-bg[0]),Math.abs(p[1]-bg[1]),Math.abs(p[2]-bg[2])));
+    if(diff>64){ rows[y]++; cols[x]++; } }
+  const span=(arr,need)=>{ let s=arr.findIndex(n=>n>=need), e=arr.length-1; while(e>=0&&arr[e]<need) e--; return s<0?null:[s,e]; };
+  const ry=span(rows,Math.max(2,Math.round(w*0.004))), rx=span(cols,Math.max(2,Math.round(h*0.004)));
+  const fill=bg[3]<128?null:`rgb(${bg[0]},${bg[1]},${bg[2]})`;
+  if(!ry||!rx) return {x:0,y:0,w:img.width,h:img.height,fill,trimmed:false};
+  const box={x:rx[0]/A,y:ry[0]/A,w:(rx[1]-rx[0]+1)/A,h:(ry[1]-ry[0]+1)/A};
+  const trimmed=box.w*box.h<0.8*img.width*img.height;
+  return trimmed?{...box,fill,trimmed}:{x:0,y:0,w:img.width,h:img.height,fill,trimmed};
+}
 function shrinkLogo(file){
   return new Promise((res,rej)=>{
     if(!file||!/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
     const img=new Image(), src=URL.createObjectURL(file);
     img.onload=()=>{
       URL.revokeObjectURL(src);
-      const k=Math.min(1,AD_LOGO_MAX/Math.max(img.width,img.height)), w=Math.max(1,Math.round(img.width*k)), h=Math.max(1,Math.round(img.height*k));
-      const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d");
-      g.imageSmoothingQuality="high"; g.drawImage(img,0,0,w,h);
+      const bx=logoBox(img)||{x:0,y:0,w:img.width,h:img.height,fill:null,trimmed:false};
+      const side=Math.max(bx.w,bx.h)*(bx.trimmed?1.24:1), cx=bx.x+bx.w/2, cy=bx.y+bx.h/2;   // 잘랐으면 둘레에 12%씩 여유
+      const S=Math.max(1,Math.min(AD_LOGO_MAX,Math.round(side))), k=S/side;
+      const c=document.createElement("canvas"); c.width=S; c.height=S; const g=c.getContext("2d");
+      if(bx.fill){ g.fillStyle=bx.fill; g.fillRect(0,0,S,S); }
+      g.imageSmoothingQuality="high";
+      g.drawImage(img,(img.width/2-cx)*k+S/2-img.width*k/2,(img.height/2-cy)*k+S/2-img.height*k/2,img.width*k,img.height*k);
       let out=c.toDataURL("image/webp",0.9);
       if(!/^data:image\/webp/.test(out)||out.length>AD_LOGO_BYTES) out=c.toDataURL("image/png");
-      if(out.length>AD_LOGO_BYTES){ g.globalCompositeOperation="destination-over"; g.fillStyle="#fff"; g.fillRect(0,0,w,h); out=c.toDataURL("image/jpeg",0.85); }
+      if(out.length>AD_LOGO_BYTES){ g.globalCompositeOperation="destination-over"; g.fillStyle="#fff"; g.fillRect(0,0,S,S); out=c.toDataURL("image/jpeg",0.85); }
       out.length>AD_LOGO_BYTES?rej(new Error("사진이 너무 복잡해요. 다른 사진으로 해 주세요")):res(out);
     };
     img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
@@ -753,8 +779,8 @@ function AdBanner({ad}){
   const url=adUrl(ad.url), th=adTheme(ad.bg);
   const body=(
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
-      {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:4,boxSizing:"border-box"}}>
-        <img src={ad.logoImg} alt={ad.logo||"로고"} draggable={false} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
+      {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,0.06)",flexShrink:0,overflow:"hidden"}}>
+        <img src={ad.logoImg} alt={ad.logo||"로고"} draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
       </div>:ad.logo&&<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:"0 4px",boxSizing:"border-box"}}>
         <span style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:th.logo,fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
       </div>}
@@ -872,8 +898,8 @@ function AdSettings(){
           <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{adPeriod(saved)}</p>; })()}
         <FieldWrap label="로고 사진 (선택)">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:54,height:54,borderRadius:16,background:"#fff",border:`1.5px ${f.logoImg?"solid #EADFD2":"dashed #D6DEF7"}`,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",padding:f.logoImg?4:0,boxSizing:"border-box",flexShrink:0}}>
-              {f.logoImg?<img src={f.logoImg} alt="로고 미리보기" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}}/>:<Icon name="camera" size={22} color="#A3AAC2" stroke={1.6}/>}
+            <div style={{width:54,height:54,borderRadius:16,background:"#fff",border:f.logoImg?"none":"1.5px dashed #D6DEF7",boxShadow:f.logoImg?"0 0 0 1px rgba(0,0,0,0.06)":"none",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxSizing:"border-box",flexShrink:0}}>
+              {f.logoImg?<img src={f.logoImg} alt="로고 미리보기" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<Icon name="camera" size={22} color="#A3AAC2" stroke={1.6}/>}
             </div>
             <label style={{...btnSmall,background:"#fff",color:BLUE,border:`1.5px solid ${BLUE}`,display:"inline-flex",alignItems:"center",opacity:logoBusy?0.6:1}}>
               {logoBusy?"줄이는 중…":f.logoImg?"사진 바꾸기":"사진 올리기"}
@@ -881,7 +907,7 @@ function AdSettings(){
             </label>
             {f.logoImg&&<button type="button" onClick={()=>set("logoImg","")} style={{...btnSmall,background:"#fff",color:"#ef4444",border:"1.5px solid #FBD5D5"}}>빼기</button>}
           </div>
-          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>정사각형이나 배경이 투명한 로고가 잘 어울려요. 사진이 있으면 아래 로고 글자 대신 사진이 보여요.</p>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>로고 둘레의 빈 배경은 올릴 때 자동으로 잘라 내요. 사진이 있으면 아래 로고 글자 대신 사진이 보여요.</p>
         </FieldWrap>
         {field("logo","로고 글자 (선택)","예: ESSENT",12)}
         <FieldWrap label="배경색">

@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=faf4c1183c">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=faf4c1183c">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=d8223f0b28">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=d8223f0b28">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2221,6 +2221,86 @@ function adTheme(bg) {
 // 투명 배경을 살리려고 webp → png 순으로, 그래도 크면 흰 바탕 jpeg로. 보통 5~20KB
 const AD_LOGO_MAX = 160,
   AD_LOGO_BYTES = 60000;
+// 로고만 남기기: 가장자리 색(벽·종이 배경)과 확실히 다른 부분을 찾아 그 둘레만 잘라 정사각형으로 맞춰요.
+// 모자라는 칸은 가장자리 색으로 채워서, 배너 칸을 꽉 채워도 로고가 잘리지 않아요
+function logoBox(img) {
+  const A = Math.min(1, 400 / Math.max(img.width, img.height)),
+    w = Math.max(1, Math.round(img.width * A)),
+    h = Math.max(1, Math.round(img.height * A));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d");
+  g.drawImage(img, 0, 0, w, h);
+  let d;
+  try {
+    d = g.getImageData(0, 0, w, h).data;
+  } catch (e) {
+    return null;
+  }
+  const at = (x, y) => {
+    const i = (y * w + x) * 4;
+    return [d[i], d[i + 1], d[i + 2], d[i + 3]];
+  };
+  const edge = [];
+  for (let x = 0; x < w; x += 2) {
+    edge.push(at(x, 0), at(x, h - 1));
+  }
+  for (let y = 0; y < h; y += 2) {
+    edge.push(at(0, y), at(w - 1, y));
+  }
+  const med = k => {
+    const v = edge.map(p => p[k]).sort((m, n) => m - n);
+    return v[v.length >> 1];
+  };
+  const bg = [med(0), med(1), med(2), med(3)];
+  const rows = new Array(h).fill(0),
+    cols = new Array(w).fill(0);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = at(x, y);
+    const diff = bg[3] < 128 ? p[3] - bg[3] : p[3] < 128 ? 255 : Math.max(Math.abs(p[0] - bg[0]), Math.abs(p[1] - bg[1]), Math.abs(p[2] - bg[2]));
+    if (diff > 64) {
+      rows[y]++;
+      cols[x]++;
+    }
+  }
+  const span = (arr, need) => {
+    let s = arr.findIndex(n => n >= need),
+      e = arr.length - 1;
+    while (e >= 0 && arr[e] < need) e--;
+    return s < 0 ? null : [s, e];
+  };
+  const ry = span(rows, Math.max(2, Math.round(w * 0.004))),
+    rx = span(cols, Math.max(2, Math.round(h * 0.004)));
+  const fill = bg[3] < 128 ? null : `rgb(${bg[0]},${bg[1]},${bg[2]})`;
+  if (!ry || !rx) return {
+    x: 0,
+    y: 0,
+    w: img.width,
+    h: img.height,
+    fill,
+    trimmed: false
+  };
+  const box = {
+    x: rx[0] / A,
+    y: ry[0] / A,
+    w: (rx[1] - rx[0] + 1) / A,
+    h: (ry[1] - ry[0] + 1) / A
+  };
+  const trimmed = box.w * box.h < 0.8 * img.width * img.height;
+  return trimmed ? {
+    ...box,
+    fill,
+    trimmed
+  } : {
+    x: 0,
+    y: 0,
+    w: img.width,
+    h: img.height,
+    fill,
+    trimmed
+  };
+}
 function shrinkLogo(file) {
   return new Promise((res, rej) => {
     if (!file || !/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
@@ -2228,21 +2308,35 @@ function shrinkLogo(file) {
       src = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(src);
-      const k = Math.min(1, AD_LOGO_MAX / Math.max(img.width, img.height)),
-        w = Math.max(1, Math.round(img.width * k)),
-        h = Math.max(1, Math.round(img.height * k));
+      const bx = logoBox(img) || {
+        x: 0,
+        y: 0,
+        w: img.width,
+        h: img.height,
+        fill: null,
+        trimmed: false
+      };
+      const side = Math.max(bx.w, bx.h) * (bx.trimmed ? 1.24 : 1),
+        cx = bx.x + bx.w / 2,
+        cy = bx.y + bx.h / 2; // 잘랐으면 둘레에 12%씩 여유
+      const S = Math.max(1, Math.min(AD_LOGO_MAX, Math.round(side))),
+        k = S / side;
       const c = document.createElement("canvas");
-      c.width = w;
-      c.height = h;
+      c.width = S;
+      c.height = S;
       const g = c.getContext("2d");
+      if (bx.fill) {
+        g.fillStyle = bx.fill;
+        g.fillRect(0, 0, S, S);
+      }
       g.imageSmoothingQuality = "high";
-      g.drawImage(img, 0, 0, w, h);
+      g.drawImage(img, (img.width / 2 - cx) * k + S / 2 - img.width * k / 2, (img.height / 2 - cy) * k + S / 2 - img.height * k / 2, img.width * k, img.height * k);
       let out = c.toDataURL("image/webp", 0.9);
       if (!/^data:image\/webp/.test(out) || out.length > AD_LOGO_BYTES) out = c.toDataURL("image/png");
       if (out.length > AD_LOGO_BYTES) {
         g.globalCompositeOperation = "destination-over";
         g.fillStyle = "#fff";
-        g.fillRect(0, 0, w, h);
+        g.fillRect(0, 0, S, S);
         out = c.toDataURL("image/jpeg", 0.85);
       }
       out.length > AD_LOGO_BYTES ? rej(new Error("사진이 너무 복잡해요. 다른 사진으로 해 주세요")) : res(out);
@@ -2312,23 +2406,18 @@ function AdBanner({
       height: 54,
       borderRadius: 16,
       background: "#fff",
-      border: "1px solid #EADFD2",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
+      boxShadow: "0 0 0 1px rgba(0,0,0,0.06)",
       flexShrink: 0,
-      overflow: "hidden",
-      padding: 4,
-      boxSizing: "border-box"
+      overflow: "hidden"
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: ad.logoImg,
     alt: ad.logo || "로고",
     draggable: false,
     style: {
-      maxWidth: "100%",
-      maxHeight: "100%",
-      objectFit: "contain",
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
       display: "block"
     }
   })) : ad.logo && /*#__PURE__*/React.createElement("div", {
@@ -2774,12 +2863,12 @@ function AdSettings() {
       height: 54,
       borderRadius: 16,
       background: "#fff",
-      border: `1.5px ${f.logoImg ? "solid #EADFD2" : "dashed #D6DEF7"}`,
+      border: f.logoImg ? "none" : "1.5px dashed #D6DEF7",
+      boxShadow: f.logoImg ? "0 0 0 1px rgba(0,0,0,0.06)" : "none",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
-      padding: f.logoImg ? 4 : 0,
       boxSizing: "border-box",
       flexShrink: 0
     }
@@ -2787,9 +2876,10 @@ function AdSettings() {
     src: f.logoImg,
     alt: "\uB85C\uACE0 \uBBF8\uB9AC\uBCF4\uAE30",
     style: {
-      maxWidth: "100%",
-      maxHeight: "100%",
-      objectFit: "contain"
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block"
     }
   }) : /*#__PURE__*/React.createElement(Icon, {
     name: "camera",
@@ -2829,7 +2919,7 @@ function AdSettings() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "\uC815\uC0AC\uAC01\uD615\uC774\uB098 \uBC30\uACBD\uC774 \uD22C\uBA85\uD55C \uB85C\uACE0\uAC00 \uC798 \uC5B4\uC6B8\uB824\uC694. \uC0AC\uC9C4\uC774 \uC788\uC73C\uBA74 \uC544\uB798 \uB85C\uACE0 \uAE00\uC790 \uB300\uC2E0 \uC0AC\uC9C4\uC774 \uBCF4\uC5EC\uC694.")), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, "\uB85C\uACE0 \uB458\uB808\uC758 \uBE48 \uBC30\uACBD\uC740 \uC62C\uB9B4 \uB54C \uC790\uB3D9\uC73C\uB85C \uC798\uB77C \uB0B4\uC694. \uC0AC\uC9C4\uC774 \uC788\uC73C\uBA74 \uC544\uB798 \uB85C\uACE0 \uAE00\uC790 \uB300\uC2E0 \uC0AC\uC9C4\uC774 \uBCF4\uC5EC\uC694.")), field("logo", "로고 글자 (선택)", "예: ESSENT", 12), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC30\uACBD\uC0C9"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13761,7 +13851,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "faf4c1183c";
+const BUILD_ID = "d8223f0b28";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
