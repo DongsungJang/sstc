@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=de68b38dba">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=de68b38dba">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=34ecd06c21">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=34ecd06c21">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -292,8 +292,9 @@ function votesFromRec(rec) {
       by: v.by || "",
       byUid: v.byUid || ""
     });
-    (v.guests || []).forEach(g => g && g.name && out.push({
+    (v.guests || []).forEach((g, gi) => g && g.name && out.push({
       key,
+      gi,
       name: g.name,
       ntrp: "",
       at: g.at || v.at,
@@ -7281,6 +7282,17 @@ function MeetingDetail({
     if (!window.confirm(`${v.name} 님을 이 모임 참석에서 뺄까요?${votes0[v.key] && (votes0[v.key].guests || []).length ? " 이 회원이 초대한 게스트도 함께 빠져요." : ""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}`, null).catch(e => alert(authMsg(e)));
   } : null;
+  // 게스트 빼기: 관리자는 누구 게스트든, 회원은 자기가 초대한 게스트만. 지난(종료된) 모임도 돼요
+  // (게스트였다가 정회원이 된 사람을 나중에 정리하려고). 참석 횟수·통계는 투표 기록에서 바로 다시 계산돼요.
+  const canKickGuest = v => v.isGuest && (isAdmin || v.key === myVoteKey());
+  const kickGuest = v => canKickGuest(v) ? () => {
+    const host = votes0[v.key],
+      list = host && host.guests || [];
+    if (!list[v.gi] || list[v.gi].name !== v.name) return alert("게스트 정보가 바뀌었어요. 다시 열어 주세요.");
+    if (!window.confirm(`게스트 ${v.name} 님을 이 모임 참석에서 뺄까요?${isPast && isAdmin ? "\n정회원이 됐다면 빼고 나서 '다른 회원 참석 등록'으로 다시 넣어 주세요." : ""}`)) return;
+    saveMeetingPath(`m${meeting.id}/votes/${v.key}/guests`, list.filter((g, i) => g && i !== v.gi)).catch(e => alert(authMsg(e)));
+  } : null;
+  const rowRemove = v => v.isGuest ? kickGuest(v) : kick(v);
   const myConfirmIdx = confirmed.findIndex(v => v.isMe),
     myWaitIdx = waitlist.findIndex(v => v.isMe);
   const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `참석 확정 · ${myConfirmIdx + 1}번째` : `대기 ${myWaitIdx + 1}번째 (대기 ${waitlist.length}명 중)${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "불참으로 등록되었어요" : myStatus === "maybe" ? "미정으로 등록되었어요" : "";
@@ -7909,7 +7921,7 @@ function MeetingDetail({
     key: v.name + i,
     v: v,
     idx: i + 1,
-    onRemove: kick && !v.isGuest ? kick(v) : null
+    onRemove: rowRemove(v)
   })), confirmed.length === 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
@@ -7943,7 +7955,7 @@ function MeetingDetail({
     v: v,
     idx: i + 1,
     wait: true,
-    onRemove: kick && !v.isGuest ? kick(v) : null
+    onRemove: rowRemove(v)
   }))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
@@ -12731,7 +12743,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "de68b38dba";
+const BUILD_ID = "34ecd06c21";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
