@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=b66730377b">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=b66730377b">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fd47880f99">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fd47880f99">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -95,13 +95,16 @@ const {
 } = React;
 
 // ─── 테마 (파란색 기본) ──────────────────────────────────────────────────────
-const BLUE = "#3B63F3";
-const BLUE_DEEP = "#2F4FD8";
-const BLUE_LIGHT = "#EEF2FF";
-const GRAD = "linear-gradient(135deg,#5B8DEF 0%,#3B63F3 55%,#2F4FD8 100%)";
-const SHADOW = "0 6px 24px rgba(40,70,180,0.08)";
-const SHADOW_BTN = "0 8px 18px rgba(59,99,243,0.28)";
-const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
+const BLUE = "#2152E6";
+const BLUE_DEEP = "#1A43C9";
+const BLUE_LIGHT = "#E8EEFF";
+const GRAD = "#2152E6"; // 하드코트 디자인: 그라데이션 없이 단색 파랑
+const INK = "#0B1E5B"; // 남색 (글자·탭바)
+const BALL = "#D7F24A"; // 테니스공 형광 (강조)
+const PAGE_BG = "#EDF0F6";
+const SHADOW = "none";
+const SHADOW_BTN = "none";
+const FONT = "'Inter Tight','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
@@ -330,7 +333,7 @@ function WaitTag({
       fontSize: 11,
       fontWeight: 700,
       padding: "2px 8px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#FFF4E5",
       color: "#C2610C",
       whiteSpace: "nowrap"
@@ -548,38 +551,37 @@ function calcCareer(startDate) {
 // ─── 공통 UI ──────────────────────────────────────────────────────────────────
 const inputStyle = {
   width: "100%",
-  border: "1.5px solid #D6DEF7",
-  borderRadius: 999,
-  padding: "11px 16px",
+  border: "1.5px solid #E2E6F0",
+  borderRadius: 14,
+  padding: "13px 16px",
   fontSize: 14,
   outline: "none",
   boxSizing: "border-box",
   background: "#fff",
-  color: "#1B2559",
+  color: INK,
   fontFamily: "inherit"
 };
 const btnPrimary = {
   width: "100%",
-  padding: "13px 0",
+  padding: "15px 0",
   background: GRAD,
   color: "#fff",
   border: "none",
-  borderRadius: 999,
+  borderRadius: 14,
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: 700,
   cursor: "pointer",
-  boxShadow: SHADOW_BTN,
-  letterSpacing: "0.02em"
+  boxShadow: SHADOW_BTN
 };
 const btnSecondary = {
   flex: 1,
-  padding: "13px 0",
-  background: "#fff",
-  color: BLUE,
-  border: "1.5px solid #D6DEF7",
-  borderRadius: 999,
+  padding: "15px 0",
+  background: PAGE_BG,
+  color: "#5E6A8E",
+  border: "none",
+  borderRadius: 14,
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: 700,
   cursor: "pointer"
 };
 const btnSmall = {
@@ -587,7 +589,7 @@ const btnSmall = {
   background: BLUE,
   color: "#fff",
   border: "none",
-  borderRadius: 999,
+  borderRadius: 12,
   fontSize: 12,
   fontWeight: 600,
   cursor: "pointer",
@@ -609,7 +611,7 @@ function FieldWrap({
     style: {
       fontSize: 14,
       fontWeight: 500,
-      color: "#2B3674"
+      color: INK
     }
   }, label, required && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -661,9 +663,8 @@ function Card({
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff",
-      borderRadius: 22,
+      borderRadius: 20,
       padding: 18,
-      boxShadow: SHADOW,
       ...style
     }
   }, children);
@@ -682,9 +683,10 @@ function SectionTitle({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 15,
-      fontWeight: 700,
-      color: "#1B2559"
+      fontSize: 17,
+      fontWeight: 900,
+      color: INK,
+      letterSpacing: "-0.03em"
     }
   }, children), action && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -692,12 +694,12 @@ function SectionTitle({
     style: {
       background: "none",
       border: "none",
-      fontSize: 12,
+      fontSize: 13,
       color: BLUE,
       cursor: "pointer",
-      fontWeight: 600
+      fontWeight: 700
     }
-  }, action, " \u2192"));
+  }, action));
 }
 function StepIndicator({
   current
@@ -894,7 +896,7 @@ function NewTag({
       letterSpacing: "0.04em",
       lineHeight: "16px",
       padding: "0 6px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#ef4444",
       color: "#fff",
       whiteSpace: "nowrap",
@@ -1535,7 +1537,7 @@ function Step2({
       justifyContent: "center",
       cursor: "pointer",
       overflow: "hidden",
-      background: "#F5F7FE"
+      background: "#F1F4FA"
     }
   }, preview ? /*#__PURE__*/React.createElement("img", {
     src: preview,
@@ -1787,7 +1789,7 @@ function Step3({
     style: {
       fontSize: 16,
       fontWeight: 600,
-      color: "#2B3674",
+      color: INK,
       marginLeft: 8
     }
   }, popupItem.label)), /*#__PURE__*/React.createElement("button", {
@@ -1854,7 +1856,7 @@ function Step3({
       color: BLUE,
       background: BLUE_LIGHT,
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       whiteSpace: "nowrap"
     }
   }, career)), /*#__PURE__*/React.createElement("p", {
@@ -1873,7 +1875,7 @@ function Step3({
     style: {
       fontSize: 14,
       fontWeight: 500,
-      color: "#2B3674"
+      color: INK
     }
   }, "\uB808\uC2A8 \uC774\uB825"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1952,7 +1954,7 @@ function Step3({
         height: 18,
         borderRadius: "50%",
         border: "1px solid #D6DEF7",
-        background: "#F5F7FE",
+        background: "#F1F4FA",
         color: "#6B7493",
         fontSize: 10,
         cursor: "pointer",
@@ -1974,7 +1976,7 @@ function Step3({
     style: {
       fontSize: 14,
       fontWeight: 500,
-      color: "#2B3674"
+      color: INK
     }
   }, "\uC8FC \uC6B4\uB3D9 \uD69F\uC218"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2005,7 +2007,7 @@ function Step3({
     style: {
       fontSize: 14,
       fontWeight: 500,
-      color: "#2B3674"
+      color: INK
     }
   }, "\uB2E4\uB978 \uD14C\uB2C8\uC2A4 \uD074\uB7FD \uCC38\uC5EC \uC911"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2033,7 +2035,7 @@ function Step3({
     style: {
       fontSize: 14,
       fontWeight: 500,
-      color: "#2B3674"
+      color: INK
     }
   }, "\uC785\uC0C1 \uC774\uB825"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2076,7 +2078,7 @@ function Step3({
     style: {
       padding: "0 10px",
       border: "1px solid #fca5a5",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#fff5f5",
       color: "#ef4444",
       cursor: "pointer",
@@ -2088,7 +2090,7 @@ function Step3({
     style: {
       padding: "8px 0",
       border: `1px dashed ${BLUE}`,
-      borderRadius: 999,
+      borderRadius: 12,
       background: BLUE_LIGHT,
       color: BLUE,
       fontSize: 13,
@@ -2136,7 +2138,7 @@ function Empty({
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "18px 12px",
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 16,
       textAlign: "center"
     }
@@ -2156,7 +2158,7 @@ function Empty({
       background: GRAD,
       color: "#fff",
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
@@ -2185,7 +2187,7 @@ const AD_EMPTY = {
 };
 const AD_FIELDS = ["tag", "logo", "logoImg", "bg", "top", "title", "sub", "url", "popup", "start", "end"];
 // 배경색: 비우면 기본 아이보리. 고른 색으로 은은한 그라데이션을 만들고, 어두운 색이면 글자를 흰색으로 바꿔요
-const AD_COLORS = [["", "아이보리"], ["#DCEBFF", "하늘"], ["#D6F2E4", "민트"], ["#FFE0E8", "핑크"], ["#E7E0FF", "라벤더"], ["#FFF0BF", "레몬"], ["#1B2559", "네이비"], ["#2B2B2B", "블랙"]];
+const AD_COLORS = [["", "아이보리"], ["#DCEBFF", "하늘"], ["#D6F2E4", "민트"], ["#FFE0E8", "핑크"], ["#E7E0FF", "라벤더"], ["#FFF0BF", "레몬"], [INK, "네이비"], ["#2B2B2B", "블랙"]];
 const adHex = v => /^#[0-9a-fA-F]{6}$/.test(v || "") ? v.toUpperCase() : "";
 function adTheme(bg) {
   const h = adHex(bg);
@@ -2468,7 +2470,7 @@ function AdTag({
       background: bg,
       border: `1px solid ${line}`,
       padding: "1px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       whiteSpace: "nowrap",
       ...style
     }
@@ -2548,7 +2550,7 @@ function AdPopup({
       margin: 0,
       fontSize: 16,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       wordBreak: "keep-all",
       lineHeight: 1.4
     }
@@ -2556,7 +2558,7 @@ function AdPopup({
     style: {
       margin: "0 0 18px",
       fontSize: 14,
-      color: "#2B3674",
+      color: INK,
       lineHeight: 1.7,
       whiteSpace: "pre-wrap",
       wordBreak: "break-word"
@@ -2828,12 +2830,12 @@ function AdStats({
       margin: 0,
       fontSize: 18,
       fontWeight: 700,
-      color: c || "#1B2559"
+      color: c || INK
     }
   }, val));
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 16,
       padding: 12
     }
@@ -2848,7 +2850,7 @@ function AdStats({
     style: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, label, " \uBC18\uC751"), stats && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -2876,7 +2878,7 @@ function AdStats({
     onClick: () => setRange(k),
     style: {
       padding: "4px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 12,
       cursor: "pointer",
       fontFamily: FONT,
@@ -3030,7 +3032,7 @@ function AdCarousel({
       height: 6,
       padding: 0,
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       background: k === i ? "#B9A28C" : "#DCD2C6",
       cursor: "pointer",
       transition: "width .2s"
@@ -3225,7 +3227,7 @@ function AdSettings() {
       onClick: () => pick(id),
       style: {
         padding: "7px 12px",
-        borderRadius: 999,
+        borderRadius: 12,
         fontSize: 13,
         fontWeight: sel ? 700 : 500,
         cursor: "pointer",
@@ -3260,14 +3262,14 @@ function AdSettings() {
     style: {
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, "\uD648 \uD654\uBA74 \uBC30\uB108"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       fontWeight: 700,
       padding: "3px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: showing ? "#E5F7EE" : "#F1F2F5",
       color: showing ? "#067647" : "#6B7280"
     }
@@ -3287,7 +3289,7 @@ function AdSettings() {
     },
     style: {
       padding: "7px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
@@ -3301,7 +3303,7 @@ function AdSettings() {
     const k = list.findIndex(a => a.id === cur);
     const mv = {
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 12,
       fontWeight: 600,
       cursor: "pointer",
@@ -3369,7 +3371,7 @@ function AdSettings() {
         fontSize: 11,
         fontWeight: 700,
         padding: "2px 9px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: st[1],
         color: st[2]
       }
@@ -3379,7 +3381,7 @@ function AdSettings() {
     label: `배너${list.findIndex(a => a.id === cur) + 1}`
   }), mtAd && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 14,
       padding: "10px 12px",
       fontSize: 12,
@@ -3390,7 +3392,7 @@ function AdSettings() {
     style: {
       margin: "4px 0 0",
       fontWeight: 600,
-      color: "#2B3674"
+      color: INK
     }
   }, mtAd.meeting.date, " ", mtAd.meeting.time, " \xB7 ", mtAd.meeting.placeName || mtAd.meeting.place)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uC624\uB978\uCABD \uC704 \uD45C\uC2DC"
@@ -3409,7 +3411,7 @@ function AdSettings() {
       onClick: () => set("tag", name),
       style: {
         padding: "6px 14px",
-        borderRadius: 999,
+        borderRadius: 12,
         fontSize: 13,
         fontWeight: 700,
         cursor: "pointer",
@@ -3545,7 +3547,7 @@ function AdSettings() {
         position: "relative",
         height: 34,
         padding: "0 12px",
-        borderRadius: 999,
+        borderRadius: 12,
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
@@ -3620,7 +3622,7 @@ function AdSettings() {
       alignItems: "center",
       gap: 8,
       fontSize: 14,
-      color: "#2B3674",
+      color: INK,
       cursor: "pointer",
       padding: "2px 0 4px"
     }
@@ -3769,7 +3771,7 @@ function AdSettings() {
       margin: "0 0 6px",
       fontSize: 13,
       fontWeight: 600,
-      color: "#2B3674"
+      color: INK
     }
   }, "\uB118\uC5B4\uAC00\uB294 \uC2DC\uAC04 ", /*#__PURE__*/React.createElement("span", {
     style: {
@@ -3790,7 +3792,7 @@ function AdSettings() {
     onClick: () => saveSec(n),
     style: {
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       cursor: "pointer",
       fontFamily: FONT,
@@ -3934,7 +3936,7 @@ function HomeTab({
     onAction: onCreate
   }, "\uC544\uC9C1 \uC7A1\uD78C \uBAA8\uC784\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     style: {
-      background: next.cancelled ? GONE.bg : isFull(next) ? FULL.bg : BLUE_LIGHT,
+      background: next.cancelled ? GONE.bg : isFull(next) ? FULL.bg : "#F1F4FA",
       border: next.cancelled ? `1.5px solid ${GONE.line}` : isFull(next) ? `1.5px solid ${FULL.line}` : "1.5px solid transparent",
       borderRadius: 18,
       padding: 16
@@ -3950,22 +3952,27 @@ function HomeTab({
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 3px",
-      fontWeight: 700,
-      fontSize: 15,
-      color: "#1B2559",
+      margin: "0 0 6px",
       display: "flex",
       alignItems: "center",
       gap: 6,
       flexWrap: "wrap"
     }
-  }, next.date, /*#__PURE__*/React.createElement(KindBadge, {
+  }, /*#__PURE__*/React.createElement(KindBadge, {
     m: next
   })), /*#__PURE__*/React.createElement("p", {
     style: {
+      margin: "0 0 4px",
+      fontWeight: 900,
+      fontSize: 20,
+      color: INK,
+      letterSpacing: "-0.03em"
+    }
+  }, next.date), /*#__PURE__*/React.createElement("p", {
+    style: {
       margin: "0 0 2px",
-      fontSize: 13,
-      color: "#4A5578"
+      fontSize: 14,
+      color: "#5E6A8E"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "clock",
@@ -3973,21 +3980,20 @@ function HomeTab({
   }), " ", next.time), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
-      fontSize: 13,
-      color: "#4A5578"
+      fontSize: 14,
+      color: "#5E6A8E"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "pin",
     s: 13
   }), " ", next.placeName || next.place)), /*#__PURE__*/React.createElement("span", {
     style: {
-      background: GRAD,
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 700,
-      padding: "4px 12px",
-      borderRadius: 20,
-      boxShadow: SHADOW_BTN
+      background: INK,
+      color: BALL,
+      fontSize: 12,
+      fontWeight: 800,
+      padding: "5px 10px",
+      borderRadius: 8
     }
   }, dDay(next.iso))), next.cancelled ? /*#__PURE__*/React.createElement("p", {
     style: {
@@ -4088,7 +4094,7 @@ function HomeTab({
     style: {
       marginTop: 10,
       padding: "10px 12px",
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 10,
       display: "flex",
       justifyContent: "space-between",
@@ -4100,7 +4106,7 @@ function HomeTab({
       margin: 0,
       fontSize: 13,
       fontWeight: 600,
-      color: "#2B3674"
+      color: INK
     }
   }, nextNext.date), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -4179,7 +4185,7 @@ function HomeTab({
       margin: "0 0 3px",
       fontSize: 14,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       display: "flex",
       alignItems: "center",
       gap: 6,
@@ -4218,7 +4224,7 @@ function HomeTab({
       fontSize: 11,
       fontWeight: 700,
       padding: "3px 9px",
-      borderRadius: 999,
+      borderRadius: 12,
       whiteSpace: "nowrap",
       background: gone ? GONE.c : ok ? "#fff" : "#FFF4E5",
       color: gone ? "#fff" : ok ? BLUE : "#C2610C"
@@ -4243,7 +4249,7 @@ function HomeTab({
       gap: 10,
       padding: "8px 10px",
       borderRadius: 10,
-      background: r.isMe ? BLUE_LIGHT : "#F5F7FE",
+      background: r.isMe ? BLUE_LIGHT : "#F1F4FA",
       border: r.isMe ? `1.5px solid ${BLUE}` : "1px solid transparent"
     }
   }, /*#__PURE__*/React.createElement(RankNo, {
@@ -4253,7 +4259,7 @@ function HomeTab({
       flex: 1,
       fontSize: 14,
       fontWeight: r.isMe ? 700 : 500,
-      color: r.isMe ? BLUE : "#2B3674"
+      color: r.isMe ? BLUE : INK
     }
   }, r.name, r.isMe && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -4311,7 +4317,7 @@ function HomeTab({
     style: {
       flex: 1,
       fontSize: 14,
-      color: "#1B2559",
+      color: INK,
       fontWeight: n.important ? 600 : 400
     }
   }, n.title), /*#__PURE__*/React.createElement("span", {
@@ -5195,10 +5201,10 @@ function AttendButtons({
     out = status === "absent";
   const base = {
     flex: 1,
-    padding: "9px 0",
-    borderRadius: 999,
-    fontSize: 13,
-    fontWeight: 600,
+    padding: "13px 0",
+    borderRadius: 14,
+    fontSize: 15,
+    fontWeight: 700,
     cursor: "pointer",
     display: "inline-flex",
     alignItems: "center",
@@ -5231,9 +5237,9 @@ function AttendButtons({
     onClick: () => onVote("absent"),
     style: {
       ...base,
-      background: out ? "#EF4444" : "#fff",
-      color: out ? "#fff" : "#6B7493",
-      border: `1.5px solid ${out ? "#EF4444" : "#D6DEF7"}`
+      background: out ? "#E5484D" : "#EDF0F6",
+      color: out ? "#fff" : "#5E6A8E",
+      border: `1.5px solid ${out ? "#E5484D" : "transparent"}`
     }
   }, out ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
     n: "check",
@@ -5665,7 +5671,7 @@ function Pager({
     "aria-label": `${label} ${to < p ? "이전" : "다음"} 페이지`,
     style: {
       padding: "8px 16px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       fontFamily: FONT,
@@ -5863,7 +5869,7 @@ function AdminTab() {
       fontSize: 12,
       fontWeight: 600,
       padding: "6px 11px",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "1.5px solid #D6DEF7",
       background: "#fff",
       color: "#4A5578",
@@ -5876,7 +5882,7 @@ function AdminTab() {
       fontSize: 10,
       fontWeight: 700,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: bg,
       color: c
     }
@@ -5895,7 +5901,7 @@ function AdminTab() {
     key: m.uid,
     style: {
       borderRadius: 14,
-      background: sel[m.uid] ? BLUE_LIGHT : "#F5F7FE",
+      background: sel[m.uid] ? BLUE_LIGHT : "#F1F4FA",
       padding: "10px 12px",
       border: sel[m.uid] ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
     }
@@ -5942,7 +5948,7 @@ function AdminTab() {
     style: {
       fontSize: 14,
       fontWeight: 600,
-      color: "#1B2559"
+      color: INK
     }
   }, m.nickname || "(닉네임 없음)"), m.realName ? /*#__PURE__*/React.createElement("span", {
     style: {
@@ -5961,7 +5967,7 @@ function AdminTab() {
       color: "#C2610C",
       background: "#FFF4E5",
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: "2px 8px",
       cursor: "pointer",
       fontFamily: FONT
@@ -6320,7 +6326,7 @@ function NumStepper({
       textAlign: "center",
       fontSize: 16,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       fontVariantNumeric: "tabular-nums"
     }
   }, value, unit), /*#__PURE__*/React.createElement("button", {
@@ -6578,7 +6584,7 @@ function BracketSetup({
     style: {
       margin: "0 0 4px",
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, "\uCC38\uC11D\uC790\uAC00 ", n, "\uBA85\uC774\uC5D0\uC694"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -6591,7 +6597,7 @@ function BracketSetup({
   const label = {
     fontSize: 14,
     fontWeight: 600,
-    color: "#2B3674"
+    color: INK
   };
   const rowS = {
     display: "flex",
@@ -6653,7 +6659,7 @@ function BracketSetup({
     onClick: () => setDur(m),
     style: {
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       cursor: "pointer",
       fontWeight: dur === m ? 600 : 400,
@@ -6679,7 +6685,7 @@ function BracketSetup({
       padding: "12px 14px",
       fontSize: 13,
       lineHeight: 1.6,
-      color: "#2B3674"
+      color: INK
     }
   }, k > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("b", null, k, "\uC138\uC158"), " \xB7 ", start, " ~ ", pad2(hhmmApp(toMin(start) + k * dur)), " \xB7 \uD55C \uC138\uC158\uC5D0 ", slot, "\uBA85 \uCD9C\uC804, ", Math.max(0, n - slot), "\uBA85 \uD734\uC2DD", leftover > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -6714,7 +6720,7 @@ function BracketSetup({
         gap: 8,
         padding: "6px 8px 6px 4px",
         borderRadius: 14,
-        background: p.isMe ? BLUE_LIGHT : "#F5F7FE",
+        background: p.isMe ? BLUE_LIGHT : "#F1F4FA",
         border: p.isMe ? `1.5px solid ${BLUE}` : "1.5px solid transparent",
         transform: `translateY(${dragging ? drag.dy : shiftOf(i)}px)`,
         transition: dragging ? "none" : "transform 0.15s",
@@ -6757,7 +6763,7 @@ function BracketSetup({
         minWidth: 0,
         fontSize: 14,
         fontWeight: p.isMe ? 700 : 500,
-        color: "#1B2559",
+        color: INK,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
@@ -6823,7 +6829,7 @@ function BracketSetup({
       padding: "12px 14px",
       fontSize: 13,
       lineHeight: 1.6,
-      color: problem ? "#9A4A07" : "#2B3674"
+      color: problem ? "#9A4A07" : INK
     }
   }, problem || /*#__PURE__*/React.createElement(React.Fragment, null, "\uAC8C\uC784 \uC218 \uD569\uACC4 ", sum, " = ", k, "\uC138\uC158 \xD7 ", slot, "\uC790\uB9AC \u2713"), fixable && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -6850,7 +6856,7 @@ const hhmmApp = m => Math.floor(m / 60) + ":" + ("0" + m % 60).slice(-2);
 const chipBtn = {
   padding: "5px 0",
   width: 52,
-  borderRadius: 999,
+  borderRadius: 12,
   fontSize: 11,
   fontWeight: 600,
   cursor: "pointer",
@@ -6926,7 +6932,7 @@ function ManualBracket({
   const label = {
     fontSize: 14,
     fontWeight: 600,
-    color: "#2B3674"
+    color: INK
   };
   const rowS = {
     display: "flex",
@@ -7134,7 +7140,7 @@ function ManualBracket({
     onClick: () => setDur(m),
     style: {
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       cursor: "pointer",
       fontWeight: dur === m ? 600 : 400,
@@ -7160,7 +7166,7 @@ function ManualBracket({
       padding: "12px 14px",
       fontSize: 13,
       lineHeight: 1.6,
-      color: "#2B3674"
+      color: INK
     }
   }, /*#__PURE__*/React.createElement("b", null, draft.length, "\uC138\uC158"), " \xB7 ", start, " ~ ", timeOf(draft.length))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uCC38\uAC00\uC790"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -7182,11 +7188,11 @@ function ManualBracket({
       alignItems: "center",
       gap: 4,
       padding: "5px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 12,
       fontWeight: 500,
-      background: p.name === ME ? BLUE_LIGHT : "#F5F7FE",
-      color: "#1B2559",
+      background: p.name === ME ? BLUE_LIGHT : "#F1F4FA",
+      color: INK,
       border: `1.5px solid ${p.name === ME ? BLUE : "transparent"}`
     }
   }, p.name, /*#__PURE__*/React.createElement("b", {
@@ -7272,7 +7278,7 @@ function ManualBracket({
       style: {
         fontSize: 16,
         fontWeight: 700,
-        color: "#1B2559",
+        color: INK,
         fontVariantNumeric: "tabular-nums"
       }
     }, timeOf(s)), /*#__PURE__*/React.createElement("span", {
@@ -7344,9 +7350,9 @@ function ManualBracket({
         onChange: e => setSlot(s, c, side, k, e.target.value),
         style: {
           ...sel,
-          color: v ? "#1B2559" : "#A3AAC2",
+          color: v ? INK : "#A3AAC2",
           fontWeight: v ? 600 : 400,
-          background: v ? "#fff" : "#F5F7FE"
+          background: v ? "#fff" : "#F1F4FA"
         }
       }, /*#__PURE__*/React.createElement("option", {
         value: ""
@@ -7417,7 +7423,7 @@ function ManualBracket({
       padding: "12px 14px",
       fontSize: 13,
       lineHeight: 1.6,
-      color: problem ? "#9A4A07" : "#2B3674"
+      color: problem ? "#9A4A07" : INK
     }
   }, problem || /*#__PURE__*/React.createElement(React.Fragment, null, "\uAC8C\uC784 ", draft.reduce((a, row) => a + row.filter(courtFilled).length, 0), "\uD310 \xB7 \uC800\uC7A5\uD558\uBA74 \uBC14\uB85C \uC2A4\uCF54\uC5B4\uB97C \uC785\uB825\uD560 \uC218 \uC788\uC5B4\uC694", initial ? ". 사람이 바뀐 경기의 점수는 지워져요" : "")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -7509,7 +7515,7 @@ function GameCard({
         gap: 8,
         padding: "8px 8px 8px 12px",
         borderRadius: 14,
-        background: win ? BLUE_LIGHT : "#F5F7FE",
+        background: win ? BLUE_LIGHT : "#F1F4FA",
         border: win ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
       }
     }, /*#__PURE__*/React.createElement("span", {
@@ -7525,7 +7531,7 @@ function GameCard({
         minWidth: 0,
         fontSize: 14,
         fontWeight: win ? 700 : 500,
-        color: "#1B2559",
+        color: INK,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
@@ -7549,7 +7555,7 @@ function GameCard({
         textAlign: "center",
         fontSize: 20,
         fontWeight: 700,
-        color: win ? BLUE : "#1B2559",
+        color: win ? BLUE : INK,
         fontVariantNumeric: "tabular-nums"
       }
     }, g[side]), !readOnly && /*#__PURE__*/React.createElement("button", {
@@ -7608,7 +7614,7 @@ function GameCard({
     }),
     style: {
       padding: "5px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 12,
       fontWeight: 600,
       cursor: "pointer",
@@ -7703,7 +7709,7 @@ function MeetingBracket({
     style: {
       display: "flex",
       background: "#E4E9F7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4
     }
   }, [["auto", "자동 편성"], ["manual", "직접 작성"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
@@ -7713,7 +7719,7 @@ function MeetingBracket({
     style: {
       flex: 1,
       padding: "8px 0",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "none",
       fontSize: 13,
       fontWeight: 600,
@@ -7747,7 +7753,7 @@ function MeetingBracket({
     style: {
       margin: "0 0 4px",
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, "\uC544\uC9C1 \uB300\uC9C4\uD45C\uAC00 \uC5C6\uC5B4\uC694"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -7786,7 +7792,7 @@ function MeetingBracket({
       padding: "12px 14px",
       fontSize: 13,
       lineHeight: 1.6,
-      color: "#2B3674"
+      color: INK
     }
   }, /*#__PURE__*/React.createElement("b", null, "\uB300\uC9C4\uD45C \uC218\uC815 \uC911"), " \xB7 \uC790\uB9AC\uB97C \uBC14\uAFB8\uACE0 \uC544\uB798 ", /*#__PURE__*/React.createElement("b", null, "\uC218\uC815 \uC800\uC7A5"), "\uC744 \uB20C\uB7EC \uC8FC\uC138\uC694. \uADF8\uB300\uB85C\uC778 \uACBD\uAE30\uC758 \uC810\uC218\uB294 \uB0A8\uC544\uC694."), /*#__PURE__*/React.createElement(ManualBracket, {
     meeting: meeting,
@@ -7823,7 +7829,7 @@ function MeetingBracket({
       margin: "0 0 2px",
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, bracket.players.length, "\uBA85 \xB7 ", bracket.sessions.length, "\uC138\uC158"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -7884,7 +7890,7 @@ function MeetingBracket({
     style: {
       display: "flex",
       background: "#E4E9F7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4
     }
   }, [["games", "대진·스코어"], ["table", "개인 성적"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
@@ -7894,7 +7900,7 @@ function MeetingBracket({
     style: {
       flex: 1,
       padding: "8px 0",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "none",
       fontSize: 13,
       fontWeight: 600,
@@ -7926,7 +7932,7 @@ function MeetingBracket({
     style: {
       fontSize: 16,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       fontVariantNumeric: "tabular-nums"
     }
   }, bracket.times[s]), /*#__PURE__*/React.createElement("span", {
@@ -7999,7 +8005,7 @@ function MeetingBracket({
         gap: 6,
         padding: "9px 10px",
         borderRadius: 14,
-        background: me ? BLUE_LIGHT : "#F5F7FE",
+        background: me ? BLUE_LIGHT : "#F1F4FA",
         border: me ? `1.5px solid ${BLUE}` : "1.5px solid transparent",
         fontVariantNumeric: "tabular-nums"
       }
@@ -8015,14 +8021,14 @@ function MeetingBracket({
         flex: 1,
         fontSize: 14,
         fontWeight: me ? 700 : 500,
-        color: me ? BLUE : "#2B3674"
+        color: me ? BLUE : INK
       }
     }, r.name), /*#__PURE__*/React.createElement("span", {
       style: {
         width: 56,
         textAlign: "center",
         fontSize: 13,
-        color: "#2B3674"
+        color: INK
       }
     }, /*#__PURE__*/React.createElement("b", {
       style: {
@@ -8172,7 +8178,7 @@ function VoteRow({
       gap: 10,
       padding: "8px 12px",
       borderRadius: 14,
-      background: v.isMe ? BLUE_LIGHT : wait ? "#FFFBF2" : "#F5F7FE",
+      background: v.isMe ? BLUE_LIGHT : wait ? "#FFFBF2" : "#F1F4FA",
       border: v.isMe ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -8200,7 +8206,7 @@ function VoteRow({
     style: {
       fontSize: 14,
       fontWeight: v.isMe ? 700 : 500,
-      color: v.isMe ? BLUE : "#1B2559"
+      color: v.isMe ? BLUE : INK
     }
   }, v.name), !v.isGuest && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -8212,7 +8218,7 @@ function VoteRow({
       fontSize: 10,
       fontWeight: 600,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: tag.bg,
       color: tag.c
     }
@@ -8221,7 +8227,7 @@ function VoteRow({
       fontSize: 10,
       fontWeight: 600,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#EEF4FF",
       color: BLUE
     }
@@ -8233,7 +8239,7 @@ function VoteRow({
       fontSize: 10,
       fontWeight: 600,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#EEF4FF",
       color: BLUE
     }
@@ -8245,7 +8251,7 @@ function VoteRow({
       fontSize: 10,
       fontWeight: 600,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#FEF9C3",
       color: "#A16207"
     }
@@ -8254,7 +8260,7 @@ function VoteRow({
       fontSize: 10,
       fontWeight: 600,
       padding: "2px 7px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#FEF2F2",
       color: "#ef4444"
     }
@@ -8271,7 +8277,7 @@ function VoteRow({
     style: {
       background: "none",
       border: "1px solid #FBD5D5",
-      borderRadius: 999,
+      borderRadius: 12,
       color: "#ef4444",
       fontSize: 12,
       fontWeight: 600,
@@ -8408,7 +8414,7 @@ function MentionInput({
     style: {
       fontSize: 14,
       fontWeight: 600,
-      color: "#1B2559"
+      color: INK
     }
   }, x.nickname), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -8610,7 +8616,7 @@ function CommentBox({
       style: {
         fontSize: 13,
         fontWeight: 700,
-        color: c.anon ? "#6B7493" : "#1B2559"
+        color: c.anon ? "#6B7493" : INK
       }
     }, shown(c)), c.anon && mine && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -8660,7 +8666,7 @@ function CommentBox({
       style: {
         margin: "3px 0 0",
         fontSize: 14,
-        color: "#2B3674",
+        color: INK,
         lineHeight: 1.55
       }
     }, /*#__PURE__*/React.createElement(CommentText, {
@@ -8801,7 +8807,7 @@ function MemberAttend({
     style: {
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       display: "flex",
       alignItems: "center",
       gap: 6
@@ -8816,7 +8822,7 @@ function MemberAttend({
     style: {
       background: BLUE_LIGHT,
       border: `1px solid ${BLUE}`,
-      borderRadius: 999,
+      borderRadius: 12,
       color: BLUE,
       fontSize: 12,
       fontWeight: 600,
@@ -8889,14 +8895,14 @@ function MemberAttend({
       gap: 10,
       padding: "8px 12px",
       borderRadius: 14,
-      background: "#F5F7FE"
+      background: "#F1F4FA"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
       fontSize: 14,
       fontWeight: 500,
-      color: "#1B2559"
+      color: INK
     }
   }, m.nickname, realNameOf(m) && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -9250,7 +9256,7 @@ function MeetingDetail({
     style: {
       display: "flex",
       background: "#E4E9F7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4
     }
   }, [["info", "모임 정보"], ...(meeting.flashType === "training" ? [] : [["bracket", "대진표 · 스코어"]])].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
@@ -9260,12 +9266,12 @@ function MeetingDetail({
     style: {
       flex: 1,
       padding: "10px 0",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "none",
       fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
-      background: view === k ? GRAD : "transparent",
+      background: view === k ? INK : "transparent",
       color: view === k ? "#fff" : "#6B7493",
       boxShadow: view === k ? SHADOW_BTN : "none"
     }
@@ -9285,7 +9291,7 @@ function MeetingDetail({
       margin: "0 0 6px",
       fontSize: 17,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, meeting.date), /*#__PURE__*/React.createElement(KindBadge, {
     m: meeting
@@ -9425,7 +9431,7 @@ function MeetingDetail({
     style: {
       fontSize: 13,
       fontWeight: 500,
-      color: "#1B2559"
+      color: INK
     }
   }, r.value)))), !gone && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9527,7 +9533,7 @@ function MeetingDetail({
       fontSize: 13,
       textAlign: "center",
       color: "#6B7493",
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 12,
       padding: "10px 0"
     }
@@ -9554,7 +9560,7 @@ function MeetingDetail({
     }
   }, myMsg), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 12,
       padding: 12,
       border: "1px solid #E4E9F7",
@@ -9566,7 +9572,7 @@ function MeetingDetail({
     style: {
       fontSize: 13,
       fontWeight: 600,
-      color: "#2B3674"
+      color: INK
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "clock",
@@ -9585,7 +9591,7 @@ function MeetingDetail({
     style: {
       flex: "0 0 92px",
       padding: "7px 0",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
@@ -9624,7 +9630,7 @@ function MeetingDetail({
     }
   }, "\uC774\uBC88 \uB2EC \uC815\uAE30 \uBAA8\uC784 \uCC38\uC11D ", myCount, "\uD68C (\uC774 \uBAA8\uC784 \uC804\uAE4C\uC9C0)"), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 12,
       padding: 12,
       border: "1px solid #E4E9F7"
@@ -9640,7 +9646,7 @@ function MeetingDetail({
     style: {
       fontSize: 13,
       fontWeight: 600,
-      color: "#2B3674"
+      color: INK
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "userPlus",
@@ -9651,7 +9657,7 @@ function MeetingDetail({
     style: {
       background: BLUE_LIGHT,
       border: `1px solid ${BLUE}`,
-      borderRadius: 999,
+      borderRadius: 12,
       color: BLUE,
       fontSize: 12,
       fontWeight: 600,
@@ -9673,7 +9679,7 @@ function MeetingDetail({
       gap: 8,
       padding: "7px 10px",
       background: "#fff",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "1px solid #E4E9F7"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
@@ -9684,7 +9690,7 @@ function MeetingDetail({
     style: {
       flex: 1,
       fontSize: 13,
-      color: "#2B3674",
+      color: INK,
       fontWeight: 500
     }
   }, g.name), /*#__PURE__*/React.createElement("span", {
@@ -9721,7 +9727,7 @@ function MeetingDetail({
     style: {
       flex: 1,
       border: "1px solid #D6DEF7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: "8px 12px",
       fontSize: 13,
       outline: "none"
@@ -9734,7 +9740,7 @@ function MeetingDetail({
       background: BLUE,
       color: "#fff",
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer"
@@ -9781,9 +9787,9 @@ function MeetingDetail({
     style: {
       fontSize: 11,
       padding: "4px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: BLUE_LIGHT,
-      color: "#2B3674"
+      color: INK
     }
   }, /*#__PURE__*/React.createElement("b", {
     style: {
@@ -9875,7 +9881,7 @@ function MeetingDetail({
     })),
     style: {
       padding: "7px 14px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: goneForm.reason === r ? 700 : 500,
       cursor: "pointer",
@@ -10051,7 +10057,7 @@ function MiniCalendar({
     style: {
       width: 30,
       height: 30,
-      borderRadius: 999,
+      borderRadius: 12,
       border: "1px solid #E4E9F7",
       background: "#fff",
       color: "#4A5578",
@@ -10086,7 +10092,7 @@ function MiniCalendar({
       margin: 0,
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, y, "\uB144 ", mo, "\uC6D4"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -10144,12 +10150,12 @@ function MiniCalendar({
         width: 22,
         height: 22,
         lineHeight: "22px",
-        borderRadius: 999,
+        borderRadius: 12,
         fontSize: 12,
         fontWeight: isToday || list.length ? 700 : 400,
         fontVariantNumeric: "tabular-nums",
         background: isToday ? GRAD : "transparent",
-        color: isToday ? "#fff" : past ? "#C5CBE0" : dow === 0 ? "#E5484D" : dow === 6 ? BLUE : "#1B2559"
+        color: isToday ? "#fff" : past ? "#C5CBE0" : dow === 0 ? "#E5484D" : dow === 6 ? BLUE : INK
       }
     }, d), /*#__PURE__*/React.createElement("span", {
       style: {
@@ -10164,7 +10170,7 @@ function MiniCalendar({
         width: 5,
         height: 5,
         boxSizing: "border-box",
-        borderRadius: 999,
+        borderRadius: 12,
         background: m.cancelled ? "transparent" : KIND_DOT[kindKey(m)],
         border: m.cancelled ? `1.2px solid ${GONE.c}` : "none",
         opacity: past ? 0.45 : 1
@@ -10197,7 +10203,7 @@ function MiniCalendar({
     style: {
       width: 6,
       height: 6,
-      borderRadius: 999,
+      borderRadius: 12,
       background: KIND_DOT[k]
     }
   }), l)), /*#__PURE__*/React.createElement("span", {
@@ -10211,7 +10217,7 @@ function MiniCalendar({
       width: 6,
       height: 6,
       boxSizing: "border-box",
-      borderRadius: 999,
+      borderRadius: 12,
       border: `1.2px solid ${GONE.c}`
     }
   }), "\uBB34\uC0B0")), picked && /*#__PURE__*/React.createElement("div", {
@@ -10228,7 +10234,7 @@ function MiniCalendar({
       margin: 0,
       fontSize: 14,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, fmtDate(pick), " \uBAA8\uC784 ", picked.length, "\uAC1C"), picked.map(m => {
     const past = m.status === "past",
@@ -10246,7 +10252,7 @@ function MiniCalendar({
         padding: "12px 14px",
         borderRadius: 16,
         border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "#E4E9F7"}`,
-        background: gone ? GONE.bg : full ? FULL.bg : past ? "#F5F7FE" : "#fff",
+        background: gone ? GONE.bg : full ? FULL.bg : past ? "#F1F4FA" : "#fff",
         cursor: "pointer",
         textAlign: "left",
         boxShadow: "0 2px 8px rgba(33,82,230,0.06)",
@@ -10265,7 +10271,7 @@ function MiniCalendar({
       style: {
         fontSize: 16,
         fontWeight: 700,
-        color: "#1B2559",
+        color: INK,
         fontVariantNumeric: "tabular-nums"
       }
     }, m.time), gone ? /*#__PURE__*/React.createElement("span", {
@@ -10274,7 +10280,7 @@ function MiniCalendar({
         fontSize: 12,
         fontWeight: 700,
         padding: "3px 10px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: GONE.c,
         color: "#fff",
         whiteSpace: "nowrap"
@@ -10285,7 +10291,7 @@ function MiniCalendar({
         fontSize: 12,
         fontWeight: 700,
         padding: "3px 10px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: "#E4E9F7",
         color: "#6B7493",
         whiteSpace: "nowrap"
@@ -10296,7 +10302,7 @@ function MiniCalendar({
         fontSize: 12,
         fontWeight: 700,
         padding: "3px 10px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: full ? FULL.c : BLUE_LIGHT,
         color: full ? "#fff" : BLUE
       }
@@ -10442,7 +10448,7 @@ function MapCard({
       margin: 0,
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       display: "flex",
       alignItems: "center",
       gap: 6,
@@ -10453,7 +10459,7 @@ function MapCard({
       fontSize: 11,
       fontWeight: 700,
       padding: "2px 8px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: col.bg,
       color: col.c
     }
@@ -10462,7 +10468,7 @@ function MapCard({
       fontSize: 12,
       fontWeight: 700,
       padding: "3px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: full ? FULL.c : BLUE_LIGHT,
       color: full ? "#fff" : BLUE,
       whiteSpace: "nowrap"
@@ -10492,7 +10498,7 @@ function MapCard({
       fontSize: 11,
       fontWeight: 700,
       padding: "3px 10px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: st.bg,
       color: st.c,
       whiteSpace: "nowrap",
@@ -10750,14 +10756,14 @@ function CourtMap({
         alignItems: "center",
         gap: 5,
         padding: "7px 12px",
-        borderRadius: 999,
+        borderRadius: 12,
         border: "none",
         fontSize: 12,
         fontWeight: 700,
         cursor: "pointer",
         whiteSpace: "nowrap",
         background: on ? "#0B1E5B" : "#fff",
-        color: on ? "#fff" : "#1B2559",
+        color: on ? "#fff" : INK,
         boxShadow: "0 2px 8px rgba(11,30,91,0.14)"
       }
     }, dot && /*#__PURE__*/React.createElement("span", {
@@ -10898,7 +10904,7 @@ function CourtMap({
     style: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, shown.length ? `예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳` : "예정된 모임이 없어요", pending.length ? " · 위치 찾는 중…" : ""), groups.some(g => g.list.length > 1) && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -10927,7 +10933,7 @@ function CourtMap({
       margin: 0,
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559",
+      color: INK,
       minWidth: 0,
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -10969,7 +10975,7 @@ function CourtMap({
     style: {
       width: i === page ? 16 : 6,
       height: 6,
-      borderRadius: 999,
+      borderRadius: 12,
       background: i === page ? BLUE : "#D6DEF7",
       transition: "width .2s"
     }
@@ -10978,7 +10984,7 @@ function CourtMap({
       margin: "0 0 4px",
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, "\uC704\uCE58\uB97C \uCC3E\uC9C0 \uBABB\uD55C \uBAA8\uC784 ", lost.length), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -11027,7 +11033,7 @@ function CourtMap({
         margin: 0,
         fontSize: 14,
         fontWeight: 600,
-        color: "#1B2559"
+        color: INK
       }
     }, m.date, " ", /*#__PURE__*/React.createElement("span", {
       style: {
@@ -11068,7 +11074,7 @@ function ViewToggle({
     style: {
       display: "flex",
       background: "#E4E9F7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4
     }
   }, [["list", "목록", "list"], ["map", "지도", "map"]].map(([k, l, ic]) => {
@@ -11082,12 +11088,12 @@ function ViewToggle({
       style: {
         flex: 1,
         padding: "10px 0",
-        borderRadius: 999,
+        borderRadius: 12,
         border: "none",
         fontSize: 14,
         fontWeight: 600,
         cursor: "pointer",
-        background: on ? GRAD : "transparent",
+        background: on ? INK : "transparent",
         color: on ? "#fff" : "#6B7493",
         boxShadow: on ? SHADOW_BTN : "none",
         display: "flex",
@@ -11120,7 +11126,7 @@ function MoreButton({
       background: "#fff",
       color: BLUE,
       border: "1.5px solid #D6DEF7",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
@@ -11211,7 +11217,7 @@ function BookingTab({
     style: {
       display: "flex",
       background: "#E4E9F7",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4
     }
   }, [["flash", "번개 모임", "zap"], ["regular", "정기 모임", "calendar"]].map(([k, l, ic]) => {
@@ -11227,12 +11233,12 @@ function BookingTab({
       style: {
         flex: 1,
         padding: "10px 0",
-        borderRadius: 999,
+        borderRadius: 12,
         border: "none",
         fontSize: 14,
         fontWeight: 600,
         cursor: "pointer",
-        background: on ? GRAD : "transparent",
+        background: on ? INK : "transparent",
         color: on ? "#fff" : "#6B7493",
         boxShadow: on ? SHADOW_BTN : "none",
         display: "flex",
@@ -11250,7 +11256,7 @@ function BookingTab({
         fontWeight: 700,
         minWidth: 18,
         padding: "1px 6px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: on ? "rgba(255,255,255,0.25)" : "#fff",
         color: on ? "#fff" : BLUE
       }
@@ -11269,7 +11275,7 @@ function BookingTab({
       margin: "0 0 10px",
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, "\uB2E4\uAC00\uC624\uB294 ", label), upcoming.length === 0 && /*#__PURE__*/React.createElement(Empty, {
     action: `+ ${label} 만들기`,
@@ -11309,7 +11315,7 @@ function BookingTab({
         margin: "0 0 4px",
         fontWeight: 700,
         fontSize: 15,
-        color: "#1B2559",
+        color: INK,
         display: "flex",
         alignItems: "center",
         gap: 6,
@@ -11423,7 +11429,7 @@ function BookingTab({
     key: m.id,
     onClick: () => setSelId(m.id),
     style: {
-      background: "#F5F7FE",
+      background: "#F1F4FA",
       borderRadius: 20,
       padding: 14,
       border: "1px solid #E4E9F7",
@@ -11584,7 +11590,7 @@ function StatsTab() {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
-      background: "linear-gradient(180deg,#5B8DEF,#3B63F3)",
+      background: "linear-gradient(180deg,#5B8DEF,#2152E6)",
       borderRadius: "6px 6px 0 0",
       height: `${r.me / maxVal * 100}%`,
       minHeight: 4
@@ -11648,7 +11654,7 @@ function StatsTab() {
       gap: 10,
       padding: "8px 10px",
       borderRadius: 10,
-      background: r.isMe ? BLUE_LIGHT : "#F5F7FE",
+      background: r.isMe ? BLUE_LIGHT : "#F1F4FA",
       border: r.isMe ? `1.5px solid ${BLUE}` : "1px solid transparent"
     }
   }, /*#__PURE__*/React.createElement(RankNo, {
@@ -11658,7 +11664,7 @@ function StatsTab() {
       flex: 1,
       fontSize: 14,
       fontWeight: r.isMe ? 700 : 500,
-      color: r.isMe ? BLUE : "#2B3674"
+      color: r.isMe ? BLUE : INK
     }
   }, r.name, r.isMe && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -11848,7 +11854,7 @@ function MyInfoSheet({
       fontSize: 11,
       fontWeight: 700,
       padding: "3px 9px",
-      borderRadius: 999,
+      borderRadius: 12,
       background: bg,
       color
     }
@@ -11874,7 +11880,7 @@ function MyInfoSheet({
       flex: 1,
       fontSize: 13,
       fontWeight: 500,
-      color: "#1B2559",
+      color: INK,
       wordBreak: "keep-all"
     }
   }, v)) : null;
@@ -11898,7 +11904,7 @@ function MyInfoSheet({
       maxWidth: 440,
       maxHeight: "92vh",
       overflowY: "auto",
-      background: "#F3F5FB",
+      background: "#EDF0F6",
       borderRadius: "28px 28px 0 0",
       padding: "20px 16px calc(20px + env(safe-area-inset-bottom,0px))",
       boxSizing: "border-box",
@@ -11918,7 +11924,7 @@ function MyInfoSheet({
       margin: 0,
       fontSize: 19,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, edit ? "정보 수정" : "내 정보"), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -11977,7 +11983,7 @@ function MyInfoSheet({
       margin: "0 0 3px",
       fontSize: 18,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, pr.nickname || ME, pr.realName && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -12049,7 +12055,7 @@ function MyInfoSheet({
       margin: 0,
       fontSize: 13,
       fontWeight: 600,
-      color: "#1B2559"
+      color: INK
     }
   }, m.date), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -12245,7 +12251,7 @@ function Sheet({
       maxWidth: 440,
       maxHeight: "88vh",
       overflowY: "auto",
-      background: "#F3F5FB",
+      background: "#EDF0F6",
       borderRadius: "28px 28px 0 0",
       padding: "20px 18px calc(20px + env(safe-area-inset-bottom,0px))",
       boxSizing: "border-box",
@@ -12265,7 +12271,7 @@ function Sheet({
       margin: 0,
       fontSize: 19,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, title), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -12353,7 +12359,7 @@ function NotiSheet({
         display: "block",
         fontSize: 14,
         fontWeight: n.unread ? 700 : 500,
-        color: "#1B2559",
+        color: INK,
         lineHeight: 1.45,
         wordBreak: "keep-all"
       }
@@ -12460,10 +12466,10 @@ function KindBadge({
     col = KIND_COLOR[kindKey(m)];
   return /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: 700,
-      padding: "2px 8px",
-      borderRadius: 999,
+      padding: "3px 9px",
+      borderRadius: 7,
       background: col.bg,
       color: col.c,
       whiteSpace: "nowrap"
@@ -12500,7 +12506,7 @@ function Pills({
       style: {
         flex: 1,
         padding: "10px 0",
-        borderRadius: 999,
+        borderRadius: 12,
         fontSize: 14,
         fontWeight: 600,
         cursor: "pointer",
@@ -13189,7 +13195,7 @@ function MeetingForm({
       maxWidth: 440,
       maxHeight: "92vh",
       overflowY: "auto",
-      background: "#F3F5FB",
+      background: "#EDF0F6",
       borderRadius: "28px 28px 0 0",
       padding: "20px 18px calc(20px + env(safe-area-inset-bottom,0px))",
       boxSizing: "border-box",
@@ -13207,7 +13213,7 @@ function MeetingForm({
       margin: 0,
       fontSize: 19,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, editing ? "모임 수정" : "모임 만들기"), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -13356,7 +13362,7 @@ function MeetingForm({
       onClick: () => set("surface", on ? "" : v),
       style: {
         padding: "8px 14px",
-        borderRadius: 999,
+        borderRadius: 12,
         fontSize: 13,
         fontWeight: on ? 700 : 500,
         cursor: "pointer",
@@ -13743,7 +13749,7 @@ function AnonToggle({
     style: {
       width: 36,
       height: 20,
-      borderRadius: 999,
+      borderRadius: 12,
       background: on ? BLUE : "#D6DEF7",
       position: "relative",
       transition: "background .15s",
@@ -13845,7 +13851,7 @@ function PostForm({
     onClick: submit,
     style: {
       padding: "11px 22px",
-      borderRadius: 999,
+      borderRadius: 12,
       border: "none",
       background: text.trim() ? GRAD : "#E4E9F7",
       color: "#fff",
@@ -13873,7 +13879,7 @@ function PostBody({
     style: {
       margin: 0,
       fontSize: 15,
-      color: "#1B2559",
+      color: INK,
       lineHeight: 1.6,
       ...(long && !more ? {
         display: "-webkit-box",
@@ -13967,7 +13973,7 @@ function FreeBoard({
       margin: 0,
       fontSize: 15,
       fontWeight: 700,
-      color: "#1B2559"
+      color: INK
     }
   }, BOARD_NAME, "\uC740 \uC815\uD68C\uC6D0 \uACF5\uAC04\uC774\uC5D0\uC694"), /*#__PURE__*/React.createElement("p", {
     style: {
@@ -14052,7 +14058,7 @@ function FreeBoard({
         display: "block",
         fontSize: 14,
         fontWeight: 700,
-        color: p.anon ? "#6B7493" : "#1B2559"
+        color: p.anon ? "#6B7493" : INK
       }
     }, p.anon ? "익명" : p.name, mine && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -14275,7 +14281,7 @@ function MembersTab({
     style: {
       display: "flex",
       background: "#fff",
-      borderRadius: 999,
+      borderRadius: 12,
       padding: 4,
       boxShadow: "0 4px 16px rgba(40,70,180,0.08)"
     }
@@ -14290,9 +14296,9 @@ function MembersTab({
       style: {
         flex: 1,
         padding: "9px 0",
-        borderRadius: 999,
+        borderRadius: 12,
         border: "none",
-        background: view === k ? GRAD : "transparent",
+        background: view === k ? INK : "transparent",
         color: view === k ? "#fff" : "#4A5578",
         fontSize: 14,
         fontWeight: view === k ? 700 : 500,
@@ -14313,7 +14319,7 @@ function MembersTab({
         fontWeight: 800,
         lineHeight: "16px",
         padding: "0 6px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: "#ef4444",
         color: "#fff"
       }
@@ -14393,8 +14399,8 @@ function MemberList({
       gap: 4,
       fontSize: 12,
       color: "#4A5578",
-      background: "#F5F7FE",
-      borderRadius: 999,
+      background: "#F1F4FA",
+      borderRadius: 12,
       padding: "4px 10px"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
@@ -14428,7 +14434,7 @@ function MemberList({
     onClick: () => pickSort(k),
     style: {
       padding: "6px 12px",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       whiteSpace: "nowrap",
       fontWeight: sort === k ? 600 : 400,
@@ -14451,7 +14457,7 @@ function MemberList({
       margin: "6px 4px 0",
       fontSize: 14,
       fontWeight: 700,
-      color: "#2B3674",
+      color: INK,
       display: "flex",
       alignItems: "center",
       gap: 6
@@ -14524,7 +14530,7 @@ function MemberList({
       style: {
         fontSize: 15,
         fontWeight: 700,
-        color: "#1B2559"
+        color: INK
       }
     }, m.nickname), realNameOf(m) && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -14545,7 +14551,7 @@ function MemberList({
         fontSize: 10,
         fontWeight: 700,
         padding: "1px 7px",
-        borderRadius: 999,
+        borderRadius: 12,
         background: BLUE_LIGHT,
         color: BLUE
       }
@@ -14637,7 +14643,7 @@ function MemberList({
         style: {
           fontSize: 12,
           fontWeight: 600,
-          color: "#1B2559",
+          color: INK,
           whiteSpace: "nowrap"
         }
       }, mt.date.slice(5)), /*#__PURE__*/React.createElement("span", {
@@ -14665,7 +14671,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "b66730377b";
+const BUILD_ID = "fd47880f99";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -14751,7 +14757,7 @@ function UpdateBanner() {
       background: "#D7F24A",
       color: "#0B1E5B",
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 700,
       cursor: "pointer",
@@ -14798,21 +14804,84 @@ const TABS = [{
 
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 :root{color-scheme:only light}
-body{margin:0;background:#E9EDFA;font-family:${FONT};color:#1B2559;-webkit-font-smoothing:antialiased}
+body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
-input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 3px rgba(59,99,243,0.15)}
+input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
 .sstc-adrow::-webkit-scrollbar{display:none}
 `;
+
+// ── 하드코트 디자인 공용 조각 ──
+const HEADER_H = 176; // 홈이 아닌 화면의 파란 윗부분 높이 (화면마다 같게)
+// 파란 윗부분 배경: 가운데에 가로로 놓인 테니스 풀코트 라인 (복식 23.77×10.97m 비율)
+function CourtLines({
+  opacity = 0.14
+}) {
+  const W = 360,
+    H = 166,
+    sy = H * 1.37 / 10.97,
+    svc = W * 6.40 / 23.77,
+    x0 = (390 - W) / 2,
+    y0 = (200 - H) / 2;
+  return /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    viewBox: "0 0 390 200",
+    preserveAspectRatio: "xMidYMid meet",
+    style: {
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none"
+    }
+  }, /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x0} ${y0})`,
+    fill: "none",
+    stroke: "#fff",
+    strokeOpacity: opacity,
+    strokeWidth: "2"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "0",
+    y: "0",
+    width: W,
+    height: H
+  }), /*#__PURE__*/React.createElement("path", {
+    d: `M0 ${sy}H${W}M0 ${H - sy}H${W}M${W / 2 - svc} ${sy}V${H - sy}M${W / 2 + svc} ${sy}V${H - sy}M${W / 2 - svc} ${H / 2}H${W / 2 + svc}M0 ${H / 2}h7M${W} ${H / 2}h-7`
+  }), /*#__PURE__*/React.createElement("path", {
+    d: `M${W / 2} -8V${H + 8}`,
+    strokeOpacity: opacity * 1.8,
+    strokeWidth: "2.5"
+  })));
+}
+// 작은 테니스공 로고
+const BallMark = ({
+  size = 20
+}) => /*#__PURE__*/React.createElement("svg", {
+  "aria-hidden": "true",
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24"
+}, /*#__PURE__*/React.createElement("circle", {
+  cx: "12",
+  cy: "12",
+  r: "11",
+  fill: BALL
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M4.2 4.8c3.6 3.4 3.6 11 0 14.4M19.8 4.8c-3.6 3.4-3.6 11 0 14.4",
+  fill: "none",
+  stroke: GRAD,
+  strokeWidth: "1.6",
+  strokeLinecap: "round"
+}));
 const iconBtn = {
-  width: 38,
-  height: 38,
-  borderRadius: "50%",
+  width: 40,
+  height: 40,
+  borderRadius: 12,
   border: "none",
-  background: "rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.14)",
   color: "#fff",
   display: "flex",
   alignItems: "center",
@@ -15679,7 +15748,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         minHeight: "100vh",
-        background: "#F3F5FB",
+        background: "#fff",
         maxWidth: 440,
         margin: "0 auto",
         fontFamily: FONT
@@ -15687,39 +15756,21 @@ function App() {
     }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement("div", {
       style: {
         background: GRAD,
-        borderRadius: "0 0 36px 36px",
-        padding: `${screen === "login" ? 56 : 36}px 24px ${screen === "login" ? 88 : 72}px`,
+        padding: `${screen === "login" ? 60 : 36}px 24px ${screen === "login" ? 72 : 60}px`,
         color: "#fff",
         textAlign: "center",
         position: "relative",
         overflow: "hidden"
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: "absolute",
-        width: 220,
-        height: 220,
-        borderRadius: "50%",
-        border: "1.5px solid rgba(255,255,255,0.18)",
-        top: -90,
-        right: -70
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: "absolute",
-        width: 140,
-        height: 140,
-        borderRadius: "50%",
-        background: "rgba(255,255,255,0.07)",
-        bottom: -50,
-        left: -40
-      }
+    }, /*#__PURE__*/React.createElement(CourtLines, {
+      opacity: 0.1
     }), /*#__PURE__*/React.createElement("div", {
       title: "Sorry, not sorry",
       style: {
-        width: screen === "login" ? 112 : 76,
-        height: screen === "login" ? 112 : 76,
-        margin: "0 auto 14px",
+        position: "relative",
+        width: screen === "login" ? 120 : 76,
+        height: screen === "login" ? 120 : 76,
+        margin: "0 auto 18px",
         borderRadius: "50%",
         border: "2px solid rgba(255,255,255,0.85)",
         display: "flex",
@@ -15738,36 +15789,38 @@ function App() {
       size: screen === "login" ? 80 : 54
     })))), /*#__PURE__*/React.createElement("h1", {
       style: {
-        fontSize: 30,
-        fontWeight: 700,
-        margin: "0 0 2px",
-        letterSpacing: "0.08em"
+        position: "relative",
+        fontSize: screen === "login" ? 40 : 30,
+        fontWeight: 800,
+        margin: "0 0 4px",
+        letterSpacing: "0.04em"
       }
     }, "SSTC"), /*#__PURE__*/React.createElement("p", {
       style: {
-        fontSize: 12,
+        position: "relative",
+        fontSize: 13,
         margin: "0 0 10px",
-        opacity: 0.8,
+        opacity: 0.75,
         letterSpacing: "0.04em"
       }
     }, wink ? "Sorry, not sorry" : "Serve & Smash Tennis Club"), /*#__PURE__*/React.createElement("p", {
       style: {
+        position: "relative",
         fontSize: 14,
         margin: 0,
         opacity: 0.85
       }
     }, loading ? "불러오는 중" : pending ? "승인 대기" : titles[screen])), /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "0 16px 48px",
-        marginTop: -48,
+        padding: "0 0 48px",
+        marginTop: -26,
         position: "relative"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#fff",
-        borderRadius: 28,
-        boxShadow: "0 12px 40px rgba(40,70,180,0.12)",
-        padding: "28px 22px"
+        borderRadius: "26px 26px 0 0",
+        padding: "28px 20px"
       }
     }, loading && /*#__PURE__*/React.createElement("p", {
       style: {
@@ -15946,7 +15999,7 @@ function App() {
       maxWidth: 440,
       margin: "0 auto",
       minHeight: "100vh",
-      background: "#F3F5FB",
+      background: "#EDF0F6",
       display: "flex",
       flexDirection: "column",
       fontFamily: FONT
@@ -15955,22 +16008,13 @@ function App() {
     style: {
       background: GRAD,
       color: "#fff",
-      borderRadius: "0 0 32px 32px",
-      padding: `18px 20px ${isHome ? 56 : 26}px`,
+      padding: `14px 20px ${isHome ? 50 : 46}px`,
       position: "relative",
-      overflow: "hidden"
+      overflow: "hidden",
+      boxSizing: "border-box",
+      minHeight: isHome ? 0 : HEADER_H
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      width: 200,
-      height: 200,
-      borderRadius: "50%",
-      border: "1.5px solid rgba(255,255,255,0.15)",
-      top: -80,
-      right: -60
-    }
-  }), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(CourtLines, null), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -15984,10 +16028,9 @@ function App() {
       ...iconBtn,
       width: "auto",
       padding: "0 14px 0 8px",
-      borderRadius: 999,
       gap: 2,
       fontSize: 13,
-      fontWeight: 600
+      fontWeight: 700
     },
     "aria-label": "\uB4A4\uB85C\uAC00\uAE30"
   }, /*#__PURE__*/React.createElement(Icon, {
@@ -15996,17 +16039,15 @@ function App() {
     stroke: 2.4
   }), openMeeting.from === "home" ? "홈" : openMeeting.from === "members" ? "회원" : openMeeting.from === "map" ? "지도" : "목록") : /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 14,
-      fontWeight: 600,
-      opacity: 0.9,
+      fontSize: 19,
+      fontWeight: 800,
+      letterSpacing: "0.02em",
       display: "inline-flex",
       alignItems: "center",
-      gap: 6
+      gap: 8
     }
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "ball",
-    size: 16,
-    stroke: 2
+  }, /*#__PURE__*/React.createElement(BallMark, {
+    size: 22
   }), "SSTC"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -16036,14 +16077,14 @@ function App() {
       height: 18,
       padding: "0 5px",
       boxSizing: "border-box",
-      borderRadius: 999,
+      borderRadius: 12,
       background: "#ef4444",
       color: "#fff",
       fontSize: 11,
       fontWeight: 700,
       lineHeight: "18px",
       textAlign: "center",
-      border: "2px solid #3B63F3"
+      border: "2px solid #2152E6"
     }
   }, club.unread > 9 ? "9+" : club.unread)), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -16067,15 +16108,19 @@ function App() {
   }, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 2px",
-      fontSize: 13,
-      opacity: 0.85
+      fontSize: 14,
+      opacity: 0.75
     }
   }, "\uC548\uB155\uD558\uC138\uC694"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 26,
-      fontWeight: 700,
-      letterSpacing: "-0.01em"
+      fontWeight: 900,
+      letterSpacing: "-0.03em",
+      display: "flex",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8
     }
   }, ME, " \uB2D8", realAdmin && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -16083,64 +16128,29 @@ function App() {
     "aria-label": adminOn ? "회원 모드로 보기" : "관리자 모드로 보기",
     title: "\uB20C\uB7EC\uC11C \uBAA8\uB4DC \uBC14\uAFB8\uAE30",
     style: {
-      marginLeft: 8,
-      padding: "4px 10px 4px 9px",
-      borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.45)",
-      background: adminOn ? "rgba(255,255,255,0.22)" : "transparent",
-      color: "#fff",
+      padding: "5px 10px 5px 9px",
+      borderRadius: 10,
+      border: "none",
+      background: adminOn ? BALL : "rgba(255,255,255,0.14)",
+      color: adminOn ? INK : "#fff",
       fontSize: 11,
       fontWeight: 700,
       fontFamily: FONT,
-      verticalAlign: "middle",
       cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
-      gap: 4
+      gap: 4,
+      letterSpacing: 0
     }
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "swap",
     size: 12,
     stroke: 2.2
-  }), adminOn ? "관리자 모드" : "회원 모드"))) : curMeeting ? /*#__PURE__*/React.createElement("div", {
+  }), adminOn ? "관리자 모드" : "회원 모드")), /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "relative",
-      marginTop: 18
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: "0 0 2px",
-      fontSize: 13,
-      opacity: 0.85
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "pin",
-    s: 13
-  }), " ", curMeeting.place), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 24,
-      fontWeight: 700,
-      letterSpacing: "-0.01em"
-    }
-  }, curMeeting.date)) : /*#__PURE__*/React.createElement("p", {
-    style: {
-      position: "relative",
-      margin: "18px 0 0",
-      fontSize: 26,
-      fontWeight: 700,
-      letterSpacing: "-0.01em"
-    }
-  }, tabTitles[tab])), isHome && /*#__PURE__*/React.createElement("div", {
-    style: {
-      margin: "-38px 16px 0",
-      position: "relative",
-      zIndex: 2
-    }
-  }, /*#__PURE__*/React.createElement(Card, {
-    style: {
-      padding: "16px 8px",
-      display: "flex"
+      display: "flex",
+      gap: 22,
+      marginTop: 16
     }
   }, [{
     label: "NTRP",
@@ -16150,34 +16160,64 @@ function App() {
     value: account && account.profile ? calcCareer(account.profile.tennisStart) || "-" : "-"
   }, {
     label: "올해(누적)",
-    value: `${yearCount}회 (${myCount.length}회)`
-  }].map((s, i) => /*#__PURE__*/React.createElement("div", {
-    key: s.label,
+    value: `${yearCount}회 (${myCount.length})`
+  }].map(x => /*#__PURE__*/React.createElement("div", {
+    key: x.label
+  }, /*#__PURE__*/React.createElement("p", {
     style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      borderLeft: i > 0 ? "1px solid #EEF1FA" : "none"
+      margin: 0,
+      fontSize: 12,
+      opacity: 0.65
+    }
+  }, x.label), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 18,
+      fontWeight: 700,
+      letterSpacing: "-0.03em",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, x.value))))) : curMeeting ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      marginTop: 16
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 4px",
-      fontSize: 11,
-      color: "#A3AAC2",
-      letterSpacing: "0.04em"
-    }
-  }, s.label), /*#__PURE__*/React.createElement("p", {
-    style: {
       margin: 0,
-      fontSize: 15,
-      fontWeight: 700,
-      color: BLUE
+      fontSize: 28,
+      fontWeight: 900,
+      letterSpacing: "-0.035em"
     }
-  }, s.value))))), /*#__PURE__*/React.createElement("div", {
+  }, curMeeting.date), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 15,
+      opacity: 0.8,
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pin",
+    s: 15
+  }), curMeeting.place)) : /*#__PURE__*/React.createElement("p", {
+    style: {
+      position: "relative",
+      margin: "18px 0 0",
+      fontSize: 26,
+      fontWeight: 900,
+      letterSpacing: "-0.03em"
+    }
+  }, tabTitles[tab])), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
-      padding: "16px 16px 96px"
+      padding: "20px 16px 110px",
+      marginTop: -26,
+      borderRadius: "26px 26px 0 0",
+      background: PAGE_BG,
+      position: "relative",
+      zIndex: 2
     }
   }, FB && account && account.profile && !account.profile.realName && /*#__PURE__*/React.createElement(Card, {
     style: {
@@ -16203,7 +16243,7 @@ function App() {
       background: GRAD,
       color: "#fff",
       border: "none",
-      borderRadius: 999,
+      borderRadius: 12,
       fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
@@ -16261,11 +16301,11 @@ function App() {
       bottom: "calc(86px + env(safe-area-inset-bottom,0px))",
       height: 52,
       padding: "0 20px 0 16px",
-      borderRadius: 999,
+      borderRadius: 16,
       border: "none",
-      background: GRAD,
-      color: "#fff",
-      boxShadow: "0 8px 20px rgba(40,70,180,0.35)",
+      background: BALL,
+      color: INK,
+      boxShadow: "0 8px 20px rgba(11,30,91,0.25)",
       cursor: "pointer",
       zIndex: 25,
       display: "flex",
@@ -16311,7 +16351,7 @@ function App() {
   }, [["내 정보 보기", () => {
     setMenu(false);
     setMyInfo(true);
-  }, "#1B2559"], ["로그아웃", () => {
+  }, INK], ["로그아웃", () => {
     setMenu(false);
     logout();
   }, "#ef4444"]].map(([l, f, c]) => /*#__PURE__*/React.createElement("button", {
@@ -16396,10 +16436,9 @@ function App() {
       transform: "translateX(-50%)",
       width: "100%",
       maxWidth: 440,
-      background: GRAD,
-      borderRadius: "24px 24px 0 0",
-      boxShadow: "0 -6px 24px rgba(40,70,180,0.18)",
+      background: INK,
       display: "flex",
+      padding: "0 6px",
       zIndex: 20,
       paddingBottom: "env(safe-area-inset-bottom,0px)"
     }
@@ -16420,7 +16459,7 @@ function App() {
       },
       style: {
         flex: 1,
-        padding: "12px 0 10px",
+        padding: "9px 0 10px",
         background: "none",
         border: "none",
         cursor: "pointer",
@@ -16438,46 +16477,45 @@ function App() {
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         display: "inline-flex",
-        opacity: on ? 1 : 0.6
+        alignItems: "center",
+        justifyContent: "center",
+        width: 48,
+        height: 32,
+        borderRadius: 16,
+        background: on ? BALL : "transparent",
+        color: on ? INK : "rgba(255,255,255,0.55)"
       }
     }, /*#__PURE__*/React.createElement(Icon, {
       name: t.icon,
-      size: 22,
+      size: 21,
       stroke: on ? 2.2 : 1.8
     })), nb > 0 && /*#__PURE__*/React.createElement("span", {
       "aria-label": `새 항목 ${nb}개`,
       style: {
         position: "absolute",
-        top: -7,
-        left: 14,
+        top: -5,
+        left: 30,
         minWidth: 20,
         height: 18,
         padding: "0 5px",
         boxSizing: "border-box",
-        borderRadius: 999,
+        borderRadius: 12,
         background: "#ef4444",
         color: "#fff",
         fontSize: 11,
         fontWeight: 700,
         lineHeight: "14px",
         textAlign: "center",
-        border: "2px solid #3B63F3",
+        border: `2px solid ${INK}`,
         whiteSpace: "nowrap"
       }
     }, "+", nb > 99 ? 99 : nb)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         fontWeight: on ? 700 : 500,
-        opacity: on ? 1 : 0.6
+        color: on ? "#fff" : "rgba(255,255,255,0.55)"
       }
-    }, t.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 18,
-        height: 3,
-        background: on ? "#fff" : "transparent",
-        borderRadius: 10
-      }
-    }));
+    }, t.label));
   })));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));

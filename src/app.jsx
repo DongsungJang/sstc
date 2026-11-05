@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 
 // ─── 테마 (파란색 기본) ──────────────────────────────────────────────────────
-const BLUE = "#3B63F3";
-const BLUE_DEEP = "#2F4FD8";
-const BLUE_LIGHT = "#EEF2FF";
-const GRAD = "linear-gradient(135deg,#5B8DEF 0%,#3B63F3 55%,#2F4FD8 100%)";
-const SHADOW = "0 6px 24px rgba(40,70,180,0.08)";
-const SHADOW_BTN = "0 8px 18px rgba(59,99,243,0.28)";
-const FONT = "'Poppins','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
+const BLUE = "#2152E6";
+const BLUE_DEEP = "#1A43C9";
+const BLUE_LIGHT = "#E8EEFF";
+const GRAD = "#2152E6";   // 하드코트 디자인: 그라데이션 없이 단색 파랑
+const INK = "#0B1E5B";    // 남색 (글자·탭바)
+const BALL = "#D7F24A";   // 테니스공 형광 (강조)
+const PAGE_BG = "#EDF0F6";
+const SHADOW = "none";
+const SHADOW_BTN = "none";
+const FONT = "'Inter Tight','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
 
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
@@ -123,7 +126,7 @@ const GONE={c:"#6B7280",bg:"#F1F2F5",line:"#D9DCE3"};
 // 대기 인원 (무산된 모임은 0) · 0명이면 아무것도 안 보여요
 const waitN=m=>m&&!m.cancelled?(m.waitlist||[]).length:0;
 function WaitTag({m}){ const n=waitN(m); if(!n) return null;
-  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:"#FFF4E5",color:"#C2610C",whiteSpace:"nowrap"}}>대기 {n}명</span>; }
+  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:12,background:"#FFF4E5",color:"#C2610C",whiteSpace:"nowrap"}}>대기 {n}명</span>; }
 const goneLabel=m=>m&&m.cancelled?`무산 · ${m.cancelled.reason||"기타"}`:"";
 // 모임 종류: 정기 모임(참석 적은 회원 우선) / 번개 모임(선착순)
 const KIND_LABEL={regular:"정기 모임",flash:"번개 모임"};
@@ -236,15 +239,15 @@ function calcCareer(startDate) {
 }
 
 // ─── 공통 UI ──────────────────────────────────────────────────────────────────
-const inputStyle = {width:"100%",border:"1.5px solid #D6DEF7",borderRadius:999,padding:"11px 16px",fontSize:14,outline:"none",boxSizing:"border-box",background:"#fff",color:"#1B2559",fontFamily:"inherit"};
-const btnPrimary = {width:"100%",padding:"13px 0",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:15,fontWeight:600,cursor:"pointer",boxShadow:SHADOW_BTN,letterSpacing:"0.02em"};
-const btnSecondary = {flex:1,padding:"13px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:15,fontWeight:600,cursor:"pointer"};
-const btnSmall = {padding:"10px 14px",background:BLUE,color:"#fff",border:"none",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"};
+const inputStyle = {width:"100%",border:"1.5px solid #E2E6F0",borderRadius:14,padding:"13px 16px",fontSize:14,outline:"none",boxSizing:"border-box",background:"#fff",color:INK,fontFamily:"inherit"};
+const btnPrimary = {width:"100%",padding:"15px 0",background:GRAD,color:"#fff",border:"none",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:SHADOW_BTN};
+const btnSecondary = {flex:1,padding:"15px 0",background:PAGE_BG,color:"#5E6A8E",border:"none",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer"};
+const btnSmall = {padding:"10px 14px",background:BLUE,color:"#fff",border:"none",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"};
 
 function FieldWrap({label,required,error,children}) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{fontSize:14,fontWeight:500,color:"#2B3674"}}>{label}{required&&<span style={{color:"#ef4444"}}> *</span>}</div>
+      <div style={{fontSize:14,fontWeight:500,color:INK}}>{label}{required&&<span style={{color:"#ef4444"}}> *</span>}</div>
       {children}
       {error&&<p style={{fontSize:12,color:"#ef4444",margin:0}}>{error}</p>}
     </div>
@@ -267,14 +270,14 @@ function CheckGroup({options,selected,onChange,multi=true}) {
 }
 
 function Card({children,style={}}) {
-  return <div style={{background:"#fff",borderRadius:22,padding:18,boxShadow:SHADOW,...style}}>{children}</div>;
+  return <div style={{background:"#fff",borderRadius:20,padding:18,...style}}>{children}</div>;
 }
 
 function SectionTitle({children,action,onAction}) {
   return (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-      <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>{children}</span>
-      {action&&<button type="button" onClick={onAction} style={{background:"none",border:"none",fontSize:12,color:BLUE,cursor:"pointer",fontWeight:600}}>{action} →</button>}
+      <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>{children}</span>
+      {action&&<button type="button" onClick={onAction} style={{background:"none",border:"none",fontSize:13,color:BLUE,cursor:"pointer",fontWeight:700}}>{action}</button>}
     </div>
   );
 }
@@ -341,7 +344,7 @@ const postNewItem=p=>({id:"p"+p.id,at:+p.at||0,by:p.uid});
 const memberNewItem=m=>({id:"u"+m.uid,at:m.uid===SEEN.uid?0:(+m.approvedAt||+m.createdAt||0),by:m.approvedByUid||""});
 const pendingNewItem=m=>({id:"a"+m.uid,at:+m.createdAt||0,by:m.uid});
 const isNew=x=>isNewItem(x.id,x.at,x.by);
-function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:999,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
+function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
 function LoginScreen({notice,onSignup,onForgot,onLogin}) {
   const [email,setEmail]=useState(()=>lsGet(LS.email)||"");
@@ -530,7 +533,7 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
       {!editing&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <div onClick={()=>fileRef.current.click()} style={{width:88,height:88,borderRadius:"50%",border:"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F5F7FE"}}>
+        <div onClick={()=>fileRef.current.click()} style={{width:88,height:88,borderRadius:"50%",border:"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F1F4FA"}}>
           {preview?<img src={preview} alt="프로필" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
         </div>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>클릭해서 프로필 사진 추가 (선택)</p>
@@ -598,7 +601,7 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
         <div onClick={()=>setNtrpPopup(null)} style={{position:"fixed",inset:0,background:"rgba(27,37,89,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
           <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,padding:24,maxWidth:340,width:"100%",boxShadow:"0 8px 32px rgba(0,0,0,0.2)",maxHeight:"80vh",overflowY:"auto"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div><span style={{fontSize:24,fontWeight:"bold",color:BLUE}}>{popupItem.score}</span><span style={{fontSize:16,fontWeight:600,color:"#2B3674",marginLeft:8}}>{popupItem.label}</span></div>
+              <div><span style={{fontSize:24,fontWeight:"bold",color:BLUE}}>{popupItem.score}</span><span style={{fontSize:16,fontWeight:600,color:INK,marginLeft:8}}>{popupItem.label}</span></div>
               <button onClick={()=>setNtrpPopup(null)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#A3AAC2"}}>✕</button>
             </div>
             <p style={{fontSize:14,color:"#4A5578",lineHeight:1.75,margin:"0 0 20px",whiteSpace:"pre-line"}}>{popupItem.desc}</p>
@@ -612,12 +615,12 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
       <FieldWrap label="테니스 시작 일자" required={!isAdmin} error={errors.tennisStart}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <input type="month" value={data.tennisStart} style={{...inputStyle,flex:1}} onChange={e=>onChange("tennisStart",e.target.value)} max={new Date().toISOString().slice(0,7)}/>
-          {career&&<span style={{fontSize:13,fontWeight:600,color:BLUE,background:BLUE_LIGHT,padding:"6px 12px",borderRadius:999,whiteSpace:"nowrap"}}>{career}</span>}
+          {career&&<span style={{fontSize:13,fontWeight:600,color:BLUE,background:BLUE_LIGHT,padding:"6px 12px",borderRadius:12,whiteSpace:"nowrap"}}>{career}</span>}
         </div>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>매월 자동으로 경력이 업데이트돼요</p>
       </FieldWrap>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{fontSize:14,fontWeight:500,color:"#2B3674"}}>레슨 이력</div>
+        <div style={{fontSize:14,fontWeight:500,color:INK}}>레슨 이력</div>
         <div style={{display:"flex",gap:8}}>{["현재 레슨 중","과거에 받은 적 있음","레슨 경험 없음"].map(o=><button key={o} type="button" onClick={()=>onChange("lessonStatus",o)} style={tab(data.lessonStatus===o)}>{o}</button>)}</div>
         {(data.lessonStatus==="현재 레슨 중"||data.lessonStatus==="과거에 받은 적 있음")&&<input type="text" value={data.lessonMemo} style={inputStyle} onChange={e=>onChange("lessonMemo",e.target.value)} placeholder="레슨 내용 간단히"/>}
       </div>
@@ -634,13 +637,13 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
                 {item.score}<span style={{fontSize:10,marginLeft:3,opacity:0.8}}>{item.label}</span>
               </button>
               <button type="button" onClick={()=>setNtrpPopup(item.score)}
-                style={{width:18,height:18,borderRadius:"50%",border:"1px solid #D6DEF7",background:"#F5F7FE",color:"#6B7493",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0,fontWeight:600}}>?</button>
+                style={{width:18,height:18,borderRadius:"50%",border:"1px solid #D6DEF7",background:"#F1F4FA",color:"#6B7493",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0,fontWeight:600}}>?</button>
             </div>
           );})}
         </div>
       </FieldWrap>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{fontSize:14,fontWeight:500,color:"#2B3674"}}>주 운동 횟수</div>
+        <div style={{fontSize:14,fontWeight:500,color:INK}}>주 운동 횟수</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {["주 1회","주 2회","주 3회","주 4회","주 5회 이상"].map(o=>(
             <button key={o} type="button" onClick={()=>onChange("weeklyFreq",o)}
@@ -649,22 +652,22 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{fontSize:14,fontWeight:500,color:"#2B3674"}}>다른 테니스 클럽 참여 중</div>
+        <div style={{fontSize:14,fontWeight:500,color:INK}}>다른 테니스 클럽 참여 중</div>
         <div style={{display:"flex",gap:8}}>{["예","아니오"].map(o=><button key={o} type="button" onClick={()=>onChange("otherClub",o)} style={tab(data.otherClub===o)}>{o}</button>)}</div>
         {data.otherClub==="예"&&<input type="text" value={data.otherClubName||""} style={inputStyle} onChange={e=>onChange("otherClubName",e.target.value)} placeholder="클럽명 (예: 한강 테니스클럽)"/>}
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{fontSize:14,fontWeight:500,color:"#2B3674"}}>입상 이력</div>
+        <div style={{fontSize:14,fontWeight:500,color:INK}}>입상 이력</div>
         <div style={{display:"flex",gap:8}}>{["있음","없음"].map(o=><button key={o} type="button" onClick={()=>onChange("award",o)} style={tab(data.award===o)}>{o}</button>)}</div>
         {data.award==="있음"&&(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {(data.awardList||[""]).map((item,idx)=>(
               <div key={idx} style={{display:"flex",gap:6}}>
                 <input type="text" value={item} onChange={e=>{const n=[...(data.awardList||[""])];n[idx]=e.target.value;onChange("awardList",n);}} placeholder="대회명 · 성적" style={{...inputStyle,flex:1}}/>
-                {idx>0&&<button type="button" onClick={()=>onChange("awardList",(data.awardList||[""]).filter((_,i)=>i!==idx))} style={{padding:"0 10px",border:"1px solid #fca5a5",borderRadius:999,background:"#fff5f5",color:"#ef4444",cursor:"pointer",fontSize:16}}>✕</button>}
+                {idx>0&&<button type="button" onClick={()=>onChange("awardList",(data.awardList||[""]).filter((_,i)=>i!==idx))} style={{padding:"0 10px",border:"1px solid #fca5a5",borderRadius:12,background:"#fff5f5",color:"#ef4444",cursor:"pointer",fontSize:16}}>✕</button>}
               </div>
             ))}
-            <button type="button" onClick={()=>onChange("awardList",[...(data.awardList||[""]),""  ])} style={{padding:"8px 0",border:`1px dashed ${BLUE}`,borderRadius:999,background:BLUE_LIGHT,color:BLUE,fontSize:13,cursor:"pointer",fontWeight:500}}>+ 대회 이력 추가</button>
+            <button type="button" onClick={()=>onChange("awardList",[...(data.awardList||[""]),""  ])} style={{padding:"8px 0",border:`1px dashed ${BLUE}`,borderRadius:12,background:BLUE_LIGHT,color:BLUE,fontSize:13,cursor:"pointer",fontWeight:500}}>+ 대회 이력 추가</button>
           </div>
         )}
       </div>
@@ -682,9 +685,9 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
 // ─── 홈 탭 ────────────────────────────────────────────────────────────────────
 function Empty({children,action,onAction}) {
   return(
-    <div style={{padding:"18px 12px",background:"#F5F7FE",borderRadius:16,textAlign:"center"}}>
+    <div style={{padding:"18px 12px",background:"#F1F4FA",borderRadius:16,textAlign:"center"}}>
       <p style={{margin:0,fontSize:13,color:"#8A93B2",lineHeight:1.6}}>{children}</p>
-      {action&&<button type="button" onClick={onAction} style={{marginTop:10,padding:"8px 16px",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:SHADOW_BTN}}>{action}</button>}
+      {action&&<button type="button" onClick={onAction} style={{marginTop:10,padding:"8px 16px",background:GRAD,color:"#fff",border:"none",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",boxShadow:SHADOW_BTN}}>{action}</button>}
     </div>
   );
 }
@@ -696,7 +699,7 @@ function Empty({children,action,onAction}) {
 const AD_EMPTY={enabled:false,tag:"광고",logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",popup:"",start:"",end:""};
 const AD_FIELDS=["tag","logo","logoImg","bg","top","title","sub","url","popup","start","end"];
 // 배경색: 비우면 기본 아이보리. 고른 색으로 은은한 그라데이션을 만들고, 어두운 색이면 글자를 흰색으로 바꿔요
-const AD_COLORS=[["","아이보리"],["#DCEBFF","하늘"],["#D6F2E4","민트"],["#FFE0E8","핑크"],["#E7E0FF","라벤더"],["#FFF0BF","레몬"],["#1B2559","네이비"],["#2B2B2B","블랙"]];
+const AD_COLORS=[["","아이보리"],["#DCEBFF","하늘"],["#D6F2E4","민트"],["#FFE0E8","핑크"],["#E7E0FF","라벤더"],["#FFF0BF","레몬"],[INK,"네이비"],["#2B2B2B","블랙"]];
 const adHex=v=>/^#[0-9a-fA-F]{6}$/.test(v||"")?v.toUpperCase():"";
 function adTheme(bg){
   const h=adHex(bg);
@@ -806,7 +809,7 @@ const FOCUS_ATTEND={id:0};
 const AD_TAGS=[["광고","#8A7563","rgba(255,255,255,0.85)","#E6D9CA"],["공지","#D23C3C","#FFF1F1","#FBD5D5"],["모집","#067647","#E5F7EE","#B7E6CC"],["이벤트","#C2610C","#FFF4E5","#FAD9B0"]];
 const adTagOf=t=>AD_TAGS.find(x=>x[0]===t)||AD_TAGS[0];
 function AdTag({tag,style}){ const [name,c,bg,line]=adTagOf(tag);
-  return <span style={{fontSize:10,fontWeight:700,color:c,background:bg,border:`1px solid ${line}`,padding:"1px 7px",borderRadius:999,whiteSpace:"nowrap",...style}}>{name}</span>; }
+  return <span style={{fontSize:10,fontWeight:700,color:c,background:bg,border:`1px solid ${line}`,padding:"1px 7px",borderRadius:12,whiteSpace:"nowrap",...style}}>{name}</span>; }
 // 링크 대신 미리 써 둔 문구를 띄우는 팝업
 function AdPopup({ad,onClose}){
   useEffect(()=>{ const k=e=>{ if(e.key==="Escape") onClose(); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[]);
@@ -817,10 +820,10 @@ function AdPopup({ad,onClose}){
           {adLogoOk(ad.logoImg)&&<img src={ad.logoImg} alt="" style={{width:44,height:44,borderRadius:12,objectFit:"cover",flexShrink:0,boxShadow:"0 0 0 1px rgba(0,0,0,0.06)"}}/>}
           <div style={{flex:1,minWidth:0}}>
             <AdTag tag={ad.tag} style={{display:"inline-block",marginBottom:4}}/>
-            <p style={{margin:0,fontSize:16,fontWeight:700,color:"#1B2559",wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
+            <p style={{margin:0,fontSize:16,fontWeight:700,color:INK,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
           </div>
         </div>
-        <p style={{margin:"0 0 18px",fontSize:14,color:"#2B3674",lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{ad.popup}</p>
+        <p style={{margin:"0 0 18px",fontSize:14,color:INK,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{ad.popup}</p>
         <button type="button" onClick={onClose} style={btnPrimary}>닫기</button>
       </div>
     </div>);
@@ -889,16 +892,16 @@ function AdStats({ad,label}){
   const box=(name,val,c)=>(
     <div style={{flex:1,background:"#fff",borderRadius:14,padding:"10px 6px",textAlign:"center"}}>
       <p style={{margin:"0 0 2px",fontSize:11,color:"#6B7493"}}>{name}</p>
-      <p style={{margin:0,fontSize:18,fontWeight:700,color:c||"#1B2559"}}>{val}</p>
+      <p style={{margin:0,fontSize:18,fontWeight:700,color:c||INK}}>{val}</p>
     </div>);
   return (
-    <div style={{background:"#F5F7FE",borderRadius:16,padding:12}}>
+    <div style={{background:"#F1F4FA",borderRadius:16,padding:12}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <span style={{fontSize:13,fontWeight:700,color:"#1B2559"}}>{label} 반응</span>
+        <span style={{fontSize:13,fontWeight:700,color:INK}}>{label} 반응</span>
         {stats&&<button type="button" onClick={copy} style={{background:"none",border:"none",fontSize:12,color:BLUE,fontWeight:600,cursor:"pointer",padding:0,fontFamily:FONT}}>결과 복사</button>}
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-        {AD_RANGES.map(([k,name])=><button key={k} type="button" onClick={()=>setRange(k)} style={{padding:"4px 10px",borderRadius:999,fontSize:12,cursor:"pointer",fontFamily:FONT,
+        {AD_RANGES.map(([k,name])=><button key={k} type="button" onClick={()=>setRange(k)} style={{padding:"4px 10px",borderRadius:12,fontSize:12,cursor:"pointer",fontFamily:FONT,
           border:`1px solid ${range===k?BLUE:"#D6DEF7"}`,background:range===k?BLUE:"#fff",color:range===k?"#fff":"#4A5578",fontWeight:range===k?700:500}}>{name}</button>)}
       </div>
       {stats===null?<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>숫자를 보려면 README의 새 파이어베이스 규칙(adStats)을 콘솔에 붙여넣어 주세요.</p>
@@ -950,7 +953,7 @@ function AdCarousel({ads,sec=AD_SEC_DEF}){
       </div>
       <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:8}}>
         {ads.map((a,k)=><button key={a.id} type="button" aria-label={`배너 ${k+1}번 보기`} onClick={()=>go(k)}
-          style={{width:k===i?16:6,height:6,padding:0,border:"none",borderRadius:999,background:k===i?"#B9A28C":"#DCD2C6",cursor:"pointer",transition:"width .2s"}}/>)}
+          style={{width:k===i?16:6,height:6,padding:0,border:"none",borderRadius:12,background:k===i?"#B9A28C":"#DCD2C6",cursor:"pointer",transition:"width .2s"}}/>)}
       </div>
     </div>);
 }
@@ -1023,22 +1026,22 @@ function AdSettings(){
   const field=(k,label,ph,max)=>(
     <FieldWrap label={label}><input value={f[k]} maxLength={max} onChange={e=>set(k,e.target.value)} placeholder={ph} style={inputStyle}/></FieldWrap>);
   const tabBtn=(id,label,a)=>{ const sel=cur===id, st=a&&status(a); return (
-    <button key={id} type="button" onClick={()=>pick(id)} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:sel?700:500,cursor:"pointer",whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5,
+    <button key={id} type="button" onClick={()=>pick(id)} style={{padding:"7px 12px",borderRadius:12,fontSize:13,fontWeight:sel?700:500,cursor:"pointer",whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5,
       border:`1.5px solid ${sel?BLUE:"#D6DEF7"}`,background:sel?BLUE:"#fff",color:sel?"#fff":"#4A5578",fontFamily:FONT}}>
       {st&&<span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:st[0]==="노출 중"?"#12B76A":st[0]==="시작 전"?"#F59E0B":"#C4C9D4",boxShadow:sel?"0 0 0 1.5px #fff":"none"}}/>}{label}</button>); };
   return (
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>홈 화면 배너</span>
-        <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:999,background:showing?"#E5F7EE":"#F1F2F5",color:showing?"#067647":"#6B7280"}}>{ads===undefined?"불러오는 중":showing?`홈에 ${showing}개 보이는 중`:"홈에 안 보여요"}</span>
+        <span style={{fontSize:15,fontWeight:700,color:INK}}>홈 화면 배너</span>
+        <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:12,background:showing?"#E5F7EE":"#F1F2F5",color:showing?"#067647":"#6B7280"}}>{ads===undefined?"불러오는 중":showing?`홈에 ${showing}개 보이는 중`:"홈에 안 보여요"}</span>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
         {list.map((a,k)=>tabBtn(a.id,`배너${k+1}`,a))}
         {cur==="new"?tabBtn("new",`배너${list.length+1}`,null)
-          :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 배너 추가</button>}
+          :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 배너 추가</button>}
       </div>
       {saved&&list.length>1&&(()=>{ const k=list.findIndex(a=>a.id===cur);
-        const mv={padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT,background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"};
+        const mv={padding:"6px 12px",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT,background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"};
         return <div style={{display:"flex",alignItems:"center",gap:6,margin:"-4px 0 12px",flexWrap:"wrap"}}>
           <span style={{fontSize:12,color:"#6B7493",marginRight:2}}>순서</span>
           <button type="button" disabled={busy||k<=0} onClick={()=>move(-1)} style={{...mv,opacity:k<=0?0.4:1}}>← 앞으로</button>
@@ -1047,16 +1050,16 @@ function AdSettings(){
         </div>; })()}
       {ads!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{mtAd?(mtAd.hide&&saved.enabled?mtAd.hide:"모임 홍보 배너"):adPeriod(saved)}</p>; })()}
+          <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:12,background:st[1],color:st[2]}}>{st[0]}</span>{mtAd?(mtAd.hide&&saved.enabled?mtAd.hide:"모임 홍보 배너"):adPeriod(saved)}</p>; })()}
         {saved&&<AdStats ad={mtAd||saved} label={`배너${list.findIndex(a=>a.id===cur)+1}`}/>}
-        {mtAd&&<div style={{background:"#F5F7FE",borderRadius:14,padding:"10px 12px",fontSize:12,color:"#4A5578",lineHeight:1.6}}>
+        {mtAd&&<div style={{background:"#F1F4FA",borderRadius:14,padding:"10px 12px",fontSize:12,color:"#4A5578",lineHeight:1.6}}>
           모임 상세에서 넣은 배너예요. 날짜·시간·장소·남은 자리는 모임 정보로 자동으로 채워지고, 누르면 그 모임 참석 버튼으로 가요. 자리가 다 차거나 모임이 끝나거나 무산되면 홈에서 저절로 빠져요.
-          {mtAd.meeting&&<p style={{margin:"4px 0 0",fontWeight:600,color:"#2B3674"}}>{mtAd.meeting.date} {mtAd.meeting.time} · {mtAd.meeting.placeName||mtAd.meeting.place}</p>}
+          {mtAd.meeting&&<p style={{margin:"4px 0 0",fontWeight:600,color:INK}}>{mtAd.meeting.date} {mtAd.meeting.time} · {mtAd.meeting.placeName||mtAd.meeting.place}</p>}
         </div>}
         <FieldWrap label="오른쪽 위 표시">
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {AD_TAGS.map(([name,c,bg,line])=>{ const on=adTagOf(f.tag)[0]===name; return (
-              <button key={name} type="button" aria-pressed={on} onClick={()=>set("tag",name)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT,
+              <button key={name} type="button" aria-pressed={on} onClick={()=>set("tag",name)} style={{padding:"6px 14px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT,
                 color:c,background:bg,border:`1.5px solid ${on?c:line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 3.5px ${c}`:"none"}}>{name}</button>); })}
           </div>
           <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>업체 광고는 "광고", 우리 모임 소식은 공지(꼭 알아야 할 것)·모집(훈련팟 등)·이벤트 중에 골라요.</p>
@@ -1082,7 +1085,7 @@ function AdSettings(){
               <button key={name} type="button" title={name} aria-label={`배경색 ${name}`} aria-pressed={on} onClick={()=>set("bg",c)}
                 style={{width:34,height:34,borderRadius:"50%",cursor:"pointer",padding:0,background:adTheme(look).bg,border:`1.5px solid ${adTheme(look).line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}/>); })}
             {(()=>{ const custom=!!adHex(f.bg)&&!AD_COLORS.some(([c])=>adHex(c)===adHex(f.bg)); return (
-              <label title="직접 고르기" style={{position:"relative",height:34,padding:"0 12px",borderRadius:999,display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:600,color:BLUE,background:"#fff",border:`1.5px solid ${custom?BLUE:"#D6DEF7"}`,boxShadow:custom?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}>
+              <label title="직접 고르기" style={{position:"relative",height:34,padding:"0 12px",borderRadius:12,display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:600,color:BLUE,background:"#fff",border:`1.5px solid ${custom?BLUE:"#D6DEF7"}`,boxShadow:custom?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}>
                 <span style={{width:16,height:16,borderRadius:"50%",background:custom?adHex(f.bg):"conic-gradient(#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171)",border:"1px solid rgba(0,0,0,0.1)"}}/>직접 고르기
                 <input type="color" value={adHex(f.bg)||"#DCEBFF"} onChange={e=>set("bg",e.target.value)} style={{position:"absolute",inset:0,opacity:0,width:"100%",height:"100%",cursor:"pointer",border:"none",padding:0}}/>
               </label>); })()}
@@ -1097,7 +1100,7 @@ function AdSettings(){
           <p style={{margin:"2px 0 0",fontSize:11,color:adUrl(f.url)&&String(f.popup||"").trim()?"#C2610C":"#A3AAC2"}}>{adUrl(f.url)&&String(f.popup||"").trim()?"링크가 있어서 지금은 링크가 열려요. 팝업을 쓰려면 링크를 비워 주세요.":`링크가 없을 때 배너를 누르면 이 문구가 창으로 떠요. ${String(f.popup||"").length}/500자`}</p>
         </FieldWrap>
         <FieldWrap label="보여 줄 기간" error={rangeBad?"종료일은 시작일과 같거나 뒤여야 해요":""}>
-          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#2B3674",cursor:"pointer",padding:"2px 0 4px"}}>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:INK,cursor:"pointer",padding:"2px 0 4px"}}>
             <input type="checkbox" checked={unlimited} onChange={e=>{ if(e.target.checked){ set("start",""); set("end",""); } else { set("start",adToday()); } }} style={{width:18,height:18,accentColor:BLUE}}/>
             기간 무제한 (끌 때까지 계속)
           </label>
@@ -1124,9 +1127,9 @@ function AdSettings(){
         {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 배너 취소":`배너${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
         {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
         <div style={{borderTop:"1px solid #EEF1FA",paddingTop:12}}>
-          <p style={{margin:"0 0 6px",fontSize:13,fontWeight:600,color:"#2B3674"}}>넘어가는 시간 <span style={{fontWeight:500,color:"#6B7493"}}>· 모든 배너 공통 · 지금 {sec}초</span></p>
+          <p style={{margin:"0 0 6px",fontSize:13,fontWeight:600,color:INK}}>넘어가는 시간 <span style={{fontWeight:500,color:"#6B7493"}}>· 모든 배너 공통 · 지금 {sec}초</span></p>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
-            {AD_SECS.map(n=><button key={n} type="button" aria-pressed={sec===n} onClick={()=>saveSec(n)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,cursor:"pointer",fontFamily:FONT,
+            {AD_SECS.map(n=><button key={n} type="button" aria-pressed={sec===n} onClick={()=>saveSec(n)} style={{padding:"6px 12px",borderRadius:12,fontSize:13,cursor:"pointer",fontFamily:FONT,
               border:`1.5px solid ${sec===n?BLUE:"#D6DEF7"}`,background:sec===n?BLUE:"#fff",color:sec===n?"#fff":"#4A5578",fontWeight:sec===n?700:500}}>{n}초</button>)}
             <span style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:2}}>
               <input type="number" inputMode="numeric" min={2} max={30} aria-label="넘어가는 시간 직접 넣기" value={secIn} placeholder={AD_SECS.includes(sec)?"직접":String(sec)} onChange={e=>{ setSecIn(e.target.value); setSecMsg(""); }} onKeyDown={e=>{ if(e.key==="Enter") saveSec(secIn); }}
@@ -1171,14 +1174,15 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       <Card>
         <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임</SectionTitle>
         {!next?<Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty>:(
-        <div style={{background:next.cancelled?GONE.bg:isFull(next)?FULL.bg:BLUE_LIGHT,border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:18,padding:16}}>
+        <div style={{background:next.cancelled?GONE.bg:isFull(next)?FULL.bg:"#F1F4FA",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:18,padding:16}}>
           <div onClick={()=>onOpenMeeting(next.id,"info")} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,cursor:"pointer"}}>
             <div>
-              <p style={{margin:"0 0 3px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{next.date}<KindBadge m={next}/></p>
-              <p style={{margin:"0 0 2px",fontSize:13,color:"#4A5578"}}><Ic n="clock" s={13}/> {next.time}</p>
-              <p style={{margin:0,fontSize:13,color:"#4A5578"}}><Ic n="pin" s={13}/> {next.placeName||next.place}</p>
+              <p style={{margin:"0 0 6px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/></p>
+              <p style={{margin:"0 0 4px",fontWeight:900,fontSize:20,color:INK,letterSpacing:"-0.03em"}}>{next.date}</p>
+              <p style={{margin:"0 0 2px",fontSize:14,color:"#5E6A8E"}}><Ic n="clock" s={13}/> {next.time}</p>
+              <p style={{margin:0,fontSize:14,color:"#5E6A8E"}}><Ic n="pin" s={13}/> {next.placeName||next.place}</p>
             </div>
-            <span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,boxShadow:SHADOW_BTN}}>{dDay(next.iso)}</span>
+            <span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"5px 10px",borderRadius:8}}>{dDay(next.iso)}</span>
           </div>
           {next.cancelled?(
             <p style={{margin:0,fontSize:14,fontWeight:700,color:"#374151",textAlign:"center",background:"#fff",borderRadius:12,padding:"10px 8px"}}>
@@ -1201,8 +1205,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           </>}
         </div>)}
         {nextNext&&(
-          <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F5F7FE",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#2B3674"}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.placeName||nextNext.place}</p></div>
+          <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F1F4FA",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:INK}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.placeName||nextNext.place}</p></div>
             <span style={{fontSize:12,color:nextNext.cancelled?GONE.c:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)||nextNext.cancelled?700:400}}>{nextNext.cancelled?goneLabel(nextNext):isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext)?` · 대기 ${waitN(nextNext)}명`:""}`:`${nextNext.attendees.length}명 참석예정`}</span>
           </div>
         )}
@@ -1216,12 +1220,12 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
               <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
               <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
+                <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
                 <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
                 <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
+                <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
                 {ok&&!gone&&<WaitTag m={m}/>}
               </div>
             </div>
@@ -1236,9 +1240,9 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {monthRank.slice(0,7).map(r=>(
-            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
+            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F1F4FA",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
               <RankNo r={r}/>
-              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
+              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
               <span style={{fontSize:11,color:"#A3AAC2",marginRight:4}}>NTRP {r.ntrp}</span>
               <span style={{fontSize:13,fontWeight:700,color:BLUE}}>{r.count}회</span>
             </div>
@@ -1253,7 +1257,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <div key={n.id} ref={exp===n.id?noticeRef:null}>
               <div onClick={()=>setExp(exp===n.id?null:n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"11px 0",borderBottom:i<notices.length-1?"1px solid #EEF1FA":"none",cursor:"pointer"}}>
                 {n.important&&<span style={{fontSize:10,background:"#fef2f2",color:"#ef4444",padding:"2px 6px",borderRadius:6,fontWeight:600,whiteSpace:"nowrap"}}>중요</span>}
-                <span style={{flex:1,fontSize:14,color:"#1B2559",fontWeight:n.important?600:400}}>{n.title}</span>
+                <span style={{flex:1,fontSize:14,color:INK,fontWeight:n.important?600:400}}>{n.title}</span>
                 <span style={{fontSize:11,color:"#A3AAC2",whiteSpace:"nowrap"}}>{fmtDate(ymd(new Date(n.at))).slice(2,10)}</span>
                 <span style={{fontSize:11,color:"#A3AAC2",marginLeft:4}}>{exp===n.id?"▲":"▼"}</span>
               </div>
@@ -1683,14 +1687,14 @@ const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
 // 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
 function AttendButtons({status,onVote}) {
   const going=status==="attend", out=status==="absent";
-  const base={flex:1,padding:"9px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
+  const base={flex:1,padding:"13px 0",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
   return (
     <div style={{display:"flex",gap:8}}>
       <button type="button" aria-pressed={going} onClick={()=>onVote("attend")} style={{...base,
         background:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:going?SHADOW_BTN:"none"}}>
         {going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
       <button type="button" aria-pressed={out} onClick={()=>onVote("absent")} style={{...base,
-        background:out?"#EF4444":"#fff",color:out?"#fff":"#6B7493",border:`1.5px solid ${out?"#EF4444":"#D6DEF7"}`}}>
+        background:out?"#E5484D":"#EDF0F6",color:out?"#fff":"#5E6A8E",border:`1.5px solid ${out?"#E5484D":"transparent"}`}}>
         {out?<><Ic n="check" s={15} w={2.6}/>불참</>:"불참"}</button>
     </div>);
 }
@@ -1891,7 +1895,7 @@ function Pager({page,total,onChange,label}){
   if(total<=PAGE_SIZE) return null;
   const pages=pageCount(total), p=Math.min(page,pages-1);
   const btn=(text,to,dis)=><button type="button" disabled={dis} onClick={()=>onChange(to)} aria-label={`${label} ${to<p?"이전":"다음"} 페이지`}
-    style={{padding:"8px 16px",borderRadius:999,fontSize:13,fontWeight:600,fontFamily:FONT,cursor:dis?"default":"pointer",border:"1.5px solid #D6DEF7",background:"#fff",color:dis?"#C0C6D9":BLUE,opacity:dis?0.6:1}}>{text}</button>;
+    style={{padding:"8px 16px",borderRadius:12,fontSize:13,fontWeight:600,fontFamily:FONT,cursor:dis?"default":"pointer",border:"1.5px solid #D6DEF7",background:"#fff",color:dis?"#C0C6D9":BLUE,opacity:dis?0.6:1}}>{text}</button>;
   return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:10}}>
     {btn("‹ 이전",p-1,p===0)}
     <span style={{fontSize:13,fontWeight:700,color:"#4A5578"}}>{p+1} / {pages}</span>
@@ -1973,18 +1977,18 @@ function AdminTab(){
     Promise.all(chosen.map(m=>inbox(m.uid,msg))).then(()=>{setSent(`${chosen.length}명에게 보냈어요`);setSel({});})
       .catch(fail).finally(()=>setBusy(false));
   };
-  const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:999,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
-  const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:999,background:bg,color:c}}>{t}</span>;
+  const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:12,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
+  const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:12,background:bg,color:c}}>{t}</span>;
   const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,background:"#fff",color:danger?"#ef4444":"#6B7493",border:`1.5px solid ${danger?"#FBD5D5":"#D6DEF7"}`}}>{label}</button>;
   const row=(m,acts,checkable=true)=>(
-    <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F5F7FE",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+    <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F1F4FA",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.nickname||"(닉네임 없음)"}</span>
+            <span style={{fontSize:14,fontWeight:600,color:INK}}>{m.nickname||"(닉네임 없음)"}</span>
             {m.realName?<span style={{fontSize:12,color:"#4A5578"}}>({m.realName})</span>
-              :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:999,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
+              :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:12,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
             {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
             {!approved[m.uid]&&!admins[m.uid]&&!m.withdrawn&&isNew(pendingNewItem(m))&&<NewTag/>}
@@ -2100,7 +2104,7 @@ function NumStepper({value,onChange,min,max,unit}){
   return (
     <div style={{display:"flex",alignItems:"center",gap:6}}>
       <button type="button" onClick={()=>onChange(Math.max(min,value-1))} disabled={value<=min} aria-label="줄이기" style={stepBtn(false,value<=min)}>−</button>
-      <span style={{minWidth:44,textAlign:"center",fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{value}{unit}</span>
+      <span style={{minWidth:44,textAlign:"center",fontSize:16,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{value}{unit}</span>
       <button type="button" onClick={()=>onChange(Math.min(max,value+1))} disabled={value>=max} aria-label="늘리기" style={stepBtn(true,value>=max)}>+</button>
     </div>
   );
@@ -2213,11 +2217,11 @@ function BracketSetup({meeting,participants,onCreate,prevOrder}) {
   if(n<4) return (
     <Card style={{textAlign:"center",padding:"28px 18px"}}>
       <div style={{marginBottom:8,color:BLUE}}><Icon name="ball" size={36} stroke={1.6}/></div>
-      <p style={{margin:"0 0 4px",fontWeight:700,color:"#1B2559"}}>참석자가 {n}명이에요</p>
+      <p style={{margin:"0 0 4px",fontWeight:700,color:INK}}>참석자가 {n}명이에요</p>
       <p style={{margin:0,fontSize:13,color:"#6B7493",lineHeight:1.6}}>복식 대진은 4명 이상부터 만들 수 있어요.<br/>참석자나 게스트가 늘면 다시 와 주세요.</p>
     </Card>
   );
-  const label={fontSize:14,fontWeight:600,color:"#2B3674"};
+  const label={fontSize:14,fontWeight:600,color:INK};
   const rowS={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10};
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -2229,12 +2233,12 @@ function BracketSetup({meeting,participants,onCreate,prevOrder}) {
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <span style={label}>게임당 시간</span>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {DUR_OPTIONS.map(m=><button key={m} type="button" onClick={()=>setDur(m)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,cursor:"pointer",fontWeight:dur===m?600:400,border:`1.5px solid ${dur===m?BLUE:"#D6DEF7"}`,background:dur===m?BLUE:"#fff",color:dur===m?"#fff":"#4A5578"}}>{m}분</button>)}
+              {DUR_OPTIONS.map(m=><button key={m} type="button" onClick={()=>setDur(m)} style={{padding:"6px 12px",borderRadius:12,fontSize:13,cursor:"pointer",fontWeight:dur===m?600:400,border:`1.5px solid ${dur===m?BLUE:"#D6DEF7"}`,background:dur===m?BLUE:"#fff",color:dur===m?"#fff":"#4A5578"}}>{m}분</button>)}
             </div>
           </div>
           <div style={rowS}><span style={label}>코트 수</span><NumStepper value={courts} onChange={setCourts} min={1} max={Math.max(1,Math.min(8,Math.floor(n/4)))} unit="면"/></div>
         </div>
-        <div style={{marginTop:14,background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
+        <div style={{marginTop:14,background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:INK}}>
           {k>0?(<>
             <b>{k}세션</b> · {start} ~ {pad2(hhmmApp(toMin(start)+k*dur))} · 한 세션에 {slot}명 출전, {Math.max(0,n-slot)}명 휴식
             {leftover>0&&<span style={{display:"block",fontSize:12,color:"#6B7493"}}>종료 전 {leftover}분은 남아요</span>}
@@ -2249,12 +2253,12 @@ function BracketSetup({meeting,participants,onCreate,prevOrder}) {
         </p>
         <div ref={listRef} style={{display:"flex",flexDirection:"column",gap:6,userSelect:drag?"none":"auto",WebkitUserSelect:drag?"none":"auto"}}>
           {order.map((p,i)=>{ const dragging=drag&&drag.i===i; return(
-            <div key={(p.isGuest?"g:":"")+p.name} data-row="" style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px 6px 4px",borderRadius:14,background:p.isMe?BLUE_LIGHT:"#F5F7FE",border:p.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent",
+            <div key={(p.isGuest?"g:":"")+p.name} data-row="" style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px 6px 4px",borderRadius:14,background:p.isMe?BLUE_LIGHT:"#F1F4FA",border:p.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent",
               transform:`translateY(${dragging?drag.dy:shiftOf(i)}px)`,transition:dragging?"none":"transform 0.15s",position:"relative",zIndex:dragging?2:0,boxShadow:dragging?"0 8px 20px rgba(33,82,230,0.25)":"none"}}>
               <span role="button" aria-label={`${p.name} 순서 끌어서 옮기기`} onPointerDown={onGrip(i)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}
                 style={{touchAction:"none",userSelect:"none",WebkitUserSelect:"none",cursor:dragging?"grabbing":"grab",color:"#A3AAC2",display:"flex",padding:"6px 2px"}}><Icon name="grip" size={18} stroke={2.6}/></span>
               <span style={{width:20,fontSize:12,fontWeight:700,color:BLUE,textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{i+1}</span>
-              <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:p.isMe?700:500,color:"#1B2559",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:p.isMe?700:500,color:INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {p.name}<span style={{fontSize:11,color:"#A3AAC2",fontWeight:400,marginLeft:5}}>{p.isGuest?"게스트":p.ntrp}</span>
                 {(p.arrive||p.leave)&&<span style={{display:"block",fontSize:11,color:BLUE,fontWeight:500}}>{[p.arrive&&`${p.arrive} 도착`,p.leave&&`${p.leave} 출발`].filter(Boolean).join(" · ")}</span>}
               </span>
@@ -2266,7 +2270,7 @@ function BracketSetup({meeting,participants,onCreate,prevOrder}) {
               </div>
             </div>);})}
         </div>
-        <div style={{marginTop:14,background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":"#2B3674"}}>
+        <div style={{marginTop:14,background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":INK}}>
           {problem||<>게임 수 합계 {sum} = {k}세션 × {slot}자리 ✓</>}
           {fixable&&<button type="button" onClick={fit} style={{...btnSmall,display:"block",marginTop:8,background:"#C2610C"}}>자동으로 맞추기</button>}
         </div>
@@ -2277,7 +2281,7 @@ function BracketSetup({meeting,participants,onCreate,prevOrder}) {
 }
 const hhmmApp = m => Math.floor(m/60)+":"+("0"+m%60).slice(-2);
 
-const chipBtn={padding:"5px 0",width:52,borderRadius:999,fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0};
+const chipBtn={padding:"5px 0",width:52,borderRadius:12,fontSize:11,fontWeight:600,cursor:"pointer",flexShrink:0};
 const arrowBtn=dis=>({background:"none",border:"none",padding:"0 4px",fontSize:9,lineHeight:"13px",color:dis?"#D6DEF7":"#6B7493",cursor:dis?"default":"pointer"});
 
 // ─── 대진표 직접 작성·수정 ────────────────────────────────────────────────────
@@ -2308,7 +2312,7 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
   const [draft,setDraft]=useState(()=>initial?draftFromBracket(initial):[Array.from({length:courts},emptyCourt)]);
   const [newName,setNewName]=useState("");
   const [nameErr,setNameErr]=useState("");
-  const label={fontSize:14,fontWeight:600,color:"#2B3674"};
+  const label={fontSize:14,fontWeight:600,color:INK};
   const rowS={display:"flex",alignItems:"center",justifyContent:"space-between",gap:10};
   const timeOf=s=>pad2(hhmmApp(toMin(start)+s*dur));
   const setCourts=n=>{ setCourtsN(n); setDraft(d=>d.map(row=>row.length>=n?row.slice(0,n):[...row,...Array.from({length:n-row.length},emptyCourt)])); };
@@ -2377,12 +2381,12 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <span style={label}>게임당 시간</span>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {DUR_OPTIONS.map(m=><button key={m} type="button" onClick={()=>setDur(m)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,cursor:"pointer",fontWeight:dur===m?600:400,border:`1.5px solid ${dur===m?BLUE:"#D6DEF7"}`,background:dur===m?BLUE:"#fff",color:dur===m?"#fff":"#4A5578"}}>{m}분</button>)}
+              {DUR_OPTIONS.map(m=><button key={m} type="button" onClick={()=>setDur(m)} style={{padding:"6px 12px",borderRadius:12,fontSize:13,cursor:"pointer",fontWeight:dur===m?600:400,border:`1.5px solid ${dur===m?BLUE:"#D6DEF7"}`,background:dur===m?BLUE:"#fff",color:dur===m?"#fff":"#4A5578"}}>{m}분</button>)}
             </div>
           </div>
           <div style={rowS}><span style={label}>코트 수</span><NumStepper value={courts} onChange={setCourts} min={1} max={8} unit="면"/></div>
         </div>
-        <div style={{marginTop:14,background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
+        <div style={{marginTop:14,background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:INK}}>
           <b>{draft.length}세션</b> · {start} ~ {timeOf(draft.length)}
         </div>
       </Card>
@@ -2391,7 +2395,7 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
         <p style={{margin:"0 0 10px",fontSize:12,color:"#6B7493",lineHeight:1.6}}>참석 확정자예요. 투표하지 않은 사람이 함께 치면 이름을 추가해 주세요. 숫자는 지금까지 넣은 게임 수예요.</p>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {pool.map(p=>(
-            <span key={p.name} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:999,fontSize:12,fontWeight:500,background:p.name===ME?BLUE_LIGHT:"#F5F7FE",color:"#1B2559",border:`1.5px solid ${p.name===ME?BLUE:"transparent"}`}}>
+            <span key={p.name} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:12,fontSize:12,fontWeight:500,background:p.name===ME?BLUE_LIGHT:"#F1F4FA",color:INK,border:`1.5px solid ${p.name===ME?BLUE:"transparent"}`}}>
               {p.name}<b style={{color:count[p.name]?BLUE:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{count[p.name]||0}</b>
               {p.added&&<button type="button" onClick={()=>removeName(p.name)} aria-label={`${p.name} 빼기`} style={{background:"none",border:"none",padding:0,display:"flex",color:"#A3AAC2",cursor:"pointer"}}><Icon name="x" size={13}/></button>}
             </span>
@@ -2407,7 +2411,7 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
       {draft.map((row,s)=>{ const used=usedIn(row); const rest=pool.filter(p=>!used.has(p.name)).map(p=>p.name); return(
         <Card key={s} style={{padding:16}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-            <span style={{fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{timeOf(s)}</span>
+            <span style={{fontSize:16,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{timeOf(s)}</span>
             <span style={{flex:1,fontSize:12,color:"#A3AAC2"}}>~ {timeOf(s+1)} · {s+1}세션</span>
             <button type="button" onClick={()=>removeSession(s)} aria-label={`${s+1}세션 지우기`} style={{background:"none",border:"none",color:"#A3AAC2",cursor:"pointer",display:"flex",padding:4}}><Icon name="trash" size={17}/></button>
           </div>
@@ -2420,7 +2424,7 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
                     <span style={{fontSize:10,fontWeight:700,color:side==="a"?BLUE:"#6B7493",width:14,textAlign:"center"}}>{side.toUpperCase()}</span>
                     {[0,1].map(k=>{ const v=ct[side][k]; return(
                       <select key={k} aria-label={`${s+1}세션 코트 ${c+1} ${side.toUpperCase()}팀 ${k+1}번`} value={v||""} onChange={e=>setSlot(s,c,side,k,e.target.value)}
-                        style={{...sel,color:v?"#1B2559":"#A3AAC2",fontWeight:v?600:400,background:v?"#fff":"#F5F7FE"}}>
+                        style={{...sel,color:v?INK:"#A3AAC2",fontWeight:v?600:400,background:v?"#fff":"#F1F4FA"}}>
                         <option value="">선택</option>
                         {pool.map(p=><option key={p.name} value={p.name} disabled={p.name!==v&&used.has(p.name)}>{p.name} ({count[p.name]||0}게임){p.name!==v&&used.has(p.name)?" · 배정됨":""}</option>)}
                       </select>);})}
@@ -2437,7 +2441,7 @@ function ManualBracket({meeting,participants,initial,onSave,onCancel}){
           </div>
         </Card>);})}
       <button type="button" onClick={addSession} disabled={draft.length>=16} style={{...btnSecondary,flex:"none",width:"100%",borderStyle:"dashed",opacity:draft.length>=16?0.45:1}}>+ 세션 추가</button>
-      <div style={{background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":"#2B3674"}}>
+      <div style={{background:problem?"#FFF4E5":BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:problem?"#9A4A07":INK}}>
         {problem||<>게임 {draft.reduce((a,row)=>a+row.filter(courtFilled).length,0)}판 · 저장하면 바로 스코어를 입력할 수 있어요{initial?". 사람이 바뀐 경기의 점수는 지워져요":""}</>}
       </div>
       <div style={{display:"flex",gap:8}}>
@@ -2477,13 +2481,13 @@ function GameCard({game,court,onScore,me,readOnly}) {
   const row=(side)=>{
     const win=o===side, names=game[side];
     return (
-      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 8px 8px 12px",borderRadius:14,background:win?BLUE_LIGHT:"#F5F7FE",border:win?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 8px 8px 12px",borderRadius:14,background:win?BLUE_LIGHT:"#F1F4FA",border:win?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
         <span style={{fontSize:10,fontWeight:700,color:side==="a"?BLUE:"#6B7493",width:14}}>{side==="a"?"A":"B"}</span>
-        <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:win?700:500,color:"#1B2559",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+        <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:win?700:500,color:INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {names.map((nm,i)=><span key={i} style={nm===me?{color:BLUE,fontWeight:700}:null}>{i>0?" · ":""}{nm}</span>)}
         </span>
         {!readOnly&&<button type="button" onClick={()=>set(side,-1)} disabled={g[side]<=0} aria-label={`${side.toUpperCase()}팀 1점 빼기`} style={stepBtn(false,g[side]<=0)}>−</button>}
-        <span style={{width:22,marginRight:readOnly?6:0,textAlign:"center",fontSize:20,fontWeight:700,color:win?BLUE:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{g[side]}</span>
+        <span style={{width:22,marginRight:readOnly?6:0,textAlign:"center",fontSize:20,fontWeight:700,color:win?BLUE:INK,fontVariantNumeric:"tabular-nums"}}>{g[side]}</span>
         {!readOnly&&<button type="button" onClick={()=>set(side,1)} disabled={g[side]>=6} aria-label={`${side.toUpperCase()}팀 1점 더하기`} style={stepBtn(true,g[side]>=6)}>+</button>}
       </div>
     );
@@ -2499,7 +2503,7 @@ function GameCard({game,court,onScore,me,readOnly}) {
         <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#6B7493"}}>
           <span style={{flex:1}}>무승부 · 가위바위보 승자</span>
           {["a","b"].map(sd=><button key={sd} type="button" onClick={()=>onScore(game.key,{...g,rps:g.rps===sd?null:sd})}
-            style={{padding:"5px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",border:`1.5px solid ${g.rps===sd?BLUE:"#D6DEF7"}`,background:g.rps===sd?BLUE:"#fff",color:g.rps===sd?"#fff":"#4A5578"}}>{sd.toUpperCase()}팀</button>)}
+            style={{padding:"5px 12px",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",border:`1.5px solid ${g.rps===sd?BLUE:"#D6DEF7"}`,background:g.rps===sd?BLUE:"#fff",color:g.rps===sd?"#fff":"#4A5578"}}>{sd.toUpperCase()}팀</button>)}
         </div>
       )}
       {(g.a>0||g.b>0)&&!readOnly&&(
@@ -2529,9 +2533,9 @@ function MeetingBracket({meeting,participants,store}) {
   const canManage=participants.some(p=>p.isMe)||!!(bracket&&(bracket.players||[]).includes(ME));
   useEffect(()=>{ if(!bracket||!canManage) setEditing(false); },[!!bracket,canManage]);
   const howTabs=(
-    <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+    <div style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
       {[["auto","자동 편성"],["manual","직접 작성"]].map(([k,l])=>(
-        <button key={k} type="button" onClick={()=>setHow(k)} style={{flex:1,padding:"8px 0",borderRadius:999,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:how===k?"#fff":"transparent",color:how===k?BLUE:"#6B7493",boxShadow:how===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
+        <button key={k} type="button" onClick={()=>setHow(k)} style={{flex:1,padding:"8px 0",borderRadius:12,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:how===k?"#fff":"transparent",color:how===k?BLUE:"#6B7493",boxShadow:how===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
       ))}
     </div>
   );
@@ -2539,7 +2543,7 @@ function MeetingBracket({meeting,participants,store}) {
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <Card style={{textAlign:"center",padding:"28px 18px"}}>
         <div style={{marginBottom:8,color:BLUE}}><Icon name="ball" size={36} stroke={1.6}/></div>
-        <p style={{margin:"0 0 4px",fontWeight:700,color:"#1B2559"}}>아직 대진표가 없어요</p>
+        <p style={{margin:"0 0 4px",fontWeight:700,color:INK}}>아직 대진표가 없어요</p>
         <p style={{margin:0,fontSize:13,color:"#6B7493",lineHeight:1.6}}>대진표는 이 모임 참가자가 만들어요.<br/>만들어지면 여기에서 볼 수 있어요.</p>
       </Card>
     </div>
@@ -2555,7 +2559,7 @@ function MeetingBracket({meeting,participants,store}) {
   );
   if(editing&&canManage) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <div style={{background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:"#2B3674"}}>
+      <div style={{background:BLUE_LIGHT,borderRadius:16,padding:"12px 14px",fontSize:13,lineHeight:1.6,color:INK}}>
         <b>대진표 수정 중</b> · 자리를 바꾸고 아래 <b>수정 저장</b>을 눌러 주세요. 그대로인 경기의 점수는 남아요.
       </div>
       <ManualBracket meeting={meeting} participants={participants} initial={bracket} onCancel={()=>setEditing(false)}
@@ -2571,7 +2575,7 @@ function MeetingBracket({meeting,participants,store}) {
       <Card style={{padding:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div>
-            <p style={{margin:"0 0 2px",fontSize:15,fontWeight:700,color:"#1B2559"}}>{bracket.players.length}명 · {bracket.sessions.length}세션</p>
+            <p style={{margin:"0 0 2px",fontSize:15,fontWeight:700,color:INK}}>{bracket.players.length}명 · {bracket.sessions.length}세션</p>
             <p style={{margin:0,fontSize:12,color:"#6B7493"}}>{bracket.times[0]} ~ {bracket.ends[bracket.ends.length-1]} · 코트 {bracket.courts||2}면 · 게임당 {bracket.dur||30}분</p>
           </div>
           <div style={{textAlign:"right"}}>
@@ -2583,16 +2587,16 @@ function MeetingBracket({meeting,participants,store}) {
         {bracket.manual?<p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>직접 작성한 대진표{bracket.editedBy?` · ${bracket.editedBy} 수정`:""} · 휴식 {bracket.summary.restMin===bracket.summary.restMax?bracket.summary.restMin:`${bracket.summary.restMin}~${bracket.summary.restMax}`}회</p>
         :<p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>실력 균형(순위 합 차이) {bracket.summary.diffSum} · 휴식 {bracket.summary.restMin===bracket.summary.restMax?bracket.summary.restMin:`${bracket.summary.restMin}~${bracket.summary.restMax}`}회 · 3연속 {bracket.summary.triple}명</p>}
       </Card>
-      <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+      <div style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["games","대진·스코어"],["table","개인 성적"]].map(([k,l])=>(
-          <button key={k} type="button" onClick={()=>setShow(k)} style={{flex:1,padding:"8px 0",borderRadius:999,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:show===k?"#fff":"transparent",color:show===k?BLUE:"#6B7493",boxShadow:show===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
+          <button key={k} type="button" onClick={()=>setShow(k)} style={{flex:1,padding:"8px 0",borderRadius:12,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",background:show===k?"#fff":"transparent",color:show===k?BLUE:"#6B7493",boxShadow:show===k?"0 2px 8px rgba(40,70,180,0.12)":"none"}}>{l}</button>
         ))}
       </div>
       {show==="games"&&!canManage&&<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}>점수는 이 모임 참가자만 입력할 수 있어요</p>}
       {show==="games"&&bracket.sessions.map((ses,s)=>(
         <Card key={s} style={{padding:16}}>
           <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:12}}>
-            <span style={{fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{bracket.times[s]}</span>
+            <span style={{fontSize:16,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{bracket.times[s]}</span>
             <span style={{fontSize:12,color:"#A3AAC2"}}>~ {bracket.ends[s]} · {s+1}세션</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -2610,10 +2614,10 @@ function MeetingBracket({meeting,participants,store}) {
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {table.map((r,i)=>{const me=r.name===ME,diff=r.pf-r.pa;return(
-              <div key={r.name} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 10px",borderRadius:14,background:me?BLUE_LIGHT:"#F5F7FE",border:me?`1.5px solid ${BLUE}`:"1.5px solid transparent",fontVariantNumeric:"tabular-nums"}}>
+              <div key={r.name} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 10px",borderRadius:14,background:me?BLUE_LIGHT:"#F1F4FA",border:me?`1.5px solid ${BLUE}`:"1.5px solid transparent",fontVariantNumeric:"tabular-nums"}}>
                 <span style={{width:22,fontSize:13,fontWeight:700,color:i<3&&r.played?BLUE:"#A3AAC2"}}>{i+1}</span>
-                <span style={{flex:1,fontSize:14,fontWeight:me?700:500,color:me?BLUE:"#2B3674"}}>{r.name}</span>
-                <span style={{width:56,textAlign:"center",fontSize:13,color:"#2B3674"}}><b style={{color:BLUE}}>{r.w}</b> {r.d} {r.l}</span>
+                <span style={{flex:1,fontSize:14,fontWeight:me?700:500,color:me?BLUE:INK}}>{r.name}</span>
+                <span style={{width:56,textAlign:"center",fontSize:13,color:INK}}><b style={{color:BLUE}}>{r.w}</b> {r.d} {r.l}</span>
                 <span style={{width:34,textAlign:"right",fontSize:13,fontWeight:600,color:diff>0?BLUE:diff<0?"#ef4444":"#A3AAC2"}}>{diff>0?"+":""}{diff}</span>
               </div>
             );})}
@@ -2650,21 +2654,21 @@ function VoteRow({v,idx,wait,onRemove}) {
     :v.prio&&v.count>0?{t:`이달 ${v.count}회 참석`,bg:"#EEF1FA",c:"#6B7493"}:null;
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,
-      background:v.isMe?BLUE_LIGHT:wait?"#FFFBF2":"#F5F7FE",border:v.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+      background:v.isMe?BLUE_LIGHT:wait?"#FFFBF2":"#F1F4FA",border:v.isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
       <span style={{width:20,textAlign:"center",fontSize:13,fontWeight:700,color:wait?"#C2610C":BLUE,fontVariantNumeric:"tabular-nums"}}>{idx}</span>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-          <span style={{fontSize:14,fontWeight:v.isMe?700:500,color:v.isMe?BLUE:"#1B2559"}}>{v.name}</span>
+          <span style={{fontSize:14,fontWeight:v.isMe?700:500,color:v.isMe?BLUE:INK}}>{v.name}</span>
           {!v.isGuest&&<span style={{fontSize:11,color:"#A3AAC2"}}>{v.ntrp}</span>}
-          {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:tag.bg,color:tag.c}}>{tag.t}</span>}
-          {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
-          {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
-          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF9C3",color:"#A16207"}}>대신 등록</span>}
-          {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:999,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
+          {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:tag.bg,color:tag.c}}>{tag.t}</span>}
+          {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
+          {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
+          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#FEF9C3",color:"#A16207"}}>대신 등록</span>}
+          {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
         <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} {v.by&&!v.isGuest?`${v.by} 님이 등록`:"투표"}</span>
       </div>
-      {onRemove&&<button type="button" aria-label={`${v.name} 참석 빼기`} onClick={onRemove} style={{background:"none",border:"1px solid #FBD5D5",borderRadius:999,color:"#ef4444",fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>빼기</button>}
+      {onRemove&&<button type="button" aria-label={`${v.name} 참석 빼기`} onClick={onRemove} style={{background:"none",border:"1px solid #FBD5D5",borderRadius:12,color:"#ef4444",fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>빼기</button>}
     </div>
   );
 }
@@ -2694,7 +2698,7 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,min
       {hits.length>0&&<div role="listbox" aria-label="언급할 회원" style={{position:"absolute",left:0,right:0,bottom:"100%",marginBottom:6,background:"#fff",borderRadius:14,boxShadow:"0 8px 24px rgba(16,24,64,0.18)",padding:4,zIndex:5,maxHeight:220,overflowY:"auto"}}>
         {hits.map(x=><button key={x.uid} type="button" role="option" aria-selected="false" onMouseDown={e=>e.preventDefault()} onClick={()=>pick(x.nickname)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"none",borderRadius:10,cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
           <span style={{width:26,height:26,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{x.nickname.slice(0,1)}</span>
-          <span style={{fontSize:14,fontWeight:600,color:"#1B2559"}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
+          <span style={{fontSize:14,fontWeight:600,color:INK}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
       <textarea ref={ref} value={value} autoFocus={autoFocus} rows={Math.min(maxRows,Math.max(minRows,value.split("\n").length))} placeholder={placeholder} maxLength={maxLength}
@@ -2749,7 +2753,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
             <span style={{width:32,height:32,borderRadius:"50%",background:c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:c.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{c.anon?"?":(c.name||"?").slice(0,1)}</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
-                <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":"#1B2559"}}>{shown(c)}</span>
+                <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":INK}}>{shown(c)}</span>
                 {c.anon&&mine&&<span style={{fontSize:10,color:"#A3AAC2"}}>(내 댓글)</span>}
                 <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(c.at)}{c.editedAt?" · 수정됨":""}</span>
               </div>
@@ -2760,7 +2764,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
                   <button type="button" onClick={()=>saveEdit(c)} style={{...small,color:BLUE,fontWeight:700}}>저장</button>
                 </div>
               </div>):(<>
-                <p style={{margin:"3px 0 0",fontSize:14,color:"#2B3674",lineHeight:1.55}}><CommentText text={c.text} names={names}/></p>
+                <p style={{margin:"3px 0 0",fontSize:14,color:INK,lineHeight:1.55}}><CommentText text={c.text} names={names}/></p>
                 {(mine||isAdmin)&&<div style={{display:"flex",gap:12,marginTop:4}}>
                   {mine&&<button type="button" onClick={()=>setEdit({id:c.id,text:c.text})} style={small}><Ic n="pencil" s={11}/> 수정</button>}
                   <button type="button" onClick={()=>del(c)} style={small}>삭제</button>
@@ -2809,8 +2813,8 @@ function MemberAttend({meeting,isAdmin}){
   return(
     <Card>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:15,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6}}><Ic n="userPlus" s={15} c={BLUE}/>다른 회원 참석 등록</span>
-        <button type="button" onClick={()=>setShow(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:999,color:BLUE,fontSize:12,fontWeight:600,padding:"5px 12px",cursor:"pointer"}}>{show?"닫기":"+ 회원 추가"}</button>
+        <span style={{fontSize:15,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n="userPlus" s={15} c={BLUE}/>다른 회원 참석 등록</span>
+        <button type="button" onClick={()=>setShow(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:12,color:BLUE,fontSize:12,fontWeight:600,padding:"5px 12px",cursor:"pointer"}}>{show?"닫기":"+ 회원 추가"}</button>
       </div>
       <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>같이 치기로 한 회원을 대신 넣어 줄 수 있어요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '대신 등록'으로 표시돼요. 등록된 회원에게 알림이 가요. {isAdmin?"빼려면 명단에서 빼기를 눌러요.":"내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."}</p>
       {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
@@ -2820,8 +2824,8 @@ function MemberAttend({meeting,isAdmin}){
           {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
           {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"더 넣을 수 있는 회원이 없어요"}</p>}
           {list.map(m=>(
-            <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F5F7FE"}}>
-              <span style={{flex:1,fontSize:14,fontWeight:500,color:"#1B2559"}}>{m.nickname}{realNameOf(m)&&<span style={{fontSize:13,color:"#4A5578"}}>({realNameOf(m)})</span>} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
+            <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F1F4FA"}}>
+              <span style={{flex:1,fontSize:14,fontWeight:500,color:INK}}>{m.nickname}{realNameOf(m)&&<span style={{fontSize:13,color:"#4A5578"}}>({realNameOf(m)})</span>} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
               <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px"}}>참석</button>
             </div>
           ))}
@@ -2978,15 +2982,15 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const setTimeNote=(k,v)=>store.saveRsvp({...voteValue("attend",mine),[k]:v||null});
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14,paddingBottom:24}}>
-      <div style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+      <div style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["info","모임 정보"],...(meeting.flashType==="training"?[]:[["bracket","대진표 · 스코어"]])].map(([k,l])=>(
-          <button key={k} type="button" onClick={()=>setView(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#6B7493",boxShadow:view===k?SHADOW_BTN:"none"}}>{l}</button>
+          <button key={k} type="button" onClick={()=>setView(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:view===k?INK:"transparent",color:view===k?"#fff":"#6B7493",boxShadow:view===k?SHADOW_BTN:"none"}}>{l}</button>
         ))}
       </div>
       {view==="bracket"&&meeting.flashType!=="training"?<MeetingBracket meeting={meeting} participants={participants} store={store}/>:(<>
       <Card>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-          <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:"#1B2559"}}>{meeting.date}</p><KindBadge m={meeting}/></div>
+          <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:INK}}>{meeting.date}</p><KindBadge m={meeting}/></div>
           {gone?<span style={{background:GONE.c,color:"#fff",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>{goneLabel(meeting)}</span>
             :isPast?<span style={{background:"#EEF1FA",color:"#A3AAC2",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20}}>종료된 모임</span>
             :open&&fill>=100?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>마감 · 대기 가능</span>
@@ -3001,7 +3005,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
             <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{width:22,display:"flex",justifyContent:"center",color:"#8A93B2"}}><Icon name={r.icon} size={17} stroke={1.8}/></span>
               <span style={{fontSize:13,color:"#A3AAC2",width:64}}>{r.label}</span>
-              <span style={{fontSize:13,fontWeight:500,color:"#1B2559"}}>{r.value}</span>
+              <span style={{fontSize:13,fontWeight:500,color:INK}}>{r.value}</span>
             </div>
           ))}
         </div>
@@ -3020,17 +3024,17 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           </div>
         )}
         {!gone&&isPast&&<p style={{margin:0,fontSize:14,fontWeight:600,textAlign:"center",color:"#8A93B2",background:"#EEF1FA",borderRadius:12,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="clock" size={16} stroke={1.9}/>종료된 모임</p>}
-        {!gone&&!isPast&&!open&&<p data-attend="" style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F5F7FE",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
+        {!gone&&!isPast&&!open&&<p data-attend="" style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F1F4FA",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
         {!gone&&!isPast&&open&&(
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
             <AttendButtons status={myStatus} onVote={setMyStatus}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {myStatus==="attend"&&(
-              <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
-                <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}><Ic n="clock" s={14}/> 늦게 오거나 일찍 가나요?</span>
+              <div style={{background:"#F1F4FA",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:INK}}><Ic n="clock" s={14}/> 늦게 오거나 일찍 가나요?</span>
                 {[["arrive","늦게 와요","도착",mine.arrive,hhmmApp(Math.min(toMin(mEnd)-30,toMin(mStart)+30))],["leave","일찍 가요","출발",mine.leave,hhmmApp(Math.max(toMin(mStart)+30,toMin(mEnd)-30))]].map(([k,l,w,val,def])=>(
                   <div key={k} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <button type="button" aria-pressed={!!val} onClick={()=>setTimeNote(k,val?null:pad2(def))} style={{flex:"0 0 92px",padding:"7px 0",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",border:`1.5px solid ${val?BLUE:"#D6DEF7"}`,background:val?BLUE:"#fff",color:val?"#fff":"#6B7493"}}>{l}</button>
+                    <button type="button" aria-pressed={!!val} onClick={()=>setTimeNote(k,val?null:pad2(def))} style={{flex:"0 0 92px",padding:"7px 0",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",border:`1.5px solid ${val?BLUE:"#D6DEF7"}`,background:val?BLUE:"#fff",color:val?"#fff":"#6B7493"}}>{l}</button>
                     {val?<><TimeInput label={`${w} 시간`} value={val} onChange={v=>setTimeNote(k,v)} style={{flex:1}}/><span style={{fontSize:12,color:"#6B7493"}}>{w}</span></>
                       :<span style={{fontSize:12,color:"#A3AAC2"}}>{k==="arrive"?`${mStart}부터 와요`:`${mEnd}까지 있어요`}</span>}
                   </div>
@@ -3040,24 +3044,24 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
             )}
             {prio&&<p style={{margin:0,fontSize:11,textAlign:"center",color:"#A3AAC2"}}>이번 달 정기 모임 참석 {myCount}회 (이 모임 전까지)</p>}
             {myStatus==="attend"&&(
-              <div style={{background:"#F5F7FE",borderRadius:12,padding:12,border:"1px solid #E4E9F7"}}>
+              <div style={{background:"#F1F4FA",borderRadius:12,padding:12,border:"1px solid #E4E9F7"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:guests.length>0?10:0}}>
-                  <span style={{fontSize:13,fontWeight:600,color:"#2B3674"}}><Ic n="userPlus" s={14}/> 게스트 초대</span>
-                  <button type="button" onClick={()=>setShowGuest(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:999,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer"}}>{showGuest?"취소":"+ 게스트 추가"}</button>
+                  <span style={{fontSize:13,fontWeight:600,color:INK}}><Ic n="userPlus" s={14}/> 게스트 초대</span>
+                  <button type="button" onClick={()=>setShowGuest(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:12,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 10px",cursor:"pointer"}}>{showGuest?"취소":"+ 게스트 추가"}</button>
                 </div>
                 {guests.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:showGuest?10:0}}>
                   {guests.map((g,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#fff",borderRadius:999,border:"1px solid #E4E9F7"}}>
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#fff",borderRadius:12,border:"1px solid #E4E9F7"}}>
                       <Ic n="user" s={15} c="#8A93B2"/>
-                      <span style={{flex:1,fontSize:13,color:"#2B3674",fontWeight:500}}>{g.name}</span>
+                      <span style={{flex:1,fontSize:13,color:INK,fontWeight:500}}>{g.name}</span>
                       <span style={{fontSize:11,background:"#E4E9F7",color:"#6B7493",padding:"2px 7px",borderRadius:10}}>게스트</span>
                       <button type="button" onClick={()=>removeGuest(i)} style={{background:"none",border:"none",color:"#A3AAC2",fontSize:16,cursor:"pointer",padding:0,lineHeight:1}}>✕</button>
                     </div>
                   ))}
                 </div>}
                 {showGuest&&<div style={{display:"flex",gap:8}}>
-                  <input type="text" value={guestInput} onChange={e=>setGuestInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addGuest()} placeholder="게스트 이름 입력" style={{flex:1,border:"1px solid #D6DEF7",borderRadius:999,padding:"8px 12px",fontSize:13,outline:"none"}}/>
-                  <button type="button" onClick={addGuest} style={{padding:"8px 14px",background:BLUE,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer"}}>추가</button>
+                  <input type="text" value={guestInput} onChange={e=>setGuestInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addGuest()} placeholder="게스트 이름 입력" style={{flex:1,border:"1px solid #D6DEF7",borderRadius:12,padding:"8px 12px",fontSize:13,outline:"none"}}/>
+                  <button type="button" onClick={addGuest} style={{padding:"8px 14px",background:BLUE,color:"#fff",border:"none",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>추가</button>
                 </div>}
                 {guests.length===0&&!showGuest&&<p style={{margin:"8px 0 0",fontSize:12,color:"#A3AAC2"}}>{meeting.guestCap?`정원 외 게스트 ${meeting.guestCap}명까지 선착순으로 받아요`:"게스트 자리는 따로 없어요. 회원 자리가 남으면 참석할 수 있어요"}</p>}
               </div>
@@ -3071,7 +3075,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         <SectionTitle>참석 확정 ({total}/{meeting.total}명)</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
           {(prio?[["1","이달 덜 참석한 회원","먼저"],["2","같은 횟수면","투표 빠른 순"]]:[["i:zap","번개 모임","선착순"]]).concat([["i:userPlus","게스트",meeting.guestCap?`정원 외 ${meeting.guestCap}명 · 선착순`:"빈자리만"]]).map(([n,a,b])=>(
-            <span key={a} style={{fontSize:11,padding:"4px 10px",borderRadius:999,background:BLUE_LIGHT,color:"#2B3674"}}><b style={{color:BLUE}}>{n.startsWith("i:")?<Ic n={n.slice(2)} s={12}/>:n}</b> {a} · {b}</span>
+            <span key={a} style={{fontSize:11,padding:"4px 10px",borderRadius:12,background:BLUE_LIGHT,color:INK}}><b style={{color:BLUE}}>{n.startsWith("i:")?<Ic n={n.slice(2)} s={12}/>:n}</b> {a} · {b}</span>
           ))}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -3097,7 +3101,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           <SectionTitle>모임 무산 처리</SectionTitle>
           <p style={{margin:"0 0 10px",fontSize:12,color:"#6B7493",lineHeight:1.6}}>모임 기록은 남기고 회색으로 "무산"이라고 표시해요. 참석 투표가 막히고, 참석 횟수·랭킹에서 빠져요. 참석 누른 회원에게 알림이 가요.</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-            {CANCEL_REASONS.map(r=><button key={r} type="button" aria-pressed={goneForm.reason===r} onClick={()=>setGoneForm(f=>({...f,reason:r}))} style={{padding:"7px 14px",borderRadius:999,fontSize:13,fontWeight:goneForm.reason===r?700:500,cursor:"pointer",border:`1.5px solid ${goneForm.reason===r?GONE.c:"#D6DEF7"}`,background:goneForm.reason===r?GONE.c:"#fff",color:goneForm.reason===r?"#fff":"#4A5578"}}>{r}</button>)}
+            {CANCEL_REASONS.map(r=><button key={r} type="button" aria-pressed={goneForm.reason===r} onClick={()=>setGoneForm(f=>({...f,reason:r}))} style={{padding:"7px 14px",borderRadius:12,fontSize:13,fontWeight:goneForm.reason===r?700:500,cursor:"pointer",border:`1.5px solid ${goneForm.reason===r?GONE.c:"#D6DEF7"}`,background:goneForm.reason===r?GONE.c:"#fff",color:goneForm.reason===r?"#fff":"#4A5578"}}>{r}</button>)}
           </div>
           <textarea value={goneForm.memo} onChange={e=>setGoneForm(f=>({...f,memo:e.target.value}))} placeholder="메모 (선택) 예: 코트 물웅덩이로 사용 불가" rows={2} maxLength={200} style={{...inputStyle,resize:"vertical",marginBottom:10}}/>
           <div style={{display:"flex",gap:8}}>
@@ -3145,13 +3149,13 @@ function MiniCalendar({onOpen}){
   const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
   const count=Object.values(byDay).reduce((a,l)=>a+l.length,0);
   const picked=pick&&byDay[pick];
-  const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:30,height:30,borderRadius:999,border:"1px solid #E4E9F7",background:"#fff",color:"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
+  const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:30,height:30,borderRadius:12,border:"1px solid #E4E9F7",background:"#fff",color:"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
   return(
     <Card style={{padding:"12px 12px 10px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
         {navBtn(-1,"chevL","이전 달")}
         <div style={{textAlign:"center"}}>
-          <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559"}}>{y}년 {mo}월</p>
+          <p style={{margin:0,fontSize:15,fontWeight:700,color:INK}}>{y}년 {mo}월</p>
           <p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>{count?`모임 ${count}개`:"모임 없음"}</p>
         </div>
         {navBtn(1,"chevR","다음 달")}
@@ -3164,29 +3168,29 @@ function MiniCalendar({onOpen}){
           return(
             <button key={iso} type="button" aria-label={`${mo}월 ${d}일${list.length?` 모임 ${list.length}개`:""}`} aria-pressed={on} onClick={()=>setPick(on||!list.length?null:iso)}
               style={{border:"none",background:on?BLUE_LIGHT:"transparent",borderRadius:10,padding:"2px 0 3px",cursor:list.length?"pointer":"default",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minHeight:30}}>
-              <span style={{width:22,height:22,lineHeight:"22px",borderRadius:999,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
-                background:isToday?GRAD:"transparent",color:isToday?"#fff":past?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:"#1B2559"}}>{d}</span>
+              <span style={{width:22,height:22,lineHeight:"22px",borderRadius:12,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
+                background:isToday?GRAD:"transparent",color:isToday?"#fff":past?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:INK}}>{d}</span>
               <span style={{display:"flex",gap:2,height:5,alignItems:"center"}}>
-                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:999,background:m.cancelled?"transparent":KIND_DOT[kindKey(m)],border:m.cancelled?`1.2px solid ${GONE.c}`:"none",opacity:past?0.45:1}}/>)}
+                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:12,background:m.cancelled?"transparent":KIND_DOT[kindKey(m)],border:m.cancelled?`1.2px solid ${GONE.c}`:"none",opacity:past?0.45:1}}/>)}
                 {list.length>3&&<span style={{fontSize:8,lineHeight:"5px",color:"#6B7493",fontWeight:700}}>+{list.length-3}</span>}
               </span>
             </button>);
         })}
       </div>
       <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6,fontSize:11,color:"#6B7493"}}>
-        {[["regular","정기"],["game","번개 게임"],["training","번개 훈련"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:999,background:KIND_DOT[k]}}/>{l}</span>)}
-        <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:999,border:`1.2px solid ${GONE.c}`}}/>무산</span>
+        {[["regular","정기"],["game","번개 게임"],["training","번개 훈련"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:12,background:KIND_DOT[k]}}/>{l}</span>)}
+        <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:12,border:`1.2px solid ${GONE.c}`}}/>무산</span>
       </div>
       {picked&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
-        <p style={{margin:0,fontSize:14,fontWeight:700,color:"#1B2559"}}>{fmtDate(pick)} 모임 {picked.length}개</p>
+        <p style={{margin:0,fontSize:14,fontWeight:700,color:INK}}>{fmtDate(pick)} 모임 {picked.length}개</p>
         {picked.map(m=>{ const past=m.status==="past", full=!past&&isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled; return(
-          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:past?"#F5F7FE":"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
+          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:past?"#F1F4FA":"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
             <span style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
               <KindBadge m={m}/>
-              <span style={{fontSize:16,fontWeight:700,color:"#1B2559",fontVariantNumeric:"tabular-nums"}}>{m.time}</span>
-              {gone?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:GONE.c,color:"#fff",whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
-                :past?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:"#E4E9F7",color:"#6B7493",whiteSpace:"nowrap"}}>종료 · {m.attendees.length}명 참석</span>
-                :<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE}}>{full?"마감 ":""}{m.attendees.length}/{m.total}명</span>}
+              <span style={{fontSize:16,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{m.time}</span>
+              {gone?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:GONE.c,color:"#fff",whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
+                :past?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:"#E4E9F7",color:"#6B7493",whiteSpace:"nowrap"}}>종료 · {m.attendees.length}명 참석</span>
+                :<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE}}>{full?"마감 ":""}{m.attendees.length}/{m.total}명</span>}
             </span>
             <span style={{fontSize:14,color:"#4A5578",display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={14}/>{m.placeName||m.place}</span>
             <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",fontSize:12}}>
@@ -3234,13 +3238,13 @@ function MapCard({m,onOpen}){
   return <div role="button" tabIndex={0} onClick={()=>onOpen(m.id)} onKeyDown={e=>e.key==="Enter"&&onOpen(m.id)}
     style={{flex:"0 0 100%",scrollSnapAlign:"center",boxSizing:"border-box",border:"1px solid #E4E9F7",borderRadius:16,padding:"12px 14px",cursor:"pointer",background:"#fff"}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-      <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}
-        <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:col.bg,color:col.c}}>{m.kind==="flash"?`번개 ${FLASH_TYPE[m.flashType]}`:"정기"}</span></p>
-      <span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:999,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE,whiteSpace:"nowrap"}}>{m.attendees.length}/{m.total}명</span>
+      <p style={{margin:0,fontSize:15,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}
+        <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:12,background:col.bg,color:col.c}}>{m.kind==="flash"?`번개 ${FLASH_TYPE[m.flashType]}`:"정기"}</span></p>
+      <span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE,whiteSpace:"nowrap"}}>{m.attendees.length}/{m.total}명</span>
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:6}}>
       <span style={{fontSize:13,color:"#6B7493",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Ic n="clock" s={13}/> {m.time}{m.courtNo?` · ${courtLabel(m.courtNo)}`:""}</span>
-      <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:999,background:st.bg,color:st.c,whiteSpace:"nowrap",flexShrink:0}}>{st.t}</span>
+      <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:12,background:st.bg,color:st.c,whiteSpace:"nowrap",flexShrink:0}}>{st.t}</span>
     </div>
     <div style={{height:5,background:full?FULL.line:"#E4E9F7",borderRadius:10,marginTop:10}}><div style={{height:"100%",width:`${fill}%`,background:full?FULL.bar:GRAD,borderRadius:10}}/></div>
     <p style={{margin:"8px 0 0",fontSize:12,fontWeight:600,color:BLUE,textAlign:"right"}}>탭해서 자세히 보기 →</p>
@@ -3330,8 +3334,8 @@ function CourtMap({onOpen}){
   const counts=Object.fromEntries(MAP_FILTERS.map(([k])=>[k,k==="all"?all.length:all.filter(m=>kindKey(m)===k).length]));
   const chip=(k,l)=>{ const on=filter===k, dot=k!=="all"&&KIND_COLOR[k].dot;
     return <button key={k} type="button" aria-pressed={on} onClick={()=>{setFilter(k);setSel(null);fitted.current=false;}}
-      style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:999,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",
-        background:on?"#0B1E5B":"#fff",color:on?"#fff":"#1B2559",boxShadow:"0 2px 8px rgba(11,30,91,0.14)"}}>
+      style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 12px",borderRadius:12,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",
+        background:on?"#0B1E5B":"#fff",color:on?"#fff":INK,boxShadow:"0 2px 8px rgba(11,30,91,0.14)"}}>
       {dot&&<span style={{width:7,height:7,borderRadius:"50%",background:dot}}/>}{l}{k==="all"?` ${counts.all}`:""}</button>; };
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{position:"relative",minHeight:320,height:"max(320px, calc(100svh - 500px))",borderRadius:24,overflow:"hidden",background:"#E7ECF6",boxShadow:SHADOW}}>
@@ -3347,28 +3351,28 @@ function CourtMap({onOpen}){
     </div>
     {/* 안내: 지도 위에 얹지 않고 지도 바로 아래 한 줄로 */}
     {status==="ready"&&<div style={{background:"#fff",borderRadius:16,padding:"10px 14px",boxShadow:SHADOW,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-      <span style={{fontSize:13,fontWeight:700,color:"#1B2559"}}>{shown.length?`예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳`:"예정된 모임이 없어요"}{pending.length?" · 위치 찾는 중…":""}</span>
+      <span style={{fontSize:13,fontWeight:700,color:INK}}>{shown.length?`예정된 모임 ${shown.length}개 · 코트 ${groups.length}곳`:"예정된 모임이 없어요"}{pending.length?" · 위치 찾는 중…":""}</span>
       {groups.some(g=>g.list.length>1)&&<span style={{fontSize:12,color:"#6B7493"}}>숫자 = 그 코트의 모임 수</span>}
     </div>}
     {cur&&<div ref={cardRef} style={{background:"#fff",borderRadius:20,boxShadow:SHADOW,padding:"14px 14px 10px",scrollMarginBottom:100}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
-        <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cur.name}</p>
+        <p style={{margin:0,fontSize:15,fontWeight:700,color:INK,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cur.name}</p>
         <span style={{fontSize:12,color:"#8A93B2",whiteSpace:"nowrap",flexShrink:0}}>{cur.list.length>1?`모임 ${cur.list.length}개 · 옆으로 넘기기 ›`:"모임 1개"}</span>
       </div>
       <div ref={strip} onScroll={e=>{const el=e.currentTarget;setPage(Math.round(el.scrollLeft/Math.max(1,el.clientWidth)));}}
         style={{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",scrollbarWidth:"none"}}>
         {cur.list.map(m=><MapCard key={m.id} m={m} onOpen={onOpen}/>)}
       </div>
-      {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:999,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
+      {cur.list.length>1&&<div style={{display:"flex",justifyContent:"center",gap:5,marginTop:8}}>{cur.list.map((m,i)=><span key={m.id} style={{width:i===page?16:6,height:6,borderRadius:12,background:i===page?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}</div>}
     </div>}
     {status==="ready"&&lost.length>0&&<div>
-      <p style={{margin:"0 0 4px",fontSize:15,fontWeight:700,color:"#1B2559"}}>위치를 찾지 못한 모임 {lost.length}</p>
+      <p style={{margin:"0 0 4px",fontSize:15,fontWeight:700,color:INK}}>위치를 찾지 못한 모임 {lost.length}</p>
       <p style={{margin:"0 0 10px",fontSize:12,color:"#8A93B2"}}>모임 수정에서 테니스장을 카카오 장소 검색으로 고르면 지도에 나와요.</p>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {lost.map(m=>{ const col=KIND_COLOR[kindKey(m)]; return <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpen(m.id)} style={{background:"#fff",borderRadius:16,padding:"12px 14px",boxShadow:SHADOW,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
           <span style={{width:8,height:8,borderRadius:"50%",background:col.dot,flexShrink:0}}/>
           <div style={{flex:1,minWidth:0}}>
-            <p style={{margin:0,fontSize:14,fontWeight:600,color:"#1B2559"}}>{m.date} <span style={{fontSize:12,color:"#8A93B2",fontWeight:500}}>{m.info.start}</span></p>
+            <p style={{margin:0,fontSize:14,fontWeight:600,color:INK}}>{m.date} <span style={{fontSize:12,color:"#8A93B2",fontWeight:500}}>{m.info.start}</span></p>
             <p style={{margin:0,fontSize:12,color:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
           </div>
           <span style={{fontSize:12,fontWeight:700,color:BLUE,whiteSpace:"nowrap"}}>{m.attendees.length}/{m.total}명</span>
@@ -3379,9 +3383,9 @@ function CourtMap({onOpen}){
 }
 // 예약 탭 맨 위: 목록 / 지도 전환
 function ViewToggle({view,onView}){
-  return <div role="tablist" aria-label="보기 방식" style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+  return <div role="tablist" aria-label="보기 방식" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
     {[["list","목록","list"],["map","지도","map"]].map(([k,l,ic])=>{const on=view===k;return(
-      <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>onView(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?GRAD:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+      <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>onView(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?INK:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
         <Icon name={ic} size={15} stroke={2}/>{l}</button>);})}
   </div>;
 }
@@ -3390,7 +3394,7 @@ const MORE_STEP=3;
 function MoreButton({shown,total,onChange}){
   if(total<=MORE_STEP) return null;
   const all=shown>=total;
-  return <button type="button" onClick={()=>onChange(all?MORE_STEP:shown+MORE_STEP)} style={{marginTop:2,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>
+  return <button type="button" onClick={()=>onChange(all?MORE_STEP:shown+MORE_STEP)} style={{marginTop:2,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>
     {all?"접기":`더보기 (${Math.min(MORE_STEP,total-shown)}개 더)`}
   </button>;
 }
@@ -3416,14 +3420,14 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
       <ViewToggle view={view} onView={onView}/>
       <MiniCalendar onOpen={setSelId}/>
-      <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:999,padding:4}}>
+      <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["flash","번개 모임","zap"],["regular","정기 모임","calendar"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length,fresh=upAll.some(m=>m.kind===k&&!m.cancelled&&isNew(meetingNewItem(m)));return(
-          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:999,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?GRAD:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            <Icon name={ic} size={15} stroke={2}/>{l}{n>0&&<span style={{fontSize:11,fontWeight:700,minWidth:18,padding:"1px 6px",borderRadius:999,background:on?"rgba(255,255,255,0.25)":"#fff",color:on?"#fff":BLUE}}>{n}</span>}{fresh&&<span aria-label="새 모임 있음" style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",marginLeft:-2}}/>}
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?INK:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <Icon name={ic} size={15} stroke={2}/>{l}{n>0&&<span style={{fontSize:11,fontWeight:700,minWidth:18,padding:"1px 6px",borderRadius:12,background:on?"rgba(255,255,255,0.25)":"#fff",color:on?"#fff":BLUE}}>{n}</span>}{fresh&&<span aria-label="새 모임 있음" style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",marginLeft:-2}}/>}
           </button>);})}
       </div>
       <div>
-        <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#1B2559"}}>다가오는 {label}</p>
+        <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:INK}}>다가오는 {label}</p>
         {upcoming.length===0&&<Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty>}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {upcoming.slice(0,upN).map(m=>{
@@ -3433,7 +3437,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
               <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:gone?GONE.bg:full?FULL.bg:"#fff",border:`1.5px solid ${gone?GONE.line:full?FULL.line:"transparent"}`,opacity:gone?0.85:1,borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                   <div>
-                    <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:"#1B2559",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/>{!gone&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
+                    <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/>{!gone&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
                     <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}><Ic n="clock" s={13}/> {m.time}</p>
                     <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p>
                   </div>
@@ -3458,7 +3462,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
           <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {past.slice(0,pastN).map(m=>(
-              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#F5F7FE",borderRadius:20,padding:14,border:"1px solid #E4E9F7",cursor:"pointer"}}>
+              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#F1F4FA",borderRadius:20,padding:14,border:"1px solid #E4E9F7",cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <p style={{margin:"0 0 3px",fontWeight:600,fontSize:14,color:"#6B7493"}}>{m.date}</p>
@@ -3510,7 +3514,7 @@ function StatsTab() {
             <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
               <span style={{fontSize:10,color:BLUE,fontWeight:700}}>{r.me}</span>
               <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:80}}>
-                <div style={{flex:1,background:"linear-gradient(180deg,#5B8DEF,#3B63F3)",borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
+                <div style={{flex:1,background:"linear-gradient(180deg,#5B8DEF,#2152E6)",borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
                 <div style={{flex:1,background:"#DCE4FF",borderRadius:"6px 6px 0 0",height:`${(r.avg/maxVal)*100}%`,minHeight:4}}/>
               </div>
               <span style={{fontSize:10,color:"#A3AAC2"}}>{r.label}</span>
@@ -3531,9 +3535,9 @@ function StatsTab() {
         {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {rank.map(r=>(
-            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F5F7FE",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
+            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F1F4FA",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
               <RankNo r={r}/>
-              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:"#2B3674"}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
+              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
               <div style={{width:70,height:6,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${(r.count/rank[0].count)*100}%`,background:r.isMe?BLUE:"#A9BCFF",borderRadius:10}}/></div>
               <span style={{fontSize:13,fontWeight:700,color:BLUE,width:28,textAlign:"right"}}>{r.count}</span>
             </div>
@@ -3615,20 +3619,20 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
     return {m,label,color:v.status==="attend"&&ci>=0?BLUE:v.status==="attend"?"#C2610C":"#8A93B2"};
   }).filter(Boolean);
   const until=+lsGet(LS.until), keepLeft=lsGet(LS.keep)==="0"?null:until?Math.max(0,Math.ceil((until-Date.now())/86400000)):null;
-  const badge=(text,bg,color)=><span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:999,background:bg,color}}>{text}</span>;
-  const Row=({k,v})=>v?<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid #EEF1FA"}}><span style={{width:84,fontSize:13,color:"#A3AAC2"}}>{k}</span><span style={{flex:1,fontSize:13,fontWeight:500,color:"#1B2559",wordBreak:"keep-all"}}>{v}</span></div>:null;
+  const badge=(text,bg,color)=><span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,background:bg,color}}>{text}</span>;
+  const Row=({k,v})=>v?<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid #EEF1FA"}}><span style={{width:84,fontSize:13,color:"#A3AAC2"}}>{k}</span><span style={{flex:1,fontSize:13,fontWeight:500,color:INK,wordBreak:"keep-all"}}>{v}</span></div>:null;
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
+      <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{edit?"정보 수정":"내 정보"}</p>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{edit?"정보 수정":"내 정보"}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         {edit?<Card><ProfileEdit account={account} onCancel={()=>setEdit(false)} onDone={p=>{onProfileSaved(p);setEdit(false);}}/></Card>:<>
         <Card style={{display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:56,height:56,borderRadius:"50%",background:GRAD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><MascotSvg size={44}/></div>
           <div style={{flex:1,minWidth:0}}>
-            <p style={{margin:"0 0 3px",fontSize:18,fontWeight:700,color:"#1B2559"}}>{pr.nickname||ME}{pr.realName&&<span style={{fontSize:13,fontWeight:500,color:"#6B7493",marginLeft:6}}>{pr.realName}</span>}</p>
+            <p style={{margin:"0 0 3px",fontSize:18,fontWeight:700,color:INK}}>{pr.nickname||ME}{pr.realName&&<span style={{fontSize:13,fontWeight:500,color:"#6B7493",marginLeft:6}}>{pr.realName}</span>}</p>
             <p style={{margin:"0 0 6px",fontSize:12,color:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.email||(account&&account.user&&account.user.email)||""}</p>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {account&&account.admin&&badge("관리자",BLUE,"#fff")}
@@ -3648,7 +3652,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
           <SectionTitle>다가오는 모임 내 투표</SectionTitle>
           {mine.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>투표한 모임이 없어요.</p>:mine.map(({m,label,color})=>(
             <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #EEF1FA"}}>
-              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:"#1B2559"}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p></div>
+              <div><p style={{margin:0,fontSize:13,fontWeight:600,color:INK}}>{m.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p></div>
               <span style={{fontSize:12,fontWeight:700,color}}>{label}</span>
             </div>
           ))}
@@ -3703,9 +3707,9 @@ function NoticeForm({onClose}) {
 function Sheet({title,onClose,children}) {
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:16}}>
+      <div role="dialog" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{title}</p>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{title}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         {children}
@@ -3726,7 +3730,7 @@ function NotiSheet({items,onClose,onPick,isAdmin}) {
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
                 <span style={{width:34,height:34,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={NOTI_ICON[n.type]||"bell"} size={17} stroke={1.9}/></span>
                 <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:"block",fontSize:14,fontWeight:n.unread?700:500,color:"#1B2559",lineHeight:1.45,wordBreak:"keep-all"}}>{n.text}</span>
+                  <span style={{display:"block",fontSize:14,fontWeight:n.unread?700:500,color:INK,lineHeight:1.45,wordBreak:"keep-all"}}>{n.text}</span>
                   <span style={{display:"block",fontSize:11,color:"#A3AAC2",marginTop:3}}>{ago(n.at)}{n.type==="member"&&isAdmin?" · 눌러서 승인하기":go?" · 눌러서 보기":""}</span>
                 </span>
                 {n.unread&&<span style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",marginTop:6,flexShrink:0}}/>}
@@ -3779,13 +3783,13 @@ function ensureSeries(all){
 }
 function KindBadge({m}){
   const flash=m.kind==="flash", col=KIND_COLOR[kindKey(m)];
-  return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:999,background:col.bg,color:col.c,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
+  return <span style={{fontSize:12,fontWeight:700,padding:"3px 9px",borderRadius:7,background:col.bg,color:col.c,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
 }
 function Pills({value,options,onChange,label}){
   return(
     <div role="radiogroup" aria-label={label} style={{display:"flex",gap:8}}>
       {options.map(([v,l])=>{const on=value===v;return(
-        <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>onChange(v)} style={{flex:1,padding:"10px 0",borderRadius:999,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT,border:on?"none":"1.5px solid #D6DEF7",background:on?GRAD:"#fff",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none"}}>{l}</button>
+        <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>onChange(v)} style={{flex:1,padding:"10px 0",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT,border:on?"none":"1.5px solid #D6DEF7",background:on?GRAD:"#fff",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none"}}>{l}</button>
       );})}
     </div>
   );
@@ -4003,9 +4007,9 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
   const hint=t=><p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>{t}</p>;
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#F3F5FB",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
+      <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <p style={{margin:0,fontSize:19,fontWeight:700,color:"#1B2559"}}>{editing?"모임 수정":"모임 만들기"}</p>
+          <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{editing?"모임 수정":"모임 만들기"}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -4044,7 +4048,7 @@ function MeetingForm({initial,defaultKind,onClose,onSaved}) {
           </FieldWrap>
           <FieldWrap label="코트 종류">
             <div role="radiogroup" aria-label="코트 종류" style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {SURFACES.map(v=>{const on=f.surface===v;return <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>set("surface",on?"":v)} style={{padding:"8px 14px",borderRadius:999,fontSize:13,fontWeight:on?700:500,cursor:"pointer",border:`1.5px solid ${on?BLUE:"#D6DEF7"}`,background:on?BLUE:"#fff",color:on?"#fff":"#4A5578"}}>{v}</button>;})}
+              {SURFACES.map(v=>{const on=f.surface===v;return <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>set("surface",on?"":v)} style={{padding:"8px 14px",borderRadius:12,fontSize:13,fontWeight:on?700:500,cursor:"pointer",border:`1.5px solid ${on?BLUE:"#D6DEF7"}`,background:on?BLUE:"#fff",color:on?"#fff":"#4A5578"}}>{v}</button>;})}
             </div>
             {hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")}
           </FieldWrap>
@@ -4191,7 +4195,7 @@ function useBoard(enabled){
 function AnonToggle({on,onChange,style}){
   return(
     <button type="button" role="switch" aria-checked={on} onClick={()=>onChange(!on)} style={{display:"inline-flex",alignItems:"center",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:FONT,fontSize:13,fontWeight:600,color:on?BLUE:"#6B7493",...style}}>
-      <span style={{width:36,height:20,borderRadius:999,background:on?BLUE:"#D6DEF7",position:"relative",transition:"background .15s",flexShrink:0}}>
+      <span style={{width:36,height:20,borderRadius:12,background:on?BLUE:"#D6DEF7",position:"relative",transition:"background .15s",flexShrink:0}}>
         <span style={{position:"absolute",top:2,left:on?18:2,width:16,height:16,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.2)",transition:"left .15s"}}/>
       </span>
       익명으로 쓰기
@@ -4221,7 +4225,7 @@ function PostForm({initial,onClose}){
       <div style={{display:"flex",alignItems:"center",marginTop:12,gap:10}}>
         <AnonToggle on={anon} onChange={setAnon}/>
         <span style={{fontSize:12,color:"#A3AAC2",fontVariantNumeric:"tabular-nums",marginLeft:"auto"}}>{text.length}/{BOARD_MAX}</span>
-        <button type="button" disabled={!text.trim()||busy} onClick={submit} style={{padding:"11px 22px",borderRadius:999,border:"none",background:text.trim()?GRAD:"#E4E9F7",color:"#fff",fontSize:14,fontWeight:700,cursor:text.trim()?"pointer":"default"}}>{busy?"올리는 중…":initial?"저장":"올리기"}</button>
+        <button type="button" disabled={!text.trim()||busy} onClick={submit} style={{padding:"11px 22px",borderRadius:12,border:"none",background:text.trim()?GRAD:"#E4E9F7",color:"#fff",fontSize:14,fontWeight:700,cursor:text.trim()?"pointer":"default"}}>{busy?"올리는 중…":initial?"저장":"올리기"}</button>
       </div>
       {anon&&<p style={{margin:"10px 0 0",fontSize:12,color:"#8A93B2",lineHeight:1.5}}>닉네임 대신 "익명"으로 보여요. 내 글은 나만 수정·삭제할 수 있고, 운영진은 삭제만 할 수 있어요.</p>}
     </Sheet>
@@ -4231,7 +4235,7 @@ function PostBody({p,names,full}){
   const [more,setMore]=useState(false);
   const long=!full&&(p.text.length>160||p.text.split("\n").length>4);
   return(<>
-    <p style={{margin:0,fontSize:15,color:"#1B2559",lineHeight:1.6,...(long&&!more?{display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden"}:{})}}><CommentText text={p.text} names={names}/></p>
+    <p style={{margin:0,fontSize:15,color:INK,lineHeight:1.6,...(long&&!more?{display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden"}:{})}}><CommentText text={p.text} names={names}/></p>
     {long&&!more&&<button type="button" onClick={e=>{e.stopPropagation();setMore(true);}} style={{background:"none",border:"none",padding:0,marginTop:4,fontSize:13,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>더보기</button>}
   </>);
 }
@@ -4256,7 +4260,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
   if(!canWrite) return(
     <Card style={{textAlign:"center",padding:"28px 20px"}}>
       <span style={{display:"inline-flex",width:48,height:48,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,alignItems:"center",justifyContent:"center",marginBottom:10}}><Icon name="message" size={22} stroke={1.9}/></span>
-      <p style={{margin:0,fontSize:15,fontWeight:700,color:"#1B2559"}}>{BOARD_NAME}은 정회원 공간이에요</p>
+      <p style={{margin:0,fontSize:15,fontWeight:700,color:INK}}>{BOARD_NAME}은 정회원 공간이에요</p>
       <p style={{margin:"6px 0 0",fontSize:13,color:"#6B7493",lineHeight:1.5}}>운영진이 가입을 승인하면 글을 읽고 쓸 수 있어요.</p>
     </Card>);
   if(!posts) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>{BOARD_NAME}을 불러오는 중이에요…</p></Card>;
@@ -4268,7 +4272,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
       <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(p.name||"?").slice(0,1)}</span>
       <div style={{flex:1,minWidth:0}}>
-        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":"#1B2559"}}>{p.anon?"익명":p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
+        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":INK}}>{p.anon?"익명":p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
         <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
       </div>
     </div>); };
@@ -4319,9 +4323,9 @@ function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:999,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
+      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:12,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
         {[["list","회원 목록","users"],["board",BOARD_NAME,"message"]].map(([k,l,ic])=>{ const n=newCounts[k]||0; return(
-          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:999,border:"none",background:view===k?GRAD:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{fontSize:10,fontWeight:800,lineHeight:"16px",padding:"0 6px",borderRadius:999,background:"#ef4444",color:"#fff"}}>NEW {n}</span>}</button>
+          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:12,border:"none",background:view===k?INK:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{fontSize:10,fontWeight:800,lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff"}}>NEW {n}</span>}</button>
         );})}
       </div>
       {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
@@ -4351,21 +4355,21 @@ function MemberList({onOpenMeeting}){
     const keys=[...g.keys()].sort((a,b)=>!a?1:!b?-1:sort==="hand"?(HAND_ORDER.indexOf(a)+99*(HAND_ORDER.indexOf(a)<0))-(HAND_ORDER.indexOf(b)+99*(HAND_ORDER.indexOf(b)<0)):a.localeCompare(b,"ko"));
     return keys.map(k=>({label:k||(sort==="hand"?"손 미입력":"동네 미입력"),items:g.get(k)})); })():[{label:null,items:list}];
   const total=Object.values(data.members).filter(m=>m&&m.nickname&&!m.withdrawn).length;
-  const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F5F7FE",borderRadius:999,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
+  const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F1F4FA",borderRadius:12,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
   return(
     <>
       <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
         <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 본명, 동네, 코트로 찾기" style={inputStyle}/>
         <div style={{display:"flex",gap:6}}>
           {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
-            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 12px",borderRadius:999,fontSize:13,whiteSpace:"nowrap",fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
+            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 12px",borderRadius:12,fontSize:13,whiteSpace:"nowrap",fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
           ))}
           <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"#A3AAC2"}}>{list.length}명</span>
         </div>
       </Card>
       {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
       {groups.map(gr=>(<React.Fragment key={gr.label||"all"}>
-      {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:"#2B3674",display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
+      {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
       {gr.items.map(m=>{
         const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
         return(
@@ -4374,10 +4378,10 @@ function MemberList({onOpenMeeting}){
               <div style={{width:44,height:44,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:700,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>{m.nickname}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:INK}}>{m.nickname}</span>
                   {realNameOf(m)&&<span style={{fontSize:13,fontWeight:500,color:"#4A5578"}}>({realNameOf(m)})</span>}
                   {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
-                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:999,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
+                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:12,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
                   {isNew(memberNewItem(m))&&<NewTag/>}
                 </div>
                 <span style={{fontSize:12,color:"#A3AAC2"}}>{cnt?`이달 ${cnt}회 참석`:"이달 참석 기록 없음"}</span>
@@ -4405,7 +4409,7 @@ function MemberList({onOpenMeeting}){
                   {up.map(mt=>(
                     <button key={mt.id} type="button" onClick={e=>{e.stopPropagation();onOpenMeeting&&onOpenMeeting(mt.id);}} style={{display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left",padding:"6px 10px",background:BLUE_LIGHT,border:"none",borderRadius:10,cursor:"pointer",fontFamily:FONT}}>
                       <span style={{fontSize:11,fontWeight:700,color:BLUE,minWidth:38}}>{dDay(mt.iso)}</span>
-                      <span style={{fontSize:12,fontWeight:600,color:"#1B2559",whiteSpace:"nowrap"}}>{mt.date.slice(5)}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:INK,whiteSpace:"nowrap"}}>{mt.date.slice(5)}</span>
                       <span style={{flex:1,minWidth:0,fontSize:12,color:"#6B7493",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(mt.info&&mt.info.start)||""} {mt.placeName||mt.place}</span>
                     </button>
                   ))}
@@ -4450,7 +4454,7 @@ function UpdateBanner(){
         <p style={{margin:0,fontSize:14,fontWeight:700}}>새 버전이 있어요</p>
         <p style={{margin:"2px 0 0",fontSize:12,opacity:0.8,lineHeight:1.4}}>업데이트를 눌러 주세요. 그래도 그대로면 앱을 완전히 껐다가 다시 열어 주세요.</p>
       </div>
-      <button type="button" onClick={reloadFresh} style={{padding:"9px 14px",background:"#D7F24A",color:"#0B1E5B",border:"none",borderRadius:999,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:FONT}}>업데이트</button>
+      <button type="button" onClick={reloadFresh} style={{padding:"9px 14px",background:"#D7F24A",color:"#0B1E5B",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:FONT}}>업데이트</button>
       <button type="button" onClick={()=>setHide(true)} aria-label="안내 닫기" style={{background:"none",border:"none",color:"#fff",opacity:0.7,padding:4,cursor:"pointer",display:"flex"}}><Icon name="x" size={16}/></button>
     </div>);
 }
@@ -4460,17 +4464,33 @@ const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",i
 
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 :root{color-scheme:only light}
-body{margin:0;background:#E9EDFA;font-family:${FONT};color:#1B2559;-webkit-font-smoothing:antialiased}
+body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
-input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 3px rgba(59,99,243,0.15)}
+input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
 .sstc-adrow::-webkit-scrollbar{display:none}
 `;
 
-const iconBtn={width:38,height:38,borderRadius:"50%",border:"none",background:"rgba(255,255,255,0.18)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
+// ── 하드코트 디자인 공용 조각 ──
+const HEADER_H=176;   // 홈이 아닌 화면의 파란 윗부분 높이 (화면마다 같게)
+// 파란 윗부분 배경: 가운데에 가로로 놓인 테니스 풀코트 라인 (복식 23.77×10.97m 비율)
+function CourtLines({opacity=0.14}){
+  const W=360,H=166,sy=H*1.37/10.97,svc=W*6.40/23.77,x0=(390-W)/2,y0=(200-H)/2;
+  return <svg aria-hidden="true" viewBox="0 0 390 200" preserveAspectRatio="xMidYMid meet" style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+    <g transform={`translate(${x0} ${y0})`} fill="none" stroke="#fff" strokeOpacity={opacity} strokeWidth="2">
+      <rect x="0" y="0" width={W} height={H}/>
+      <path d={`M0 ${sy}H${W}M0 ${H-sy}H${W}M${W/2-svc} ${sy}V${H-sy}M${W/2+svc} ${sy}V${H-sy}M${W/2-svc} ${H/2}H${W/2+svc}M0 ${H/2}h7M${W} ${H/2}h-7`}/>
+      <path d={`M${W/2} -8V${H+8}`} strokeOpacity={opacity*1.8} strokeWidth="2.5"/>
+    </g>
+  </svg>;
+}
+// 작은 테니스공 로고
+const BallMark=({size=20})=><svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill={BALL}/><path d="M4.2 4.8c3.6 3.4 3.6 11 0 14.4M19.8 4.8c-3.6 3.4-3.6 11 0 14.4" fill="none" stroke={GRAD} strokeWidth="1.6" strokeLinecap="round"/></svg>;
+
+const iconBtn={width:40,height:40,borderRadius:12,border:"none",background:"rgba(255,255,255,0.14)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
 // 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
 // 마스코트: 움직이는 부분(표정 바꾸기·윙크·손)을 각각 따로 겹친 SVG로 나눠서, 애니메이션이 SVG 안쪽 도형이 아니라
@@ -4731,21 +4751,20 @@ export default function App() {
   if(screen!=="main"||pending||loading) {
     const titles={login:"로그인",forgot:"비밀번호 찾기",signup:"회원가입"};
     return(
-      <div style={{minHeight:"100vh",background:"#F3F5FB",maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
+      <div style={{minHeight:"100vh",background:"#fff",maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
         <style>{GLOBAL_CSS}</style><UpdateBanner/>
-        {/* 파란 히어로 */}
-        <div style={{background:GRAD,borderRadius:"0 0 36px 36px",padding:`${screen==="login"?56:36}px 24px ${screen==="login"?88:72}px`,color:"#fff",textAlign:"center",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",width:220,height:220,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.18)",top:-90,right:-70}}/>
-          <div style={{position:"absolute",width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,0.07)",bottom:-50,left:-40}}/>
-          <div title="Sorry, not sorry" style={{width:screen==="login"?112:76,height:screen==="login"?112:76,margin:"0 auto 14px",borderRadius:"50%",border:"2px solid rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.12)",cursor:"pointer",userSelect:"none"}} onClick={()=>setWink(w=>!w)}>
+        {/* 파란 히어로 (하드코트: 단색 파랑 + 가로 풀코트 라인) */}
+        <div style={{background:GRAD,padding:`${screen==="login"?60:36}px 24px ${screen==="login"?72:60}px`,color:"#fff",textAlign:"center",position:"relative",overflow:"hidden"}}>
+          <CourtLines opacity={0.1}/>
+          <div title="Sorry, not sorry" style={{position:"relative",width:screen==="login"?120:76,height:screen==="login"?120:76,margin:"0 auto 18px",borderRadius:"50%",border:"2px solid rgba(255,255,255,0.85)",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,255,255,0.12)",cursor:"pointer",userSelect:"none"}} onClick={()=>setWink(w=>!w)}>
             <div className="sp-hop"><div className="sp-bounce"><MascotSvg size={screen==="login"?80:54}/></div></div>
           </div>
-          <h1 style={{fontSize:30,fontWeight:700,margin:"0 0 2px",letterSpacing:"0.08em"}}>SSTC</h1>
-          <p style={{fontSize:12,margin:"0 0 10px",opacity:0.8,letterSpacing:"0.04em"}}>{wink?"Sorry, not sorry":"Serve & Smash Tennis Club"}</p>
-          <p style={{fontSize:14,margin:0,opacity:0.85}}>{loading?"불러오는 중":pending?"승인 대기":titles[screen]}</p>
+          <h1 style={{position:"relative",fontSize:screen==="login"?40:30,fontWeight:800,margin:"0 0 4px",letterSpacing:"0.04em"}}>SSTC</h1>
+          <p style={{position:"relative",fontSize:13,margin:"0 0 10px",opacity:0.75,letterSpacing:"0.04em"}}>{wink?"Sorry, not sorry":"Serve & Smash Tennis Club"}</p>
+          <p style={{position:"relative",fontSize:14,margin:0,opacity:0.85}}>{loading?"불러오는 중":pending?"승인 대기":titles[screen]}</p>
         </div>
-        <div style={{padding:"0 16px 48px",marginTop:-48,position:"relative"}}>
-          <div style={{background:"#fff",borderRadius:28,boxShadow:"0 12px 40px rgba(40,70,180,0.12)",padding:"28px 22px"}}>
+        <div style={{padding:"0 0 48px",marginTop:-26,position:"relative"}}>
+          <div style={{background:"#fff",borderRadius:"26px 26px 0 0",padding:"28px 20px"}}>
             {loading&&<p style={{margin:0,textAlign:"center",color:"#6B7493",fontSize:14}}>잠시만요…</p>}
             {!loading&&pending&&<PendingScreen profile={account.profile} onRefresh={()=>loadAccount(account.user)} onLogout={logout}/>}
             {!loading&&!pending&&screen==="login"&&<LoginScreen notice={loginNote} onSignup={()=>setScreen("signup")} onForgot={()=>setScreen("forgot")} onLogin={()=>setScreen("main")}/>}
@@ -4799,19 +4818,19 @@ export default function App() {
     setForm2({initial:null,kind}); };
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
-    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#F3F5FB",display:"flex",flexDirection:"column",fontFamily:FONT}}>
+    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style><UpdateBanner/>
-      {/* 파란 헤더 */}
-      <div style={{background:GRAD,color:"#fff",borderRadius:"0 0 32px 32px",padding:`18px 20px ${isHome?56:26}px`,position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",border:"1.5px solid rgba(255,255,255,0.15)",top:-80,right:-60}}/>
+      {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
+      <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?50:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
+        <CourtLines/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
-            ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",borderRadius:999,gap:2,fontSize:13,fontWeight:600}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
-            :<span style={{fontSize:14,fontWeight:600,opacity:0.9,display:"inline-flex",alignItems:"center",gap:6}}><Icon name="ball" size={16} stroke={2}/>SSTC</span>}
+            ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
+            :<span style={{fontSize:19,fontWeight:800,letterSpacing:"0.02em",display:"inline-flex",alignItems:"center",gap:8}}><BallMark size={22}/>SSTC</span>}
           <div style={{display:"flex",gap:8}}>
             <button type="button" onClick={()=>{setNoti(club.items);club.markSeen();}} style={{...iconBtn,position:"relative"}} title="알림" aria-label={`알림${club.unread?` ${club.unread}개 안 읽음`:""}`}>
               <Icon name="bell" size={19}/>
-              {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:999,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #3B63F3"}}>{club.unread>9?"9+":club.unread}</span>}
+              {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #2152E6"}}>{club.unread>9?"9+":club.unread}</span>}
             </button>
             <div style={{position:"relative"}}>
               <button type="button" onClick={()=>setMenu(v=>!v)} style={iconBtn} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}><Icon name="user" size={19}/></button>
@@ -4820,39 +4839,31 @@ export default function App() {
         </div>
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
-            <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}>안녕하세요</p>
-            <p style={{margin:0,fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
-              style={{marginLeft:8,padding:"4px 10px 4px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,0.45)",background:adminOn?"rgba(255,255,255,0.22)":"transparent",color:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,verticalAlign:"middle",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}>
+            <p style={{margin:"0 0 2px",fontSize:14,opacity:0.75}}>안녕하세요</p>
+            <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
+              style={{padding:"5px 10px 5px 9px",borderRadius:10,border:"none",background:adminOn?BALL:"rgba(255,255,255,0.14)",color:adminOn?INK:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:0}}>
               <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
+            <div style={{display:"flex",gap:22,marginTop:16}}>
+              {[{label:"NTRP",value:(account&&account.profile&&account.profile.ntrp)||MEMBER_NTRP[ME]||"-"},
+                {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"-"},{label:"올해(누적)",value:`${yearCount}회 (${myCount.length})`}].map(x=>(
+                <div key={x.label}><p style={{margin:0,fontSize:12,opacity:0.65}}>{x.label}</p><p style={{margin:"2px 0 0",fontSize:18,fontWeight:700,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{x.value}</p></div>
+              ))}
+            </div>
           </div>
         ):(
           curMeeting?(
-            <div style={{position:"relative",marginTop:18}}>
-              <p style={{margin:"0 0 2px",fontSize:13,opacity:0.85}}><Ic n="pin" s={13}/> {curMeeting.place}</p>
-              <p style={{margin:0,fontSize:24,fontWeight:700,letterSpacing:"-0.01em"}}>{curMeeting.date}</p>
+            <div style={{position:"relative",marginTop:16}}>
+              <p style={{margin:0,fontSize:28,fontWeight:900,letterSpacing:"-0.035em"}}>{curMeeting.date}</p>
+              <p style={{margin:"4px 0 0",fontSize:15,opacity:0.8,display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={15}/>{curMeeting.place}</p>
             </div>
-          ):<p style={{position:"relative",margin:"18px 0 0",fontSize:26,fontWeight:700,letterSpacing:"-0.01em"}}>{tabTitles[tab]}</p>
+          ):<p style={{position:"relative",margin:"18px 0 0",fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}</p>
         )}
       </div>
-      {/* 홈: 헤더에 걸친 내 정보 카드 */}
-      {isHome&&(
-        <div style={{margin:"-38px 16px 0",position:"relative",zIndex:2}}>
-          <Card style={{padding:"16px 8px",display:"flex"}}>
-            {[{label:"NTRP",value:(account&&account.profile&&account.profile.ntrp)||MEMBER_NTRP[ME]||"-"},
-              {label:"구력",value:account&&account.profile?(calcCareer(account.profile.tennisStart)||"-"):"-"},{label:"올해(누적)",value:`${yearCount}회 (${myCount.length}회)`}].map((s,i)=>(
-              <div key={s.label} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",borderLeft:i>0?"1px solid #EEF1FA":"none"}}>
-                <p style={{margin:"0 0 4px",fontSize:11,color:"#A3AAC2",letterSpacing:"0.04em"}}>{s.label}</p>
-                <p style={{margin:0,fontSize:15,fontWeight:700,color:BLUE}}>{s.value}</p>
-              </div>
-            ))}
-          </Card>
-        </div>
-      )}
-      <div style={{flex:1,padding:"16px 16px 96px"}}>
+      <div style={{flex:1,padding:"20px 16px 110px",marginTop:-26,borderRadius:"26px 26px 0 0",background:PAGE_BG,position:"relative",zIndex:2}}>
         {FB&&account&&account.profile&&!account.profile.realName&&(
           <Card style={{marginBottom:12,display:"flex",alignItems:"center",gap:10,background:"#FFF8EC",border:"1px solid #FDE2B8"}}>
             <span style={{flex:1,fontSize:13,color:"#8A5A12",lineHeight:1.5}}>본명이 아직 없어요. 회원 확인을 위해 본명을 넣어 주세요.</span>
-            <button type="button" onClick={()=>setMyInfo("edit")} style={{padding:"8px 14px",background:GRAD,color:"#fff",border:"none",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>입력하기</button>
+            <button type="button" onClick={()=>setMyInfo("edit")} style={{padding:"8px 14px",background:GRAD,color:"#fff",border:"none",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>입력하기</button>
           </Card>
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
@@ -4868,7 +4879,7 @@ export default function App() {
       {/* 새 모임 버튼 (+ 새 모임): 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
       {tab==="booking"&&!curMeeting&&bookView!=="map"&&(
         <button type="button" onClick={openCreate} title="새 모임 만들기"
-          style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",height:52,padding:"0 20px 0 16px",borderRadius:999,border:"none",background:GRAD,color:"#fff",boxShadow:"0 8px 20px rgba(40,70,180,0.35)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:700,fontFamily:FONT,whiteSpace:"nowrap"}}>
+          style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",height:52,padding:"0 20px 0 16px",borderRadius:16,border:"none",background:BALL,color:INK,boxShadow:"0 8px 20px rgba(11,30,91,0.25)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:700,fontFamily:FONT,whiteSpace:"nowrap"}}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           새 모임
         </button>
@@ -4876,7 +4887,7 @@ export default function App() {
       {menu&&<>
                 <div onClick={()=>setMenu(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
                 <div role="menu" style={{position:"fixed",right:"max(20px, calc(50% - 200px))",top:62,zIndex:41,background:"#fff",borderRadius:18,boxShadow:"0 12px 32px rgba(20,40,120,0.22)",padding:6,minWidth:150}}>
-                  {[["내 정보 보기",()=>{setMenu(false);setMyInfo(true);},"#1B2559"],["로그아웃",()=>{setMenu(false);logout();},"#ef4444"]].map(([l,f,c])=>(
+                  {[["내 정보 보기",()=>{setMenu(false);setMyInfo(true);},INK],["로그아웃",()=>{setMenu(false);logout();},"#ef4444"]].map(([l,f,c])=>(
                     <button key={l} type="button" role="menuitem" onClick={f} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",background:"none",border:"none",borderRadius:12,fontSize:14,fontWeight:600,color:c,cursor:"pointer",fontFamily:FONT}}>{l}</button>
                   ))}
                 </div>
@@ -4892,16 +4903,15 @@ export default function App() {
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
       {mForm&&<MeetingForm initial={mForm.initial} defaultKind={mForm.kind} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
-      {/* 파란 하단 탭바 */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:GRAD,borderRadius:"24px 24px 0 0",boxShadow:"0 -6px 24px rgba(40,70,180,0.18)",display:"flex",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      {/* 남색 하단 탭바: 지금 탭은 공 색 알약 */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:INK,display:"flex",padding:"0 6px",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
-          <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"12px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
+          <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
             <span style={{position:"relative",display:"inline-flex"}}>
-              <span style={{display:"inline-flex",opacity:on?1:0.6}}><Icon name={t.icon} size={22} stroke={on?2.2:1.8}/></span>
-              {nb>0&&<span aria-label={`새 항목 ${nb}개`} style={{position:"absolute",top:-7,left:14,minWidth:20,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:999,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"14px",textAlign:"center",border:"2px solid #3B63F3",whiteSpace:"nowrap"}}>+{nb>99?99:nb}</span>}
+              <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:48,height:32,borderRadius:16,background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.55)"}}><Icon name={t.icon} size={21} stroke={on?2.2:1.8}/></span>
+              {nb>0&&<span aria-label={`새 항목 ${nb}개`} style={{position:"absolute",top:-5,left:30,minWidth:20,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"14px",textAlign:"center",border:`2px solid ${INK}`,whiteSpace:"nowrap"}}>+{nb>99?99:nb}</span>}
             </span>
-            <span style={{fontSize:11,fontWeight:on?700:500,opacity:on?1:0.6}}>{t.label}</span>
-            <div style={{width:18,height:3,background:on?"#fff":"transparent",borderRadius:10}}/>
+            <span style={{fontSize:11,fontWeight:on?700:500,color:on?"#fff":"rgba(255,255,255,0.55)"}}>{t.label}</span>
           </button>
         );})}
       </div>
