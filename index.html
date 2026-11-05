@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=2561823543">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=2561823543">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=43b7bfd5d5">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=43b7bfd5d5">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2585,7 +2585,7 @@ function AdStats({
       const x = adSum(stats, days);
       return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`;
     });
-    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g, ".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 절반 이상 보였을 때, 클릭은 눌러서 링크를 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`, "SSTC 광고 결과", "광고 결과");
+    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g, ".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크를 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`, "SSTC 광고 결과", "광고 결과");
   };
   const box = (name, val, c) => /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2688,7 +2688,7 @@ function AdStats({
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uAE30\uC900: \uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uAD11\uACE0\uAC00 \uD654\uBA74\uC5D0 \uC808\uBC18 \uC774\uC0C1 \uBCF4\uC600\uC744 \uB54C, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB97C \uC5F4\uC5C8\uC744 \uB54C \uC138\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 1\uBC88\uC73C\uB85C \uC138\uC694(\uD55C\uAD6D \uB0A0\uC9DC \uAE30\uC900).")));
+  }, "\uAE30\uC900: \uB178\uCD9C\uC740 \uD648\uC5D0\uC11C \uC774 \uAD11\uACE0\uAC00 \uD654\uBA74\uC5D0 \uB2E4 \uBCF4\uC600\uC744 \uB54C, \uD074\uB9AD\uC740 \uB20C\uB7EC\uC11C \uB9C1\uD06C\uB97C \uC5F4\uC5C8\uC744 \uB54C \uC138\uC694. \uAC19\uC740 \uD68C\uC6D0\uC774 \uAC19\uC740 \uB0A0 \uC5EC\uB7EC \uBC88 \uBCF4\uAC70\uB098 \uB20C\uB7EC\uB3C4 1\uBC88\uC73C\uB85C \uC138\uC694(\uD55C\uAD6D \uB0A0\uC9DC \uAE30\uC900).")));
 }
 function AdCarousel({
   ads
@@ -2701,7 +2701,7 @@ function AdCarousel({
     if (i >= n) setI(0);
   }, [n]);
   const shownId = n ? ads[Math.min(i, n - 1)].id : "";
-  // 노출: 배너가 화면에 절반 이상 보이는 동안 지금 나와 있는 광고를 세요 (스크롤로 가려져 있거나 앱이 뒤에 있으면 안 셈)
+  // 노출: 배너가 화면에 다 보이는 동안(가장자리 반올림 오차로 95% 이상) 지금 나와 있는 광고를 세요 (스크롤로 가려져 있거나 앱이 뒤에 있으면 안 셈)
   const wrap = useRef(null);
   const [seen, setSeen] = useState(false);
   useEffect(() => {
@@ -2711,8 +2711,8 @@ function AdCarousel({
       setSeen(true);
       return;
     }
-    const io = new IntersectionObserver(es => setSeen(es[0].isIntersecting && es[0].intersectionRatio >= 0.5), {
-      threshold: [0, 0.5, 1]
+    const io = new IntersectionObserver(es => setSeen(es[0].isIntersecting && es[0].intersectionRatio >= 0.95), {
+      threshold: [0, 0.5, 0.95, 1]
     });
     io.observe(el);
     return () => io.disconnect();
@@ -14053,7 +14053,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "2561823543";
+const BUILD_ID = "43b7bfd5d5";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
