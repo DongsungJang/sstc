@@ -825,7 +825,7 @@ function AdStats({ad,label}){
   const rg=AD_RANGES.find(x=>x[0]===range), sum=adSum(stats,rg[2]);
   const copy=()=>{
     const lines=AD_RANGES.map(([,name,days])=>{ const x=adSum(stats,days); return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`; });
-    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n같은 회원이 같은 날 여러 번 보거나 눌러도 한 번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
+    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 절반 이상 보였을 때, 클릭은 눌러서 링크를 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
   };
   const box=(name,val,c)=>(
     <div style={{flex:1,background:"#fff",borderRadius:14,padding:"10px 6px",textAlign:"center"}}>
@@ -845,7 +845,7 @@ function AdStats({ad,label}){
       {stats===null?<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>숫자를 보려면 README의 새 파이어베이스 규칙(adStats)을 콘솔에 붙여넣어 주세요.</p>
       :stats===undefined?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>불러오는 중…</p>:<>
         <div style={{display:"flex",gap:6}}>{box("노출",sum.v)}{box("클릭",sum.c,BLUE)}{box("클릭률",sum.rate+"%")}</div>
-        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>노출은 홈에서 이 광고가 화면에 나온 것, 클릭은 눌러서 링크를 연 거예요. 같은 회원이 같은 날 여러 번 보거나 눌러도 한 번으로 세요.</p>
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 광고가 화면에 절반 이상 보였을 때, 클릭은 눌러서 링크를 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
       </>}
     </div>);
 }
@@ -856,7 +856,18 @@ function AdCarousel({ads}){
   const n=ads.length;
   useEffect(()=>{ if(i>=n) setI(0); },[n]);
   const shownId=n?ads[Math.min(i,n-1)].id:"";
-  useEffect(()=>{ if(shownId&&!document.hidden) adTrack(shownId,"views"); },[shownId]);   // 지금 화면에 나온 광고를 노출로 세요
+  // 노출: 배너가 화면에 절반 이상 보이는 동안 지금 나와 있는 광고를 세요 (스크롤로 가려져 있거나 앱이 뒤에 있으면 안 셈)
+  const wrap=useRef(null);
+  const [seen,setSeen]=useState(false);
+  useEffect(()=>{
+    const el=wrap.current; if(!el) return;
+    if(typeof IntersectionObserver==="undefined"){ setSeen(true); return; }
+    const io=new IntersectionObserver(es=>setSeen(es[0].isIntersecting&&es[0].intersectionRatio>=0.5),{threshold:[0,0.5,1]});
+    io.observe(el); return ()=>io.disconnect();
+  },[n>0]);
+  const [front,setFront]=useState(()=>typeof document==="undefined"||!document.hidden);
+  useEffect(()=>{ const f=()=>setFront(!document.hidden); document.addEventListener("visibilitychange",f); return ()=>document.removeEventListener("visibilitychange",f); },[]);
+  useEffect(()=>{ if(shownId&&seen&&front) adTrack(shownId,"views"); },[shownId,seen,front]);
   useEffect(()=>{
     if(n<2) return;
     const t=setInterval(()=>{
@@ -867,12 +878,12 @@ function AdCarousel({ads}){
     return ()=>clearInterval(t);
   },[n]);
   if(!n) return null;
-  if(n===1) return <AdBanner ad={ads[0]} onOpen={()=>adTrack(ads[0].id,"clicks")}/>;
+  if(n===1) return <div ref={wrap}><AdBanner ad={ads[0]} onOpen={()=>adTrack(ads[0].id,"clicks")}/></div>;
   const onScroll=e=>{ const el=e.currentTarget; const k=Math.round(el.scrollLeft/Math.max(1,el.clientWidth)); if(k!==i) setI(Math.max(0,Math.min(n-1,k))); };
   const touch=()=>{ hold.current=Date.now(); };
   const go=k=>{ touch(); const el=ref.current; if(el) el.scrollTo({left:k*el.clientWidth,behavior:"smooth"}); };
   return (
-    <div>
+    <div ref={wrap}>
       <div ref={ref} className="sstc-adrow" onScroll={onScroll} onTouchStart={touch} onPointerDown={touch} onWheel={touch}
         style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory",scrollbarWidth:"none",borderRadius:20,overscrollBehaviorX:"contain"}}>
         {ads.map(a=><div key={a.id} style={{flex:"0 0 100%",scrollSnapAlign:"start",scrollSnapStop:"always"}}><AdBanner ad={a} onOpen={()=>adTrack(a.id,"clicks")}/></div>)}
