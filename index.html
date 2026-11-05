@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f8306a7828">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f8306a7828">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=558c8d855b">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=558c8d855b">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -6644,6 +6644,7 @@ function useMentions() {
 }
 const clip = (t, n = 40) => t.length > n ? t.slice(0, n) + "…" : t;
 // allowAnon: 익명으로 쓰기 선택 (소곤소곤), nameOf(c): 화면에 보일 이름 (익명 번호 등)
+// anonNotify: 알림에 쓴 사람·댓글 내용을 아예 안 남겨요 (소곤소곤: 실명으로 썼다 지우고 익명으로 다시 써도 누군지 모르게)
 function CommentBox({
   comments,
   save,
@@ -6654,6 +6655,7 @@ function CommentBox({
   onAdded,
   title = "댓글",
   allowAnon = false,
+  anonNotify = false,
   nameOf
 }) {
   const {
@@ -6668,7 +6670,12 @@ function CommentBox({
   const uid = myUid() || myVoteKey();
   const all = toList(comments).filter(c => c && c.text).sort((a, b) => a.at - b.at);
   const shown = c => nameOf ? nameOf(c) : c.name;
-  const notify = (t, prev, an) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => postFeed({
+  const notify = (t, prev, an) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => anonNotify ? postFeed({
+    type: "mention",
+    to: u,
+    ...link,
+    text: `${where}에서 누군가 회원님을 불렀어요`
+  }, true) : postFeed({
     type: "mention",
     to: u,
     ...link,
@@ -12270,19 +12277,20 @@ function FreeBoard({
       isAdmin: isAdmin,
       canWrite: canWrite,
       allowAnon: true,
+      anonNotify: true,
       nameOf: anonNamer(open),
       save: (cid, v) => saveBoardPath(`${open.id}/comments/${cid}`, v),
       where: `${BOARD_NAME} "${clip(open.text, 15)}" 글 댓글`,
       link: {
         postId: open.id
       },
-      onAdded: (t, ment, an) => {
+      onAdded: (t, ment) => {
         if (open.uid && open.uid !== uid && !(ment && ment[open.uid])) postFeed({
           type: "boardComment",
           to: open.uid,
           postId: open.id,
-          text: `${an ? "익명" : ME} 님이 내 글에 댓글을 달았어요: "${clip(t)}"`
-        }, an);
+          text: `내 글 "${clip(open.text, 15)}"에 새 댓글이 달렸어요`
+        }, true);
       }
     }));
   } else {
@@ -12771,7 +12779,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "f8306a7828";
+const BUILD_ID = "558c8d855b";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
