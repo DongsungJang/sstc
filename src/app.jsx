@@ -774,7 +774,7 @@ function useAds(on){
   useEffect(()=>{ const t=setInterval(()=>setDay(adToday()),60000); return ()=>clearInterval(t); },[]);
   return ads.filter(a=>a.enabled&&a.title&&adPhase(a,day)==="live");
 }
-function AdBanner({ad}){
+function AdBanner({ad,onOpen}){
   if(!ad||!ad.title) return null;
   const url=adUrl(ad.url), th=adTheme(ad.bg);
   const body=(
@@ -793,15 +793,81 @@ function AdBanner({ad}){
     </div>);
   const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
   const tag=<span style={{position:"absolute",top:8,right:10,fontSize:10,fontWeight:700,color:"#9A8371",background:"rgba(255,255,255,0.8)",border:"1px solid #E6D9CA",padding:"1px 7px",borderRadius:999}}>광고</span>;
-  return url?<a href={url} target="_blank" rel="noopener noreferrer" draggable={false} aria-label={`광고: ${ad.title}`} style={box}>{body}{tag}</a>:<div style={box}>{body}{tag}</div>;
+  return url?<a href={url} target="_blank" rel="noopener noreferrer" draggable={false} onClick={onOpen} aria-label={`광고: ${ad.title}`} style={box}>{body}{tag}</a>:<div style={box}>{body}{tag}</div>;
 }
 // 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
+// 광고 노출·클릭 세기: club/adStats/<광고id>/<YYYY-MM-DD>/{views,clicks}/<uid> = true
+// 같은 회원이 같은 날 여러 번 봐도·눌러도 한 번으로 세요 (날짜는 한국 시간). 이미 센 건 이 기기에 적어 둬서 다시 안 써요
+const AD_TRACKED=(()=>{ try{ return new Set(JSON.parse(localStorage.getItem("sstc-ad-tracked")||"[]")); }catch(e){ return new Set(); } })();
+function adTrack(id,kind){
+  const uid=myUid(); if(!FB||!uid||!id) return;
+  const day=adToday(), key=`${day}|${id}|${kind}|${uid}`;
+  if(AD_TRACKED.has(key)) return;
+  AD_TRACKED.add(key);
+  try{ localStorage.setItem("sstc-ad-tracked",JSON.stringify([...AD_TRACKED].filter(k=>k.slice(0,10)===day))); }catch(e){}
+  FB.club.child(`adStats/${id}/${day}/${kind}/${uid}`).set(true).catch(()=>AD_TRACKED.delete(key));
+}
+// 관리 탭: 광고 하나의 노출·클릭 (오늘 / 최근 7일 / 30일 / 전체)
+const AD_RANGES=[["today","오늘",1],["7","최근 7일",7],["30","최근 30일",30],["all","전체",0]];
+function adSum(stats,days){
+  const today=adToday(), from=days?new Date(Date.parse(today+"T00:00:00Z")-(days-1)*86400000).toISOString().slice(0,10):"";
+  let v=0,c=0; Object.keys(stats||{}).forEach(d=>{ if(from&&d<from) return; const x=stats[d]||{}; v+=Object.keys(x.views||{}).length; c+=Object.keys(x.clicks||{}).length; });
+  return {v,c,rate:v?Math.round(c/v*1000)/10:0};
+}
+function AdStats({ad,label}){
+  const [stats,setStats]=useState(undefined);
+  const [range,setRange]=useState("7");
+  useEffect(()=>{
+    setStats(undefined);
+    const r=FB.club.child("adStats/"+ad.id), h=s=>setStats(s.val()||{});
+    r.on("value",h,()=>setStats(null)); return ()=>r.off("value",h);
+  },[ad.id]);
+  const rg=AD_RANGES.find(x=>x[0]===range), sum=adSum(stats,rg[2]);
+  const copy=()=>{
+    const lines=AD_RANGES.map(([,name,days])=>{ const x=adSum(stats,days); return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`; });
+    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 절반 이상 보였을 때, 클릭은 눌러서 링크를 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
+  };
+  const box=(name,val,c)=>(
+    <div style={{flex:1,background:"#fff",borderRadius:14,padding:"10px 6px",textAlign:"center"}}>
+      <p style={{margin:"0 0 2px",fontSize:11,color:"#6B7493"}}>{name}</p>
+      <p style={{margin:0,fontSize:18,fontWeight:700,color:c||"#1B2559"}}>{val}</p>
+    </div>);
+  return (
+    <div style={{background:"#F5F7FE",borderRadius:16,padding:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:13,fontWeight:700,color:"#1B2559"}}>{label} 반응</span>
+        {stats&&<button type="button" onClick={copy} style={{background:"none",border:"none",fontSize:12,color:BLUE,fontWeight:600,cursor:"pointer",padding:0,fontFamily:FONT}}>결과 복사</button>}
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+        {AD_RANGES.map(([k,name])=><button key={k} type="button" onClick={()=>setRange(k)} style={{padding:"4px 10px",borderRadius:999,fontSize:12,cursor:"pointer",fontFamily:FONT,
+          border:`1px solid ${range===k?BLUE:"#D6DEF7"}`,background:range===k?BLUE:"#fff",color:range===k?"#fff":"#4A5578",fontWeight:range===k?700:500}}>{name}</button>)}
+      </div>
+      {stats===null?<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>숫자를 보려면 README의 새 파이어베이스 규칙(adStats)을 콘솔에 붙여넣어 주세요.</p>
+      :stats===undefined?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>불러오는 중…</p>:<>
+        <div style={{display:"flex",gap:6}}>{box("노출",sum.v)}{box("클릭",sum.c,BLUE)}{box("클릭률",sum.rate+"%")}</div>
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 광고가 화면에 절반 이상 보였을 때, 클릭은 눌러서 링크를 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
+      </>}
+    </div>);
+}
 function AdCarousel({ads}){
   const ref=useRef(null);
   const [i,setI]=useState(0);
   const hold=useRef(0);   // 손으로 만진 시각: 그 뒤 5초는 자동으로 안 넘김
   const n=ads.length;
   useEffect(()=>{ if(i>=n) setI(0); },[n]);
+  const shownId=n?ads[Math.min(i,n-1)].id:"";
+  // 노출: 배너가 화면에 절반 이상 보이는 동안 지금 나와 있는 광고를 세요 (스크롤로 가려져 있거나 앱이 뒤에 있으면 안 셈)
+  const wrap=useRef(null);
+  const [seen,setSeen]=useState(false);
+  useEffect(()=>{
+    const el=wrap.current; if(!el) return;
+    if(typeof IntersectionObserver==="undefined"){ setSeen(true); return; }
+    const io=new IntersectionObserver(es=>setSeen(es[0].isIntersecting&&es[0].intersectionRatio>=0.5),{threshold:[0,0.5,1]});
+    io.observe(el); return ()=>io.disconnect();
+  },[n>0]);
+  const [front,setFront]=useState(()=>typeof document==="undefined"||!document.hidden);
+  useEffect(()=>{ const f=()=>setFront(!document.hidden); document.addEventListener("visibilitychange",f); return ()=>document.removeEventListener("visibilitychange",f); },[]);
+  useEffect(()=>{ if(shownId&&seen&&front) adTrack(shownId,"views"); },[shownId,seen,front]);
   useEffect(()=>{
     if(n<2) return;
     const t=setInterval(()=>{
@@ -812,15 +878,15 @@ function AdCarousel({ads}){
     return ()=>clearInterval(t);
   },[n]);
   if(!n) return null;
-  if(n===1) return <AdBanner ad={ads[0]}/>;
+  if(n===1) return <div ref={wrap}><AdBanner ad={ads[0]} onOpen={()=>adTrack(ads[0].id,"clicks")}/></div>;
   const onScroll=e=>{ const el=e.currentTarget; const k=Math.round(el.scrollLeft/Math.max(1,el.clientWidth)); if(k!==i) setI(Math.max(0,Math.min(n-1,k))); };
   const touch=()=>{ hold.current=Date.now(); };
   const go=k=>{ touch(); const el=ref.current; if(el) el.scrollTo({left:k*el.clientWidth,behavior:"smooth"}); };
   return (
-    <div>
+    <div ref={wrap}>
       <div ref={ref} className="sstc-adrow" onScroll={onScroll} onTouchStart={touch} onPointerDown={touch} onWheel={touch}
         style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory",scrollbarWidth:"none",borderRadius:20,overscrollBehaviorX:"contain"}}>
-        {ads.map(a=><div key={a.id} style={{flex:"0 0 100%",scrollSnapAlign:"start",scrollSnapStop:"always"}}><AdBanner ad={a}/></div>)}
+        {ads.map(a=><div key={a.id} style={{flex:"0 0 100%",scrollSnapAlign:"start",scrollSnapStop:"always"}}><AdBanner ad={a} onOpen={()=>adTrack(a.id,"clicks")}/></div>)}
       </div>
       <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:8}}>
         {ads.map((a,k)=><button key={a.id} type="button" aria-label={`광고 ${k+1}번 보기`} onClick={()=>go(k)}
@@ -871,7 +937,7 @@ function AdSettings(){
   const remove=()=>{
     if(cur==="new"){ pick(list[0]?list[0].id:"new"); return; }
     if(!window.confirm(`광고${list.findIndex(a=>a.id===cur)+1} "${(saved&&saved.title)||""}"을(를) 지울까요?`)) return;
-    setBusy(true); FB.club.child("ads/"+cur).remove().then(()=>setMsg("지웠어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+    setBusy(true); FB.club.child("ads/"+cur).remove().then(()=>FB.club.child("adStats/"+cur).remove().catch(()=>{})).then(()=>setMsg("지웠어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
   };
   const status=a=>!a.enabled?["꺼짐","#F1F2F5","#6B7280"]:({live:["노출 중","#E5F7EE","#067647"],before:["시작 전","#FFF4E5","#C2610C"],after:["기간 끝남","#F1F2F5","#6B7280"]})[adPhase(a)];
   const showing=list.filter(a=>a.enabled&&a.title&&adPhase(a)==="live").length;
@@ -896,6 +962,7 @@ function AdSettings(){
       {ads!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
           <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{adPeriod(saved)}</p>; })()}
+        {saved&&<AdStats ad={saved} label={`광고${list.findIndex(a=>a.id===cur)+1}`}/>}
         <FieldWrap label="로고 사진 (선택)">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:54,height:54,borderRadius:16,background:"#fff",border:f.logoImg?"none":"1.5px dashed #D6DEF7",boxShadow:f.logoImg?"0 0 0 1px rgba(0,0,0,0.06)":"none",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxSizing:"border-box",flexShrink:0}}>
