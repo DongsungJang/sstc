@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=558c8d855b">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=558c8d855b">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=7aa990f649">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=7aa990f649">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2218,6 +2218,10 @@ function HomeTab({
   // 홈에서 바로 참석·불참 투표
   const myVote = next && next.rec && next.rec.votes && next.rec.votes[myVoteKey()];
   const myStatus = myVote && myVote.status;
+  const myGoing = next && myStatus === "attend" ? going.find(g => g.m.id === next.id) || {
+    ok: true,
+    label: "참석 확정"
+  } : null;
   const vote = status => saveMeetingPath("m" + next.id + "/votes/" + myVoteKey(), voteValue(status, myVote)).then(() => {
     if (status === "attend") notifyAttend(next, myStatus);
   }).catch(e => alert(authMsg(e)));
@@ -2352,41 +2356,31 @@ function HomeTab({
       background: isFull(next) ? FULL.bar : GRAD,
       borderRadius: 10
     }
-  }))), isOpen(next) ? /*#__PURE__*/React.createElement("div", {
+  }))), isOpen(next) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AttendButtons, {
+    status: myStatus,
+    onVote: vote
+  }), myGoing ? /*#__PURE__*/React.createElement("p", {
     style: {
-      display: "flex",
-      gap: 8
+      margin: "8px 0 0",
+      fontSize: 12,
+      textAlign: "center",
+      color: myGoing.ok ? BLUE : "#C2610C"
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => vote("attend"),
+  }, myGoing.label, "\uC774\uC5D0\uC694") : myStatus === "absent" ? /*#__PURE__*/React.createElement("p", {
     style: {
-      flex: 1,
-      padding: "9px 0",
-      background: myStatus === "attend" ? GRAD : "#fff",
-      color: myStatus === "attend" ? "#fff" : BLUE,
-      border: myStatus === "attend" ? "none" : `1.5px solid ${BLUE}`,
-      borderRadius: 999,
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-      boxShadow: myStatus === "attend" ? SHADOW_BTN : "none"
+      margin: "8px 0 0",
+      fontSize: 12,
+      textAlign: "center",
+      color: "#6B7493"
     }
-  }, myStatus === "attend" ? "참석 투표함 ✓" : "참석하기 ✓"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => vote("absent"),
+  }, "\uBD88\uCC38\uC73C\uB85C \uD45C\uC2DC\uD588\uC5B4\uC694") : /*#__PURE__*/React.createElement("p", {
     style: {
-      flex: 1,
-      padding: "8px 0",
-      background: myStatus === "absent" ? "#fef2f2" : "#fff",
-      color: myStatus === "absent" ? "#ef4444" : "#6B7493",
-      border: `1.5px solid ${myStatus === "absent" ? "#ef4444" : "#D6DEF7"}`,
-      borderRadius: 999,
-      fontSize: 13,
-      fontWeight: myStatus === "absent" ? 600 : 400,
-      cursor: "pointer"
+      margin: "8px 0 0",
+      fontSize: 12,
+      textAlign: "center",
+      color: "#A3AAC2"
     }
-  }, "\uBD88\uCC38")) : /*#__PURE__*/React.createElement("p", {
+  }, "\uC544\uC9C1 \uCC38\uC11D \uC5EC\uBD80\uB97C \uC815\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694")) : /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 12,
@@ -3495,6 +3489,62 @@ const dbReady = typeof window === "undefined" ? Promise.resolve(null) : Promise.
     return null;
   }
 });
+// 참석·불참 버튼 (홈·모임 상세 공용). 고른 쪽만 꽉 찬 색 + 체크, 안 고른 쪽은 테두리만.
+// 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
+function AttendButtons({
+  status,
+  onVote
+}) {
+  const going = status === "attend",
+    out = status === "absent";
+  const base = {
+    flex: 1,
+    padding: "9px 0",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-pressed": going,
+    onClick: () => onVote("attend"),
+    style: {
+      ...base,
+      background: going ? GRAD : "#fff",
+      color: going ? "#fff" : BLUE,
+      border: going ? "1.5px solid transparent" : `1.5px solid ${BLUE}`,
+      boxShadow: going ? SHADOW_BTN : "none"
+    }
+  }, going ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "check",
+    s: 15,
+    w: 2.6
+  }), "\uCC38\uC11D \uC911") : "참석하기"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-pressed": out,
+    onClick: () => onVote("absent"),
+    style: {
+      ...base,
+      background: out ? "#EF4444" : "#fff",
+      color: out ? "#fff" : "#6B7493",
+      border: `1.5px solid ${out ? "#EF4444" : "#D6DEF7"}`
+    }
+  }, out ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "check",
+    s: 15,
+    w: 2.6
+  }), "\uBD88\uCC38") : "불참"));
+}
 // club/meetings/<path>에 값 쓰기 (null이면 지움)
 const saveMeetingPath = (path, value) => dbReady.then(db => {
   if (!db) throw new Error("저장소가 없어요");
@@ -7292,7 +7342,7 @@ function MeetingDetail({
   const rowRemove = v => v.isGuest ? kickGuest(v) : kick(v);
   const myConfirmIdx = confirmed.findIndex(v => v.isMe),
     myWaitIdx = waitlist.findIndex(v => v.isMe);
-  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `참석 확정 · ${myConfirmIdx + 1}번째` : `대기 ${myWaitIdx + 1}번째 (대기 ${waitlist.length}명 중)${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "불참으로 등록되었어요" : myStatus === "maybe" ? "미정으로 등록되었어요" : "";
+  const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `참석 확정 · ${myConfirmIdx + 1}번째` : `대기 ${myWaitIdx + 1}번째 (대기 ${waitlist.length}명 중)${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "불참으로 등록되었어요" : myStatus === "maybe" ? "미정으로 등록되었어요" : "아직 참석 여부를 정하지 않았어요";
   // 대진표 참가자 = 참석 확정자
   const participants = confirmed.map(v => ({
     name: v.name,
@@ -7309,28 +7359,6 @@ function MeetingDetail({
     ...voteValue("attend", mine),
     [k]: v || null
   });
-  const C = {
-    attend: {
-      border: BLUE,
-      bg: BLUE,
-      color: "#fff"
-    },
-    maybe: {
-      border: "#f59e0b",
-      bg: "#fffbeb",
-      color: "#d97706"
-    },
-    absent: {
-      border: "#ef4444",
-      bg: "#fef2f2",
-      color: "#ef4444"
-    }
-  };
-  const I = {
-    border: "#E4E9F7",
-    bg: "#fff",
-    color: "#6B7493"
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -7631,42 +7659,15 @@ function MeetingDetail({
       flexDirection: "column",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, [{
-    label: "✓ 참석",
-    val: "attend"
-  }, {
-    label: "✕ 불참",
-    val: "absent"
-  }].map(btn => {
-    const active = myStatus === btn.val;
-    const s = active ? C[btn.val] : I;
-    return /*#__PURE__*/React.createElement("button", {
-      key: btn.val,
-      type: "button",
-      onClick: () => setMyStatus(btn.val),
-      style: {
-        flex: 1,
-        padding: "9px 0",
-        borderRadius: 999,
-        fontSize: 13,
-        cursor: "pointer",
-        fontWeight: 600,
-        border: `1.5px solid ${s.border}`,
-        background: s.bg,
-        color: s.color
-      }
-    }, btn.label);
-  })), myStatus && /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(AttendButtons, {
+    status: myStatus,
+    onVote: setMyStatus
+  }), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 12,
       textAlign: "center",
-      color: myStatus === "attend" && myConfirmIdx < 0 ? "#C2610C" : "#6B7493"
+      color: !myStatus ? "#A3AAC2" : myStatus === "attend" && myConfirmIdx < 0 ? "#C2610C" : "#6B7493"
     }
   }, myMsg), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12779,7 +12780,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "558c8d855b";
+const BUILD_ID = "7aa990f649";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
