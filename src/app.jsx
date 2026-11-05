@@ -89,8 +89,16 @@ const NTRP_LEVELS = [
   { score:"선출", label:"선출",  desc:"중·고·대학교 테니스부 등 학교 선수 출신이에요." },
 ];
 
-// 회원 NTRP (투표에 같이 저장된 값으로 채움)
+// 회원 NTRP: 회원 정보(club/members)의 최신 값이 먼저, 없으면 투표에 같이 저장된 값으로 채움
 const MEMBER_NTRP = {};
+// 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
+let MEMBER_BY_UID = {};
+function setMemberInfo(members){
+  MEMBER_BY_UID={};
+  Object.entries(members||{}).forEach(([uid,m])=>{ if(m&&m.nickname){ MEMBER_BY_UID[uid]={nickname:m.nickname,ntrp:m.ntrp||""}; if(m.ntrp) MEMBER_NTRP[m.nickname]=m.ntrp; } });
+}
+// uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
+const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)||name;
 
 // ─── 모임 목록 ────────────────────────────────────────────────────────────────
 // 모임은 club/meetings/m<id>에 저장해요: info(날짜·시간·장소·정원·예약 오픈·설명), votes(<회원 키>: 참석 투표), bracket, scores.
@@ -111,9 +119,10 @@ function votesFromRec(rec){
   Object.keys((rec&&rec.votes)||{}).forEach(key=>{
     const v=rec.votes[key];
     if(!v||v.status!=="attend"||!v.at) return;
-    if(v.ntrp&&!MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name]=v.ntrp;
-    out.push({key,name:v.name,ntrp:v.ntrp||"",at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:v.by||"",byUid:v.byUid||""});
-    (v.guests||[]).forEach((g,gi)=>g&&g.name&&out.push({key,gi,name:g.name,ntrp:"",at:g.at||v.at,guestOf:v.name}));
+    const p=MEMBER_BY_UID[key], name=(p&&p.nickname)||v.name, ntrp=(p&&p.ntrp)||v.ntrp||"";
+    if(ntrp&&!MEMBER_NTRP[name]) MEMBER_NTRP[name]=ntrp;
+    out.push({key,name,ntrp,at:v.at,arrive:v.arrive||"",leave:v.leave||"",by:curNick(v.byUid,v.by||""),byUid:v.byUid||""});
+    (v.guests||[]).forEach((g,gi)=>g&&g.name&&out.push({key,gi,name:g.name,ntrp:"",at:g.at||v.at,guestOf:name}));
   });
   return out;
 }
@@ -2729,7 +2738,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
   const [anon,setAnon]=useState(false);
   const uid=myUid()||myVoteKey();
   const all=toList(comments).filter(c=>c&&c.text).sort((a,b)=>a.at-b.at);
-  const shown=c=>nameOf?nameOf(c):c.name;
+  const shown=c=>nameOf?nameOf(c):curNick(c.uid,c.name);
   const notify=(t,prev,an)=>Object.keys(mentionsOf(t)).filter(u=>u!==uid&&!(prev&&prev[u])).forEach(u=>
     anonNotify?postFeed({type:"mention",to:u,...link,text:`${where}에서 누군가 회원님을 불렀어요`},true)
       :postFeed({type:"mention",to:u,...link,text:`${an?"익명":ME} 님이 ${where}에서 회원님을 불렀어요: "${clip(t)}"`},an));
@@ -2750,7 +2759,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
         {all.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>첫 댓글을 남겨 보세요. @로 회원을 부르면 알림이 가요.</p>}
         {all.map(c=>{ const mine=c.uid===uid, editing=edit&&edit.id===c.id; return(
           <div key={c.id} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-            <span style={{width:32,height:32,borderRadius:"50%",background:c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:c.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{c.anon?"?":(c.name||"?").slice(0,1)}</span>
+            <span style={{width:32,height:32,borderRadius:"50%",background:c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:c.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{c.anon?"?":(curNick(c.uid,c.name)||"?").slice(0,1)}</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":INK}}>{shown(c)}</span>
@@ -4244,7 +4253,7 @@ function anonNamer(post){
   const nums=new Map();
   toList(post.comments).filter(c=>c&&c.text&&c.anon).sort((a,b)=>a.at-b.at).forEach(c=>{
     if(post.anon&&c.uid===post.uid) return; if(!nums.has(c.uid)) nums.set(c.uid,nums.size+1); });
-  return c=>!c.anon?c.name:(post.anon&&c.uid===post.uid)?"익명(글쓴이)":`익명${nums.get(c.uid)||""}`;
+  return c=>!c.anon?curNick(c.uid,c.name):(post.anon&&c.uid===post.uid)?"익명(글쓴이)":`익명${nums.get(c.uid)||""}`;
 }
 function FreeBoard({canWrite,isAdmin,focus}){
   useSeen();
@@ -4270,9 +4279,9 @@ function FreeBoard({canWrite,isAdmin,focus}){
   const back=<button type="button" onClick={()=>setOpenId(null)} style={{...small,fontSize:14,alignSelf:"flex-start",color:BLUE,fontWeight:600,padding:"2px 4px"}}><Ic n="chevL" s={16}/> 목록으로</button>;
   const head=p=>{ const mine=p.uid===uid; return(
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-      <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(p.name||"?").slice(0,1)}</span>
+      <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(curNick(p.uid,p.name)||"?").slice(0,1)}</span>
       <div style={{flex:1,minWidth:0}}>
-        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":INK}}>{p.anon?"익명":p.name}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
+        <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":INK}}>{p.anon?"익명":curNick(p.uid,p.name)}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
         <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
       </div>
     </div>); };
@@ -4730,6 +4739,9 @@ export default function App() {
   const inMain=screen==="main"&&(!FB||!!(account&&account.user&&(account.admin||account.approved)));
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
+  // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
+  const clubSeen=useRef(null);
+  if(clubData&&clubSeen.current!==clubData){ clubSeen.current=clubData; setMemberInfo(clubData.members); buildMeetings(RAW_MEETINGS); }
   const boardPosts=useBoard(inMain);
   // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
   const adData=useAds(inMain);
