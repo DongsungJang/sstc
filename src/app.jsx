@@ -771,9 +771,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             </div>
           ))}
           {going.length>3&&(
-            <button type="button" onClick={()=>setGoingN(goingN>=going.length?3:goingN+3)} style={{marginTop:2,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer"}}>
-              {goingN>=going.length?"접기":`더보기 (${Math.min(3,going.length-goingN)}개 더)`}
-            </button>
+            <MoreButton shown={goingN} total={going.length} onChange={setGoingN}/>
           )}
         </div>)}
       </Card>
@@ -2867,10 +2865,20 @@ function ViewToggle({view,onView}){
         <Icon name={ic} size={15} stroke={2}/>{l}</button>);})}
   </div>;
 }
+// 3개씩 더보기 / 다 펼쳤으면 접기 (홈 "내가 참석할 모임", 예약 탭 목록)
+const MORE_STEP=3;
+function MoreButton({shown,total,onChange}){
+  if(total<=MORE_STEP) return null;
+  const all=shown>=total;
+  return <button type="button" onClick={()=>onChange(all?MORE_STEP:shown+MORE_STEP)} style={{marginTop:2,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>
+    {all?"접기":`더보기 (${Math.min(MORE_STEP,total-shown)}개 더)`}
+  </button>;
+}
 function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate,view,onView}) {
   useSeen();
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"flash";}catch(e){return "flash";}});
-  const pickKind=k=>{setKind(k);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
+  const [upN,setUpN]=useState(MORE_STEP), [pastN,setPastN]=useState(MORE_STEP);
+  const pickKind=k=>{setKind(k);setUpN(MORE_STEP);setPastN(MORE_STEP);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
   const setSelId=id=>onOpen(id,"info");
   const sel=open&&MEETINGS.find(m=>m.id===open.id);
   if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} isAdmin={isAdmin} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
@@ -2898,7 +2906,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
         <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#1B2559"}}>다가오는 {label}</p>
         {upcoming.length===0&&<Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty>}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {upcoming.map(m=>{
+          {upcoming.slice(0,upN).map(m=>{
             const fill=Math.min(100,Math.round((m.attendees.length/Math.max(1,m.total))*100));
             const isAtt=m.attendees.some(a=>a.isMe), full=isFull(m), gone=m.cancelled;
             return(
@@ -2922,13 +2930,14 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
               </div>
             );
           })}
+          <MoreButton shown={upN} total={upcoming.length} onChange={setUpN}/>
         </div>
       </div>
       {past.length>0&&(
         <div>
           <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {past.map(m=>(
+            {past.slice(0,pastN).map(m=>(
               <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#F5F7FE",borderRadius:20,padding:14,border:"1px solid #E4E9F7",cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
@@ -2939,6 +2948,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
                 </div>
               </div>
             ))}
+            <MoreButton shown={pastN} total={past.length} onChange={setPastN}/>
           </div>
         </div>
       )}
