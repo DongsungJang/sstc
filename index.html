@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=74bd1f8cbc">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=74bd1f8cbc">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=6550ec5a05">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=6550ec5a05">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -4593,6 +4593,57 @@ function PendingScreen({
 // 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
 // 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
 const ADMIN_MSG = [["vote", "모임 투표 독려", m => m ? `${m.date} ${m.place} 모임 참석 투표해 주세요!` : "다가오는 모임 참석 투표해 주세요!"], ["profile", "정보 수정 요청", () => "프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["realName", "본명 입력 요청", () => "본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."], ["career", "구력 확인 요청", () => "구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."], ["custom", "직접 쓰기", () => ""]];
+// 관리 탭 회원 목록: 5명씩 끊어 보기 (이전 / 1 / 6 / 다음)
+const PAGE_SIZE = 5;
+const pageCount = total => Math.max(1, Math.ceil(total / PAGE_SIZE));
+// 승인·탈퇴로 목록이 줄어 지금 페이지가 비면 마지막 페이지를 보여 줘요
+const pageOf = (list, page) => {
+  const p = Math.min(page, pageCount(list.length) - 1);
+  return list.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE);
+};
+function Pager({
+  page,
+  total,
+  onChange,
+  label
+}) {
+  if (total <= PAGE_SIZE) return null;
+  const pages = pageCount(total),
+    p = Math.min(page, pages - 1);
+  const btn = (text, to, dis) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: dis,
+    onClick: () => onChange(to),
+    "aria-label": `${label} ${to < p ? "이전" : "다음"} 페이지`,
+    style: {
+      padding: "8px 16px",
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 600,
+      fontFamily: FONT,
+      cursor: dis ? "default" : "pointer",
+      border: "1.5px solid #D6DEF7",
+      background: "#fff",
+      color: dis ? "#C0C6D9" : BLUE,
+      opacity: dis ? 0.6 : 1
+    }
+  }, text);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      marginTop: 10
+    }
+  }, btn("‹ 이전", p - 1, p === 0), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#4A5578"
+    }
+  }, p + 1, " / ", pages), btn("다음 ›", p + 1, p >= pages - 1));
+}
 function AdminTab() {
   useSeen();
   const [members, setMembers] = useState(null);
@@ -4611,6 +4662,19 @@ function AdminTab() {
   const [nameEdit, setNameEdit] = useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen, setLastSeen] = useState({}); // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen, setSortSeen] = useState(false); // 정회원 목록 최근 접속순
+  const [pg, setPg] = useState({
+    pending: 0,
+    active: 0,
+    gone: 0
+  }); // 목록별 페이지 (5명씩)
+  const goPage = (k, n) => setPg(p => ({
+    ...p,
+    [k]: n
+  }));
+  const toggleSortSeen = () => {
+    setSortSeen(v => !v);
+    goPage("active", 0);
+  }; // 정렬 바꾸면 1페이지로
   useEffect(() => {
     const r = FB.club.child("lastSeen");
     const h = s => setLastSeen(s.val() || {});
@@ -5076,16 +5140,21 @@ function AdminTab() {
       flexDirection: "column",
       gap: 6
     }
-  }, pending.map(m => row(m, /*#__PURE__*/React.createElement(React.Fragment, null, small("탈퇴", () => withdraw(m), true), /*#__PURE__*/React.createElement("button", {
+  }, pageOf(pending, pg.pending).map(m => row(m, /*#__PURE__*/React.createElement(React.Fragment, null, small("탈퇴", () => withdraw(m), true), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => approve(m.uid),
     style: {
       ...btnSmall,
       background: GRAD
     }
-  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778")))))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778"))))), /*#__PURE__*/React.createElement(Pager, {
+    page: pg.pending,
+    total: pending.length,
+    onChange: n => goPage("pending", n),
+    label: "\uC900\uD68C\uC6D0"
+  })), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
     action: lastSeen ? sortSeen ? "가입순" : "최근 접속순" : null,
-    onAction: () => setSortSeen(v => !v)
+    onAction: toggleSortSeen
   }, "\uC815\uD68C\uC6D0 (", active.length, "\uBA85)"), !lastSeen && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "0 0 8px",
@@ -5099,7 +5168,12 @@ function AdminTab() {
       flexDirection: "column",
       gap: 6
     }
-  }, activeShown.map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement("p", {
+  }, pageOf(activeShown, pg.active).map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement(Pager, {
+    page: pg.active,
+    total: activeShown.length,
+    onChange: n => goPage("active", n),
+    label: "\uC815\uD68C\uC6D0"
+  }), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
@@ -5115,7 +5189,12 @@ function AdminTab() {
       flexDirection: "column",
       gap: 6
     }
-  }, gone.map(m => row(m, small("되돌리기 (준회원)", () => restore(m)), false))), showGone && /*#__PURE__*/React.createElement("p", {
+  }, pageOf(gone, pg.gone).map(m => row(m, small("되돌리기 (준회원)", () => restore(m)), false))), showGone && /*#__PURE__*/React.createElement(Pager, {
+    page: pg.gone,
+    total: gone.length,
+    onChange: n => goPage("gone", n),
+    label: "\uD0C8\uD1F4 \uD68C\uC6D0"
+  }), showGone && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
@@ -13428,7 +13507,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "74bd1f8cbc";
+const BUILD_ID = "6550ec5a05";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
