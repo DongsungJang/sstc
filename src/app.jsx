@@ -691,8 +691,21 @@ function Empty({children,action,onAction}) {
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
 // club/ads/a<만든 시각> = {enabled, logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
-const AD_EMPTY={enabled:false,logo:"",logoImg:"",top:"",title:"",sub:"",url:"",start:"",end:""};
-const AD_FIELDS=["logo","logoImg","top","title","sub","url","start","end"];
+const AD_EMPTY={enabled:false,logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",start:"",end:""};
+const AD_FIELDS=["logo","logoImg","bg","top","title","sub","url","start","end"];
+// 배경색: 비우면 기본 아이보리. 고른 색으로 은은한 그라데이션을 만들고, 어두운 색이면 글자를 흰색으로 바꿔요
+const AD_COLORS=[["","아이보리"],["#DCEBFF","하늘"],["#D6F2E4","민트"],["#FFE0E8","핑크"],["#E7E0FF","라벤더"],["#FFF0BF","레몬"],["#1B2559","네이비"],["#2B2B2B","블랙"]];
+const adHex=v=>/^#[0-9a-fA-F]{6}$/.test(v||"")?v.toUpperCase():"";
+function adTheme(bg){
+  const h=adHex(bg);
+  if(!h) return {bg:"linear-gradient(115deg,#FBF7F2 0%,#F3EAE0 100%)",line:"#EADFD2",top:"#9A8371",title:"#4A3728",sub:"#7D6655",arrow:"#B9A28C",logo:"#6E5644"};
+  const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+  const mix=(t,k)=>"#"+c.map((x,i)=>Math.round(x+(t[i]-x)*k).toString(16).padStart(2,"0")).join("");
+  const lum=(0.2126*c[0]+0.7152*c[1]+0.0722*c[2])/255;
+  if(lum<0.55) return {bg:`linear-gradient(115deg,${mix([255,255,255],0.12)} 0%,${h} 100%)`,line:mix([0,0,0],0.15),top:"rgba(255,255,255,0.75)",title:"#fff",sub:"rgba(255,255,255,0.85)",arrow:"rgba(255,255,255,0.7)",logo:h};
+  const ink=mix([0,0,0],0.78);
+  return {bg:`linear-gradient(115deg,${mix([255,255,255],0.55)} 0%,${h} 100%)`,line:mix([0,0,0],0.08),top:mix([0,0,0],0.5),title:ink,sub:mix([0,0,0],0.62),arrow:mix([0,0,0],0.3),logo:ink};
+}
 // 로고 사진: 브라우저에서 가로세로 최대 160px로 줄여 data URL로 광고 데이터에 같이 저장 (파이어베이스 Storage 안 씀)
 // 투명 배경을 살리려고 webp → png 순으로, 그래도 크면 흰 바탕 jpeg로. 보통 5~20KB
 const AD_LOGO_MAX=160, AD_LOGO_BYTES=60000;
@@ -737,22 +750,22 @@ function useAds(on){
 }
 function AdBanner({ad}){
   if(!ad||!ad.title) return null;
-  const url=adUrl(ad.url);
+  const url=adUrl(ad.url), th=adTheme(ad.bg);
   const body=(
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
       {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:4,boxSizing:"border-box"}}>
         <img src={ad.logoImg} alt={ad.logo||"로고"} draggable={false} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
       </div>:ad.logo&&<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:"0 4px",boxSizing:"border-box"}}>
-        <span style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:"#6E5644",fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
+        <span style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:th.logo,fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
       </div>}
       <div style={{flex:1,minWidth:0,paddingRight:ad.top?0:28}}>
-        {ad.top&&<p style={{margin:"0 34px 3px 0",fontSize:11,color:"#9A8371",fontWeight:600,wordBreak:"keep-all"}}>{ad.top}</p>}
-        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:"#4A3728",wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
-        {ad.sub&&<p style={{margin:0,fontSize:12,color:"#7D6655",wordBreak:"keep-all"}}>{ad.sub}</p>}
+        {ad.top&&<p style={{margin:"0 34px 3px 0",fontSize:11,color:th.top,fontWeight:600,wordBreak:"keep-all"}}>{ad.top}</p>}
+        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:th.title,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
+        {ad.sub&&<p style={{margin:0,fontSize:12,color:th.sub,wordBreak:"keep-all"}}>{ad.sub}</p>}
       </div>
-      {url&&<span aria-hidden="true" style={{fontSize:20,color:"#B9A28C",flexShrink:0}}>›</span>}
+      {url&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
     </div>);
-  const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:"linear-gradient(115deg,#FBF7F2 0%,#F3EAE0 100%)",border:"1px solid #EADFD2",boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
+  const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
   const tag=<span style={{position:"absolute",top:8,right:10,fontSize:10,fontWeight:700,color:"#9A8371",background:"rgba(255,255,255,0.8)",border:"1px solid #E6D9CA",padding:"1px 7px",borderRadius:999}}>광고</span>;
   return url?<a href={url} target="_blank" rel="noopener noreferrer" draggable={false} aria-label={`광고: ${ad.title}`} style={box}>{body}{tag}</a>:<div style={box}>{body}{tag}</div>;
 }
@@ -821,7 +834,7 @@ function AdSettings(){
     if(urlBad){ setMsg("링크 주소를 확인해 주세요"); return; }
     if(rangeBad){ setMsg("종료일은 시작일과 같거나 뒤여야 해요"); return; }
     const now=Date.now(), id=cur==="new"?"a"+now:cur;
-    const v={logo:f.logo.trim().slice(0,12),logoImg:adLogoOk(f.logoImg)?f.logoImg:"",top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
+    const v={logo:f.logo.trim().slice(0,12),logoImg:adLogoOk(f.logoImg)?f.logoImg:"",bg:adHex(f.bg),top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
       start:f.start||"",end:f.end||"",enabled:!!enabled,createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
     setBusy(true);
     FB.club.child("ads/"+id).set(v).then(()=>{ setCur(id); setF({...AD_EMPTY,...v});
@@ -871,6 +884,18 @@ function AdSettings(){
           <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>정사각형이나 배경이 투명한 로고가 잘 어울려요. 사진이 있으면 아래 로고 글자 대신 사진이 보여요.</p>
         </FieldWrap>
         {field("logo","로고 글자 (선택)","예: ESSENT",12)}
+        <FieldWrap label="배경색">
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+            {AD_COLORS.map(([c,name])=>{ const on=adHex(f.bg)===adHex(c)&&(!!c||!adHex(f.bg)); return (
+              <button key={name} type="button" title={name} aria-label={`배경색 ${name}`} aria-pressed={on} onClick={()=>set("bg",c)}
+                style={{width:34,height:34,borderRadius:"50%",cursor:"pointer",padding:0,background:adTheme(c).bg,border:`1.5px solid ${adTheme(c).line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}/>); })}
+            {(()=>{ const custom=!!adHex(f.bg)&&!AD_COLORS.some(([c])=>adHex(c)===adHex(f.bg)); return (
+              <label title="직접 고르기" style={{position:"relative",height:34,padding:"0 12px",borderRadius:999,display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:12,fontWeight:600,color:BLUE,background:"#fff",border:`1.5px solid ${custom?BLUE:"#D6DEF7"}`,boxShadow:custom?`0 0 0 2px #fff,0 0 0 4px ${BLUE}`:"none"}}>
+                <span style={{width:16,height:16,borderRadius:"50%",background:custom?adHex(f.bg):"conic-gradient(#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171)",border:"1px solid rgba(0,0,0,0.1)"}}/>직접 고르기
+                <input type="color" value={adHex(f.bg)||"#DCEBFF"} onChange={e=>set("bg",e.target.value)} style={{position:"absolute",inset:0,opacity:0,width:"100%",height:"100%",cursor:"pointer",border:"none",padding:0}}/>
+              </label>); })()}
+          </div>
+        </FieldWrap>
         {field("top","윗줄 작은 글씨 (선택)","예: SSTC 회원이 운영해요 · 당산역 5분",40)}
         {field("title","제목","예: 코트 위 햇볕에 지친 피부, 카밍 케어",40)}
         {field("sub","설명 (선택)","예: 에센트피부과 · 브라이트닝 · 리프팅",50)}
