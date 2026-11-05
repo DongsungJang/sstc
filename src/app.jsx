@@ -688,7 +688,96 @@ function Empty({children,action,onAction}) {
     </div>
   );
 }
-function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice}) {
+// ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
+// club/ad = {enabled, logo, top, title, sub, url, updatedAt, updatedByUid}. 관리 탭에서 켜야만 홈에 보여요.
+const AD_EMPTY={enabled:false,logo:"",top:"",title:"",sub:"",url:""};
+// 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
+const adUrl=u=>{ u=String(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return /^https?:\/\/[^\s/]+\.[^\s]+/i.test(u)?u:""; };
+function useAd(on){
+  const [ad,setAd]=useState(null);
+  useEffect(()=>{
+    if(!FB||!on){ setAd(null); return; }
+    const r=FB.club.child("ad"), h=s=>setAd(s.val()||null);
+    r.on("value",h,()=>setAd(null)); return ()=>r.off("value",h);
+  },[on]);
+  return ad;
+}
+function AdBanner({ad}){
+  if(!ad||!ad.title) return null;
+  const url=adUrl(ad.url);
+  const body=(
+    <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px"}}>
+      {ad.logo&&<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:"0 4px",boxSizing:"border-box"}}>
+        <span style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:"#6E5644",fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
+      </div>}
+      <div style={{flex:1,minWidth:0,paddingRight:ad.top?0:28}}>
+        {ad.top&&<p style={{margin:"0 34px 3px 0",fontSize:11,color:"#9A8371",fontWeight:600,wordBreak:"keep-all"}}>{ad.top}</p>}
+        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:"#4A3728",wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
+        {ad.sub&&<p style={{margin:0,fontSize:12,color:"#7D6655",wordBreak:"keep-all"}}>{ad.sub}</p>}
+      </div>
+      {url&&<span aria-hidden="true" style={{fontSize:20,color:"#B9A28C",flexShrink:0}}>›</span>}
+    </div>);
+  const box={display:"block",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:"linear-gradient(115deg,#FBF7F2 0%,#F3EAE0 100%)",border:"1px solid #EADFD2",boxShadow:"0 4px 14px rgba(33,82,230,0.06)"};
+  const tag=<span style={{position:"absolute",top:8,right:10,fontSize:10,fontWeight:700,color:"#9A8371",background:"rgba(255,255,255,0.8)",border:"1px solid #E6D9CA",padding:"1px 7px",borderRadius:999}}>광고</span>;
+  return url?<a href={url} target="_blank" rel="noopener noreferrer" aria-label={`광고: ${ad.title}`} style={box}>{body}{tag}</a>:<div style={box}>{body}{tag}</div>;
+}
+// 관리 탭: 광고 내용 넣기 + 켜기/끄기
+function AdSettings(){
+  const [saved,setSaved]=useState(undefined);   // undefined: 불러오는 중, null: 아직 없음
+  const [f,setF]=useState(AD_EMPTY);
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState("");
+  useEffect(()=>{
+    const r=FB.club.child("ad"), h=s=>{ const v=s.val()||null; setSaved(v); setF({...AD_EMPTY,...(v||{})}); };
+    r.on("value",h,e=>{ setSaved(null); setMsg(authMsg(e)); }); return ()=>r.off("value",h);
+  },[]);
+  const set=(k,v)=>{ setF(p=>({...p,[k]:v})); setMsg(""); };
+  const urlBad=!!f.url.trim()&&!adUrl(f.url);
+  const dirty=saved!==undefined&&["logo","top","title","sub","url"].some(k=>(f[k]||"")!==((saved&&saved[k])||""));
+  const save=enabled=>{
+    if(enabled&&!f.title.trim()){ setMsg("제목을 넣어야 켤 수 있어요"); return; }
+    if(urlBad){ setMsg("링크 주소를 확인해 주세요"); return; }
+    const v={logo:f.logo.trim().slice(0,12),top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
+      enabled:!!enabled,updatedAt:Date.now(),updatedByUid:myUid()};
+    setBusy(true);
+    FB.club.child("ad").set(v).then(()=>setMsg(enabled?"켰어요. 홈 화면에 보여요":"저장했어요. 지금은 꺼져 있어요"))
+      .catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+  };
+  const on=!!(saved&&saved.enabled);
+  const field=(k,label,ph,max)=>(
+    <FieldWrap label={label}><input value={f[k]} maxLength={max} onChange={e=>set(k,e.target.value)} placeholder={ph} style={inputStyle}/></FieldWrap>);
+  return (
+    <Card>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:15,fontWeight:700,color:"#1B2559"}}>광고 배너</span>
+        <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:999,background:on?"#E5F7EE":"#F1F2F5",color:on?"#067647":"#6B7280"}}>{saved===undefined?"불러오는 중":on?"켜짐 · 홈에 보여요":"꺼짐"}</span>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {field("logo","로고 글자 (선택)","예: ESSENT",12)}
+        {field("top","윗줄 작은 글씨 (선택)","예: SSTC 회원이 운영해요 · 당산역 5분",40)}
+        {field("title","제목","예: 코트 위 햇볕에 지친 피부, 카밍 케어",40)}
+        {field("sub","설명 (선택)","예: 에센트피부과 · 브라이트닝 · 리프팅",50)}
+        <FieldWrap label="누르면 열 링크 (선택)" error={urlBad?"주소를 확인해 주세요":""}><input value={f.url} onChange={e=>set("url",e.target.value)} placeholder="예: essentskin.co.kr" inputMode="url" autoCapitalize="none" style={inputStyle}/></FieldWrap>
+        {f.title.trim()&&<div>
+          <p style={{margin:"2px 0 6px",fontSize:12,color:"#6B7493"}}>미리보기</p>
+          <AdBanner ad={{...f,title:f.title.trim()}}/>
+        </div>}
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          {on?<>
+            <button type="button" disabled={busy} onClick={()=>save(false)} style={{...btnSecondary,color:"#6B7493"}}>끄기</button>
+            <button type="button" disabled={busy||!dirty} onClick={()=>save(true)} style={{...btnSecondary,flex:1,background:GRAD,color:"#fff",border:"none",opacity:dirty?1:0.5}}>고친 내용 저장</button>
+          </>:<>
+            <button type="button" disabled={busy||!dirty} onClick={()=>save(false)} style={{...btnSecondary,opacity:dirty?1:0.5}}>저장만</button>
+            <button type="button" disabled={busy} onClick={()=>save(true)} style={{...btnSecondary,background:GRAD,color:"#fff",border:"none"}}>켜기</button>
+          </>}
+        </div>
+        {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어야|권한|오류|실패/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜면 홈 "다가오는 모임" 바로 아래에 "광고" 표시와 함께 보여요. 꺼 두면 내용은 남아 있고 회원에게는 안 보여요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
+      </div>
+    </Card>);
+}
+
+function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ad}) {
   const [goingN,setGoingN]=useState(3);
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
   const [exp,setExp]=useState(focusId);
@@ -753,6 +842,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           </div>
         )}
       </Card>
+      {ad&&ad.enabled&&<AdBanner ad={ad}/>}
       <Card>
         <SectionTitle>내가 참석할 모임{going.length>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{going.length}</span>}</SectionTitle>
         {going.length===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
@@ -1590,6 +1680,7 @@ function AdminTab(){
         </div>}
         {showGone&&<p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>}
       </Card>}
+      <AdSettings/>
     </div>
   );
 }
@@ -4201,6 +4292,7 @@ export default function App() {
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
   const boardPosts=useBoard(inMain);
+  const ad=useAd(inMain);   // 광고 배너 (관리 탭에서 켜야 홈에 보여요)
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(()=>{ if(!inMain) return; markTabSeen(tab); return ()=>markTabSeen(tab); },[tab,inMain,myId]);
   const newMeetings=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).map(meetingNewItem);
@@ -4344,7 +4436,7 @@ export default function App() {
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
-          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice}/>}
+          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice} ad={ad}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view,from)=>openM(id,view,from||"booking")} ready={list.ready} view={bookView} onView={setBookView}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} isAdmin={adminOn} boardFocus={boardFocus} newCounts={membersNew}
@@ -4352,11 +4444,12 @@ export default function App() {
         {tab==="stats"&&<StatsTab/>}
         {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
       </div>
-      {/* 모임 만들기 버튼: 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
+      {/* 새 모임 버튼 (+ 새 모임): 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
       {tab==="booking"&&!curMeeting&&bookView!=="map"&&(
-        <button type="button" onClick={openCreate} aria-label="모임 만들기" title="모임 만들기"
-          style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",width:58,height:58,borderRadius:"50%",border:"none",background:GRAD,color:"#fff",boxShadow:"0 8px 20px rgba(40,70,180,0.35)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <button type="button" onClick={openCreate} title="새 모임 만들기"
+          style={{position:"fixed",right:"max(16px, calc(50% - 204px))",bottom:"calc(86px + env(safe-area-inset-bottom,0px))",height:52,padding:"0 20px 0 16px",borderRadius:999,border:"none",background:GRAD,color:"#fff",boxShadow:"0 8px 20px rgba(40,70,180,0.35)",cursor:"pointer",zIndex:25,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:15,fontWeight:700,fontFamily:FONT,whiteSpace:"nowrap"}}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          새 모임
         </button>
       )}
       {menu&&<>

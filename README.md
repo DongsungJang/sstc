@@ -116,6 +116,10 @@
         ".read": "auth != null",
         ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
       },
+      "ad": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
+      },
       "meetings": {
         ".read": "auth != null",
         ".write": "auth != null && (root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())"
@@ -154,6 +158,7 @@
 - 자기 프로필은 본인과 관리자만, 승인은 관리자만, 모임 기록(투표·대진·점수)은 승인된 회원과 관리자만 써요.
 - 관리자 목록은 앱에서 아무도 못 바꿔요(콘솔에서만).
 - 알림(`feed`)은 로그인한 사람이 새로 쓰기만 하고 고치거나 지울 수 없어요. 개인 알림(`inbox`)과 공지(`notices`)는 관리자만 써요.
+- 광고 배너(`ad`)는 관리자만 쓰고, 로그인한 사람이 읽어요. 관리 탭에서 켜야(`enabled: true`) 홈에 보여요.
 - 마지막 접속(`lastSeen/<uid>`)은 앱을 열 때와 쓰는 동안 10분에 한 번까지 본인 칸에만 시각을 써요. 읽기는 관리자만 할 수 있어서 관리 탭 회원 목록에서만 보여요.
 - 소곤소곤(`board`, 회원 탭 게시판)은 정회원과 관리자만 읽고 글·댓글·좋아요를 써요. 익명 글·댓글도 실제 uid는 저장돼요(본인 수정·삭제용). 앱 화면에는 안 보이지만 데이터베이스를 직접 들여다보면 알 수 있어요. 글과 댓글은 쓴 사람만 고치고 지울 수 있고, 관리자는 남의 글·댓글을 지울 수만 있어요. 좋아요는 자기 칸(`likes/<uid>`)에만 눌러요. 글은 1000자까지예요.
 
