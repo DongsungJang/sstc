@@ -689,10 +689,10 @@ function Empty({children,action,onAction}) {
   );
 }
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
-const AD_EMPTY={enabled:false,logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",start:"",end:""};
-const AD_FIELDS=["logo","logoImg","bg","top","title","sub","url","start","end"];
+const AD_EMPTY={enabled:false,tag:"광고",logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",popup:"",start:"",end:""};
+const AD_FIELDS=["tag","logo","logoImg","bg","top","title","sub","url","popup","start","end"];
 // 배경색: 비우면 기본 아이보리. 고른 색으로 은은한 그라데이션을 만들고, 어두운 색이면 글자를 흰색으로 바꿔요
 const AD_COLORS=[["","아이보리"],["#DCEBFF","하늘"],["#D6F2E4","민트"],["#FFE0E8","핑크"],["#E7E0FF","라벤더"],["#FFF0BF","레몬"],["#1B2559","네이비"],["#2B2B2B","블랙"]];
 const adHex=v=>/^#[0-9a-fA-F]{6}$/.test(v||"")?v.toUpperCase():"";
@@ -760,7 +760,9 @@ const adUrl=u=>{ u=String(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.t
 const adToday=()=>kstNow().slice(0,10);
 // 기간 상태: "live" 노출 중 / "before" 시작 전 / "after" 끝남 (날짜는 한국 시간 기준, 시작일·종료일 당일 포함)
 const adPhase=(a,d=adToday())=>a.start&&d<a.start?"before":a.end&&d>a.end?"after":"live";
-const adList=v=>Object.keys(v||{}).filter(k=>v[k]&&typeof v[k]==="object").map(k=>({id:k,...v[k]})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+// 순서: 관리 탭에서 옮기면 order(0,1,2…)가 생기고, 아직 안 옮긴 광고는 만든 순서대로 뒤에 붙어요
+const adKey=a=>Number.isFinite(+a.order)&&a.order!==""&&a.order!=null?+a.order:1e6+(a.createdAt||0)/1e7;
+const adList=v=>Object.keys(v||{}).filter(k=>v[k]&&typeof v[k]==="object").map(k=>({id:k,...v[k]})).sort((a,b)=>adKey(a)-adKey(b)||(a.createdAt||0)-(b.createdAt||0));
 const adPeriod=a=>!a.start&&!a.end?"기간 무제한":`${a.start?a.start.replace(/-/g,"."):"지금"} ~ ${a.end?a.end.replace(/-/g,"."):"계속"}`;
 function useAds(on){
   const [ads,setAds]=useState([]);
@@ -774,9 +776,33 @@ function useAds(on){
   useEffect(()=>{ const t=setInterval(()=>setDay(adToday()),60000); return ()=>clearInterval(t); },[]);
   return ads.filter(a=>a.enabled&&a.title&&adPhase(a,day)==="live");
 }
+// 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 공지·모집·이벤트 ("알림"은 종 모양 알림과 헷갈려서 뺌)
+const AD_TAGS=[["광고","#8A7563","rgba(255,255,255,0.85)","#E6D9CA"],["공지","#D23C3C","#FFF1F1","#FBD5D5"],["모집","#067647","#E5F7EE","#B7E6CC"],["이벤트","#C2610C","#FFF4E5","#FAD9B0"]];
+const adTagOf=t=>AD_TAGS.find(x=>x[0]===t)||AD_TAGS[0];
+function AdTag({tag,style}){ const [name,c,bg,line]=adTagOf(tag);
+  return <span style={{fontSize:10,fontWeight:700,color:c,background:bg,border:`1px solid ${line}`,padding:"1px 7px",borderRadius:999,whiteSpace:"nowrap",...style}}>{name}</span>; }
+// 링크 대신 미리 써 둔 문구를 띄우는 팝업
+function AdPopup({ad,onClose}){
+  useEffect(()=>{ const k=e=>{ if(e.key==="Escape") onClose(); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[]);
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:60,background:"rgba(15,23,60,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div role="dialog" aria-label={ad.title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"80vh",overflowY:"auto",background:"#fff",borderRadius:24,padding:20,boxSizing:"border-box",boxShadow:"0 20px 50px rgba(15,23,60,0.3)",fontFamily:FONT}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+          {adLogoOk(ad.logoImg)&&<img src={ad.logoImg} alt="" style={{width:44,height:44,borderRadius:12,objectFit:"cover",flexShrink:0,boxShadow:"0 0 0 1px rgba(0,0,0,0.06)"}}/>}
+          <div style={{flex:1,minWidth:0}}>
+            <AdTag tag={ad.tag} style={{display:"inline-block",marginBottom:4}}/>
+            <p style={{margin:0,fontSize:16,fontWeight:700,color:"#1B2559",wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
+          </div>
+        </div>
+        <p style={{margin:"0 0 18px",fontSize:14,color:"#2B3674",lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{ad.popup}</p>
+        <button type="button" onClick={onClose} style={btnPrimary}>닫기</button>
+      </div>
+    </div>);
+}
 function AdBanner({ad,onOpen}){
+  const [pop,setPop]=useState(false);
   if(!ad||!ad.title) return null;
-  const url=adUrl(ad.url), th=adTheme(ad.bg);
+  const url=adUrl(ad.url), th=adTheme(ad.bg), popup=!url&&String(ad.popup||"").trim();
   const body=(
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
       {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,0.06)",flexShrink:0,overflow:"hidden"}}>
@@ -789,11 +815,17 @@ function AdBanner({ad,onOpen}){
         <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:th.title,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
         {ad.sub&&<p style={{margin:0,fontSize:12,color:th.sub,wordBreak:"keep-all"}}>{ad.sub}</p>}
       </div>
-      {url&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
+      {(url||popup)&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
     </div>);
   const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
-  const tag=<span style={{position:"absolute",top:8,right:10,fontSize:10,fontWeight:700,color:"#9A8371",background:"rgba(255,255,255,0.8)",border:"1px solid #E6D9CA",padding:"1px 7px",borderRadius:999}}>광고</span>;
-  return url?<a href={url} target="_blank" rel="noopener noreferrer" draggable={false} onClick={onOpen} aria-label={`광고: ${ad.title}`} style={box}>{body}{tag}</a>:<div style={box}>{body}{tag}</div>;
+  const tag=<AdTag tag={ad.tag} style={{position:"absolute",top:8,right:10}}/>;
+  const label=`${adTagOf(ad.tag)[0]}: ${ad.title}`;
+  if(url) return <a href={url} target="_blank" rel="noopener noreferrer" draggable={false} onClick={onOpen} aria-label={label} style={box}>{body}{tag}</a>;
+  if(popup) return <>
+    <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ setPop(true); onOpen&&onOpen(); }} onKeyDown={e=>{ if(e.key==="Enter"){ setPop(true); onOpen&&onOpen(); } }} style={{...box,cursor:"pointer"}}>{body}{tag}</div>
+    {pop&&<AdPopup ad={ad} onClose={()=>setPop(false)}/>}
+  </>;
+  return <div style={box}>{body}{tag}</div>;
 }
 // 홈: 광고가 여러 개면 5초마다 옆으로 넘어가고, 손으로 밀어도 넘어가요 (아래 점으로 몇 번째인지 표시)
 // 광고 노출·클릭 세기: club/adStats/<광고id>/<YYYY-MM-DD>/{views,clicks}/<uid> = true
@@ -825,7 +857,7 @@ function AdStats({ad,label}){
   const rg=AD_RANGES.find(x=>x[0]===range), sum=adSum(stats,rg[2]);
   const copy=()=>{
     const lines=AD_RANGES.map(([,name,days])=>{ const x=adSum(stats,days); return `${name}: 노출 ${x.v} · 클릭 ${x.c} · 클릭률 ${x.rate}%`; });
-    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크를 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
+    shareText(`[SSTC 앱 광고 결과] ${ad.title}\n${adToday().replace(/-/g,".")} 기준\n\n${lines.join("\n")}\n\n기준: 노출은 앱 홈에서 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 셌어요.`,"SSTC 광고 결과","광고 결과");
   };
   const box=(name,val,c)=>(
     <div style={{flex:1,background:"#fff",borderRadius:14,padding:"10px 6px",textAlign:"center"}}>
@@ -845,7 +877,7 @@ function AdStats({ad,label}){
       {stats===null?<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>숫자를 보려면 README의 새 파이어베이스 규칙(adStats)을 콘솔에 붙여넣어 주세요.</p>
       :stats===undefined?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>불러오는 중…</p>:<>
         <div style={{display:"flex",gap:6}}>{box("노출",sum.v)}{box("클릭",sum.c,BLUE)}{box("클릭률",sum.rate+"%")}</div>
-        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크를 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
+        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>기준: 노출은 홈에서 이 광고가 화면에 다 보였을 때, 클릭은 눌러서 링크나 안내 창을 열었을 때 세요. 같은 회원이 같은 날 여러 번 보거나 눌러도 1번으로 세요(한국 날짜 기준).</p>
       </>}
     </div>);
 }
@@ -926,13 +958,20 @@ function AdSettings(){
     if(urlBad){ setMsg("링크 주소를 확인해 주세요"); return; }
     if(rangeBad){ setMsg("종료일은 시작일과 같거나 뒤여야 해요"); return; }
     const now=Date.now(), id=cur==="new"?"a"+now:cur;
-    const v={logo:f.logo.trim().slice(0,12),logoImg:adLogoOk(f.logoImg)?f.logoImg:"",bg:adHex(f.bg),top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
-      start:f.start||"",end:f.end||"",enabled:!!enabled,createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
+    const v={tag:adTagOf(f.tag)[0],popup:String(f.popup||"").trim().slice(0,500),logo:f.logo.trim().slice(0,12),logoImg:adLogoOk(f.logoImg)?f.logoImg:"",bg:adHex(f.bg),top:f.top.trim().slice(0,40),title:f.title.trim().slice(0,40),sub:f.sub.trim().slice(0,50),url:adUrl(f.url),
+      start:f.start||"",end:f.end||"",enabled:!!enabled,order:saved&&saved.order!=null?saved.order:list.length+1000,createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
     setBusy(true);
     FB.club.child("ads/"+id).set(v).then(()=>{ setCur(id); setF({...AD_EMPTY,...v});
       const ph=adPhase(v);
       setMsg(!enabled?"저장했어요. 지금은 꺼져 있어요":ph==="live"?"켰어요. 홈 화면에 보여요":ph==="before"?`켰어요. ${v.start.replace(/-/g,".")}부터 보여요`:"켰지만 기간이 이미 끝났어요"); })
       .catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+  };
+  // 고른 광고를 앞(-1)/뒤(+1)로: 전체 순서를 0,1,2…로 다시 매겨 한 번에 저장
+  const move=d=>{
+    const k=list.findIndex(a=>a.id===cur), j=k+d; if(k<0||j<0||j>=list.length) return;
+    const ids=list.map(a=>a.id); [ids[k],ids[j]]=[ids[j],ids[k]];
+    const up={}; ids.forEach((id,n)=>{ up[id+"/order"]=n; });
+    setBusy(true); FB.club.child("ads").update(up).then(()=>setMsg(`광고${j+1}(으)로 옮겼어요`)).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
   };
   const remove=()=>{
     if(cur==="new"){ pick(list[0]?list[0].id:"new"); return; }
@@ -959,10 +998,26 @@ function AdSettings(){
         {cur==="new"?tabBtn("new",`광고${list.length+1}`,null)
           :<button type="button" onClick={()=>{ setCur("new"); setF(AD_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 광고 추가</button>}
       </div>
+      {saved&&list.length>1&&(()=>{ const k=list.findIndex(a=>a.id===cur);
+        const mv={padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT,background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7"};
+        return <div style={{display:"flex",alignItems:"center",gap:6,margin:"-4px 0 12px",flexWrap:"wrap"}}>
+          <span style={{fontSize:12,color:"#6B7493",marginRight:2}}>순서</span>
+          <button type="button" disabled={busy||k<=0} onClick={()=>move(-1)} style={{...mv,opacity:k<=0?0.4:1}}>← 앞으로</button>
+          <button type="button" disabled={busy||k>=list.length-1} onClick={()=>move(1)} style={{...mv,opacity:k>=list.length-1?0.4:1}}>뒤로 →</button>
+          <span style={{fontSize:11,color:"#A3AAC2"}}>홈에서 이 순서대로 넘어가요</span>
+        </div>; })()}
       {ads!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
         {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
           <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:999,background:st[1],color:st[2]}}>{st[0]}</span>{adPeriod(saved)}</p>; })()}
         {saved&&<AdStats ad={saved} label={`광고${list.findIndex(a=>a.id===cur)+1}`}/>}
+        <FieldWrap label="오른쪽 위 표시">
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {AD_TAGS.map(([name,c,bg,line])=>{ const on=adTagOf(f.tag)[0]===name; return (
+              <button key={name} type="button" aria-pressed={on} onClick={()=>set("tag",name)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT,
+                color:c,background:bg,border:`1.5px solid ${on?c:line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 3.5px ${c}`:"none"}}>{name}</button>); })}
+          </div>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>업체 광고는 "광고", 우리 모임 소식은 공지(꼭 알아야 할 것)·모집(훈련팟 등)·이벤트 중에 골라요.</p>
+        </FieldWrap>
         <FieldWrap label="로고 사진 (선택)">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:54,height:54,borderRadius:16,background:"#fff",border:f.logoImg?"none":"1.5px dashed #D6DEF7",boxShadow:f.logoImg?"0 0 0 1px rgba(0,0,0,0.06)":"none",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxSizing:"border-box",flexShrink:0}}>
@@ -993,6 +1048,10 @@ function AdSettings(){
         {field("title","제목","예: 코트 위 햇볕에 지친 피부, 카밍 케어",40)}
         {field("sub","설명 (선택)","예: 에센트피부과 · 브라이트닝 · 리프팅",50)}
         <FieldWrap label="누르면 열 링크 (선택)" error={urlBad?"주소를 확인해 주세요":""}><input value={f.url} onChange={e=>set("url",e.target.value)} placeholder="예: essentskin.co.kr" inputMode="url" autoCapitalize="none" style={inputStyle}/></FieldWrap>
+        <FieldWrap label="링크 대신 띄울 팝업 문구 (선택)">
+          <textarea value={f.popup||""} maxLength={500} rows={4} onChange={e=>set("popup",e.target.value)} placeholder={"예: 혹한기 훈련팟 모집!\n12월 매주 토 07시 · 선유도\n참여는 총무에게 카톡 주세요"} style={{...inputStyle,borderRadius:18,resize:"vertical",lineHeight:1.6,opacity:adUrl(f.url)?0.5:1}}/>
+          <p style={{margin:"2px 0 0",fontSize:11,color:adUrl(f.url)&&String(f.popup||"").trim()?"#C2610C":"#A3AAC2"}}>{adUrl(f.url)&&String(f.popup||"").trim()?"링크가 있어서 지금은 링크가 열려요. 팝업을 쓰려면 링크를 비워 주세요.":`링크가 없을 때 배너를 누르면 이 문구가 창으로 떠요. ${String(f.popup||"").length}/500자`}</p>
+        </FieldWrap>
         <FieldWrap label="보여 줄 기간" error={rangeBad?"종료일은 시작일과 같거나 뒤여야 해요":""}>
           <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#2B3674",cursor:"pointer",padding:"2px 0 4px"}}>
             <input type="checkbox" checked={unlimited} onChange={e=>{ if(e.target.checked){ set("start",""); set("end",""); } else { set("start",adToday()); } }} style={{width:18,height:18,accentColor:BLUE}}/>
@@ -1020,7 +1079,7 @@ function AdSettings(){
         </div>
         {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 광고 취소":`광고${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
         {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
-        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 광고만 홈 "다가오는 모임" 바로 아래에 "광고" 표시와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 광고만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
       </div>}
     </Card>);
 }
