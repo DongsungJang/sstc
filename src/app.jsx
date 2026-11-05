@@ -689,7 +689,7 @@ function Empty({children,action,onAction}) {
   );
 }
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, tag(광고·알림·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY={enabled:false,tag:"광고",logo:"",logoImg:"",bg:"",top:"",title:"",sub:"",url:"",popup:"",start:"",end:""};
 const AD_FIELDS=["tag","logo","logoImg","bg","top","title","sub","url","popup","start","end"];
@@ -774,8 +774,8 @@ function useAds(on){
   useEffect(()=>{ const t=setInterval(()=>setDay(adToday()),60000); return ()=>clearInterval(t); },[]);
   return ads.filter(a=>a.enabled&&a.title&&adPhase(a,day)==="live");
 }
-// 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 알림·공지·모집·이벤트
-const AD_TAGS=[["광고","#8A7563","rgba(255,255,255,0.85)","#E6D9CA"],["알림","#2F4FD8","#EEF2FF","#C9D5FF"],["공지","#D23C3C","#FFF1F1","#FBD5D5"],["모집","#067647","#E5F7EE","#B7E6CC"],["이벤트","#C2610C","#FFF4E5","#FAD9B0"]];
+// 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 공지·모집·이벤트 ("알림"은 종 모양 알림과 헷갈려서 뺌)
+const AD_TAGS=[["광고","#8A7563","rgba(255,255,255,0.85)","#E6D9CA"],["공지","#D23C3C","#FFF1F1","#FBD5D5"],["모집","#067647","#E5F7EE","#B7E6CC"],["이벤트","#C2610C","#FFF4E5","#FAD9B0"]];
 const adTagOf=t=>AD_TAGS.find(x=>x[0]===t)||AD_TAGS[0];
 function AdTag({tag,style}){ const [name,c,bg,line]=adTagOf(tag);
   return <span style={{fontSize:10,fontWeight:700,color:c,background:bg,border:`1px solid ${line}`,padding:"1px 7px",borderRadius:999,whiteSpace:"nowrap",...style}}>{name}</span>; }
@@ -999,7 +999,7 @@ function AdSettings(){
               <button key={name} type="button" aria-pressed={on} onClick={()=>set("tag",name)} style={{padding:"6px 14px",borderRadius:999,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT,
                 color:c,background:bg,border:`1.5px solid ${on?c:line}`,boxShadow:on?`0 0 0 2px #fff,0 0 0 3.5px ${c}`:"none"}}>{name}</button>); })}
           </div>
-          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>업체 광고는 "광고", 우리 모임 소식(훈련팟 모집 등)은 알림·공지·모집·이벤트 중에 골라요.</p>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>업체 광고는 "광고", 우리 모임 소식은 공지(꼭 알아야 할 것)·모집(훈련팟 등)·이벤트 중에 골라요.</p>
         </FieldWrap>
         <FieldWrap label="로고 사진 (선택)">
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1062,7 +1062,7 @@ function AdSettings(){
         </div>
         {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 광고 취소":`광고${list.findIndex(a=>a.id===cur)+1} 지우기`}</button>}
         {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났|사진|못했/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
-        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 광고만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·알림 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 광고만 홈 "다가오는 모임" 바로 아래에 고른 표시(광고·공지 등)와 함께 보여요. 여러 개면 5초마다 옆으로 넘어가고 손으로 밀어도 넘어가요. 꺼 두면 내용은 남아 있어요. 병원 광고는 할인·효과 문구에 의료광고 심의 규정이 있으니 광고주에게 확인해 주세요.</p>
       </div>}
     </Card>);
 }

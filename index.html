@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=0ca763473b">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=0ca763473b">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=b5cff0072a">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=b5cff0072a">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2165,7 +2165,7 @@ function Empty({
   }, action));
 }
 // ─── 광고 배너 (홈 "다가오는 모임" 아래) ─────────────────────────────────────
-// club/ads/a<만든 시각> = {enabled, tag(광고·알림·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
+// club/ads/a<만든 시각> = {enabled, tag(광고·공지·모집·이벤트), popup(링크 없을 때 팝업 문구), logo, logoImg(작게 줄인 data URL), top, title, sub, url, start, end, createdAt, updatedAt, updatedByUid}
 // 켜져 있고(enabled) 기간 안(start~end, 비우면 무제한)인 광고만 홈에 보여요. 여러 개면 5초마다 옆으로 넘어가요.
 const AD_EMPTY = {
   enabled: false,
@@ -2387,8 +2387,8 @@ function useAds(on) {
   }, []);
   return ads.filter(a => a.enabled && a.title && adPhase(a, day) === "live");
 }
-// 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 알림·공지·모집·이벤트
-const AD_TAGS = [["광고", "#8A7563", "rgba(255,255,255,0.85)", "#E6D9CA"], ["알림", "#2F4FD8", "#EEF2FF", "#C9D5FF"], ["공지", "#D23C3C", "#FFF1F1", "#FBD5D5"], ["모집", "#067647", "#E5F7EE", "#B7E6CC"], ["이벤트", "#C2610C", "#FFF4E5", "#FAD9B0"]];
+// 배너 오른쪽 위 종류 표시: 광고주 광고는 "광고", 우리 모임 홍보는 공지·모집·이벤트 ("알림"은 종 모양 알림과 헷갈려서 뺌)
+const AD_TAGS = [["광고", "#8A7563", "rgba(255,255,255,0.85)", "#E6D9CA"], ["공지", "#D23C3C", "#FFF1F1", "#FBD5D5"], ["모집", "#067647", "#E5F7EE", "#B7E6CC"], ["이벤트", "#C2610C", "#FFF4E5", "#FAD9B0"]];
 const adTagOf = t => AD_TAGS.find(x => x[0] === t) || AD_TAGS[0];
 function AdTag({
   tag,
@@ -3224,7 +3224,7 @@ function AdSettings() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "\uC5C5\uCCB4 \uAD11\uACE0\uB294 \"\uAD11\uACE0\", \uC6B0\uB9AC \uBAA8\uC784 \uC18C\uC2DD(\uD6C8\uB828\uD31F \uBAA8\uC9D1 \uB4F1)\uC740 \uC54C\uB9BC\xB7\uACF5\uC9C0\xB7\uBAA8\uC9D1\xB7\uC774\uBCA4\uD2B8 \uC911\uC5D0 \uACE8\uB77C\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
+  }, "\uC5C5\uCCB4 \uAD11\uACE0\uB294 \"\uAD11\uACE0\", \uC6B0\uB9AC \uBAA8\uC784 \uC18C\uC2DD\uC740 \uACF5\uC9C0(\uAF2D \uC54C\uC544\uC57C \uD560 \uAC83)\xB7\uBAA8\uC9D1(\uD6C8\uB828\uD31F \uB4F1)\xB7\uC774\uBCA4\uD2B8 \uC911\uC5D0 \uACE8\uB77C\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uB85C\uACE0 \uC0AC\uC9C4 (\uC120\uD0DD)"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3547,7 +3547,7 @@ function AdSettings() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uAD11\uACE0\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uC54C\uB9BC \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
+  }, "\uCF1C\uC838 \uC788\uACE0 \uAE30\uAC04 \uC548\uC778 \uAD11\uACE0\uB9CC \uD648 \"\uB2E4\uAC00\uC624\uB294 \uBAA8\uC784\" \uBC14\uB85C \uC544\uB798\uC5D0 \uACE0\uB978 \uD45C\uC2DC(\uAD11\uACE0\xB7\uACF5\uC9C0 \uB4F1)\uC640 \uD568\uAED8 \uBCF4\uC5EC\uC694. \uC5EC\uB7EC \uAC1C\uBA74 5\uCD08\uB9C8\uB2E4 \uC606\uC73C\uB85C \uB118\uC5B4\uAC00\uACE0 \uC190\uC73C\uB85C \uBC00\uC5B4\uB3C4 \uB118\uC5B4\uAC00\uC694. \uAEBC \uB450\uBA74 \uB0B4\uC6A9\uC740 \uB0A8\uC544 \uC788\uC5B4\uC694. \uBCD1\uC6D0 \uAD11\uACE0\uB294 \uD560\uC778\xB7\uD6A8\uACFC \uBB38\uAD6C\uC5D0 \uC758\uB8CC\uAD11\uACE0 \uC2EC\uC758 \uADDC\uC815\uC774 \uC788\uC73C\uB2C8 \uAD11\uACE0\uC8FC\uC5D0\uAC8C \uD655\uC778\uD574 \uC8FC\uC138\uC694.")));
 }
 function HomeTab({
   onGoBooking,
@@ -14247,7 +14247,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "0ca763473b";
+const BUILD_ID = "b5cff0072a";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
