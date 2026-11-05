@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fd47880f99">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fd47880f99">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=9de5ef77c6">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=9de5ef77c6">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -258,8 +258,24 @@ const NTRP_LEVELS = [{
   desc: "중·고·대학교 테니스부 등 학교 선수 출신이에요."
 }];
 
-// 회원 NTRP (투표에 같이 저장된 값으로 채움)
+// 회원 NTRP: 회원 정보(club/members)의 최신 값이 먼저, 없으면 투표에 같이 저장된 값으로 채움
 const MEMBER_NTRP = {};
+// 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
+let MEMBER_BY_UID = {};
+function setMemberInfo(members) {
+  MEMBER_BY_UID = {};
+  Object.entries(members || {}).forEach(([uid, m]) => {
+    if (m && m.nickname) {
+      MEMBER_BY_UID[uid] = {
+        nickname: m.nickname,
+        ntrp: m.ntrp || ""
+      };
+      if (m.ntrp) MEMBER_NTRP[m.nickname] = m.ntrp;
+    }
+  });
+}
+// uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
+const curNick = (uid, name) => uid && MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].nickname || name;
 
 // ─── 모임 목록 ────────────────────────────────────────────────────────────────
 // 모임은 club/meetings/m<id>에 저장해요: info(날짜·시간·장소·정원·예약 오픈·설명), votes(<회원 키>: 참석 투표), bracket, scores.
@@ -284,15 +300,18 @@ function votesFromRec(rec) {
   Object.keys(rec && rec.votes || {}).forEach(key => {
     const v = rec.votes[key];
     if (!v || v.status !== "attend" || !v.at) return;
-    if (v.ntrp && !MEMBER_NTRP[v.name]) MEMBER_NTRP[v.name] = v.ntrp;
+    const p = MEMBER_BY_UID[key],
+      name = p && p.nickname || v.name,
+      ntrp = p && p.ntrp || v.ntrp || "";
+    if (ntrp && !MEMBER_NTRP[name]) MEMBER_NTRP[name] = ntrp;
     out.push({
       key,
-      name: v.name,
-      ntrp: v.ntrp || "",
+      name,
+      ntrp,
       at: v.at,
       arrive: v.arrive || "",
       leave: v.leave || "",
-      by: v.by || "",
+      by: curNick(v.byUid, v.by || ""),
       byUid: v.byUid || ""
     });
     (v.guests || []).forEach((g, gi) => g && g.name && out.push({
@@ -301,7 +320,7 @@ function votesFromRec(rec) {
       name: g.name,
       ntrp: "",
       at: g.at || v.at,
-      guestOf: v.name
+      guestOf: name
     }));
   });
   return out;
@@ -8500,7 +8519,7 @@ function CommentBox({
   const [anon, setAnon] = useState(false);
   const uid = myUid() || myVoteKey();
   const all = toList(comments).filter(c => c && c.text).sort((a, b) => a.at - b.at);
-  const shown = c => nameOf ? nameOf(c) : c.name;
+  const shown = c => nameOf ? nameOf(c) : curNick(c.uid, c.name);
   const notify = (t, prev, an) => Object.keys(mentionsOf(t)).filter(u => u !== uid && !(prev && prev[u])).forEach(u => anonNotify ? postFeed({
     type: "mention",
     to: u,
@@ -8600,7 +8619,7 @@ function CommentBox({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, c.anon ? "?" : (c.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, c.anon ? "?" : (curNick(c.uid, c.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -13916,7 +13935,7 @@ function anonNamer(post) {
     if (post.anon && c.uid === post.uid) return;
     if (!nums.has(c.uid)) nums.set(c.uid, nums.size + 1);
   });
-  return c => !c.anon ? c.name : post.anon && c.uid === post.uid ? "익명(글쓴이)" : `익명${nums.get(c.uid) || ""}`;
+  return c => !c.anon ? curNick(c.uid, c.name) : post.anon && c.uid === post.uid ? "익명(글쓴이)" : `익명${nums.get(c.uid) || ""}`;
 }
 function FreeBoard({
   canWrite,
@@ -14048,7 +14067,7 @@ function FreeBoard({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, p.anon ? "?" : (p.name || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, p.anon ? "?" : (curNick(p.uid, p.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -14060,7 +14079,7 @@ function FreeBoard({
         fontWeight: 700,
         color: p.anon ? "#6B7493" : INK
       }
-    }, p.anon ? "익명" : p.name, mine && /*#__PURE__*/React.createElement("span", {
+    }, p.anon ? "익명" : curNick(p.uid, p.name), mine && /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: 6,
         fontSize: 10,
@@ -14671,7 +14690,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "fd47880f99";
+const BUILD_ID = "9de5ef77c6";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -15700,6 +15719,13 @@ function App() {
     if (inMain) seenLoad(myId);
   }, [inMain, myId]);
   const clubData = useClubMembers(inMain);
+  // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
+  const clubSeen = useRef(null);
+  if (clubData && clubSeen.current !== clubData) {
+    clubSeen.current = clubData;
+    setMemberInfo(clubData.members);
+    buildMeetings(RAW_MEETINGS);
+  }
   const boardPosts = useBoard(inMain);
   // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
   const adData = useAds(inMain);
