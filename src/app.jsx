@@ -3659,7 +3659,6 @@ function MoreButton({shown,total,onChange}){
   </button>;
 }
 // 예약 탭 목록 한 줄: 날짜 칸 · 장소 · 종류·시간 · 오른쪽에 인원(대기·무산)
-const kindText=m=>m.kind==="regular"?"정기":`번개 · ${m.flashType==="training"?"훈련":"게임"}`;
 function MeetRow({m,past,last,onClick}){
   const d=new Date((m.iso||"")+"T00:00:00"), ok=!isNaN(d), gone=m.cancelled, wait=waitN(m), isAtt=(m.attendees||[]).some(a=>a.isMe);
   const dim=past||gone;
@@ -3673,8 +3672,8 @@ function MeetRow({m,past,last,onClick}){
       <div style={{flex:1,minWidth:0}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:dim?"#6B7493":INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
           <span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{m.placeName||m.place}</span>{!dim&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
-        <p style={{margin:"2px 0 0",fontSize:12,color:"#6B7493",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-          {kindText(m)} · {m.time}{isAtt&&!gone&&<span style={{color:BLUE,fontWeight:700}}> · {past?"참석했어요":"참석 예정"}</span>}</p>
+        <p style={{margin:"4px 0 0",fontSize:12,color:"#6B7493",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
+          <span style={{flex:"0 0 auto",opacity:dim?0.6:1}}><KindBadge m={m}/></span><span>{m.time}</span>{isAtt&&!gone&&<span style={{color:BLUE,fontWeight:700}}>· {past?"참석했어요":"참석 예정"}</span>}</p>
       </div>
       {gone?<span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:10,background:GONE.bg,color:GONE.c,border:`1px solid ${GONE.line}`,whiteSpace:"nowrap"}}>무산</span>
         :past?<span style={{fontSize:13,fontWeight:700,color:"#A3AAC2",whiteSpace:"nowrap"}}>{m.attendees.length}명</span>
