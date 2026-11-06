@@ -816,10 +816,15 @@ function PhotoViewer(){
     </div>);
 }
 // 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
-function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style}){
+// 사진이 있으면 눌러서 크게 볼 수 있어요 (zoom={false}면 그냥 그림. 누를 때 둘레 카드가 펼쳐지지 않게 막아요)
+function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style,zoom=true,sub}){
   const r=radius===undefined?Math.round(size*0.3):radius;
   const box={width:size,height:size,borderRadius:r,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",...style};
-  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}><img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
+  const img=<img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>;
+  if(photoOk(photo)&&zoom) return <span role="button" tabIndex={0} aria-label={`${name||""} 사진 크게 보기`}
+    onClick={e=>{e.stopPropagation();e.preventDefault();openPhoto({photo,name,sub});}} onKeyDown={e=>{ if(e.key==="Enter"||e.key===" "){ e.stopPropagation();e.preventDefault();openPhoto({photo,name,sub}); } }}
+    style={{...box,background:"#E4E9F4",cursor:"zoom-in"}}>{img}</span>;
+  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}>{img}</span>;
   return <span aria-hidden="true" style={{...box,background:bg,color,fontSize:font||Math.round(size*0.4),fontWeight:900}}>{(name||"?").slice(0,1)}</span>;
 }
 const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=AD_LOGO_BYTES;
@@ -2210,7 +2215,7 @@ function AdminTab(){
   const row=(m,acts)=>(
     <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:"12px 0"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <Avatar name={m.nickname} photo={m.photo} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
+        <Avatar name={m.nickname} photo={m.photo} sub={m.realName} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname||"(닉네임 없음)"}</span>
@@ -2933,7 +2938,7 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,min
     <div style={{position:"relative",flex:1,minWidth:0}}>
       {hits.length>0&&<div role="listbox" aria-label="언급할 회원" style={{position:"absolute",left:0,right:0,bottom:"100%",marginBottom:6,background:"#fff",borderRadius:14,boxShadow:"0 8px 24px rgba(16,24,64,0.18)",padding:4,zIndex:5,maxHeight:220,overflowY:"auto"}}>
         {hits.map(x=><button key={x.uid} type="button" role="option" aria-selected="false" onMouseDown={e=>e.preventDefault()} onClick={()=>pick(x.nickname)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"none",borderRadius:10,cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
-          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12}/>
+          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12} zoom={false}/>
           <span style={{fontSize:14,fontWeight:600,color:INK}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
@@ -4633,9 +4638,7 @@ function MemberList({onOpenMeeting}){
         return(
           <div key={m.uid} role="button" tabIndex={0} aria-expanded={open===m.uid} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} onKeyDown={e=>{if(e.key==="Enter")setOpen(open===m.uid?null:m.uid);}} style={{cursor:"pointer",padding:"14px 0",borderBottom:i<gr.items.length-1?"1px solid #E8ECF4":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              {photoOk(m.photo)?<button type="button" aria-label={`${m.nickname} 사진 크게 보기`} onClick={e=>{e.stopPropagation();openPhoto({photo:m.photo,name:m.nickname,sub:realNameOf(m)});}} onKeyDown={e=>e.stopPropagation()} style={{padding:0,border:"none",background:"none",cursor:"zoom-in",borderRadius:13,flexShrink:0}}>
-                <Avatar name={m.nickname} photo={m.photo} size={42} radius={13} font={16}/></button>
-                :<Avatar name={m.nickname} photo={m.photo} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>}
+              <Avatar name={m.nickname} photo={m.photo} sub={realNameOf(m)} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
                   <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname}</span>

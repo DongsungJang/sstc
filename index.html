@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=c0f4d61b81">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=c0f4d61b81">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=23b1a2e6ff">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=23b1a2e6ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2544,6 +2544,7 @@ function PhotoViewer() {
   }, v.sub)));
 }
 // 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+// 사진이 있으면 눌러서 크게 볼 수 있어요 (zoom={false}면 그냥 그림. 누를 때 둘레 카드가 펼쳐지지 않게 막아요)
 function Avatar({
   name,
   photo,
@@ -2552,7 +2553,9 @@ function Avatar({
   bg = BLUE_LIGHT,
   color = INK,
   font,
-  style
+  style,
+  zoom = true,
+  sub
 }) {
   const r = radius === undefined ? Math.round(size * 0.3) : radius;
   const box = {
@@ -2566,13 +2569,7 @@ function Avatar({
     justifyContent: "center",
     ...style
   };
-  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
-    "aria-hidden": "true",
-    style: {
-      ...box,
-      background: "#E4E9F4"
-    }
-  }, /*#__PURE__*/React.createElement("img", {
+  const img = /*#__PURE__*/React.createElement("img", {
     src: photo,
     alt: "",
     draggable: false,
@@ -2582,7 +2579,44 @@ function Avatar({
       objectFit: "cover",
       display: "block"
     }
-  }));
+  });
+  if (photoOk(photo) && zoom) return /*#__PURE__*/React.createElement("span", {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": `${name || ""} 사진 크게 보기`,
+    onClick: e => {
+      e.stopPropagation();
+      e.preventDefault();
+      openPhoto({
+        photo,
+        name,
+        sub
+      });
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.stopPropagation();
+        e.preventDefault();
+        openPhoto({
+          photo,
+          name,
+          sub
+        });
+      }
+    },
+    style: {
+      ...box,
+      background: "#E4E9F4",
+      cursor: "zoom-in"
+    }
+  }, img);
+  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: "#E4E9F4"
+    }
+  }, img);
   return /*#__PURE__*/React.createElement("span", {
     "aria-hidden": "true",
     style: {
@@ -6835,6 +6869,7 @@ function AdminTab() {
   }, /*#__PURE__*/React.createElement(Avatar, {
     name: m.nickname,
     photo: m.photo,
+    sub: m.realName,
     size: 40,
     radius: 12,
     bg: m.uid === myUid() ? BALL : BLUE_LIGHT
@@ -9399,7 +9434,8 @@ function MentionInput({
     size: 26,
     radius: 13,
     color: BLUE,
-    font: 12
+    font: 12,
+    zoom: false
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
@@ -15533,35 +15569,10 @@ function MemberList({
         alignItems: "center",
         gap: 12
       }
-    }, photoOk(m.photo) ? /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      "aria-label": `${m.nickname} 사진 크게 보기`,
-      onClick: e => {
-        e.stopPropagation();
-        openPhoto({
-          photo: m.photo,
-          name: m.nickname,
-          sub: realNameOf(m)
-        });
-      },
-      onKeyDown: e => e.stopPropagation(),
-      style: {
-        padding: 0,
-        border: "none",
-        background: "none",
-        cursor: "zoom-in",
-        borderRadius: 13,
-        flexShrink: 0
-      }
     }, /*#__PURE__*/React.createElement(Avatar, {
       name: m.nickname,
       photo: m.photo,
-      size: 42,
-      radius: 13,
-      font: 16
-    })) : /*#__PURE__*/React.createElement(Avatar, {
-      name: m.nickname,
-      photo: m.photo,
+      sub: realNameOf(m),
       size: 42,
       radius: 13,
       bg: isMe ? BALL : BLUE_LIGHT,
@@ -15716,7 +15727,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "c0f4d61b81";
+const BUILD_ID = "23b1a2e6ff";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
