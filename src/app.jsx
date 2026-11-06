@@ -37,6 +37,7 @@ const ICON_PATHS = {
   zap:["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
   check:["M20 6 9 17l-5-5"],
   checkCircle:["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4 12 14.01l-3-3"],
+  search:["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z","M21 21l-4.35-4.35"],
   x:["M18 6 6 18","M6 6l12 12"],
   mail:["M3 5h18v14H3z","M21 7l-9 6-9-6"],
   camera:["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z","M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
@@ -190,6 +191,9 @@ function rankingOf(list){
     return {rank,name,count:c[name],ntrp:MEMBER_NTRP[name]||"-",top:rank<=3,isMe:name===ME};
   });
 }
+const DOW_KO=["일","월","화","수","목","금","토"];
+const greetLine=()=>{ const d=new Date(), h=d.getHours(); return `${DOW_KO[d.getDay()]}요일 ${h<5?"새벽이에요":h<12?"오전이에요":h<18?"오후예요":"저녁이에요"}`; };
+const longDate=iso=>{ const d=new Date(iso+"T00:00:00"); return `${d.getMonth()+1}월 ${d.getDate()}일 ${DOW_KO[d.getDay()]}요일`; };
 const dDay=iso=>{ const d=Math.round((new Date(iso+"T00:00:00")-new Date(todayYmd()+"T00:00:00"))/86400000); return d===0?"D-DAY":`D-${d}`; };
 const isOpen=m=>!m.cancelled&&(m.kind==="flash"||!m.openAt||nowAt().slice(0,16)>=m.openAt);   // 번개 모임은 만들자마자 투표 가능
 
@@ -1180,46 +1184,53 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const fill=next?Math.min(100,Math.round((next.attendees.length/Math.max(1,next.total))*100)):0;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
-      <Card>
-        <SectionTitle action={next?"전체보기":null} onAction={onGoBooking}>다가오는 모임</SectionTitle>
-        {!next?<Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty>:(
-        <div style={{background:next.cancelled?GONE.bg:isFull(next)?FULL.bg:"#F1F4FA",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:18,padding:16}}>
-          <div onClick={()=>onOpenMeeting(next.id,"info")} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,cursor:"pointer"}}>
-            <div>
-              <p style={{margin:"0 0 6px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/></p>
-              <p style={{margin:"0 0 4px",fontWeight:900,fontSize:20,color:INK,letterSpacing:"-0.03em"}}>{next.date}</p>
-              <p style={{margin:"0 0 2px",fontSize:14,color:"#5E6A8E"}}><Ic n="clock" s={13}/> {next.time}</p>
-              <p style={{margin:0,fontSize:14,color:"#5E6A8E"}}><Ic n="pin" s={13}/> {next.placeName||next.place}</p>
+      {/* 다음 모임: 파란 윗부분에 걸친 흰 카드 */}
+      {!next?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
+      <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:18,boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
+        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:14}}>
+          <p style={{margin:"0 0 10px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span></p>
+          <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
+          <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
+        </div>
+        {next.cancelled?(
+          <p style={{margin:0,fontSize:14,fontWeight:700,color:"#374151",textAlign:"center",background:"#fff",borderRadius:12,padding:"10px 8px"}}>
+            <Ic n="x" s={14}/> {goneLabel(next)}{next.cancelled.memo&&<span style={{display:"block",marginTop:3,fontSize:12,fontWeight:500,color:"#6B7280"}}>{next.cancelled.memo}</span>}
+          </p>
+        ):<>
+        <div style={{marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+            <span style={{fontSize:13,color:"#6B7493"}}>{isFull(next)?"마감":"참석 확정"}{waitN(next)>0&&<span style={{color:"#C2610C"}}> · 대기 {waitN(next)}명</span>}</span>
+            <span style={{fontSize:14,fontWeight:800,color:isFull(next)?FULL.c:INK,fontVariantNumeric:"tabular-nums"}}>{next.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}> / {next.total}명</span></span>
+          </div>
+          <div style={{height:6,background:isFull(next)?FULL.line:"#E4E9F4",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:BLUE,borderRadius:10}}/></div>
+        </div>
+        {isOpen(next)?(
+        <><AttendButtons status={myStatus} onVote={vote}/>
+        {myGoing?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
+          :myStatus==="absent"?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
+          :<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
+        ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}><Ic n="calendar" s={13}/> 예약은 {next.openDate}에 열려요</p>}
+        </>}
+      </div>)}
+      {/* 그다음 모임들: 가로로 넘겨 보는 카드 */}
+      {upcoming.length>1&&(
+      <div>
+        <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
+        <div className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollSnapType:"x mandatory"}}>
+          {upcoming.slice(1,7).map(m=>(
+            <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
+              style={{flex:"0 0 auto",width:"calc((100% - 42px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"14px 14px 13px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:12}}>
+                <KindBadge m={m}/>
+                <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
+              </div>
+              <p style={{margin:"0 0 3px",color:INK,whiteSpace:"nowrap"}}><span style={{fontSize:24,fontWeight:900,letterSpacing:"-0.04em",fontVariantNumeric:"tabular-nums"}}>{m.iso.slice(5,7)}.{m.iso.slice(8,10)}</span><span style={{fontSize:14,fontWeight:700,marginLeft:4,color:"#4A5578"}}>{DOW_KO[new Date(m.iso+"T00:00:00").getDay()]}</span></p>
+              <p style={{margin:0,fontSize:13,color:"#5E6A8E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</p>
+              {waitN(m)>0&&<p style={{margin:"4px 0 0",fontSize:12,fontWeight:700,color:"#C2610C"}}>대기 {waitN(m)}명</p>}
             </div>
-            <span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"5px 10px",borderRadius:8}}>{dDay(next.iso)}</span>
-          </div>
-          {next.cancelled?(
-            <p style={{margin:0,fontSize:14,fontWeight:700,color:"#374151",textAlign:"center",background:"#fff",borderRadius:12,padding:"10px 8px"}}>
-              <Ic n="x" s={14}/> {goneLabel(next)}{next.cancelled.memo&&<span style={{display:"block",marginTop:3,fontSize:12,fontWeight:500,color:"#6B7280"}}>{next.cancelled.memo}</span>}
-            </p>
-          ):<>
-          <div style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:"#6B7493"}}>참석 현황</span>
-              <span style={{fontSize:12,fontWeight:isFull(next)?700:600,color:isFull(next)?FULL.c:BLUE}}>{next.attendees.length} / {next.total}명{isFull(next)?" · 마감":""}{waitN(next)>0&&<span style={{color:"#C2610C"}}> · 대기 {waitN(next)}명</span>}</span>
-            </div>
-            <div style={{height:6,background:isFull(next)?FULL.line:"#DCE4FF",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:GRAD,borderRadius:10}}/></div>
-          </div>
-          {isOpen(next)?(
-          <><AttendButtons status={myStatus} onVote={vote}/>
-          {myGoing?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
-            :myStatus==="absent"?<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
-            :<p style={{margin:"8px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
-          ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}><Ic n="calendar" s={13}/> 예약은 {next.openDate}에 열려요</p>}
-          </>}
-        </div>)}
-        {nextNext&&(
-          <div onClick={()=>onOpenMeeting(nextNext.id,"info")} style={{marginTop:10,padding:"10px 12px",background:"#F1F4FA",borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-            <div><p style={{margin:0,fontSize:13,fontWeight:600,color:INK}}>{nextNext.date}</p><p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {nextNext.placeName||nextNext.place}</p></div>
-            <span style={{fontSize:12,color:nextNext.cancelled?GONE.c:isFull(nextNext)?FULL.c:"#A3AAC2",fontWeight:isFull(nextNext)||nextNext.cancelled?700:400}}>{nextNext.cancelled?goneLabel(nextNext):isFull(nextNext)?`마감 ${nextNext.attendees.length}/${nextNext.total}명${waitN(nextNext)?` · 대기 ${waitN(nextNext)}명`:""}`:`${nextNext.attendees.length}명 참석예정`}</span>
-          </div>
-        )}
-      </Card>
+          ))}
+        </div>
+      </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
       <Card>
         <SectionTitle>내가 참석할 모임{going.length>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{going.length}</span>}</SectionTitle>
@@ -2036,6 +2047,15 @@ function AdminTab(){
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <Card>
+        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
+        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
+          </div>
+        )}
+        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
+      </Card>
+      <Card>
         <SectionTitle>알림 보내기</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
           {chip("전체",()=>pick(live))}{chip("정회원 전체",()=>pick(active))}{chip("준회원 전체",()=>pick(pending))}
@@ -2053,15 +2073,6 @@ function AdminTab(){
         <button type="button" disabled={busy||!chosen.length||!text.trim()} onClick={send} style={{...btnPrimary,opacity:busy||!chosen.length||!text.trim()?0.5:1}}>{busy?"보내는 중…":`${chosen.length||""}${chosen.length?"명에게 ":""}알림 보내기`}</button>
         {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}><Ic n="check" s={14}/> {sent}</p>}
         <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 알림 목록에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
-      </Card>
-      <Card>
-        <SectionTitle>준회원 · 승인 대기 ({pending.length}명)</SectionTitle>
-        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
-          </div>
-        )}
-        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
       </Card>
       <Card>
         <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={toggleSortSeen}>정회원 ({active.length}명)</SectionTitle>
@@ -2999,22 +3010,21 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
       {view==="bracket"&&meeting.flashType!=="training"?<MeetingBracket meeting={meeting} participants={participants} store={store}/>:(<>
       <Card>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-          <div><p style={{margin:"0 0 6px",fontSize:17,fontWeight:700,color:INK}}>{meeting.date}</p><KindBadge m={meeting}/></div>
+          <KindBadge m={meeting}/>
           {gone?<span style={{background:GONE.c,color:"#fff",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>{goneLabel(meeting)}</span>
             :isPast?<span style={{background:"#EEF1FA",color:"#A3AAC2",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20}}>종료된 모임</span>
             :open&&fill>=100?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>마감 · 대기 가능</span>
             :open?<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>예약 진행 중</span>
             :<span style={{background:"#FFF4E5",color:"#C2610C",fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:20,whiteSpace:"nowrap"}}>오픈 예정</span>}
         </div>
-        <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:14}}>
-          {[{icon:"clock",label:"시간",value:meeting.time},{icon:"pin",label:"장소",value:meeting.place},...(meeting.address?[{icon:"map",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),...(meeting.kind==="flash"?[{icon:"zap",label:"종류",value:`${FLASH_TYPE[meeting.flashType]} 모임`}]:[]),
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+          {(rows=>{ const FULLW=["장소","주소","코트비","반복"], half=rows.filter(r=>!FULLW.includes(r.label)); const grp=r=>r.label==="장소"||r.label==="주소"?0:FULLW.includes(r.label)?2:1; return [...rows].sort((a,b)=>grp(a)-grp(b)).map(r=>({...r,wide:FULLW.includes(r.label)||(half.length%2===1&&r===half[half.length-1])})); })([{icon:"pin",label:"장소",value:meeting.place},{icon:"clock",label:"시간",value:meeting.time},...(meeting.address?[{icon:"map",label:"주소",value:<a href={mapUrl(meeting.address)} target="_blank" rel="noopener noreferrer" style={{color:BLUE,textDecoration:"underline",textUnderlineOffset:3}}>{meeting.address}</a>}]:[]),...(meeting.kind==="flash"?[{icon:"zap",label:"종류",value:`${FLASH_TYPE[meeting.flashType]} 모임`}]:[]),
             ...(meeting.kind==="flash"&&meeting.courtFee?[{icon:"coin",label:"코트비",value:<span>{won(meeting.courtFee)}{total>0&&<span style={{color:BLUE,fontWeight:600}}> · 1인 {won(perHead(meeting.courtFee,total))}</span>}<span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{total>0?`참석 확정 ${total}명 기준 · 회비와 별도`:"참석 확정 인원으로 나눠요 · 회비와 별도"}</span></span>}]:[]),
             {icon:"users",label:"제한 인원",value:`${meeting.capacity}명${meeting.guestCap?` + 게스트 ${meeting.guestCap}명`:""}`},...(meeting.kind==="flash"?[]:[{icon:"calendar",label:"예약 오픈",value:meeting.openDate}]),
-            ...(ser?[{icon:"repeat",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])].map(r=>(
-            <div key={r.label} style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{width:22,display:"flex",justifyContent:"center",color:"#8A93B2"}}><Icon name={r.icon} size={17} stroke={1.8}/></span>
-              <span style={{fontSize:13,color:"#A3AAC2",width:64}}>{r.label}</span>
-              <span style={{fontSize:13,fontWeight:500,color:INK}}>{r.value}</span>
+            ...(ser?[{icon:"repeat",label:"반복",value:serActive?seriesText(ser):"반복 멈춤"}]:[])]).map(r=>(
+            <div key={r.label} style={{gridColumn:r.wide?"1 / -1":"auto",background:"#F1F4FA",borderRadius:14,padding:"11px 13px",minWidth:0}}>
+              <span style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"#5E6A8E"}}><Icon name={r.icon} size={14} stroke={2} color={BLUE}/>{r.label}</span>
+              <span style={{display:"block",marginTop:4,fontSize:15,fontWeight:700,color:INK,letterSpacing:"-0.02em",overflowWrap:"anywhere"}}>{r.value}</span>
             </div>
           ))}
         </div>
@@ -3145,10 +3155,12 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
 // ─── 작은 달력 (예약 탭 맨 위) ─────────────────────────────────────────────────
 // 날짜 아래에 그날 모임 수만큼 점 (정기 파랑, 번개 게임 주황, 번개 훈련 초록, 최대 3개 + 나머지는 +n). 좌우 버튼으로 달 이동, 날짜를 누르면 그날 모임 목록.
 const KIND_DOT=Object.fromEntries(Object.entries(KIND_COLOR).map(([k,v])=>[k,v.dot]));
-function MiniCalendar({onOpen}){
+// part: "grid" = 파란 윗부분에 들어가는 달력(흰 글자), "picked" = 고른 날의 모임 목록(아래 내용), 없으면 둘 다
+function MiniCalendar({onOpen,part}){
   const today=todayYmd();
-  const [ym,setYm]=useState(()=>today.slice(0,7));
-  const [pick,setPick]=useState(null);
+  const [ym,setYm]=useShared("calYm",()=>today.slice(0,7));
+  const [pick,setPick]=useShared("calPick",null);
+  const dark=part==="grid";
   const [y,mo]=ym.split("-").map(Number);
   const shift=d=>{ const t=new Date(y,mo-1+d,1); setYm(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); setPick(null); };
   const byDay={};
@@ -3158,39 +3170,42 @@ function MiniCalendar({onOpen}){
   const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
   const count=Object.values(byDay).reduce((a,l)=>a+l.length,0);
   const picked=pick&&byDay[pick];
-  const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:30,height:30,borderRadius:12,border:"1px solid #E4E9F7",background:"#fff",color:"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
-  return(
-    <Card style={{padding:"12px 12px 10px"}}>
+  const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:32,height:32,borderRadius:10,border:dark?"none":"1px solid #E4E9F7",background:dark?"rgba(255,255,255,0.12)":"#fff",color:dark?"#fff":"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
+  const gridPart=(<>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
         {navBtn(-1,"chevL","이전 달")}
         <div style={{textAlign:"center"}}>
-          <p style={{margin:0,fontSize:15,fontWeight:700,color:INK}}>{y}년 {mo}월</p>
-          <p style={{margin:0,fontSize:11,color:"#A3AAC2"}}>{count?`모임 ${count}개`:"모임 없음"}</p>
+          <p style={{margin:0,fontSize:dark?17:15,fontWeight:700,color:dark?"#fff":INK}}>{y}년 {mo}월</p>
+          <p style={{margin:0,fontSize:11,color:dark?"rgba(255,255,255,0.6)":"#A3AAC2"}}>{count?`모임 ${count}개`:"모임 없음"}</p>
         </div>
         {navBtn(1,"chevR","다음 달")}
       </div>
       <div role="grid" aria-label={`${y}년 ${mo}월 모임 달력`} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",rowGap:2}}>
-        {WEEK.map((w,i)=><span key={w} style={{textAlign:"center",fontSize:11,fontWeight:600,color:i===0?"#E5484D":i===6?BLUE:"#A3AAC2",padding:"2px 0 4px"}}>{w}</span>)}
+        {WEEK.map((w,i)=><span key={w} style={{textAlign:"center",fontSize:11,fontWeight:600,color:dark?"rgba(255,255,255,0.55)":i===0?"#E5484D":i===6?BLUE:"#A3AAC2",padding:"2px 0 4px"}}>{w}</span>)}
         {cells.map((d,i)=>{
           if(!d) return <span key={"e"+i}/>;
           const iso=`${ym}-${String(d).padStart(2,"0")}`, list=byDay[iso]||[], isToday=iso===today, on=pick===iso, past=iso<today, dow=i%7;
           return(
             <button key={iso} type="button" aria-label={`${mo}월 ${d}일${list.length?` 모임 ${list.length}개`:""}`} aria-pressed={on} onClick={()=>setPick(on||!list.length?null:iso)}
-              style={{border:"none",background:on?BLUE_LIGHT:"transparent",borderRadius:10,padding:"2px 0 3px",cursor:list.length?"pointer":"default",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minHeight:30}}>
-              <span style={{width:22,height:22,lineHeight:"22px",borderRadius:12,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
+              style={{border:"none",background:on&&!dark?BLUE_LIGHT:"transparent",borderRadius:10,padding:"2px 0 3px",cursor:list.length?"pointer":"default",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minHeight:30}}>
+              <span style={dark?{width:30,height:30,lineHeight:"30px",borderRadius:10,fontSize:15,fontWeight:list.length||on?700:500,fontVariantNumeric:"tabular-nums",
+                background:on?BALL:"transparent",boxShadow:isToday&&!on?"inset 0 0 0 1.5px rgba(255,255,255,0.55)":"none",color:on?INK:past?"rgba(255,255,255,0.4)":"#fff"}
+                :{width:22,height:22,lineHeight:"22px",borderRadius:12,fontSize:12,fontWeight:isToday||list.length?700:400,fontVariantNumeric:"tabular-nums",
                 background:isToday?GRAD:"transparent",color:isToday?"#fff":past?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:INK}}>{d}</span>
               <span style={{display:"flex",gap:2,height:5,alignItems:"center"}}>
-                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:12,background:m.cancelled?"transparent":KIND_DOT[kindKey(m)],border:m.cancelled?`1.2px solid ${GONE.c}`:"none",opacity:past?0.45:1}}/>)}
+                {list.slice(0,3).map((m,k)=><span key={k} style={{width:5,height:5,boxSizing:"border-box",borderRadius:12,background:m.cancelled?"transparent":dark?(kindKey(m)==="regular"?"#fff":KIND_DOT[kindKey(m)]):KIND_DOT[kindKey(m)],border:m.cancelled?`1.2px solid ${dark?"rgba(255,255,255,0.7)":GONE.c}`:"none",opacity:past?0.45:1}}/>)}
                 {list.length>3&&<span style={{fontSize:8,lineHeight:"5px",color:"#6B7493",fontWeight:700}}>+{list.length-3}</span>}
               </span>
             </button>);
         })}
       </div>
-      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6,fontSize:11,color:"#6B7493"}}>
-        {[["regular","정기"],["game","번개 게임"],["training","번개 훈련"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:12,background:KIND_DOT[k]}}/>{l}</span>)}
-        <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:12,border:`1.2px solid ${GONE.c}`}}/>무산</span>
+      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6,fontSize:11,color:dark?"rgba(255,255,255,0.7)":"#6B7493"}}>
+        {[["regular","정기"],["game","번개 게임"],["training","번개 훈련"]].map(([k,l])=><span key={k} style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:12,background:dark&&k==="regular"?"#fff":KIND_DOT[k]}}/>{l}</span>)}
+        <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:12,border:`1.2px solid ${dark?"rgba(255,255,255,0.7)":GONE.c}`}}/>무산</span>
       </div>
-      {picked&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
+    </>);
+  const pickedPart=picked&&(
+      <div style={{marginTop:part?0:10,paddingTop:part?0:10,borderTop:part?"none":"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:INK}}>{fmtDate(pick)} 모임 {picked.length}개</p>
         {picked.map(m=>{ const past=m.status==="past", full=!past&&isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled; return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:past?"#F1F4FA":"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
@@ -3207,7 +3222,14 @@ function MiniCalendar({onOpen}){
               <span style={{color:BLUE,fontWeight:600}}>자세히 보기 →</span>
             </span>
           </button>);})}
-      </div>}
+      </div>
+  );
+  if(part==="grid") return <div style={{position:"relative",marginTop:14}}>{gridPart}</div>;
+  if(part==="picked") return picked?<Card style={{padding:14}}>{pickedPart}</Card>:null;
+  return(
+    <Card style={{padding:"12px 12px 10px"}}>
+      {gridPart}
+      {pickedPart}
     </Card>
   );
 }
@@ -3391,10 +3413,10 @@ function CourtMap({onOpen}){
   </div>;
 }
 // 예약 탭 맨 위: 목록 / 지도 전환
-function ViewToggle({view,onView}){
-  return <div role="tablist" aria-label="보기 방식" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
+function ViewToggle({view,onView,dark}){
+  return <div role="tablist" aria-label="보기 방식" style={{display:"flex",background:dark?"rgba(255,255,255,0.12)":"#E4E9F7",borderRadius:12,padding:dark?3:4,flexShrink:0}}>
     {[["list","목록","list"],["map","지도","map"]].map(([k,l,ic])=>{const on=view===k;return(
-      <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>onView(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?INK:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+      <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>onView(k)} style={{flex:1,padding:dark?"7px 12px":"10px 0",borderRadius:dark?9:12,border:"none",fontSize:dark?13:14,fontWeight:dark?700:600,cursor:"pointer",background:on?(dark?"#fff":INK):"transparent",color:on?(dark?INK:"#fff"):(dark?"rgba(255,255,255,0.8)":"#6B7493"),boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
         <Icon name={ic} size={15} stroke={2}/>{l}</button>);})}
   </div>;
 }
@@ -3422,13 +3444,11 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
   const label=kind==="flash"?"번개 모임":"정기 모임";
   if(view==="map") return(
     <div style={{display:"flex",flexDirection:"column",gap:14,paddingBottom:24}}>
-      <ViewToggle view={view} onView={onView}/>
       <CourtMap onOpen={id=>onOpen(id,"info","map")}/>
     </div>);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
-      <ViewToggle view={view} onView={onView}/>
-      <MiniCalendar onOpen={setSelId}/>
+      <MiniCalendar onOpen={setSelId} part="picked"/>
       <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["flash","번개 모임","zap"],["regular","정기 모임","calendar"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length,fresh=upAll.some(m=>m.kind===k&&!m.cancelled&&isNew(meetingNewItem(m)));return(
           <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?INK:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
@@ -3490,6 +3510,34 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
 }
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
+// 랭킹 시상대: 1~3등은 단상(2·1·3 순서), 4등부터는 줄 목록
+function Podium({rank}){
+  const top=rank.slice(0,3), rest=rank.slice(3);
+  const order=[top[1],top[0],top[2]].filter(Boolean);
+  const hgt={1:136,2:104,3:80};
+  return <>
+    <div style={{display:"flex",alignItems:"flex-end",gap:8,marginTop:6}}>
+      {order.map(r=>{ const first=r===top[0]; return(
+        <div key={r.name} style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",alignItems:"center"}}>
+          <span aria-hidden="true" style={{width:38,height:38,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",background:r.isMe?BALL:BLUE_LIGHT,color:INK,fontSize:16,fontWeight:900}}>{r.name.slice(0,1)}</span>
+          <span style={{margin:"6px 0 8px",fontSize:13,fontWeight:700,color:INK,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</span>
+          <div style={{width:"100%",height:hgt[top.indexOf(r)+1],borderRadius:"14px 14px 6px 6px",background:first?BLUE:INK,color:"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:22,fontWeight:900,lineHeight:1}}>{r.rank}</span>
+            <span style={{fontSize:12,opacity:0.75,marginTop:4}}>{r.count}회</span>
+          </div>
+        </div>);})}
+    </div>
+    {rest.length>0&&<div style={{marginTop:6}}>
+      {rest.map((r,i)=>(
+        <div key={r.name} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 2px",borderBottom:i<rest.length-1?"1px solid #EEF1FA":"none"}}>
+          <span style={{width:18,fontSize:15,fontWeight:800,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{r.rank}</span>
+          <span style={{flex:1,fontSize:15,fontWeight:700,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BALL,color:INK,padding:"1px 6px",borderRadius:6,marginLeft:6}}>나</span>}</span>
+          <span style={{fontSize:15,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums"}}>{r.count}회</span>
+        </div>
+      ))}
+    </div>}
+  </>;
+}
 function StatsTab() {
   const held=heldMeetings(), mineList=myHeld();
   const year=todayYmd().slice(0,4);
@@ -3509,10 +3557,10 @@ function StatsTab() {
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <div style={{display:"flex",gap:10}}>
-        {[{label:"총 누적 참석",value:`${mineList.length}회`},{label:"올해 참석",value:`${mineList.filter(m=>m.iso.slice(0,4)===year).length}회`},{label:"연속 참석",value:<>{streak}회{streak>=3&&<Ic n="flame" s={15} c="#ef4444" style={{marginLeft:3}}/>}</>}].map(s=>(
-          <Card key={s.label} style={{flex:1,textAlign:"center",padding:14}}>
-            <p style={{margin:"0 0 6px",fontSize:11,color:"#A3AAC2"}}>{s.label}</p>
-            <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE,fontVariantNumeric:"tabular-nums"}}>{s.value}</p>
+        {[{label:"올해 참석",value:`${mineList.filter(m=>m.iso.slice(0,4)===year).length}회`},{label:"연속 참석",value:<>{streak}회{streak>=3&&<span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:26,height:26,borderRadius:8,background:BALL,marginLeft:8,verticalAlign:"middle"}}><Ic n="flame" s={15} c={INK}/></span>}</>}].map(s=>(
+          <Card key={s.label} style={{flex:1,padding:"15px 16px"}}>
+            <p style={{margin:"0 0 6px",fontSize:12,color:"#6B7493"}}>{s.label}</p>
+            <p style={{margin:0,fontSize:24,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{s.value}</p>
           </Card>
         ))}
       </div>
@@ -3523,7 +3571,7 @@ function StatsTab() {
             <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
               <span style={{fontSize:10,color:BLUE,fontWeight:700}}>{r.me}</span>
               <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:80}}>
-                <div style={{flex:1,background:"linear-gradient(180deg,#5B8DEF,#2152E6)",borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
+                <div style={{flex:1,background:BLUE,borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
                 <div style={{flex:1,background:"#DCE4FF",borderRadius:"6px 6px 0 0",height:`${(r.avg/maxVal)*100}%`,minHeight:4}}/>
               </div>
               <span style={{fontSize:10,color:"#A3AAC2"}}>{r.label}</span>
@@ -3540,18 +3588,8 @@ function StatsTab() {
         </div>
       </Card>
       <Card>
-        <SectionTitle>전체 참여 랭킹</SectionTitle>
-        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:(
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {rank.map(r=>(
-            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F1F4FA",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
-              <RankNo r={r}/>
-              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
-              <div style={{width:70,height:6,background:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${(r.count/rank[0].count)*100}%`,background:r.isMe?BLUE:"#A9BCFF",borderRadius:10}}/></div>
-              <span style={{fontSize:13,fontWeight:700,color:BLUE,width:28,textAlign:"right"}}>{r.count}</span>
-            </div>
-          ))}
-        </div>)}
+        <SectionTitle>참여 랭킹</SectionTitle>
+        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:<Podium rank={rank}/>}
       </Card>
     </div>
   );
@@ -3798,7 +3836,7 @@ function Pills({value,options,onChange,label}){
   return(
     <div role="radiogroup" aria-label={label} style={{display:"flex",gap:8}}>
       {options.map(([v,l])=>{const on=value===v;return(
-        <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>onChange(v)} style={{flex:1,padding:"10px 0",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT,border:on?"none":"1.5px solid #D6DEF7",background:on?GRAD:"#fff",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none"}}>{l}</button>
+        <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>onChange(v)} style={{flex:1,padding:"10px 0",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT,border:on?`1.5px solid ${BLUE}`:"1.5px solid #E2E6F0",background:on?BLUE:"#fff",color:on?"#fff":"#5E6A8E",fontWeight:on?700:600}}>{l}</button>
       );})}
     </div>
   );
@@ -4327,7 +4365,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
 }
 
 function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
-  const [view,setView]=useState(()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const [view,setView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const pickView=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
@@ -4343,9 +4381,8 @@ function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
 function MemberList({onOpenMeeting}){
   useSeen();
   const data=useClubMembers();
-  const [q,setQ]=useState("");
-  const [sort,setSort]=useState(()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
-  const pickSort=k=>{setSort(k);try{sessionStorage.setItem("sstc-members-sort",k);}catch(e){}};
+  const [q]=useShared("memQ","");
+  const [sort]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
   const [open,setOpen]=useState(null);
   if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const ym=todayYmd().slice(0,7);
@@ -4367,15 +4404,7 @@ function MemberList({onOpenMeeting}){
   const chip=(n,t)=><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:"#4A5578",background:"#F1F4FA",borderRadius:12,padding:"4px 10px"}}><Ic n={n} s={12} c="#8A93B2"/>{t}</span>;
   return(
     <>
-      <Card style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
-        <input type="search" aria-label="회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임, 본명, 동네, 코트로 찾기" style={inputStyle}/>
-        <div style={{display:"flex",gap:6}}>
-          {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
-            <button key={k} type="button" aria-pressed={sort===k} onClick={()=>pickSort(k)} style={{padding:"6px 12px",borderRadius:12,fontSize:13,whiteSpace:"nowrap",fontWeight:sort===k?600:400,cursor:"pointer",border:`1.5px solid ${sort===k?BLUE:"#D6DEF7"}`,background:sort===k?BLUE:"#fff",color:sort===k?"#fff":"#4A5578"}}>{l}</button>
-          ))}
-          <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"#A3AAC2"}}>{list.length}명</span>
-        </div>
-      </Card>
+      <p style={{margin:"-2px 4px 0",fontSize:12,color:"#8A93B2"}}>{q?`"${q}" 찾은 회원 ${list.length}명`:`회원 ${list.length}명`}</p>
       {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
       {groups.map(gr=>(<React.Fragment key={gr.label||"all"}>
       {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
@@ -4477,6 +4506,7 @@ const GLOBAL_CSS = `
 :root{color-scheme:only light}
 body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
+.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
@@ -4496,9 +4526,69 @@ function CourtLines({opacity=0.14}){
     </g>
   </svg>;
 }
+const headChip={display:"inline-flex",alignItems:"center",gap:4,fontSize:12,fontWeight:700,padding:"4px 9px",borderRadius:8,background:"rgba(255,255,255,0.16)",color:"#fff",whiteSpace:"nowrap"};
 // 작은 테니스공 로고
 const BallMark=({size=20})=><svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill={BALL}/><path d="M4.2 4.8c3.6 3.4 3.6 11 0 14.4M19.8 4.8c-3.6 3.4-3.6 11 0 14.4" fill="none" stroke={GRAD} strokeWidth="1.6" strokeLinecap="round"/></svg>;
 
+// 화면 사이에서 나눠 쓰는 작은 상태 (파란 윗부분과 아래 내용이 같은 값을 봐야 할 때: 달력 달·고른 날, 회원 검색·정렬)
+const SHARED={}, SHARED_SUBS=new Set();
+function useShared(key,init){
+  const [,bump]=useState(0);
+  useEffect(()=>{ const g=()=>bump(x=>x+1); SHARED_SUBS.add(g); return ()=>SHARED_SUBS.delete(g); },[]);
+  if(!(key in SHARED)) SHARED[key]=typeof init==="function"?init():init;
+  return [SHARED[key],v=>{ SHARED[key]=typeof v==="function"?v(SHARED[key]):v; SHARED_SUBS.forEach(g=>g()); }];
+}
+
+// ─── 파란 윗부분에 들어가는 탭별 내용 (회원 검색, 통계 요약, 관리 요약) ─────────
+function MemberSearchHead(){
+  const [view]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const [q,setQ]=useShared("memQ","");
+  const [sort,setSortRaw]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
+  if(view==="board") return null;
+  const setSort=k=>{setSortRaw(k);try{sessionStorage.setItem("sstc-members-sort",k);}catch(e){}};
+  return(
+    <div style={{position:"relative",marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,height:48,padding:"0 14px",borderRadius:14,background:"#fff"}}>
+        <Ic n="search" s={18} c="#8A93B2"/>
+        <input value={q} onChange={e=>setQ(e.target.value)} aria-label="회원 검색" placeholder="닉네임, 본명, 동네, 코트로 찾기" style={{flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",fontSize:16,color:INK,fontFamily:FONT}}/>
+        {q&&<button type="button" aria-label="검색어 지우기" onClick={()=>setQ("")} style={{border:"none",background:"#EDF0F6",borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Ic n="x" s={13} c="#6B7493"/></button>}
+      </label>
+      <div role="group" aria-label="회원 정렬" style={{display:"flex",gap:6,overflowX:"auto"}}>
+        {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"]].map(([k,l])=>(
+          <button key={k} type="button" aria-pressed={sort===k} onClick={()=>setSort(k)} style={{flexShrink:0,padding:"7px 13px",borderRadius:10,border:"none",background:sort===k?BALL:"rgba(255,255,255,0.12)",color:sort===k?INK:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>
+        ))}
+      </div>
+    </div>);
+}
+function StatsHead(){
+  const mine=myHeld();
+  const now=new Date(), bars=[];
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); const key=`${d.getFullYear()}.${pad0(d.getMonth()+1)}`; bars.push({key,label:`${d.getMonth()+1}`,n:mine.filter(m=>m.date.slice(0,7)===key).length}); }
+  const max=Math.max(1,...bars.map(b=>b.n));
+  return(
+    <div style={{position:"relative",marginTop:12,display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:16}}>
+      <div>
+        <p style={{margin:0,fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.75)"}}>누적 참석</p>
+        <p style={{margin:"2px 0 0",color:"#fff",lineHeight:"60px",height:60}}><span style={{fontSize:58,fontWeight:800,letterSpacing:-2,fontVariantNumeric:"tabular-nums"}}>{mine.length}</span><span style={{fontSize:20,fontWeight:700,marginLeft:4}}>회</span></p>
+      </div>
+      <div aria-label="최근 6개월 내 참석" style={{display:"flex",alignItems:"flex-end",gap:8,height:76,paddingBottom:2}}>
+        {bars.map((b,i)=>(
+          <div key={b.key} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <div title={`${b.label}월 ${b.n}회`} style={{width:14,height:Math.max(12,(b.n/max)*56),borderRadius:6,background:i===bars.length-1?BALL:"rgba(255,255,255,0.85)"}}/>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.65)"}}>{b.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>);
+}
+function AdminHead({pending=0,members=0,banners=0}){
+  const tile=(label,val,hot)=>(
+    <div key={label} style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:14,background:hot?BALL:"rgba(255,255,255,0.12)",color:hot?INK:"#fff"}}>
+      <p style={{margin:0,fontSize:12,fontWeight:600,opacity:hot?0.8:0.75}}>{label}</p>
+      <p style={{margin:"2px 0 0",fontSize:24,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{val}</p>
+    </div>);
+  return <div style={{position:"relative",marginTop:14,display:"flex",gap:8}}>{tile("승인 대기",pending,pending>0)}{tile("정회원",members)}{tile("배너",banners)}</div>;
+}
 const iconBtn={width:40,height:40,borderRadius:12,border:"none",background:"rgba(255,255,255,0.14)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
 // 쏘리 낫쏘리 테니스공 캐릭터 (SSTC_app_assets). 표정·손 애니메이션은 src/splash.css의 sp-* 클래스
@@ -4833,7 +4923,7 @@ export default function App() {
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style><UpdateBanner/>
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
-      <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?50:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
+      <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
         <CourtLines/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
@@ -4851,8 +4941,8 @@ export default function App() {
         </div>
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
-            <p style={{margin:"0 0 2px",fontSize:14,opacity:0.75}}>안녕하세요</p>
-            <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
+            <p style={{margin:"0 0 2px",fontSize:14,opacity:0.75}}>{greetLine()}</p>
+            <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님, 안녕하세요{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
               style={{padding:"5px 10px 5px 9px",borderRadius:10,border:"none",background:adminOn?BALL:"rgba(255,255,255,0.14)",color:adminOn?INK:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:0}}>
               <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
             <div style={{display:"flex",gap:22,marginTop:16,alignItems:"flex-start"}}>
@@ -4865,13 +4955,30 @@ export default function App() {
         ):(
           curMeeting?(
             <div style={{position:"relative",marginTop:16}}>
-              <p style={{margin:0,fontSize:28,fontWeight:900,letterSpacing:"-0.035em"}}>{curMeeting.date}</p>
-              <p style={{margin:"4px 0 0",fontSize:15,opacity:0.8,display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={15}/>{curMeeting.place}</p>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <span style={headChip}>{curMeeting.kind==="flash"?<><Ic n="zap" s={12}/> 번개{curMeeting.flashType?` · ${FLASH_TYPE[curMeeting.flashType]}`:""}</>:"정기 모임"}</span>
+                {curMeeting.status==="upcoming"&&!curMeeting.cancelled&&<span style={{...headChip,background:BALL,color:INK}}>{dDay(curMeeting.iso)}</span>}
+                {curMeeting.cancelled&&<span style={{...headChip,background:"#fff",color:GONE.c}}>{goneLabel(curMeeting)}</span>}
+              </div>
+              <p style={{margin:"10px 0 0",fontSize:28,fontWeight:900,letterSpacing:"-0.035em"}}>{curMeeting.date}</p>
+              <p style={{margin:"4px 0 0",fontSize:15,opacity:0.8,display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={15}/>{curMeeting.placeName||curMeeting.place}</p>
             </div>
-          ):<p style={{position:"relative",margin:"18px 0 0",fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}</p>
+          ):(
+            <div style={{position:"relative"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:18}}>
+                <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}{tab==="members"&&clubData&&<span style={{marginLeft:8,opacity:0.55,fontWeight:600}}>{activeMembers(clubData).length}</span>}</p>
+                {tab==="booking"&&<ViewToggle view={bookView} onView={setBookView} dark/>}
+                {tab==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
+              </div>
+              {tab==="booking"&&bookView!=="map"&&<MiniCalendar part="grid" onOpen={id=>openM(id,"info","booking")}/>}
+              {tab==="members"&&<MemberSearchHead/>}
+              {tab==="stats"&&<StatsHead/>}
+              {tab==="admin"&&adminOn&&<AdminHead pending={newPending.length} members={clubData?activeMembers(clubData).length:0} banners={ads.length}/>}
+            </div>
+          )
         )}
       </div>
-      <div style={{flex:1,padding:"20px 16px 110px",marginTop:-26,borderRadius:"26px 26px 0 0",background:PAGE_BG,position:"relative",zIndex:2}}>
+      <div style={{flex:1,padding:"20px 16px 110px",marginTop:isHome?-96:-26,borderRadius:isHome?0:"26px 26px 0 0",background:isHome?`linear-gradient(transparent 96px,${PAGE_BG} 96px)`:PAGE_BG,position:"relative",zIndex:2}}>
         {FB&&account&&account.profile&&!account.profile.realName&&(
           <Card style={{marginBottom:12,display:"flex",alignItems:"center",gap:10,background:"#FFF8EC",border:"1px solid #FDE2B8"}}>
             <span style={{flex:1,fontSize:13,color:"#8A5A12",lineHeight:1.5}}>본명이 아직 없어요. 회원 확인을 위해 본명을 넣어 주세요.</span>
