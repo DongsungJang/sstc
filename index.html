@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=c9ddcab5f6">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=c9ddcab5f6">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fe94a283c0">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fe94a283c0">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -15827,7 +15827,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "c9ddcab5f6";
+const BUILD_ID = "fe94a283c0";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -18066,7 +18066,8 @@ function App() {
       style: {
         display: "flex",
         gap: 6,
-        marginTop: 14
+        marginTop: 14,
+        alignItems: "flex-start"
       }
     }, [["NTRP", pf.ntrp || MEMBER_NTRP[ME] || "-", 1], ["구력", (career || "-").replace(/차$/, ""), 1.7], ["올해", `${yearCount}회`, 1]].map(([k, v, fl]) => /*#__PURE__*/React.createElement("div", {
       key: k,
@@ -18081,17 +18082,22 @@ function App() {
       style: {
         margin: 0,
         fontSize: 11,
+        lineHeight: "14px",
+        height: 14,
         color: "#6B7493"
       }
     }, k), /*#__PURE__*/React.createElement("p", {
       style: {
-        margin: "2px 0 0",
+        margin: "4px 0 0",
         fontSize: 15,
+        lineHeight: "20px",
+        height: 20,
         fontWeight: 800,
         color: INK,
         whiteSpace: "nowrap",
         overflow: "hidden",
-        textOverflow: "ellipsis"
+        textOverflow: "ellipsis",
+        fontVariantNumeric: "tabular-nums"
       }
     }, v)))), /*#__PURE__*/React.createElement("button", {
       type: "button",

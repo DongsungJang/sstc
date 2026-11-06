@@ -5280,9 +5280,9 @@ export default function App() {
                       <p style={{margin:"3px 0 0",fontSize:13,color:"#6B7493"}}>{role}</p>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:6,marginTop:14}}>
+                  <div style={{display:"flex",gap:6,marginTop:14,alignItems:"flex-start"}}>
                     {[["NTRP",pf.ntrp||MEMBER_NTRP[ME]||"-",1],["구력",(career||"-").replace(/차$/,""),1.7],["올해",`${yearCount}회`,1]].map(([k,v,fl])=>(
-                      <div key={k} style={{flex:fl,minWidth:0,background:"#EDF0F6",borderRadius:12,padding:"9px 10px"}}><p style={{margin:0,fontSize:11,color:"#6B7493"}}>{k}</p><p style={{margin:"2px 0 0",fontSize:15,fontWeight:800,color:INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</p></div>
+                      <div key={k} style={{flex:fl,minWidth:0,background:"#EDF0F6",borderRadius:12,padding:"9px 10px"}}><p style={{margin:0,fontSize:11,lineHeight:"14px",height:14,color:"#6B7493"}}>{k}</p><p style={{margin:"4px 0 0",fontSize:15,lineHeight:"20px",height:20,fontWeight:800,color:INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontVariantNumeric:"tabular-nums"}}>{v}</p></div>
                     ))}
                   </div>
                   <button type="button" role="menuitem" onClick={()=>go("edit")} style={{...btnPrimary,marginTop:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={16} stroke={2.2}/>내 정보 수정</button>
