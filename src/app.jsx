@@ -1451,10 +1451,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       {upcoming.length>1&&(
       <div>
         <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
-        <div className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollSnapType:"x mandatory"}}>
+        <div className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollPadding:"0 16px",scrollSnapType:"x mandatory"}}>
           {upcoming.slice(1,7).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
-              style={{flex:"0 0 auto",width:"calc((100% - 42px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"14px 14px 13px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
+              style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"14px 14px 13px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:12}}>
                 <KindBadge m={m}/>
                 <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
@@ -3425,28 +3425,36 @@ function MiniCalendar({onOpen,part}){
         <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,boxSizing:"border-box",borderRadius:12,border:`1.2px solid ${dark?"rgba(255,255,255,0.7)":GONE.c}`}}/>무산</span>
       </div>
     </>);
+  const pickD=pick?new Date(pick+"T00:00:00"):null;
   const pickedPart=picked&&(
-      <div style={{marginTop:part?0:10,paddingTop:part?0:10,borderTop:part?"none":"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:8}}>
-        <p style={{margin:0,fontSize:14,fontWeight:700,color:INK}}>{fmtDate(pick)} 모임 {picked.length}개</p>
-        {picked.map(m=>{ const past=m.status==="past", full=!past&&isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled; return(
-          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:16,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"#E4E9F7"}`,background:gone?GONE.bg:full?FULL.bg:past?"#F1F4FA":"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 8px rgba(33,82,230,0.06)",fontFamily:FONT}}>
-            <span style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
+      <div style={{marginTop:part?0:10,paddingTop:part?0:10,borderTop:part?"none":"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <p style={{margin:0,fontSize:16,fontWeight:900,color:INK}}>{pickD.getMonth()+1}월 {pickD.getDate()}일 {WEEK[pickD.getDay()]}요일</p>
+          <span style={{fontSize:12,color:"#6B7493"}}>{picked.length}개 모임</span>
+        </div>
+        {picked.map(m=>{ const past=m.status==="past", full=!past&&isFull(m), isAtt=(m.attendees||[]).some(a=>a.isMe), gone=m.cancelled, left=Math.max(0,m.total-m.attendees.length), wait=waitN(m);
+          const fill=Math.min(100,Math.round(m.attendees.length/Math.max(1,m.total)*100)); return(
+          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} style={{display:"flex",flexDirection:"column",padding:16,borderRadius:20,border:`1.5px solid ${gone?GONE.line:full?FULL.line:"transparent"}`,background:gone?GONE.bg:"#fff",cursor:"pointer",textAlign:"left",boxShadow:SHADOW,fontFamily:FONT,width:"100%",boxSizing:"border-box"}}>
+            <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%"}}>
               <KindBadge m={m}/>
-              <span style={{fontSize:16,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{m.time}</span>
-              {gone?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:GONE.c,color:"#fff",whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
-                :past?<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:"#E4E9F7",color:"#6B7493",whiteSpace:"nowrap"}}>종료 · {m.attendees.length}명 참석</span>
-                :<span style={{marginLeft:"auto",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:12,background:full?FULL.c:BLUE_LIGHT,color:full?"#fff":BLUE}}>{full?"마감 ":""}{m.attendees.length}/{m.total}명</span>}
+              <span style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",color:gone?GONE.c:past?"#A3AAC2":full?"#E5484D":BLUE}}>
+                {gone?goneLabel(m):past?`종료 · ${m.attendees.length}명 참석`:full?(wait?`마감 · 대기 ${wait}명`:"마감"):`${left}자리 남음`}</span>
             </span>
-            <span style={{fontSize:14,color:"#4A5578",display:"flex",alignItems:"center",gap:5}}><Ic n="pin" s={14}/>{m.placeName||m.place}</span>
-            <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",fontSize:12}}>
-              <span style={{color:gone?GONE.c:isAtt?BLUE:"#A3AAC2",fontWeight:isAtt||gone?700:400}}>{gone?"무산된 모임이에요":past?(isAtt?"참석했어요":"지난 모임이에요"):isAtt?"참석 예정이에요":"아직 참석 안 했어요"}</span>
-              <span style={{color:BLUE,fontWeight:600}}>자세히 보기 →</span>
+            <span style={{marginTop:10,fontSize:18,fontWeight:900,color:past||gone?"#6B7493":INK}}>{m.placeName||m.place}</span>
+            <span style={{marginTop:2,fontSize:14,color:"#6B7493",fontVariantNumeric:"tabular-nums"}}>{m.time}{m.courtNo?` · ${courtLabel(m.courtNo)}`:""}</span>
+            {!gone&&<span style={{display:"flex",alignItems:"center",gap:10,marginTop:12,width:"100%"}}>
+              <span style={{flex:1,height:6,background:full?FULL.line:"#E4E9F4",borderRadius:10}}><span style={{display:"block",height:"100%",width:`${fill}%`,background:full?FULL.bar:BLUE,borderRadius:10}}/></span>
+              <span style={{fontSize:13,fontWeight:700,color:INK,fontVariantNumeric:"tabular-nums"}}>{m.attendees.length}/{m.total}</span>
+            </span>}
+            <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",marginTop:12,fontSize:12}}>
+              <span style={{color:gone?GONE.c:isAtt?BLUE:"#A3AAC2",fontWeight:isAtt||gone?700:400}}>{gone?(gone.memo||"무산된 모임이에요"):past?(isAtt?"참석했어요":"지난 모임이에요"):isAtt?"참석 예정이에요":"아직 참석 안 했어요"}</span>
+              <span style={{color:BLUE,fontWeight:700}}>자세히 보기 →</span>
             </span>
           </button>);})}
       </div>
   );
   if(part==="grid") return <div style={{position:"relative",marginTop:14}}>{gridPart}</div>;
-  if(part==="picked") return picked?<Card style={{padding:14}}>{pickedPart}</Card>:null;
+  if(part==="picked") return picked?pickedPart:null;
   return(
     <Card style={{padding:"12px 12px 10px"}}>
       {gridPart}
@@ -3650,6 +3658,29 @@ function MoreButton({shown,total,onChange}){
     {all?"접기":`더보기 (${Math.min(MORE_STEP,total-shown)}개 더)`}
   </button>;
 }
+// 예약 탭 목록 한 줄: 날짜 칸 · 장소 · 종류·시간 · 오른쪽에 인원(대기·무산)
+function MeetRow({m,past,last,onClick}){
+  const d=new Date((m.iso||"")+"T00:00:00"), ok=!isNaN(d), gone=m.cancelled, wait=waitN(m), isAtt=(m.attendees||[]).some(a=>a.isMe);
+  const dim=past||gone;
+  return(
+    <div role="button" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter")onClick();}}
+      style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:last?"none":"1px solid #E2E7F2",cursor:"pointer"}}>
+      <span style={{width:46,height:46,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
+        <span style={{fontSize:17,fontWeight:800,color:dim?"#A3AAC2":INK}}>{ok?d.getDate():"-"}</span>
+        <span style={{fontSize:10,fontWeight:500,color:"#6B7493",marginTop:3}}>{ok?WEEK[d.getDay()]:""}</span>
+      </span>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{margin:0,fontSize:14,fontWeight:700,color:dim?"#6B7493":INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
+          <span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{m.placeName||m.place}</span>{!dim&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
+        <p style={{margin:"4px 0 0",fontSize:12,color:"#6B7493",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
+          <span style={{flex:"0 0 auto",opacity:dim?0.6:1}}><KindBadge m={m}/></span><span>{m.time}</span>{isAtt&&!gone&&<span style={{color:BLUE,fontWeight:700}}>· {past?"참석했어요":"참석 예정"}</span>}</p>
+      </div>
+      {gone?<span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:10,background:GONE.bg,color:GONE.c,border:`1px solid ${GONE.line}`,whiteSpace:"nowrap"}}>무산</span>
+        :past?<span style={{fontSize:13,fontWeight:700,color:"#A3AAC2",whiteSpace:"nowrap"}}>{m.attendees.length}명</span>
+        :wait?<span style={{fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:10,background:"#FDECEC",color:"#E5484D",whiteSpace:"nowrap"}}>대기 {wait}</span>
+        :<span style={{fontSize:13,fontWeight:700,color:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.attendees.length}<span style={{color:"#A3AAC2"}}>/{m.total}</span></span>}
+    </div>);
+}
 function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate,view,onView}) {
   useSeen();
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"flash";}catch(e){return "flash";}});
@@ -3677,51 +3708,20 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
           </button>);})}
       </div>
       <div>
-        <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:INK}}>다가오는 {label}</p>
-        {upcoming.length===0&&<Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty>}
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {upcoming.slice(0,upN).map(m=>{
-            const fill=Math.min(100,Math.round((m.attendees.length/Math.max(1,m.total))*100));
-            const isAtt=m.attendees.some(a=>a.isMe), full=isFull(m), gone=m.cancelled;
-            return(
-              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:gone?GONE.bg:full?FULL.bg:"#fff",border:`1.5px solid ${gone?GONE.line:full?FULL.line:"transparent"}`,opacity:gone?0.85:1,borderRadius:22,padding:18,boxShadow:SHADOW,cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                  <div>
-                    <p style={{margin:"0 0 4px",fontWeight:700,fontSize:15,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/>{!gone&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
-                    <p style={{margin:"0 0 2px",fontSize:13,color:"#6B7493"}}><Ic n="clock" s={13}/> {m.time}</p>
-                    <p style={{margin:0,fontSize:13,color:"#6B7493"}}><Ic n="pin" s={13}/> {m.placeName||m.place}</p>
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                    {gone?<span style={{background:GONE.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{goneLabel(m)}</span>
-                      :full?<span style={{background:FULL.c,color:"#fff",fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20}}>마감 {m.attendees.length}/{m.total}명</span>
-                      :<span style={{background:BLUE_LIGHT,color:BLUE,fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{m.attendees.length}/{m.total}명</span>}
-                    <WaitTag m={m}/>
-                    {isAtt&&!gone&&<span style={{background:GRAD,color:"#fff",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>참석 예정</span>}
-                  </div>
-                </div>
-                {!gone&&<div style={{height:5,background:full?FULL.line:"#E4E9F7",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:full?FULL.bar:GRAD,borderRadius:10}}/></div>}
-                <p style={{margin:"8px 0 0",fontSize:12,color:gone?GONE.c:full?FULL.c:"#A3AAC2",textAlign:"right"}}>{gone?`모임이 무산됐어요${gone.memo?` · ${gone.memo}`:""}`:full?"정원이 다 찼어요 · 참석하면 대기로 들어가요 →":"탭해서 자세히 보기 →"}</p>
-              </div>
-            );
-          })}
+        <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:"#6B7493"}}>다가오는 {label}</p>
+        {upcoming.length===0&&<div style={{marginTop:8}}><Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty></div>}
+        <div style={{display:"flex",flexDirection:"column"}}>
+          {upcoming.slice(0,upN).map((m,i,arr)=><MeetRow key={m.id} m={m} last={i===arr.length-1} onClick={()=>setSelId(m.id)}/>)}
+          {upcoming.length>MORE_STEP&&<div style={{height:8}}/>}
           <MoreButton shown={upN} total={upcoming.length} onChange={setUpN}/>
         </div>
       </div>
       {past.length>0&&(
         <div>
-          <p style={{margin:"0 0 10px",fontSize:15,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {past.slice(0,pastN).map(m=>(
-              <div key={m.id} onClick={()=>setSelId(m.id)} style={{background:"#F1F4FA",borderRadius:20,padding:14,border:"1px solid #E4E9F7",cursor:"pointer"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <p style={{margin:"0 0 3px",fontWeight:600,fontSize:14,color:"#6B7493"}}>{m.date}</p>
-                    <p style={{margin:0,fontSize:12,color:"#A3AAC2"}}><Ic n="pin" s={13}/> {m.placeName||m.place}{m.cancelled?"":` · ${m.attendees.length}명 참석`}</p>
-                  </div>
-                  <span style={{background:m.cancelled?GONE.c:"#E4E9F7",color:m.cancelled?"#fff":"#A3AAC2",fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{m.cancelled?goneLabel(m):(m.attendees||[]).some(x=>x.isMe)?"참석했어요":"종료"}</span>
-                </div>
-              </div>
-            ))}
+          <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
+          <div style={{display:"flex",flexDirection:"column"}}>
+            {past.slice(0,pastN).map((m,i,arr)=><MeetRow key={m.id} m={m} past last={i===arr.length-1} onClick={()=>setSelId(m.id)}/>)}
+            {past.length>MORE_STEP&&<div style={{height:8}}/>}
             <MoreButton shown={pastN} total={past.length} onChange={setPastN}/>
           </div>
         </div>
@@ -4522,6 +4522,9 @@ function FreeBoard({canWrite,isAdmin,focus}){
   const {names}=useMentions();
   const [form,setForm]=useState(null);     // {initial} | {} | null
   const [openId,setOpenId]=useState(null);
+  const [bq]=useShared("boardQ",""), [bf]=useShared("boardF","all"), [bw]=useShared("boardWrite",0);
+  const firstW=useRef(bw);
+  useEffect(()=>{ if(bw!==firstW.current&&canWrite){ firstW.current=bw; setOpenId(null); setForm({}); } },[bw]);
   const uid=myUid()||myVoteKey();
   const go=id=>{ setOpenId(id); try{window.scrollTo(0,0);}catch(e){} };
   // 글을 열면 NEW가 사라져요 (알림으로 열어도 같음)
@@ -4570,15 +4573,32 @@ function FreeBoard({canWrite,isAdmin,focus}){
     </>);
   } else {
     body=(<>
-      <button type="button" onClick={()=>setForm({})} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"14px 16px",background:"#fff",border:"none",borderRadius:20,boxShadow:"0 4px 16px rgba(40,70,180,0.08)",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
-        <span style={{width:34,height:34,borderRadius:"50%",background:GRAD,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="pencil" size={16} stroke={2}/></span>
-        <span style={{fontSize:14,color:"#A3AAC2"}}>{ME} 님, 오늘 테니스 어땠어요?</span>
-      </button>
-      {posts.length===0&&<Empty>아직 글이 없어요. 첫 글을 남겨 보세요!</Empty>}
-      {posts.map(p=>(
-        <div key={p.id} role="button" tabIndex={0} onClick={()=>go(p.id)} onKeyDown={e=>{if(e.key==="Enter")go(p.id);}} style={{cursor:"pointer"}}>
-          <Card>{head(p)}<PostBody p={p} names={names}/>{foot(p,false)}</Card>
-        </div>))}
+      {(()=>{ const k=bq.trim().toLowerCase();
+        const shown=posts.filter(p=>(bf==="mine"?p.uid===uid:bf==="anon"?!!p.anon:bf==="commented"?toList(p.comments).some(c=>c&&c.text&&c.uid===uid):true)&&(!k||String(p.text||"").toLowerCase().includes(k)));
+        if(posts.length===0) return <Empty action={canWrite?"첫 글 쓰기":null} onAction={()=>setForm({})}>아직 글이 없어요. 첫 글을 남겨 보세요!</Empty>;
+        if(shown.length===0) return <Empty>{k?`"${bq}"가 들어간 글이 없어요.`:"해당하는 글이 없어요."}</Empty>;
+        return shown.map(p=>{ const mine=p.uid===uid, nC=toList(p.comments).filter(c=>c&&c.text).length, lk=Object.keys(p.likes||{}).length, on=!!(p.likes&&p.likes[uid]);
+          const lines=String(p.text||"").split("\n"), hasTitle=lines.length>1||lines[0].length<=40;
+          const title=hasTitle?lines[0]:"", rest=hasTitle?lines.slice(1).join("\n").trim():p.text;
+          return(
+          <div key={p.id} role="button" tabIndex={0} onClick={()=>go(p.id)} onKeyDown={e=>{if(e.key==="Enter")go(p.id);}} style={{cursor:"pointer"}}>
+            <Card style={{padding:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <Avatar name={p.anon?"?":curNick(p.uid,p.name)} photo={p.anon?"":photoOf(p.uid)} size={28} radius={9} bg={p.anon?INK:mine?BALL:BLUE_LIGHT} color={p.anon?BALL:INK} font={12}/>
+                <span style={{fontSize:13,fontWeight:700,color:INK}}>{p.anon?"익명":curNick(p.uid,p.name)}</span>
+                {mine&&<span style={{fontSize:10,fontWeight:700,background:BLUE_LIGHT,color:BLUE,padding:"1px 6px",borderRadius:6}}>{p.anon?"내 글":"나"}</span>}
+                <span style={{fontSize:12,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
+                {isNew(postNewItem(p))&&<NewTag style={{marginLeft:"auto"}}/>}
+              </div>
+              {title&&<p style={{margin:"10px 0 0",fontSize:16,fontWeight:900,color:INK,letterSpacing:"-0.02em",lineHeight:1.4,wordBreak:"keep-all"}}><CommentText text={title} names={names}/></p>}
+              {rest&&<p style={{margin:title?"4px 0 0":"10px 0 0",fontSize:14,color:"#5E6A8E",lineHeight:1.55,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",whiteSpace:"pre-wrap"}}><CommentText text={rest} names={names}/></p>}
+              <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10,fontSize:12,color:"#6B7493",fontWeight:500}}>
+                <span>댓글 {nC}</span>
+                <button type="button" aria-pressed={on} aria-label={on?"좋아요 취소":"좋아요"} onClick={e=>{e.stopPropagation();like(p);}} style={{...small,fontSize:12,fontWeight:on?700:500,color:on?"#ef4444":"#6B7493"}}>좋아요 {lk}</button>
+              </div>
+            </Card>
+          </div>); });
+      })()}
     </>);
   }
   return(<>
@@ -4758,11 +4778,30 @@ function useShared(key,init){
 }
 
 // ─── 파란 윗부분에 들어가는 탭별 내용 (회원 검색, 통계 요약, 관리 요약) ─────────
+// 소곤소곤: 파란 윗부분의 글 찾기 + 보기 고르기 (전체·내 글·댓글 단 글·익명)
+const BOARD_FILTERS=[["all","전체"],["mine","내 글"],["commented","댓글 단 글"],["anon","익명"]];
+function BoardSearchHead(){
+  const [q,setQ]=useShared("boardQ","");
+  const [f,setF]=useShared("boardF","all");
+  return(
+    <div style={{position:"relative",marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,height:48,padding:"0 14px",borderRadius:14,background:"#fff"}}>
+        <Ic n="search" s={18} c={BLUE}/>
+        <input value={q} onChange={e=>setQ(e.target.value)} aria-label="글 찾기" placeholder="글 내용으로 찾기" style={{flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",fontSize:16,color:INK,fontFamily:FONT}}/>
+        {q&&<button type="button" aria-label="검색어 지우기" onClick={()=>setQ("")} style={{border:"none",background:"#EDF0F6",borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Ic n="x" s={13} c="#6B7493"/></button>}
+      </label>
+      <div role="group" aria-label="글 보기" style={{display:"flex",gap:6,overflowX:"auto"}}>
+        {BOARD_FILTERS.map(([k,l])=>(
+          <button key={k} type="button" aria-pressed={f===k} onClick={()=>setF(k)} style={{flexShrink:0,padding:"7px 13px",borderRadius:10,border:"none",background:f===k?BALL:"rgba(255,255,255,0.12)",color:f===k?INK:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>
+        ))}
+      </div>
+    </div>);
+}
 function MemberSearchHead(){
   const [view]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const [q,setQ]=useShared("memQ","");
   const [sort,setSortRaw]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
-  if(view==="board") return null;
+  if(view==="board") return <BoardSearchHead/>;
   const setSort=k=>{setSortRaw(k);try{sessionStorage.setItem("sstc-members-sort",k);}catch(e){}};
   return(
     <div style={{position:"relative",marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
@@ -5064,6 +5103,8 @@ export default function App() {
     .filter(m=>m&&!m.withdrawn&&!clubData.approved[m.uid]&&!clubData.admins[m.uid]).map(pendingNewItem):[];
   const tabBadge={booking:tabNewCount("booking",newMeetings),members:tabNewCount("members",[...newMembers,...newPosts]),admin:tabNewCount("admin",newPending)};
   const membersNew={list:newMembers.filter(isNew).length,board:newPosts.filter(isNew).length};
+  const [memView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const [,setBoardWrite]=useShared("boardWrite",0);
   if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
@@ -5188,6 +5229,7 @@ export default function App() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:18}}>
                 <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}{tab==="members"&&clubData&&<span style={{marginLeft:8,opacity:0.55,fontWeight:600}}>{activeMembers(clubData).length}</span>}</p>
                 {tab==="booking"&&<ViewToggle view={bookView} onView={setBookView} dark/>}
+                {tab==="members"&&memView==="board"&&(!FB||!!(account&&(account.admin||account.approved)))&&<button type="button" aria-label="새 글 쓰기" title="새 글 쓰기" onClick={()=>setBoardWrite(n=>n+1)} style={{...iconBtn,width:46,height:46,borderRadius:14,background:BALL,color:INK}}><Icon name="pencil" size={20} stroke={2.2}/></button>}
                 {tab==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
                 {tab==="admin"&&realAdmin&&<button type="button" onClick={toggleView} style={{...headChip,fontSize:13,padding:"8px 12px",border:"none",cursor:"pointer",fontFamily:FONT}}><Icon name="swap" size={14} stroke={2.2}/>회원 모드로</button>}
               </div>

@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=8174af73d5">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=8174af73d5">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=c9ddcab5f6">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=c9ddcab5f6">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -5043,6 +5043,7 @@ function HomeTab({
       overflowX: "auto",
       margin: "0 -16px",
       padding: "0 16px 2px",
+      scrollPadding: "0 16px",
       scrollSnapType: "x mandatory"
     }
   }, upcoming.slice(1, 7).map(m => /*#__PURE__*/React.createElement("div", {
@@ -5055,7 +5056,7 @@ function HomeTab({
     },
     style: {
       flex: "0 0 auto",
-      width: "calc((100% - 42px) / 2)",
+      width: "calc((100% - 10px) / 2)",
       minWidth: 150,
       boxSizing: "border-box",
       background: m.cancelled ? GONE.bg : "#fff",
@@ -11254,6 +11255,7 @@ function MiniCalendar({
       border: `1.2px solid ${dark ? "rgba(255,255,255,0.7)" : GONE.c}`
     }
   }), "\uBB34\uC0B0")));
+  const pickD = pick ? new Date(pick + "T00:00:00") : null;
   const pickedPart = picked && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: part ? 0 : 10,
@@ -11261,20 +11263,34 @@ function MiniCalendar({
       borderTop: part ? "none" : "1px solid #EEF1FA",
       display: "flex",
       flexDirection: "column",
-      gap: 8
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
-      fontSize: 14,
-      fontWeight: 700,
+      fontSize: 16,
+      fontWeight: 900,
       color: INK
     }
-  }, fmtDate(pick), " \uBAA8\uC784 ", picked.length, "\uAC1C"), picked.map(m => {
+  }, pickD.getMonth() + 1, "\uC6D4 ", pickD.getDate(), "\uC77C ", WEEK[pickD.getDay()], "\uC694\uC77C"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#6B7493"
+    }
+  }, picked.length, "\uAC1C \uBAA8\uC784")), picked.map(m => {
     const past = m.status === "past",
       full = !past && isFull(m),
       isAtt = (m.attendees || []).some(a => a.isMe),
-      gone = m.cancelled;
+      gone = m.cancelled,
+      left = Math.max(0, m.total - m.attendees.length),
+      wait = waitN(m);
+    const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.total) * 100));
     return /*#__PURE__*/React.createElement("button", {
       key: m.id,
       type: "button",
@@ -11282,81 +11298,84 @@ function MiniCalendar({
       style: {
         display: "flex",
         flexDirection: "column",
-        gap: 6,
-        padding: "12px 14px",
-        borderRadius: 16,
-        border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "#E4E9F7"}`,
-        background: gone ? GONE.bg : full ? FULL.bg : past ? "#F1F4FA" : "#fff",
+        padding: 16,
+        borderRadius: 20,
+        border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "transparent"}`,
+        background: gone ? GONE.bg : "#fff",
         cursor: "pointer",
         textAlign: "left",
-        boxShadow: "0 2px 8px rgba(33,82,230,0.06)",
-        fontFamily: FONT
+        boxShadow: SHADOW,
+        fontFamily: FONT,
+        width: "100%",
+        boxSizing: "border-box"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        justifyContent: "space-between",
         width: "100%"
       }
     }, /*#__PURE__*/React.createElement(KindBadge, {
       m: m
     }), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 16,
+        fontSize: 12,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        color: gone ? GONE.c : past ? "#A3AAC2" : full ? "#E5484D" : BLUE
+      }
+    }, gone ? goneLabel(m) : past ? `종료 · ${m.attendees.length}명 참석` : full ? wait ? `마감 · 대기 ${wait}명` : "마감" : `${left}자리 남음`)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginTop: 10,
+        fontSize: 18,
+        fontWeight: 900,
+        color: past || gone ? "#6B7493" : INK
+      }
+    }, m.placeName || m.place), /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginTop: 2,
+        fontSize: 14,
+        color: "#6B7493",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, m.time, m.courtNo ? ` · ${courtLabel(m.courtNo)}` : ""), !gone && /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginTop: 12,
+        width: "100%"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        height: 6,
+        background: full ? FULL.line : "#E4E9F4",
+        borderRadius: 10
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        height: "100%",
+        width: `${fill}%`,
+        background: full ? FULL.bar : BLUE,
+        borderRadius: 10
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
         fontWeight: 700,
         color: INK,
         fontVariantNumeric: "tabular-nums"
       }
-    }, m.time), gone ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: "auto",
-        fontSize: 12,
-        fontWeight: 700,
-        padding: "3px 10px",
-        borderRadius: 12,
-        background: GONE.c,
-        color: "#fff",
-        whiteSpace: "nowrap"
-      }
-    }, goneLabel(m)) : past ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: "auto",
-        fontSize: 12,
-        fontWeight: 700,
-        padding: "3px 10px",
-        borderRadius: 12,
-        background: "#E4E9F7",
-        color: "#6B7493",
-        whiteSpace: "nowrap"
-      }
-    }, "\uC885\uB8CC \xB7 ", m.attendees.length, "\uBA85 \uCC38\uC11D") : /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: "auto",
-        fontSize: 12,
-        fontWeight: 700,
-        padding: "3px 10px",
-        borderRadius: 12,
-        background: full ? FULL.c : BLUE_LIGHT,
-        color: full ? "#fff" : BLUE
-      }
-    }, full ? "마감 " : "", m.attendees.length, "/", m.total, "\uBA85")), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        color: "#4A5578",
-        display: "flex",
-        alignItems: "center",
-        gap: 5
-      }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: "pin",
-      s: 14
-    }), m.placeName || m.place), /*#__PURE__*/React.createElement("span", {
+    }, m.attendees.length, "/", m.total)), /*#__PURE__*/React.createElement("span", {
       style: {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         width: "100%",
+        marginTop: 12,
         fontSize: 12
       }
     }, /*#__PURE__*/React.createElement("span", {
@@ -11364,10 +11383,10 @@ function MiniCalendar({
         color: gone ? GONE.c : isAtt ? BLUE : "#A3AAC2",
         fontWeight: isAtt || gone ? 700 : 400
       }
-    }, gone ? "무산된 모임이에요" : past ? isAtt ? "참석했어요" : "지난 모임이에요" : isAtt ? "참석 예정이에요" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
+    }, gone ? gone.memo || "무산된 모임이에요" : past ? isAtt ? "참석했어요" : "지난 모임이에요" : isAtt ? "참석 예정이에요" : "아직 참석 안 했어요"), /*#__PURE__*/React.createElement("span", {
       style: {
         color: BLUE,
-        fontWeight: 600
+        fontWeight: 700
       }
     }, "\uC790\uC138\uD788 \uBCF4\uAE30 \u2192")));
   }));
@@ -11377,11 +11396,7 @@ function MiniCalendar({
       marginTop: 14
     }
   }, gridPart);
-  if (part === "picked") return picked ? /*#__PURE__*/React.createElement(Card, {
-    style: {
-      padding: 14
-    }
-  }, pickedPart) : null;
+  if (part === "picked") return picked ? pickedPart : null;
   return /*#__PURE__*/React.createElement(Card, {
     style: {
       padding: "12px 12px 10px"
@@ -12186,6 +12201,151 @@ function MoreButton({
     }
   }, all ? "접기" : `더보기 (${Math.min(MORE_STEP, total - shown)}개 더)`);
 }
+// 예약 탭 목록 한 줄: 날짜 칸 · 장소 · 종류·시간 · 오른쪽에 인원(대기·무산)
+function MeetRow({
+  m,
+  past,
+  last,
+  onClick
+}) {
+  const d = new Date((m.iso || "") + "T00:00:00"),
+    ok = !isNaN(d),
+    gone = m.cancelled,
+    wait = waitN(m),
+    isAtt = (m.attendees || []).some(a => a.isMe);
+  const dim = past || gone;
+  return /*#__PURE__*/React.createElement("div", {
+    role: "button",
+    tabIndex: 0,
+    onClick: onClick,
+    onKeyDown: e => {
+      if (e.key === "Enter") onClick();
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 0",
+      borderBottom: last ? "none" : "1px solid #E2E7F2",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 46,
+      height: 46,
+      flex: "0 0 auto",
+      borderRadius: 12,
+      background: dim ? "#F4F6FB" : "#fff",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      lineHeight: 1,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 17,
+      fontWeight: 800,
+      color: dim ? "#A3AAC2" : INK
+    }
+  }, ok ? d.getDate() : "-"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 500,
+      color: "#6B7493",
+      marginTop: 3
+    }
+  }, ok ? WEEK[d.getDay()] : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 700,
+      color: dim ? "#6B7493" : INK,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, m.placeName || m.place), !dim && isNew(meetingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 12,
+      color: "#6B7493",
+      fontVariantNumeric: "tabular-nums",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: "0 0 auto",
+      opacity: dim ? 0.6 : 1
+    }
+  }, /*#__PURE__*/React.createElement(KindBadge, {
+    m: m
+  })), /*#__PURE__*/React.createElement("span", null, m.time), isAtt && !gone && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: BLUE,
+      fontWeight: 700
+    }
+  }, "\xB7 ", past ? "참석했어요" : "참석 예정"))), gone ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      padding: "4px 10px",
+      borderRadius: 10,
+      background: GONE.bg,
+      color: GONE.c,
+      border: `1px solid ${GONE.line}`,
+      whiteSpace: "nowrap"
+    }
+  }, "\uBB34\uC0B0") : past ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#A3AAC2",
+      whiteSpace: "nowrap"
+    }
+  }, m.attendees.length, "\uBA85") : wait ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      padding: "4px 10px",
+      borderRadius: 10,
+      background: "#FDECEC",
+      color: "#E5484D",
+      whiteSpace: "nowrap"
+    }
+  }, "\uB300\uAE30 ", wait) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: isFull(m) ? FULL.c : INK,
+      fontVariantNumeric: "tabular-nums",
+      whiteSpace: "nowrap"
+    }
+  }, m.attendees.length, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, "/", m.total)));
+}
 function BookingTab({
   open,
   onOpen,
@@ -12319,202 +12479,59 @@ function BookingTab({
     }));
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 10px",
-      fontSize: 15,
+      margin: "0 0 2px",
+      fontSize: 13,
       fontWeight: 700,
-      color: INK
+      color: "#6B7493"
     }
-  }, "\uB2E4\uAC00\uC624\uB294 ", label), upcoming.length === 0 && /*#__PURE__*/React.createElement(Empty, {
+  }, "\uB2E4\uAC00\uC624\uB294 ", label), upcoming.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(Empty, {
     action: `+ ${label} 만들기`,
     onAction: () => onCreate(kind)
-  }, ready ? `아직 잡힌 ${label}이 없어요.` : "모임을 불러오는 중이에요…"), /*#__PURE__*/React.createElement("div", {
+  }, ready ? `아직 잡힌 ${label}이 없어요.` : "모임을 불러오는 중이에요…")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      flexDirection: "column",
-      gap: 10
+      flexDirection: "column"
     }
-  }, upcoming.slice(0, upN).map(m => {
-    const fill = Math.min(100, Math.round(m.attendees.length / Math.max(1, m.total) * 100));
-    const isAtt = m.attendees.some(a => a.isMe),
-      full = isFull(m),
-      gone = m.cancelled;
-    return /*#__PURE__*/React.createElement("div", {
-      key: m.id,
-      onClick: () => setSelId(m.id),
-      style: {
-        background: gone ? GONE.bg : full ? FULL.bg : "#fff",
-        border: `1.5px solid ${gone ? GONE.line : full ? FULL.line : "transparent"}`,
-        opacity: gone ? 0.85 : 1,
-        borderRadius: 22,
-        padding: 18,
-        boxShadow: SHADOW,
-        cursor: "pointer"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 10
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: "0 0 4px",
-        fontWeight: 700,
-        fontSize: 15,
-        color: INK,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        flexWrap: "wrap"
-      }
-    }, m.date, /*#__PURE__*/React.createElement(KindBadge, {
-      m: m
-    }), !gone && isNew(meetingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: "0 0 2px",
-        fontSize: 13,
-        color: "#6B7493"
-      }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: "clock",
-      s: 13
-    }), " ", m.time), /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: 0,
-        fontSize: 13,
-        color: "#6B7493"
-      }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: "pin",
-      s: 13
-    }), " ", m.placeName || m.place)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-end",
-        gap: 6
-      }
-    }, gone ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        background: GONE.c,
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: 700,
-        padding: "3px 10px",
-        borderRadius: 20,
-        whiteSpace: "nowrap"
-      }
-    }, goneLabel(m)) : full ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        background: FULL.c,
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: 700,
-        padding: "3px 10px",
-        borderRadius: 20
-      }
-    }, "\uB9C8\uAC10 ", m.attendees.length, "/", m.total, "\uBA85") : /*#__PURE__*/React.createElement("span", {
-      style: {
-        background: BLUE_LIGHT,
-        color: BLUE,
-        fontSize: 12,
-        fontWeight: 600,
-        padding: "3px 10px",
-        borderRadius: 20
-      }
-    }, m.attendees.length, "/", m.total, "\uBA85"), /*#__PURE__*/React.createElement(WaitTag, {
-      m: m
-    }), isAtt && !gone && /*#__PURE__*/React.createElement("span", {
-      style: {
-        background: GRAD,
-        color: "#fff",
-        fontSize: 11,
-        fontWeight: 600,
-        padding: "3px 10px",
-        borderRadius: 20
-      }
-    }, "\uCC38\uC11D \uC608\uC815"))), !gone && /*#__PURE__*/React.createElement("div", {
-      style: {
-        height: 5,
-        background: full ? FULL.line : "#E4E9F7",
-        borderRadius: 10
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        height: "100%",
-        width: `${fill}%`,
-        background: full ? FULL.bar : GRAD,
-        borderRadius: 10
-      }
-    })), /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: "8px 0 0",
-        fontSize: 12,
-        color: gone ? GONE.c : full ? FULL.c : "#A3AAC2",
-        textAlign: "right"
-      }
-    }, gone ? `모임이 무산됐어요${gone.memo ? ` · ${gone.memo}` : ""}` : full ? "정원이 다 찼어요 · 참석하면 대기로 들어가요 →" : "탭해서 자세히 보기 →"));
+  }, upcoming.slice(0, upN).map((m, i, arr) => /*#__PURE__*/React.createElement(MeetRow, {
+    key: m.id,
+    m: m,
+    last: i === arr.length - 1,
+    onClick: () => setSelId(m.id)
+  })), upcoming.length > MORE_STEP && /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 8
+    }
   }), /*#__PURE__*/React.createElement(MoreButton, {
     shown: upN,
     total: upcoming.length,
     onChange: setUpN
   }))), past.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 10px",
-      fontSize: 15,
+      margin: "0 0 2px",
+      fontSize: 13,
       fontWeight: 700,
       color: "#A3AAC2"
     }
   }, "\uC9C0\uB09C \uBAA8\uC784"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      flexDirection: "column",
-      gap: 8
+      flexDirection: "column"
     }
-  }, past.slice(0, pastN).map(m => /*#__PURE__*/React.createElement("div", {
+  }, past.slice(0, pastN).map((m, i, arr) => /*#__PURE__*/React.createElement(MeetRow, {
     key: m.id,
-    onClick: () => setSelId(m.id),
+    m: m,
+    past: true,
+    last: i === arr.length - 1,
+    onClick: () => setSelId(m.id)
+  })), past.length > MORE_STEP && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#F1F4FA",
-      borderRadius: 20,
-      padding: 14,
-      border: "1px solid #E4E9F7",
-      cursor: "pointer"
+      height: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: "0 0 3px",
-      fontWeight: 600,
-      fontSize: 14,
-      color: "#6B7493"
-    }
-  }, m.date), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 12,
-      color: "#A3AAC2"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "pin",
-    s: 13
-  }), " ", m.placeName || m.place, m.cancelled ? "" : ` · ${m.attendees.length}명 참석`)), /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: m.cancelled ? GONE.c : "#E4E9F7",
-      color: m.cancelled ? "#fff" : "#A3AAC2",
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "3px 10px",
-      borderRadius: 20,
-      whiteSpace: "nowrap"
-    }
-  }, m.cancelled ? goneLabel(m) : (m.attendees || []).some(x => x.isMe) ? "참석했어요" : "종료")))), /*#__PURE__*/React.createElement(MoreButton, {
+  }), /*#__PURE__*/React.createElement(MoreButton, {
     shown: pastN,
     total: past.length,
     onChange: setPastN
@@ -15051,6 +15068,17 @@ function FreeBoard({
   } = useMentions();
   const [form, setForm] = useState(null); // {initial} | {} | null
   const [openId, setOpenId] = useState(null);
+  const [bq] = useShared("boardQ", ""),
+    [bf] = useShared("boardF", "all"),
+    [bw] = useShared("boardWrite", 0);
+  const firstW = useRef(bw);
+  useEffect(() => {
+    if (bw !== firstW.current && canWrite) {
+      firstW.current = bw;
+      setOpenId(null);
+      setForm({});
+    }
+  }, [bw]);
   const uid = myUid() || myVoteKey();
   const go = id => {
     setOpenId(id);
@@ -15301,59 +15329,131 @@ function FreeBoard({
       }
     }));
   } else {
-    body = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => setForm({}),
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "100%",
-        padding: "14px 16px",
-        background: "#fff",
-        border: "none",
-        borderRadius: 20,
-        boxShadow: "0 4px 16px rgba(40,70,180,0.08)",
-        cursor: "pointer",
-        textAlign: "left",
-        fontFamily: FONT
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 34,
-        height: 34,
-        borderRadius: "50%",
-        background: GRAD,
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, /*#__PURE__*/React.createElement(Icon, {
-      name: "pencil",
-      size: 16,
-      stroke: 2
-    })), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        color: "#A3AAC2"
-      }
-    }, ME, " \uB2D8, \uC624\uB298 \uD14C\uB2C8\uC2A4 \uC5B4\uB560\uC5B4\uC694?")), posts.length === 0 && /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uAE00\uC774 \uC5C6\uC5B4\uC694. \uCCAB \uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694!"), posts.map(p => /*#__PURE__*/React.createElement("div", {
-      key: p.id,
-      role: "button",
-      tabIndex: 0,
-      onClick: () => go(p.id),
-      onKeyDown: e => {
-        if (e.key === "Enter") go(p.id);
-      },
-      style: {
-        cursor: "pointer"
-      }
-    }, /*#__PURE__*/React.createElement(Card, null, head(p), /*#__PURE__*/React.createElement(PostBody, {
-      p: p,
-      names: names
-    }), foot(p, false)))));
+    body = /*#__PURE__*/React.createElement(React.Fragment, null, (() => {
+      const k = bq.trim().toLowerCase();
+      const shown = posts.filter(p => (bf === "mine" ? p.uid === uid : bf === "anon" ? !!p.anon : bf === "commented" ? toList(p.comments).some(c => c && c.text && c.uid === uid) : true) && (!k || String(p.text || "").toLowerCase().includes(k)));
+      if (posts.length === 0) return /*#__PURE__*/React.createElement(Empty, {
+        action: canWrite ? "첫 글 쓰기" : null,
+        onAction: () => setForm({})
+      }, "\uC544\uC9C1 \uAE00\uC774 \uC5C6\uC5B4\uC694. \uCCAB \uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694!");
+      if (shown.length === 0) return /*#__PURE__*/React.createElement(Empty, null, k ? `"${bq}"가 들어간 글이 없어요.` : "해당하는 글이 없어요.");
+      return shown.map(p => {
+        const mine = p.uid === uid,
+          nC = toList(p.comments).filter(c => c && c.text).length,
+          lk = Object.keys(p.likes || {}).length,
+          on = !!(p.likes && p.likes[uid]);
+        const lines = String(p.text || "").split("\n"),
+          hasTitle = lines.length > 1 || lines[0].length <= 40;
+        const title = hasTitle ? lines[0] : "",
+          rest = hasTitle ? lines.slice(1).join("\n").trim() : p.text;
+        return /*#__PURE__*/React.createElement("div", {
+          key: p.id,
+          role: "button",
+          tabIndex: 0,
+          onClick: () => go(p.id),
+          onKeyDown: e => {
+            if (e.key === "Enter") go(p.id);
+          },
+          style: {
+            cursor: "pointer"
+          }
+        }, /*#__PURE__*/React.createElement(Card, {
+          style: {
+            padding: 16
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8
+          }
+        }, /*#__PURE__*/React.createElement(Avatar, {
+          name: p.anon ? "?" : curNick(p.uid, p.name),
+          photo: p.anon ? "" : photoOf(p.uid),
+          size: 28,
+          radius: 9,
+          bg: p.anon ? INK : mine ? BALL : BLUE_LIGHT,
+          color: p.anon ? BALL : INK,
+          font: 12
+        }), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 13,
+            fontWeight: 700,
+            color: INK
+          }
+        }, p.anon ? "익명" : curNick(p.uid, p.name)), mine && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 10,
+            fontWeight: 700,
+            background: BLUE_LIGHT,
+            color: BLUE,
+            padding: "1px 6px",
+            borderRadius: 6
+          }
+        }, p.anon ? "내 글" : "나"), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 12,
+            color: "#A3AAC2"
+          }
+        }, ago(p.at), p.editedAt ? " · 수정됨" : ""), isNew(postNewItem(p)) && /*#__PURE__*/React.createElement(NewTag, {
+          style: {
+            marginLeft: "auto"
+          }
+        })), title && /*#__PURE__*/React.createElement("p", {
+          style: {
+            margin: "10px 0 0",
+            fontSize: 16,
+            fontWeight: 900,
+            color: INK,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.4,
+            wordBreak: "keep-all"
+          }
+        }, /*#__PURE__*/React.createElement(CommentText, {
+          text: title,
+          names: names
+        })), rest && /*#__PURE__*/React.createElement("p", {
+          style: {
+            margin: title ? "4px 0 0" : "10px 0 0",
+            fontSize: 14,
+            color: "#5E6A8E",
+            lineHeight: 1.55,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            whiteSpace: "pre-wrap"
+          }
+        }, /*#__PURE__*/React.createElement(CommentText, {
+          text: rest,
+          names: names
+        })), /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            marginTop: 10,
+            fontSize: 12,
+            color: "#6B7493",
+            fontWeight: 500
+          }
+        }, /*#__PURE__*/React.createElement("span", null, "\uB313\uAE00 ", nC), /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          "aria-pressed": on,
+          "aria-label": on ? "좋아요 취소" : "좋아요",
+          onClick: e => {
+            e.stopPropagation();
+            like(p);
+          },
+          style: {
+            ...small,
+            fontSize: 12,
+            fontWeight: on ? 700 : 500,
+            color: on ? "#ef4444" : "#6B7493"
+          }
+        }, "\uC88B\uC544\uC694 ", lk))));
+      });
+    })());
   }
   return /*#__PURE__*/React.createElement(React.Fragment, null, body, form && /*#__PURE__*/React.createElement(PostForm, {
     initial: form.initial,
@@ -15727,7 +15827,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "8174af73d5";
+const BUILD_ID = "c9ddcab5f6";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -15964,6 +16064,95 @@ function useShared(key, init) {
 }
 
 // ─── 파란 윗부분에 들어가는 탭별 내용 (회원 검색, 통계 요약, 관리 요약) ─────────
+// 소곤소곤: 파란 윗부분의 글 찾기 + 보기 고르기 (전체·내 글·댓글 단 글·익명)
+const BOARD_FILTERS = [["all", "전체"], ["mine", "내 글"], ["commented", "댓글 단 글"], ["anon", "익명"]];
+function BoardSearchHead() {
+  const [q, setQ] = useShared("boardQ", "");
+  const [f, setF] = useShared("boardF", "all");
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      marginTop: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      height: 48,
+      padding: "0 14px",
+      borderRadius: 14,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "search",
+    s: 18,
+    c: BLUE
+  }), /*#__PURE__*/React.createElement("input", {
+    value: q,
+    onChange: e => setQ(e.target.value),
+    "aria-label": "\uAE00 \uCC3E\uAE30",
+    placeholder: "\uAE00 \uB0B4\uC6A9\uC73C\uB85C \uCC3E\uAE30",
+    style: {
+      flex: 1,
+      minWidth: 0,
+      border: "none",
+      outline: "none",
+      background: "transparent",
+      fontSize: 16,
+      color: INK,
+      fontFamily: FONT
+    }
+  }), q && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "\uAC80\uC0C9\uC5B4 \uC9C0\uC6B0\uAE30",
+    onClick: () => setQ(""),
+    style: {
+      border: "none",
+      background: "#EDF0F6",
+      borderRadius: 8,
+      width: 26,
+      height: 26,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "x",
+    s: 13,
+    c: "#6B7493"
+  }))), /*#__PURE__*/React.createElement("div", {
+    role: "group",
+    "aria-label": "\uAE00 \uBCF4\uAE30",
+    style: {
+      display: "flex",
+      gap: 6,
+      overflowX: "auto"
+    }
+  }, BOARD_FILTERS.map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    "aria-pressed": f === k,
+    onClick: () => setF(k),
+    style: {
+      flexShrink: 0,
+      padding: "7px 13px",
+      borderRadius: 10,
+      border: "none",
+      background: f === k ? BALL : "rgba(255,255,255,0.12)",
+      color: f === k ? INK : "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, l))));
+}
 function MemberSearchHead() {
   const [view] = useShared("memView", () => {
     try {
@@ -15980,7 +16169,7 @@ function MemberSearchHead() {
       return "name";
     }
   });
-  if (view === "board") return null;
+  if (view === "board") return /*#__PURE__*/React.createElement(BoardSearchHead, null);
   const setSort = k => {
     setSortRaw(k);
     try {
@@ -17064,6 +17253,14 @@ function App() {
     list: newMembers.filter(isNew).length,
     board: newPosts.filter(isNew).length
   };
+  const [memView] = useShared("memView", () => {
+    try {
+      return sessionStorage.getItem("sstc-members-view") || "list";
+    } catch (e) {
+      return "list";
+    }
+  });
+  const [, setBoardWrite] = useShared("boardWrite", 0);
   if (splash) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
   }), /*#__PURE__*/React.createElement(UpdateBanner, null));
@@ -17628,7 +17825,24 @@ function App() {
     view: bookView,
     onView: setBookView,
     dark: true
-  }), tab === "stats" && /*#__PURE__*/React.createElement("span", {
+  }), tab === "members" && memView === "board" && (!FB || !!(account && (account.admin || account.approved))) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "\uC0C8 \uAE00 \uC4F0\uAE30",
+    title: "\uC0C8 \uAE00 \uC4F0\uAE30",
+    onClick: () => setBoardWrite(n => n + 1),
+    style: {
+      ...iconBtn,
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      background: BALL,
+      color: INK
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pencil",
+    size: 20,
+    stroke: 2.2
+  })), tab === "stats" && /*#__PURE__*/React.createElement("span", {
     style: {
       ...headChip,
       fontSize: 13,
