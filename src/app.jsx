@@ -183,8 +183,8 @@ function buildMeetings(all){
   return MEETINGS;
 }
 function refreshAttendance(){ MEETINGS.forEach(m=>{const r=resolveVotes(m,m.votes);m.attendees=r.confirmed;m.waitlist=r.waitlist;}); }
-// 이미 열린(오늘 포함) 모임, 참석 횟수, 랭킹 — 홈·통계에서 씀 (게스트 제외)
-const heldMeetings=()=>MEETINGS.filter(m=>m.iso<=todayYmd()&&!m.cancelled);
+// 끝난 모임, 참석 횟수, 랭킹 — 홈·통계에서 씀 (게스트 제외)
+const heldMeetings=()=>MEETINGS.filter(m=>m.status==="past"&&!m.cancelled);   // 끝난 모임만 (오늘 모임도 끝나기 전엔 안 셈)
 const myHeld=()=>heldMeetings().filter(m=>(m.attendees||[]).some(a=>a.isMe));
 function rankingOf(list){
   const c={};
