@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=23b1a2e6ff">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=23b1a2e6ff">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=8174af73d5">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=8174af73d5">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -15727,7 +15727,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "23b1a2e6ff";
+const BUILD_ID = "8174af73d5";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -17344,7 +17344,7 @@ function App() {
     style: {
       background: GRAD,
       color: "#fff",
-      padding: `14px 20px ${isHome ? 100 : 46}px`,
+      padding: `max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome ? 100 : 46}px`,
       position: "relative",
       overflow: "hidden",
       boxSizing: "border-box",
@@ -17432,10 +17432,11 @@ function App() {
     style: {
       ...iconBtn,
       overflow: "hidden",
-      padding: 0
+      padding: 0,
+      boxShadow: `0 0 0 2.5px ${BALL}`
     },
-    title: "\uB0B4 \uBA54\uB274",
-    "aria-label": "\uB0B4 \uBA54\uB274",
+    title: "\uB0B4 \uC815\uBCF4",
+    "aria-label": "\uB0B4 \uC815\uBCF4 \uBA54\uB274",
     "aria-expanded": menu
   }, photoOf(myUid()) ? /*#__PURE__*/React.createElement("img", {
     src: photoOf(myUid()),
@@ -17470,7 +17471,30 @@ function App() {
       flexWrap: "wrap",
       gap: 8
     }
-  }, ME, " \uB2D8, \uC548\uB155\uD558\uC138\uC694", realAdmin && /*#__PURE__*/React.createElement("button", {
+  }, ME, " \uB2D8, \uC548\uB155\uD558\uC138\uC694", /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMyInfo("edit"),
+    "aria-label": "\uB0B4 \uC815\uBCF4 \uC218\uC815",
+    title: "\uB0B4 \uC815\uBCF4 \uC218\uC815",
+    style: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      border: "none",
+      background: "rgba(255,255,255,0.16)",
+      color: "#fff",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      padding: 0,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pencil",
+    size: 16,
+    stroke: 2.2
+  })), realAdmin && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: toggleView,
     "aria-label": adminOn ? "회원 모드로 보기" : "관리자 모드로 보기",
@@ -17756,47 +17780,161 @@ function App() {
     style: {
       position: "fixed",
       inset: 0,
-      zIndex: 40
+      zIndex: 40,
+      background: "rgba(11,30,91,0.28)"
     }
-  }), /*#__PURE__*/React.createElement("div", {
-    role: "menu",
-    style: {
-      position: "fixed",
-      right: "max(20px, calc(50% - 200px))",
-      top: 62,
-      zIndex: 41,
-      background: "#fff",
-      borderRadius: 18,
-      boxShadow: "0 12px 32px rgba(20,40,120,0.22)",
-      padding: 6,
-      minWidth: 150
-    }
-  }, [["내 정보 보기", () => {
-    setMenu(false);
-    setMyInfo(true);
-  }, INK], ["로그아웃", () => {
-    setMenu(false);
-    logout();
-  }, "#ef4444"]].map(([l, f, c]) => /*#__PURE__*/React.createElement("button", {
-    key: l,
-    type: "button",
-    role: "menuitem",
-    onClick: f,
-    style: {
-      display: "block",
-      width: "100%",
-      textAlign: "left",
-      padding: "11px 14px",
-      background: "none",
-      border: "none",
-      borderRadius: 12,
-      fontSize: 14,
-      fontWeight: 600,
-      color: c,
-      cursor: "pointer",
-      fontFamily: FONT
-    }
-  }, l)))), noti && /*#__PURE__*/React.createElement(NotiSheet, {
+  }), (() => {
+    const pf = account && account.profile || {},
+      career = calcCareer(pf.tennisStart);
+    const role = [account && account.admin ? "운영진" : account && account.approved ? "정회원" : FB ? "준회원" : "데모"].join("");
+    const go = v => {
+      setMenu(false);
+      setMyInfo(v);
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      role: "menu",
+      "aria-label": "\uB0B4 \uC815\uBCF4",
+      style: {
+        position: "fixed",
+        right: "max(16px, calc(50% - 204px))",
+        top: "calc(max(26px, calc(env(safe-area-inset-top,0px) + 14px)) + 50px)",
+        zIndex: 41,
+        width: 288,
+        maxWidth: "calc(100vw - 32px)",
+        boxSizing: "border-box",
+        background: "#fff",
+        borderRadius: 22,
+        boxShadow: "0 16px 40px rgba(11,30,91,0.28)",
+        padding: 18,
+        fontFamily: FONT
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: ME,
+      photo: photoOf(myUid()) || pf.photo,
+      size: 56,
+      radius: 17,
+      bg: BALL,
+      zoom: false,
+      font: 22
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 18,
+        fontWeight: 800,
+        color: INK,
+        letterSpacing: "-0.02em"
+      }
+    }, ME, pf.realName && pf.realName !== ME && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 5,
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#6B7493"
+      }
+    }, pf.realName)), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "3px 0 0",
+        fontSize: 13,
+        color: "#6B7493"
+      }
+    }, role))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginTop: 14
+      }
+    }, [["NTRP", pf.ntrp || MEMBER_NTRP[ME] || "-", 1], ["구력", (career || "-").replace(/차$/, ""), 1.7], ["올해", `${yearCount}회`, 1]].map(([k, v, fl]) => /*#__PURE__*/React.createElement("div", {
+      key: k,
+      style: {
+        flex: fl,
+        minWidth: 0,
+        background: "#EDF0F6",
+        borderRadius: 12,
+        padding: "9px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: 0,
+        fontSize: 11,
+        color: "#6B7493"
+      }
+    }, k), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "2px 0 0",
+        fontSize: 15,
+        fontWeight: 800,
+        color: INK,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, v)))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      role: "menuitem",
+      onClick: () => go("edit"),
+      style: {
+        ...btnPrimary,
+        marginTop: 14,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "pencil",
+      size: 16,
+      stroke: 2.2
+    }), "\uB0B4 \uC815\uBCF4 \uC218\uC815"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      role: "menuitem",
+      onClick: () => go(true),
+      style: {
+        background: "none",
+        border: "none",
+        padding: "6px 2px",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#5E6A8E",
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, "\uB0B4 \uC815\uBCF4 \uBCF4\uAE30"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      role: "menuitem",
+      onClick: () => {
+        setMenu(false);
+        logout();
+      },
+      style: {
+        background: "none",
+        border: "none",
+        padding: "6px 2px",
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#8A93B2",
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, "\uB85C\uADF8\uC544\uC6C3")));
+  })()), noti && /*#__PURE__*/React.createElement(NotiSheet, {
     items: noti,
     isAdmin: adminOn,
     onClose: () => setNoti(null),

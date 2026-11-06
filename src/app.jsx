@@ -5143,7 +5143,7 @@ export default function App() {
       <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
-      <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
+      <div style={{background:GRAD,color:"#fff",padding:`max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
         {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
@@ -5155,14 +5155,14 @@ export default function App() {
               {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #2152E6"}}>{club.unread>9?"9+":club.unread}</span>}
             </button>
             <div style={{position:"relative"}}>
-              <button type="button" onClick={()=>setMenu(v=>!v)} style={{...iconBtn,overflow:"hidden",padding:0}} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}>{photoOf(myUid())?<img src={photoOf(myUid())} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="user" size={19}/>}</button>
+              <button type="button" onClick={()=>setMenu(v=>!v)} style={{...iconBtn,overflow:"hidden",padding:0,boxShadow:`0 0 0 2.5px ${BALL}`}} title="내 정보" aria-label="내 정보 메뉴" aria-expanded={menu}>{photoOf(myUid())?<img src={photoOf(myUid())} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="user" size={19}/>}</button>
             </div>
           </div>
         </div>
         {isHome?(
           <div style={{position:"relative",marginTop:18}}>
             <p style={{margin:"0 0 2px",fontSize:14,opacity:0.75}}>{greetLine()}</p>
-            <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님, 안녕하세요{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
+            <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em",display:"flex",alignItems:"center",flexWrap:"wrap",gap:8}}>{ME} 님, 안녕하세요<button type="button" onClick={()=>setMyInfo("edit")} aria-label="내 정보 수정" title="내 정보 수정" style={{width:32,height:32,borderRadius:10,border:"none",background:"rgba(255,255,255,0.16)",color:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0,flexShrink:0}}><Icon name="pencil" size={16} stroke={2.2}/></button>{realAdmin&&<button type="button" onClick={toggleView} aria-label={adminOn?"회원 모드로 보기":"관리자 모드로 보기"} title="눌러서 모드 바꾸기"
               style={{padding:"5px 10px 5px 9px",borderRadius:10,border:"none",background:adminOn?BALL:"rgba(255,255,255,0.14)",color:adminOn?INK:"#fff",fontSize:11,fontWeight:700,fontFamily:FONT,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,letterSpacing:0}}>
               <Icon name="swap" size={12} stroke={2.2}/>{adminOn?"관리자 모드":"회원 모드"}</button>}</p>
             <div style={{display:"flex",gap:22,marginTop:16,alignItems:"flex-start"}}>
@@ -5225,12 +5225,30 @@ export default function App() {
         </button>
       )}
       {menu&&<>
-                <div onClick={()=>setMenu(false)} style={{position:"fixed",inset:0,zIndex:40}}/>
-                <div role="menu" style={{position:"fixed",right:"max(20px, calc(50% - 200px))",top:62,zIndex:41,background:"#fff",borderRadius:18,boxShadow:"0 12px 32px rgba(20,40,120,0.22)",padding:6,minWidth:150}}>
-                  {[["내 정보 보기",()=>{setMenu(false);setMyInfo(true);},INK],["로그아웃",()=>{setMenu(false);logout();},"#ef4444"]].map(([l,f,c])=>(
-                    <button key={l} type="button" role="menuitem" onClick={f} style={{display:"block",width:"100%",textAlign:"left",padding:"11px 14px",background:"none",border:"none",borderRadius:12,fontSize:14,fontWeight:600,color:c,cursor:"pointer",fontFamily:FONT}}>{l}</button>
-                  ))}
-                </div>
+                <div onClick={()=>setMenu(false)} style={{position:"fixed",inset:0,zIndex:40,background:"rgba(11,30,91,0.28)"}}/>
+                {(()=>{ const pf=(account&&account.profile)||{}, career=calcCareer(pf.tennisStart);
+                  const role=[account&&account.admin?"운영진":account&&account.approved?"정회원":FB?"준회원":"데모"].join("");
+                  const go=v=>{ setMenu(false); setMyInfo(v); };
+                  return(
+                <div role="menu" aria-label="내 정보" style={{position:"fixed",right:"max(16px, calc(50% - 204px))",top:"calc(max(26px, calc(env(safe-area-inset-top,0px) + 14px)) + 50px)",zIndex:41,width:288,maxWidth:"calc(100vw - 32px)",boxSizing:"border-box",background:"#fff",borderRadius:22,boxShadow:"0 16px 40px rgba(11,30,91,0.28)",padding:18,fontFamily:FONT}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <Avatar name={ME} photo={photoOf(myUid())||pf.photo} size={56} radius={17} bg={BALL} zoom={false} font={22}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:0,fontSize:18,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{ME}{pf.realName&&pf.realName!==ME&&<span style={{marginLeft:5,fontSize:14,fontWeight:500,color:"#6B7493"}}>{pf.realName}</span>}</p>
+                      <p style={{margin:"3px 0 0",fontSize:13,color:"#6B7493"}}>{role}</p>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:14}}>
+                    {[["NTRP",pf.ntrp||MEMBER_NTRP[ME]||"-",1],["구력",(career||"-").replace(/차$/,""),1.7],["올해",`${yearCount}회`,1]].map(([k,v,fl])=>(
+                      <div key={k} style={{flex:fl,minWidth:0,background:"#EDF0F6",borderRadius:12,padding:"9px 10px"}}><p style={{margin:0,fontSize:11,color:"#6B7493"}}>{k}</p><p style={{margin:"2px 0 0",fontSize:15,fontWeight:800,color:INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</p></div>
+                    ))}
+                  </div>
+                  <button type="button" role="menuitem" onClick={()=>go("edit")} style={{...btnPrimary,marginTop:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={16} stroke={2.2}/>내 정보 수정</button>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+                    <button type="button" role="menuitem" onClick={()=>go(true)} style={{background:"none",border:"none",padding:"6px 2px",fontSize:13,fontWeight:600,color:"#5E6A8E",cursor:"pointer",fontFamily:FONT}}>내 정보 보기</button>
+                    <button type="button" role="menuitem" onClick={()=>{setMenu(false);logout();}} style={{background:"none",border:"none",padding:"6px 2px",fontSize:13,fontWeight:700,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>로그아웃</button>
+                  </div>
+                </div>); })()}
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
