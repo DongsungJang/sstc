@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=b796b7c9a5">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=b796b7c9a5">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fae3049555">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fae3049555">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -135,6 +135,7 @@ const ICON_PATHS = {
   zap: ["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
   check: ["M20 6 9 17l-5-5"],
   checkCircle: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4 12 14.01l-3-3"],
+  gear: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M12 2.8v2.4", "M12 18.8v2.4", "M2.8 12h2.4", "M18.8 12h2.4", "M5.5 5.5l1.7 1.7", "M16.8 16.8l1.7 1.7", "M5.5 18.5l1.7-1.7", "M16.8 7.2l1.7-1.7"],
   search: ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M21 21l-4.35-4.35"],
   x: ["M18 6 6 18", "M6 6l12 12"],
   mail: ["M3 5h18v14H3z", "M21 7l-9 6-9-6"],
@@ -263,18 +264,24 @@ const NTRP_LEVELS = [{
 const MEMBER_NTRP = {};
 // 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
 let MEMBER_BY_UID = {};
+let PHOTO_BY_NICK = {}; // 닉네임 → 프로필 사진 (랭킹처럼 이름만 있는 곳에서 써요)
 function setMemberInfo(members) {
   MEMBER_BY_UID = {};
+  PHOTO_BY_NICK = {};
   Object.entries(members || {}).forEach(([uid, m]) => {
     if (m && m.nickname) {
+      const ph = photoOk(m.photo) ? m.photo : "";
       MEMBER_BY_UID[uid] = {
         nickname: m.nickname,
-        ntrp: m.ntrp || ""
+        ntrp: m.ntrp || "",
+        photo: ph
       };
+      if (ph) PHOTO_BY_NICK[m.nickname] = ph;
       if (m.ntrp) MEMBER_NTRP[m.nickname] = m.ntrp;
     }
   });
 }
+const photoOf = uid => uid && MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].photo || "";
 // uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
 const curNick = (uid, name) => uid && MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].nickname || name;
 
@@ -1451,12 +1458,15 @@ function Step2({
   const [nickChecked, setNickChecked] = useState(false);
   const [nickMsg, setNickMsg] = useState("");
   const fileRef = useRef();
-  const [preview, setPreview] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(false),
+    [photoErr, setPhotoErr] = useState("");
   const handlePhoto = e => {
     const f = e.target.files[0];
+    e.target.value = "";
     if (!f) return;
-    onChange("photo", f);
-    setPreview(URL.createObjectURL(f));
+    setPhotoBusy(true);
+    setPhotoErr("");
+    shrinkPhoto(f).then(d => onChange("photo", d)).catch(err => setPhotoErr(err.message)).finally(() => setPhotoBusy(false));
   };
   const checkNick = async () => {
     if (!data.nickname.trim()) {
@@ -1548,30 +1558,34 @@ function Step2({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "crown",
     s: 13
-  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), !editing && /*#__PURE__*/React.createElement("div", {
+  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => fileRef.current.click(),
+    "aria-label": photoOk(data.photo) ? "프로필 사진 바꾸기" : "프로필 사진 넣기",
     style: {
-      width: 88,
-      height: 88,
-      borderRadius: "50%",
-      border: "2px dashed #D6DEF7",
+      width: 96,
+      height: 96,
+      borderRadius: 30,
+      border: photoOk(data.photo) ? "none" : "2px dashed #D6DEF7",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       cursor: "pointer",
       overflow: "hidden",
-      background: "#F1F4FA"
+      background: "#F1F4FA",
+      padding: 0,
+      position: "relative"
     }
-  }, preview ? /*#__PURE__*/React.createElement("img", {
-    src: preview,
-    alt: "\uD504\uB85C\uD544",
+  }, photoOk(data.photo) ? /*#__PURE__*/React.createElement("img", {
+    src: data.photo,
+    alt: "\uD504\uB85C\uD544 \uBBF8\uB9AC\uBCF4\uAE30",
     style: {
       width: "100%",
       height: "100%",
@@ -1582,13 +1596,37 @@ function Step2({
     size: 30,
     color: "#A3AAC2",
     stroke: 1.6
-  })), /*#__PURE__*/React.createElement("p", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => fileRef.current.click(),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: BLUE,
+      border: `1.5px solid ${BLUE}`
+    }
+  }, photoBusy ? "줄이는 중…" : photoOk(data.photo) ? "사진 바꾸기" : "프로필 사진 넣기"), photoOk(data.photo) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => onChange("photo", ""),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: "#ef4444",
+      border: "1.5px solid #FBD5D5"
+    }
+  }, "\uBE7C\uAE30")), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
-      color: "#A3AAC2",
+      color: photoErr ? "#ef4444" : "#A3AAC2",
       margin: 0
     }
-  }, "\uD074\uB9AD\uD574\uC11C \uD504\uB85C\uD544 \uC0AC\uC9C4 \uCD94\uAC00 (\uC120\uD0DD)"), /*#__PURE__*/React.createElement("input", {
+  }, photoErr || "선택이에요. 회원 목록과 랭킹에 닉네임 대신 사진이 보여요"), /*#__PURE__*/React.createElement("input", {
     ref: fileRef,
     type: "file",
     accept: "image/*",
@@ -2383,6 +2421,96 @@ function shrinkLogo(file) {
     };
     img.src = src;
   });
+}
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX = 192,
+  PHOTO_BYTES = 60000;
+function photoOk(v) {
+  return typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= PHOTO_BYTES;
+}
+function shrinkPhoto(file) {
+  return new Promise((res, rej) => {
+    if (!file || !/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img = new Image(),
+      src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(src);
+      const side = Math.min(img.width, img.height),
+        S = Math.max(1, Math.min(PHOTO_MAX, side));
+      const c = document.createElement("canvas");
+      c.width = S;
+      c.height = S;
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, S, S);
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+      let out = "",
+        q = 0.85;
+      while (q >= 0.4) {
+        out = c.toDataURL("image/jpeg", q);
+        if (out.length <= PHOTO_BYTES) break;
+        q -= 0.15;
+      }
+      photoOk(out) ? res(out) : rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(src);
+      rej(new Error("사진을 읽지 못했어요"));
+    };
+    img.src = src;
+  });
+}
+// 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+function Avatar({
+  name,
+  photo,
+  size = 40,
+  radius,
+  bg = BLUE_LIGHT,
+  color = INK,
+  font,
+  style
+}) {
+  const r = radius === undefined ? Math.round(size * 0.3) : radius;
+  const box = {
+    width: size,
+    height: size,
+    borderRadius: r,
+    flexShrink: 0,
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    ...style
+  };
+  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: "#E4E9F4"
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: photo,
+    alt: "",
+    draggable: false,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block"
+    }
+  }));
+  return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: bg,
+      color,
+      fontSize: font || Math.round(size * 0.4),
+      fontWeight: 900
+    }
+  }, (name || "?").slice(0, 1));
 }
 const adLogoOk = v => typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= AD_LOGO_BYTES;
 // 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
@@ -5664,6 +5792,9 @@ async function signUpMember(form) {
   } = form;
   const profile = {
     ...JSON.parse(JSON.stringify(rest)),
+    ...(photoOk(photo) ? {
+      photo
+    } : {}),
     email: form.email.trim(),
     nickname: nick,
     realName: (form.realName || "").trim(),
@@ -5804,15 +5935,17 @@ function AdminTab() {
   const [text, setText] = useState(() => ADMIN_MSG[0][2](upcoming[0]));
   const [sent, setSent] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showGone, setShowGone] = useState(false);
   const [nameEdit, setNameEdit] = useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen, setLastSeen] = useState({}); // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen, setSortSeen] = useState(false); // 정회원 목록 최근 접속순
   const [pg, setPg] = useState({
     pending: 0,
     active: 0,
-    gone: 0
+    gone: 0,
+    notify: 0
   }); // 목록별 페이지 (5명씩)
+  const [sec, setSec] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(null); // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage = (k, n) => setPg(p => ({
     ...p,
     [k]: n
@@ -5919,6 +6052,22 @@ function AdminTab() {
       realNameAt: Date.now()
     }).then(() => setNameEdit(null)).catch(fail);
   };
+  // 프로필 사진 대신 넣기·빼기 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
+  const setMemberPhoto = (m, file) => {
+    if (!file) {
+      if (!window.confirm(`${m.nickname} 님의 프로필 사진을 뺄까요?`)) return;
+      FB.club.child("members/" + m.uid).update({
+        photo: null,
+        photoBy: null
+      }).catch(fail);
+      return;
+    }
+    setPhotoBusy(m.uid);
+    shrinkPhoto(file).then(d => FB.club.child("members/" + m.uid).update({
+      photo: d,
+      photoBy: ME
+    })).catch(e => window.alert(e.message || authMsg(e))).finally(() => setPhotoBusy(null));
+  };
   // 알림 보내기
   const pick = list => setSel(Object.fromEntries(list.map(m => [m.uid, true])));
   const chosen = live.filter(m => sel[m.uid]);
@@ -5984,26 +6133,34 @@ function AdminTab() {
     onClick: onClick,
     style: {
       ...btnSmall,
-      background: "#fff",
-      color: danger ? "#ef4444" : "#6B7493",
-      border: `1.5px solid ${danger ? "#FBD5D5" : "#D6DEF7"}`
+      padding: "9px 8px",
+      background: "none",
+      color: danger ? "#E5484D" : "#5E6A8E",
+      fontWeight: 700
     }
   }, label);
-  const row = (m, acts, checkable = true) => /*#__PURE__*/React.createElement("div", {
+  const row = (m, acts, checkable = false) => /*#__PURE__*/React.createElement("div", {
     key: m.uid,
     style: {
-      borderRadius: 14,
-      background: sel[m.uid] ? BLUE_LIGHT : "#F1F4FA",
-      padding: "10px 12px",
-      border: sel[m.uid] ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
+      borderBottom: "1px solid #E8ECF4",
+      padding: checkable && sel[m.uid] ? "12px 10px" : "12px 0",
+      margin: checkable && sel[m.uid] ? "0 -10px" : 0,
+      borderRadius: checkable && sel[m.uid] ? 12 : 0,
+      background: checkable && sel[m.uid] ? BLUE_LIGHT : "transparent"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 8
+      gap: 12
     }
-  }, checkable && /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: m.nickname,
+    photo: m.photo,
+    size: 40,
+    radius: 12,
+    bg: m.uid === myUid() ? BALL : BLUE_LIGHT
+  }), checkable && /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
     "aria-label": `${m.nickname} 선택`,
     checked: !!sel[m.uid],
@@ -6038,16 +6195,17 @@ function AdminTab() {
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: INK
+      fontSize: 16,
+      fontWeight: 800,
+      color: INK,
+      letterSpacing: "-0.02em"
     }
   }, m.nickname || "(닉네임 없음)"), m.realName ? /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 12,
-      color: "#4A5578"
+      fontSize: 13,
+      color: "#6B7493"
     }
-  }, "(", m.realName, ")") : /*#__PURE__*/React.createElement("button", {
+  }, m.realName) : /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => {
       e.stopPropagation();
@@ -6069,12 +6227,15 @@ function AdminTab() {
       fontSize: 11,
       color: "#A3AAC2"
     }
-  }, "NTRP ", m.ntrp), admins[m.uid] && tag("관리자", GRAD, "#fff"), !approved[m.uid] && !admins[m.uid] && !m.withdrawn && isNew(pendingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("span", {
+  }, "NTRP ", m.ntrp), admins[m.uid] && tag("운영진", INK, "#fff"), !approved[m.uid] && !admins[m.uid] && !m.withdrawn && isNew(pendingNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
-      color: "#A3AAC2"
+      display: "block",
+      marginTop: 2,
+      fontSize: 12,
+      color: "#6B7493",
+      wordBreak: "break-all"
     }
-  }, m.email, m.tennisStart ? ` · 구력 ${calcCareer(m.tennisStart) || "-"}` : " · 구력 미입력"), lastSeen && /*#__PURE__*/React.createElement("span", {
+  }, [m.email, m.tennisStart ? `구력 ${calcCareer(m.tennisStart) || "-"}` : "구력 미입력"].filter(Boolean).join(" · ")), lastSeen && /*#__PURE__*/React.createElement("span", {
     style: {
       display: "block",
       fontSize: 11,
@@ -6088,9 +6249,10 @@ function AdminTab() {
   }), " ", seenText(seenAt(m.uid))))), acts && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 6,
+      gap: 4,
       justifyContent: "flex-end",
-      marginTop: 8
+      alignItems: "center",
+      marginTop: 6
     }
   }, acts), open === m.uid && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6169,7 +6331,65 @@ function AdminTab() {
       cursor: "pointer",
       fontFamily: FONT
     }
-  }, m.realName ? "수정" : "입력")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["마지막 접속", seenAt(m.uid) && new Date(seenAt(m.uid)).toLocaleString("ko-KR", {
+  }, m.realName ? "수정" : "입력")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      margin: "4px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      display: "inline-block",
+      width: 84
+    }
+  }, "\uD504\uB85C\uD544 \uC0AC\uC9C4"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      color: "#4A5578"
+    }
+  }, photoOk(m.photo) ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uC788\uC74C", m.photoBy ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, " \xB7 ", m.photoBy, " \uB2D8\uC774 \uB123\uC74C") : null) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, "\uC5C6\uC74C")), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: BLUE,
+      padding: "2px 4px",
+      cursor: "pointer"
+    }
+  }, photoBusy === m.uid ? "줄이는 중…" : photoOk(m.photo) ? "바꾸기" : "넣기", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (f) setMemberPhoto(m, f);
+    }
+  })), photoOk(m.photo) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMemberPhoto(m, null),
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#ef4444",
+      background: "none",
+      border: "none",
+      padding: "2px 4px",
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, "\uBE7C\uAE30")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["마지막 접속", seenAt(m.uid) && new Date(seenAt(m.uid)).toLocaleString("ko-KR", {
     year: "numeric",
     month: "numeric",
     day: "numeric",
@@ -6185,38 +6405,37 @@ function AdminTab() {
       width: 84
     }
   }, k), v))));
-  return /*#__PURE__*/React.createElement("div", {
+  const MENU = [["notify", "bell", "알림 보내기", "회원에게 앱 알림"], ["active", "users", "정회원 관리", `정회원 ${active.length}명`], ["gone", "leave", "탈퇴 회원", `${gone.length}명`], ["banner", "megaphone", "홈 화면 배너", "배너 추가·기간·순서"]];
+  const back = /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setSec(null),
+    style: {
+      alignSelf: "flex-start",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 2,
+      padding: "4px 8px 4px 2px",
+      border: "none",
+      background: "none",
+      color: INK,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "back",
+    size: 18,
+    stroke: 2.4
+  }), "\uAD00\uB9AC");
+  if (sec) return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 12,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 13,
-      color: "#A3AAC2"
-    }
-  }, "\uAE30\uB2E4\uB9AC\uB294 \uC0AC\uB78C\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 6
-    }
-  }, pageOf(pending, pg.pending).map(m => row(m, /*#__PURE__*/React.createElement(React.Fragment, null, small("탈퇴", () => withdraw(m), true), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => approve(m.uid),
-    style: {
-      ...btnSmall,
-      background: GRAD
-    }
-  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778"))))), /*#__PURE__*/React.createElement(Pager, {
-    page: pg.pending,
-    total: pending.length,
-    onChange: n => goPage("pending", n),
-    label: "\uC900\uD68C\uC6D0"
-  })), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC54C\uB9BC \uBCF4\uB0B4\uAE30"), /*#__PURE__*/React.createElement("div", {
+  }, back, sec === "notify" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uC54C\uB9BC \uBCF4\uB0B4\uAE30"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
@@ -6230,7 +6449,23 @@ function AdminTab() {
       fontWeight: 600,
       color: chosen.length ? BLUE : "#A3AAC2"
     }
-  }, chosen.length ? `${chosen.length}명 선택됨 · ${chosen.slice(0, 5).map(m => m.nickname).join(", ")}${chosen.length > 5 ? " 외" : ""}` : "아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"), /*#__PURE__*/React.createElement("select", {
+  }, chosen.length ? `${chosen.length}명 선택됨 · ${chosen.slice(0, 5).map(m => m.nickname).join(", ")}${chosen.length > 5 ? " 외" : ""}` : "아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"), /*#__PURE__*/React.createElement("div", {
+    className: "sstc-rows",
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      marginBottom: 4
+    }
+  }, pageOf(live, pg.notify).map(m => row(m, null, true))), /*#__PURE__*/React.createElement(Pager, {
+    page: pg.notify,
+    total: live.length,
+    onChange: n => goPage("notify", n),
+    label: "\uD68C\uC6D0"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 12
+    }
+  }), /*#__PURE__*/React.createElement("select", {
     "aria-label": "\uC54C\uB9BC \uC885\uB958",
     value: kind,
     onChange: e => setMsgKind(e.target.value),
@@ -6298,7 +6533,7 @@ function AdminTab() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uBC1B\uC740 \uC0AC\uB78C\uC758 \uC54C\uB9BC \uBAA9\uB85D\uC5D0 \uB5A0\uC694. \uD22C\uD45C \uB3C5\uB824\uB294 \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784\uC73C\uB85C, \uC815\uBCF4 \uC218\uC815 \uC694\uCCAD\uC740 \uB204\uB974\uBA74 \uC815\uBCF4 \uC218\uC815 \uD654\uBA74\uC73C\uB85C \uAC00\uC694.")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+  }, "\uBC1B\uC740 \uC0AC\uB78C\uC758 \uC54C\uB9BC \uBAA9\uB85D\uC5D0 \uB5A0\uC694. \uD22C\uD45C \uB3C5\uB824\uB294 \uB204\uB974\uBA74 \uADF8 \uBAA8\uC784\uC73C\uB85C, \uC815\uBCF4 \uC218\uC815 \uC694\uCCAD\uC740 \uB204\uB974\uBA74 \uC815\uBCF4 \uC218\uC815 \uD654\uBA74\uC73C\uB85C \uAC00\uC694."))), sec === "active" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
     action: lastSeen ? sortSeen ? "가입순" : "최근 접속순" : null,
     onAction: toggleSortSeen
   }, "\uC815\uD68C\uC6D0 (", active.length, "\uBA85)"), !lastSeen && /*#__PURE__*/React.createElement("p", {
@@ -6309,10 +6544,10 @@ function AdminTab() {
       lineHeight: 1.6
     }
   }, "\uB9C8\uC9C0\uB9C9 \uC811\uC18D\uC744 \uBCF4\uB824\uBA74 README\uC758 \uC0C8 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uADDC\uCE59\uC744 \uCF58\uC194\uC5D0 \uBD99\uC5EC\uB123\uC5B4 \uC8FC\uC138\uC694."), /*#__PURE__*/React.createElement("div", {
+    className: "sstc-rows",
     style: {
       display: "flex",
-      flexDirection: "column",
-      gap: 6
+      flexDirection: "column"
     }
   }, pageOf(activeShown, pg.active).map(m => row(m, admins[m.uid] ? null : /*#__PURE__*/React.createElement(React.Fragment, null, small("준회원으로", () => demote(m)), small("탈퇴", () => withdraw(m), true))))), /*#__PURE__*/React.createElement(Pager, {
     page: pg.active,
@@ -6326,28 +6561,133 @@ function AdminTab() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uC774\uB984\uC744 \uB204\uB974\uBA74 \uAC00\uC785 \uC815\uBCF4\uB97C \uBCFC \uC218 \uC788\uACE0, \uBCF8\uBA85\uB3C4 \uB300\uC2E0 \uB123\uAC70\uB098 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694. \uAD00\uB9AC\uC790 \uC9C0\uC815\uC740 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194\uC758 club/admins\uC5D0\uC11C \uD574\uC694.")), gone.length > 0 && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
-    action: showGone ? "접기" : "펼치기",
-    onAction: () => setShowGone(v => !v)
-  }, "\uD0C8\uD1F4 \uD68C\uC6D0 (", gone.length, "\uBA85)"), showGone && /*#__PURE__*/React.createElement("div", {
+  }, "\uC774\uB984\uC744 \uB204\uB974\uBA74 \uAC00\uC785 \uC815\uBCF4\uB97C \uBCFC \uC218 \uC788\uACE0, \uBCF8\uBA85\uB3C4 \uB300\uC2E0 \uB123\uAC70\uB098 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694. \uAD00\uB9AC\uC790 \uC9C0\uC815\uC740 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194\uC758 club/admins\uC5D0\uC11C \uD574\uC694."))), sec === "gone" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uD0C8\uD1F4 \uD68C\uC6D0 (", gone.length, "\uBA85)"), gone.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uD0C8\uD1F4\uD55C \uD68C\uC6D0\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+    className: "sstc-rows",
     style: {
       display: "flex",
-      flexDirection: "column",
-      gap: 6
+      flexDirection: "column"
     }
-  }, pageOf(gone, pg.gone).map(m => row(m, small("되돌리기 (준회원)", () => restore(m)), false))), showGone && /*#__PURE__*/React.createElement(Pager, {
+  }, pageOf(gone, pg.gone).map(m => row(m, small("되돌리기 (준회원)", () => restore(m)), false))), /*#__PURE__*/React.createElement(Pager, {
     page: pg.gone,
     total: gone.length,
     onChange: n => goPage("gone", n),
     label: "\uD0C8\uD1F4 \uD68C\uC6D0"
-  }), showGone && /*#__PURE__*/React.createElement("p", {
+  }), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uACC4\uC815 \uC790\uCCB4\uB97C \uC644\uC804\uD788 \uC9C0\uC6B0\uB824\uBA74 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194 Authentication\uC5D0\uC11C \uC0AD\uC81C\uD574\uC694.")), /*#__PURE__*/React.createElement(AdSettings, null));
+  }, "\uACC4\uC815 \uC790\uCCB4\uB97C \uC644\uC804\uD788 \uC9C0\uC6B0\uB824\uBA74 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194 Authentication\uC5D0\uC11C \uC0AD\uC81C\uD574\uC694."))), sec === "banner" && /*#__PURE__*/React.createElement(AdSettings, null));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+      paddingBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "\uAC00\uC785 \uC2B9\uC778 \uB300\uAE30 (", pending.length, "\uBA85)"), pending.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uAE30\uB2E4\uB9AC\uB294 \uC0AC\uB78C\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+    className: "sstc-rows",
+    style: {
+      display: "flex",
+      flexDirection: "column"
+    }
+  }, pageOf(pending, pg.pending).map(m => row(m, /*#__PURE__*/React.createElement(React.Fragment, null, small("탈퇴", () => withdraw(m), true), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => approve(m.uid),
+    style: {
+      ...btnSmall,
+      padding: "9px 14px",
+      borderRadius: 10,
+      background: BLUE,
+      fontWeight: 700
+    }
+  }, "\uC815\uD68C\uC6D0 \uC2B9\uC778"))))), /*#__PURE__*/React.createElement(Pager, {
+    page: pg.pending,
+    total: pending.length,
+    onChange: n => goPage("pending", n),
+    label: "\uC900\uD68C\uC6D0"
+  })), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      padding: "4px 18px"
+    }
+  }, MENU.map(([k, ic, t, sub], i) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    onClick: () => {
+      setSec(k);
+      try {
+        window.scrollTo(0, 0);
+      } catch (e) {}
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      width: "100%",
+      padding: "14px 0",
+      border: "none",
+      borderBottom: i < MENU.length - 1 ? "1px solid #E8ECF4" : "none",
+      background: "none",
+      cursor: "pointer",
+      textAlign: "left",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      background: BLUE_LIGHT,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: ic,
+    size: 19,
+    color: BLUE,
+    stroke: 1.9
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 16,
+      fontWeight: 800,
+      color: INK,
+      letterSpacing: "-0.02em"
+    }
+  }, t), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      marginTop: 2,
+      fontSize: 13,
+      color: "#6B7493"
+    }
+  }, sub)), /*#__PURE__*/React.createElement(Icon, {
+    name: "chevR",
+    size: 18,
+    color: "#A3AAC2"
+  })))));
 }
 
 // ─── 대진표 만들기 ───────────────────────────────────────────────────────────
@@ -8489,20 +8829,14 @@ function MentionInput({
       textAlign: "left",
       fontFamily: FONT
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 26,
-      height: 26,
-      borderRadius: "50%",
-      background: BLUE_LIGHT,
-      color: BLUE,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 12,
-      fontWeight: 700
-    }
-  }, x.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: x.nickname,
+    photo: photoOf(x.uid),
+    size: 26,
+    radius: 13,
+    color: BLUE,
+    font: 12
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
       fontWeight: 600,
@@ -8678,21 +9012,15 @@ function CommentBox({
         gap: 10,
         alignItems: "flex-start"
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 32,
-        height: 32,
-        borderRadius: "50%",
-        background: c.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
-        color: c.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, c.anon ? "?" : (curNick(c.uid, c.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: c.anon ? "?" : curNick(c.uid, c.name),
+      photo: c.anon ? "" : photoOf(c.uid),
+      size: 32,
+      radius: 16,
+      bg: c.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+      color: c.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
+      font: 13
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -11624,21 +11952,14 @@ function Podium({
         flexDirection: "column",
         alignItems: "center"
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      "aria-hidden": "true",
-      style: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: r.isMe ? BALL : BLUE_LIGHT,
-        color: INK,
-        fontSize: 16,
-        fontWeight: 900
-      }
-    }, r.name.slice(0, 1)), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: r.name,
+      photo: PHOTO_BY_NICK[r.name],
+      size: 38,
+      radius: 12,
+      bg: r.isMe ? BALL : BLUE_LIGHT,
+      font: 16
+    }), /*#__PURE__*/React.createElement("span", {
       style: {
         margin: "6px 0 8px",
         fontSize: 13,
@@ -11926,7 +12247,7 @@ async function changeNickname(uid, oldNick, newNick) {
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
-const PROFILE_FIELDS = ["realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
+const PROFILE_FIELDS = ["photo", "realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
 function ProfileEdit({
   account,
   onDone,
@@ -11964,6 +12285,10 @@ function ProfileEdit({
       patch[k] = data[k] === undefined ? null : data[k];
     });
     patch.region = data.region === "타지역" ? data.regionCustom || "타지역" : data.region;
+    patch.photo = photoOk(data.photo) ? data.photo : null;
+    if (patch.photo !== (photoOk(pr.photo) ? pr.photo : null)) {
+      patch.photoBy = null;
+    } // 본인이 바꾸면 '관리자가 넣음' 표시를 지워요
     patch.realName = (data.realName || "").trim();
     if (patch.realName !== (pr.realName || "")) {
       patch.realNameBy = null;
@@ -14230,21 +14555,15 @@ function FreeBoard({
         gap: 10,
         marginBottom: 10
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 38,
-        height: 38,
-        borderRadius: "50%",
-        background: p.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
-        color: p.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 15,
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, p.anon ? "?" : (curNick(p.uid, p.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: p.anon ? "?" : curNick(p.uid, p.name),
+      photo: p.anon ? "" : photoOf(p.uid),
+      size: 38,
+      radius: 19,
+      bg: p.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+      color: p.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
+      font: 15
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -14476,50 +14795,40 @@ function MembersTab({
     "aria-label": "\uD68C\uC6D0 \uD0ED \uBCF4\uAE30",
     style: {
       display: "flex",
-      background: "#fff",
-      borderRadius: 12,
-      padding: 4,
-      boxShadow: "0 4px 16px rgba(40,70,180,0.08)"
+      gap: 18,
+      padding: "2px 4px 0"
     }
-  }, [["list", "회원 목록", "users"], ["board", BOARD_NAME, "message"]].map(([k, l, ic]) => {
-    const n = newCounts[k] || 0;
+  }, [["list", "회원 목록"], ["board", BOARD_NAME]].map(([k, l]) => {
+    const n = newCounts[k] || 0,
+      on = view === k;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       type: "button",
       role: "tab",
-      "aria-selected": view === k,
+      "aria-selected": on,
       onClick: () => pickView(k),
       style: {
-        flex: 1,
-        padding: "9px 0",
-        borderRadius: 12,
+        padding: "4px 0 6px",
         border: "none",
-        background: view === k ? INK : "transparent",
-        color: view === k ? "#fff" : "#4A5578",
-        fontSize: 14,
-        fontWeight: view === k ? 700 : 500,
+        borderBottom: `2.5px solid ${on ? INK : "transparent"}`,
+        background: "none",
+        color: on ? INK : "#A3AAC2",
+        fontSize: 17,
+        fontWeight: 800,
+        letterSpacing: "-0.03em",
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
+        gap: 5,
         fontFamily: FONT
       }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: ic,
-      s: 15
-    }), l, n > 0 && /*#__PURE__*/React.createElement("span", {
+    }, l, n > 0 && /*#__PURE__*/React.createElement("span", {
       "aria-label": `새 항목 ${n}개`,
       style: {
-        fontSize: 10,
-        fontWeight: 800,
-        lineHeight: "16px",
-        padding: "0 6px",
-        borderRadius: 12,
-        background: "#ef4444",
-        color: "#fff"
+        color: "#ef4444",
+        fontWeight: 800
       }
-    }, "NEW ", n));
+    }, n));
   })), view === "board" ? /*#__PURE__*/React.createElement(FreeBoard, {
     canWrite: canWrite,
     isAdmin: isAdmin,
@@ -14626,27 +14935,33 @@ function MemberList({
       fontWeight: 500,
       color: "#A3AAC2"
     }
-  }, gr.items.length, "\uBA85")), gr.items.map(m => {
+  }, gr.items.length, "\uBA85")), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      padding: "4px 18px"
+    }
+  }, gr.items.map((m, i) => {
     const isMe = m.nickname === ME,
       career = calcCareer(m.tennisStart),
       hand = Array.isArray(m.hand) ? m.hand.join(", ") : m.hand,
       cnt = monthCount[m.nickname] || 0;
+    const meta = [career || "구력 미입력", hand, sort === "region" ? null : m.region, cnt ? `이달 ${cnt}회` : null].filter(Boolean).join(" · ");
     return /*#__PURE__*/React.createElement("div", {
       key: m.uid,
       role: "button",
       tabIndex: 0,
+      "aria-expanded": open === m.uid,
       onClick: () => {
         const x = memberNewItem(m);
         markItemSeen(x.id, x.at);
         setOpen(open === m.uid ? null : m.uid);
       },
+      onKeyDown: e => {
+        if (e.key === "Enter") setOpen(open === m.uid ? null : m.uid);
+      },
       style: {
-        cursor: "pointer"
-      }
-    }, /*#__PURE__*/React.createElement(Card, {
-      style: {
-        padding: 16,
-        border: isMe ? `1.5px solid ${BLUE}` : "1.5px solid transparent"
+        cursor: "pointer",
+        padding: "14px 0",
+        borderBottom: i < gr.items.length - 1 ? "1px solid #E8ECF4" : "none"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -14654,21 +14969,14 @@ function MemberList({
         alignItems: "center",
         gap: 12
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 44,
-        height: 44,
-        borderRadius: "50%",
-        background: BLUE_LIGHT,
-        color: BLUE,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 17,
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, m.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: m.nickname,
+      photo: m.photo,
+      size: 42,
+      radius: 13,
+      bg: isMe ? BALL : BLUE_LIGHT,
+      font: 16
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -14677,69 +14985,62 @@ function MemberList({
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 6,
+        gap: 5,
         flexWrap: "wrap"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color: INK
+        fontSize: 16,
+        fontWeight: 800,
+        color: INK,
+        letterSpacing: "-0.02em"
       }
     }, m.nickname), realNameOf(m) && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 500,
-        color: "#4A5578"
+        color: "#6B7493"
       }
-    }, "(", realNameOf(m), ")"), isMe && /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        background: BLUE,
-        color: "#fff",
-        padding: "1px 6px",
-        borderRadius: 10
-      }
-    }, "\uB098"), data.admins[m.uid] && /*#__PURE__*/React.createElement("span", {
+    }, realNameOf(m)), data.admins[m.uid] && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         fontWeight: 700,
-        padding: "1px 7px",
-        borderRadius: 12,
-        background: BLUE_LIGHT,
-        color: BLUE
+        padding: "2px 6px",
+        borderRadius: 6,
+        background: INK,
+        color: "#fff"
       }
-    }, "\uC6B4\uC601\uC9C4"), isNew(memberNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("span", {
+    }, "\uC6B4\uC601\uC9C4"), isNew(memberNewItem(m)) && /*#__PURE__*/React.createElement(NewTag, null)), /*#__PURE__*/React.createElement("p", {
       style: {
-        fontSize: 12,
-        color: "#A3AAC2"
+        margin: "3px 0 0",
+        fontSize: 13,
+        color: "#6B7493",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
-    }, cnt ? `이달 ${cnt}회 참석` : "이달 참석 기록 없음")), /*#__PURE__*/React.createElement("div", {
+    }, meta)), /*#__PURE__*/React.createElement("span", {
+      "aria-label": `NTRP ${m.ntrp || "없음"}`,
       style: {
+        flexShrink: 0,
+        minWidth: 40,
         textAlign: "center",
-        flexShrink: 0
+        padding: "6px 8px",
+        borderRadius: 10,
+        background: "#EDF0F6",
+        fontSize: 15,
+        fontWeight: 800,
+        color: INK,
+        fontVariantNumeric: "tabular-nums"
       }
-    }, /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: 0,
-        fontSize: 10,
-        color: "#A3AAC2"
-      }
-    }, "NTRP"), /*#__PURE__*/React.createElement("p", {
-      style: {
-        margin: 0,
-        fontSize: 18,
-        fontWeight: 700,
-        color: BLUE
-      }
-    }, m.ntrp || "-"))), /*#__PURE__*/React.createElement("div", {
+    }, m.ntrp || "-")), open === m.uid && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexWrap: "wrap",
         gap: 6,
         marginTop: 12
       }
-    }, chip("clock", career ? `구력 ${career}` : "구력 미입력"), chip("pin", m.region || "동네 미입력"), hand && (sort === "hand" || open === m.uid) && chip("user", hand), open === m.uid && /*#__PURE__*/React.createElement(React.Fragment, null, m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus))), open === m.uid && (() => {
+    }, chip("pin", m.region || "동네 미입력"), m.court && chip("ball", m.court), m.weeklyFreq && chip("calendar", `주 ${String(m.weeklyFreq).replace(/^주\s*/, "")}`), m.lessonStatus && chip("users", m.lessonStatus)), open === m.uid && (() => {
       const up = upcomingOf(m.uid);
       return /*#__PURE__*/React.createElement("div", {
         style: {
@@ -14811,21 +15112,21 @@ function MemberList({
           whiteSpace: "nowrap"
         }
       }, mt.info && mt.info.start || "", " ", mt.placeName || mt.place)))));
-    })()));
-  }))), list.length > 0 && /*#__PURE__*/React.createElement("p", {
+    })());
+  })))), list.length > 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
       color: "#A3AAC2",
       textAlign: "center"
     }
-  }, "\uCE74\uB4DC\uB97C \uB204\uB974\uBA74 \uC190\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uC640 \uCC38\uAC00 \uC608\uC815 \uBAA8\uC784\uB3C4 \uBCF4\uC5EC\uC694. \uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
+  }, "\uD68C\uC6D0\uC744 \uB204\uB974\uBA74 \uB3D9\uB124\xB7\uC790\uC8FC \uAC00\uB294 \uCF54\uD2B8\xB7\uC6B4\uB3D9 \uD69F\uC218\uC640 \uCC38\uAC00 \uC608\uC815 \uBAA8\uC784\uB3C4 \uBCF4\uC5EC\uC694. \uC5F0\uB77D\uCC98\uB294 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694."));
 }
 
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "b796b7c9a5";
+const BUILD_ID = "fae3049555";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -14962,7 +15263,7 @@ const GLOBAL_CSS = `
 :root{color-scheme:only light}
 body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
-.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
+.sstc-rows>div:last-child{border-bottom:none!important}.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
@@ -15256,14 +15557,14 @@ function AdminHead({
   members = 0,
   banners = 0
 }) {
-  const tile = (label, val, hot) => /*#__PURE__*/React.createElement("div", {
+  const tile = (label, val, unit, hot) => /*#__PURE__*/React.createElement("div", {
     key: label,
     style: {
       flex: 1,
       minWidth: 0,
-      padding: "11px 12px",
-      borderRadius: 14,
-      background: hot ? BALL : "rgba(255,255,255,0.12)",
+      padding: "12px 13px",
+      borderRadius: 16,
+      background: hot ? BALL : "rgba(255,255,255,0.14)",
       color: hot ? INK : "#fff"
     }
   }, /*#__PURE__*/React.createElement("p", {
@@ -15271,24 +15572,32 @@ function AdminHead({
       margin: 0,
       fontSize: 12,
       fontWeight: 600,
-      opacity: hot ? 0.8 : 0.75
+      opacity: hot ? 0.8 : 0.8
     }
   }, label), /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "2px 0 0",
-      fontSize: 24,
+      margin: "3px 0 0",
+      fontSize: 28,
       fontWeight: 800,
+      lineHeight: "32px",
+      letterSpacing: "-0.03em",
       fontVariantNumeric: "tabular-nums"
     }
-  }, val));
+  }, val, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      marginLeft: 2
+    }
+  }, unit)));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
-      marginTop: 14,
+      marginTop: 16,
       display: "flex",
       gap: 8
     }
-  }, tile("승인 대기", pending, pending > 0), tile("정회원", members), tile("배너", banners));
+  }, tile("승인 대기", pending, "명", pending > 0), tile("정회원", members, "명"), tile("배너", banners, "개"));
 }
 const iconBtn = {
   width: 40,
@@ -16391,7 +16700,7 @@ function App() {
   const tabs = adminOn ? [...TABS, {
     key: "admin",
     label: "관리",
-    icon: "user"
+    icon: "gear"
   }] : TABS;
   const isHome = tab === "home";
   const curMeeting = tab === "booking" && openMeeting ? MEETINGS.find(m => m.id === openMeeting.id) : null;
@@ -16435,7 +16744,7 @@ function App() {
       boxSizing: "border-box",
       minHeight: isHome ? 0 : HEADER_H
     }
-  }, /*#__PURE__*/React.createElement(CourtLines, null), /*#__PURE__*/React.createElement("div", {
+  }, !(tab === "booking" && !curMeeting && bookView !== "map") && /*#__PURE__*/React.createElement(CourtLines, null), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -16514,11 +16823,23 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setMenu(v => !v),
-    style: iconBtn,
+    style: {
+      ...iconBtn,
+      overflow: "hidden",
+      padding: 0
+    },
     title: "\uB0B4 \uBA54\uB274",
     "aria-label": "\uB0B4 \uBA54\uB274",
     "aria-expanded": menu
-  }, /*#__PURE__*/React.createElement(Icon, {
+  }, photoOf(myUid()) ? /*#__PURE__*/React.createElement("img", {
+    src: photoOf(myUid()),
+    alt: "",
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement(Icon, {
     name: "user",
     size: 19
   }))))), isHome ? /*#__PURE__*/React.createElement("div", {
@@ -16683,7 +17004,22 @@ function App() {
       fontSize: 13,
       padding: "7px 12px"
     }
-  }, todayYmd().slice(0, 4), " \uC2DC\uC98C")), tab === "booking" && bookView !== "map" && /*#__PURE__*/React.createElement(MiniCalendar, {
+  }, todayYmd().slice(0, 4), " \uC2DC\uC98C"), tab === "admin" && realAdmin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: toggleView,
+    style: {
+      ...headChip,
+      fontSize: 13,
+      padding: "8px 12px",
+      border: "none",
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "swap",
+    size: 14,
+    stroke: 2.2
+  }), "\uD68C\uC6D0 \uBAA8\uB4DC\uB85C")), tab === "booking" && bookView !== "map" && /*#__PURE__*/React.createElement(MiniCalendar, {
     part: "grid",
     onOpen: id => openM(id, "info", "booking")
   }), tab === "members" && /*#__PURE__*/React.createElement(MemberSearchHead, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsHead, null), tab === "admin" && adminOn && /*#__PURE__*/React.createElement(AdminHead, {

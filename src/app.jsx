@@ -37,6 +37,7 @@ const ICON_PATHS = {
   zap:["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
   check:["M20 6 9 17l-5-5"],
   checkCircle:["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4 12 14.01l-3-3"],
+  gear:["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M12 2.8v2.4","M12 18.8v2.4","M2.8 12h2.4","M18.8 12h2.4","M5.5 5.5l1.7 1.7","M16.8 16.8l1.7 1.7","M5.5 18.5l1.7-1.7","M16.8 7.2l1.7-1.7"],
   search:["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z","M21 21l-4.35-4.35"],
   x:["M18 6 6 18","M6 6l12 12"],
   mail:["M3 5h18v14H3z","M21 7l-9 6-9-6"],
@@ -94,10 +95,12 @@ const NTRP_LEVELS = [
 const MEMBER_NTRP = {};
 // 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
 let MEMBER_BY_UID = {};
+let PHOTO_BY_NICK = {};   // 닉네임 → 프로필 사진 (랭킹처럼 이름만 있는 곳에서 써요)
 function setMemberInfo(members){
-  MEMBER_BY_UID={};
-  Object.entries(members||{}).forEach(([uid,m])=>{ if(m&&m.nickname){ MEMBER_BY_UID[uid]={nickname:m.nickname,ntrp:m.ntrp||""}; if(m.ntrp) MEMBER_NTRP[m.nickname]=m.ntrp; } });
+  MEMBER_BY_UID={}; PHOTO_BY_NICK={};
+  Object.entries(members||{}).forEach(([uid,m])=>{ if(m&&m.nickname){ const ph=photoOk(m.photo)?m.photo:""; MEMBER_BY_UID[uid]={nickname:m.nickname,ntrp:m.ntrp||"",photo:ph}; if(ph) PHOTO_BY_NICK[m.nickname]=ph; if(m.ntrp) MEMBER_NTRP[m.nickname]=m.ntrp; } });
 }
+const photoOf=uid=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].photo)||"";
 // uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
 const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)||name;
 
@@ -518,8 +521,9 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   const [nickChecked,setNickChecked]=useState(false);
   const [nickMsg,setNickMsg]=useState("");
   const fileRef=useRef();
-  const [preview,setPreview]=useState(null);
-  const handlePhoto=e=>{const f=e.target.files[0];if(!f)return;onChange("photo",f);setPreview(URL.createObjectURL(f));};
+  const [photoBusy,setPhotoBusy]=useState(false), [photoErr,setPhotoErr]=useState("");
+  const handlePhoto=e=>{const f=e.target.files[0]; e.target.value=""; if(!f)return; setPhotoBusy(true); setPhotoErr("");
+    shrinkPhoto(f).then(d=>onChange("photo",d)).catch(err=>setPhotoErr(err.message)).finally(()=>setPhotoBusy(false));};
   const checkNick=async()=>{
     if(!data.nickname.trim()){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}
     const myUid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
@@ -545,13 +549,17 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
-      {!editing&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <div onClick={()=>fileRef.current.click()} style={{width:88,height:88,borderRadius:"50%",border:"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F1F4FA"}}>
-          {preview?<img src={preview} alt="프로필" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+        <button type="button" onClick={()=>fileRef.current.click()} aria-label={photoOk(data.photo)?"프로필 사진 바꾸기":"프로필 사진 넣기"} style={{width:96,height:96,borderRadius:30,border:photoOk(data.photo)?"none":"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F1F4FA",padding:0,position:"relative"}}>
+          {photoOk(data.photo)?<img src={data.photo} alt="프로필 미리보기" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
+        </button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button type="button" onClick={()=>fileRef.current.click()} style={{...btnSmall,background:"#fff",color:BLUE,border:`1.5px solid ${BLUE}`}}>{photoBusy?"줄이는 중…":photoOk(data.photo)?"사진 바꾸기":"프로필 사진 넣기"}</button>
+          {photoOk(data.photo)&&<button type="button" onClick={()=>onChange("photo","")} style={{...btnSmall,background:"#fff",color:"#ef4444",border:"1.5px solid #FBD5D5"}}>빼기</button>}
         </div>
-        <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>클릭해서 프로필 사진 추가 (선택)</p>
+        <p style={{fontSize:12,color:photoErr?"#ef4444":"#A3AAC2",margin:0}}>{photoErr||"선택이에요. 회원 목록과 랭킹에 닉네임 대신 사진이 보여요"}</p>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
-      </div>}
+      </div>
       <FieldWrap label="본명" required error={errors.realName}>
         <input type="text" value={data.realName||""} style={inputStyle} onChange={e=>onChange("realName",e.target.value)} placeholder="실명" autoComplete="name"/>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>회원 확인용이에요. 모임 화면에는 닉네임만 보여요</p>
@@ -770,6 +778,34 @@ function shrinkLogo(file){
     img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
     img.src=src;
   });
+}
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX=192, PHOTO_BYTES=60000;
+function photoOk(v){ return typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=PHOTO_BYTES; }
+function shrinkPhoto(file){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img=new Image(), src=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(src);
+      const side=Math.min(img.width,img.height), S=Math.max(1,Math.min(PHOTO_MAX,side));
+      const c=document.createElement("canvas"); c.width=S; c.height=S; const g=c.getContext("2d");
+      g.fillStyle="#fff"; g.fillRect(0,0,S,S); g.imageSmoothingQuality="high";
+      g.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
+      let out="", q=0.85;
+      while(q>=0.4){ out=c.toDataURL("image/jpeg",q); if(out.length<=PHOTO_BYTES) break; q-=0.15; }
+      photoOk(out)?res(out):rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
+    img.src=src;
+  });
+}
+// 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style}){
+  const r=radius===undefined?Math.round(size*0.3):radius;
+  const box={width:size,height:size,borderRadius:r,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",...style};
+  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}><img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
+  return <span aria-hidden="true" style={{...box,background:bg,color,fontSize:font||Math.round(size*0.4),fontWeight:900}}>{(name||"?").slice(0,1)}</span>;
 }
 const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=AD_LOGO_BYTES;
 // 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
@@ -1876,7 +1912,7 @@ async function signUpMember(form){
   const cred=await FB.auth.createUserWithEmailAndPassword(form.email.trim(),form.password);
   const uid=cred.user.uid;
   const {password,passwordConfirm,photo,...rest}=form;
-  const profile={...JSON.parse(JSON.stringify(rest)),email:form.email.trim(),nickname:nick,realName:(form.realName||"").trim(),
+  const profile={...JSON.parse(JSON.stringify(rest)),...(photoOk(photo)?{photo}:{}),email:form.email.trim(),nickname:nick,realName:(form.realName||"").trim(),
     region:form.region==="타지역"?(form.regionCustom||"타지역"):form.region,createdAt:Date.now()};
   await FB.club.child("members/"+uid).set(profile);
   await FB.club.child("nicknames/"+nickKey(nick)).set(uid);
@@ -1936,11 +1972,12 @@ function AdminTab(){
   const [text,setText]=useState(()=>ADMIN_MSG[0][2](upcoming[0]));
   const [sent,setSent]=useState("");
   const [busy,setBusy]=useState(false);
-  const [showGone,setShowGone]=useState(false);
   const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
-  const [pg,setPg]=useState({pending:0,active:0,gone:0});   // 목록별 페이지 (5명씩)
+  const [pg,setPg]=useState({pending:0,active:0,gone:0,notify:0});   // 목록별 페이지 (5명씩)
+  const [sec,setSec]=useState(null);
+  const [photoBusy,setPhotoBusy]=useState(null);   // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
   const toggleSortSeen=()=>{ setSortSeen(v=>!v); goPage("active",0); };   // 정렬 바꾸면 1페이지로
   useEffect(()=>{
@@ -1983,6 +2020,12 @@ function AdminTab(){
     FB.club.child("members/"+m.uid).update({realName:v,realNameBy:ME,realNameAt:Date.now()})
       .then(()=>setNameEdit(null)).catch(fail);
   };
+  // 프로필 사진 대신 넣기·빼기 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
+  const setMemberPhoto=(m,file)=>{
+    if(!file){ if(!window.confirm(`${m.nickname} 님의 프로필 사진을 뺄까요?`)) return; FB.club.child("members/"+m.uid).update({photo:null,photoBy:null}).catch(fail); return; }
+    setPhotoBusy(m.uid);
+    shrinkPhoto(file).then(d=>FB.club.child("members/"+m.uid).update({photo:d,photoBy:ME})).catch(e=>window.alert(e.message||authMsg(e))).finally(()=>setPhotoBusy(null));
+  };
   // 알림 보내기
   const pick=list=>setSel(Object.fromEntries(list.map(m=>[m.uid,true])));
   const chosen=live.filter(m=>sel[m.uid]);
@@ -1999,25 +2042,26 @@ function AdminTab(){
   };
   const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:12,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
   const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:12,background:bg,color:c}}>{t}</span>;
-  const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,background:"#fff",color:danger?"#ef4444":"#6B7493",border:`1.5px solid ${danger?"#FBD5D5":"#D6DEF7"}`}}>{label}</button>;
-  const row=(m,acts,checkable=true)=>(
-    <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F1F4FA",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
+  const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,padding:"9px 8px",background:"none",color:danger?"#E5484D":"#5E6A8E",fontWeight:700}}>{label}</button>;
+  const row=(m,acts,checkable=false)=>(
+    <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:checkable&&sel[m.uid]?"12px 10px":"12px 0",margin:checkable&&sel[m.uid]?"0 -10px":0,borderRadius:checkable&&sel[m.uid]?12:0,background:checkable&&sel[m.uid]?BLUE_LIGHT:"transparent"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <Avatar name={m.nickname} photo={m.photo} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
         {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:14,fontWeight:600,color:INK}}>{m.nickname||"(닉네임 없음)"}</span>
-            {m.realName?<span style={{fontSize:12,color:"#4A5578"}}>({m.realName})</span>
+            <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname||"(닉네임 없음)"}</span>
+            {m.realName?<span style={{fontSize:13,color:"#6B7493"}}>{m.realName}</span>
               :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:12,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
-            {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
+            {admins[m.uid]&&tag("운영진",INK,"#fff")}
             {!approved[m.uid]&&!admins[m.uid]&&!m.withdrawn&&isNew(pendingNewItem(m))&&<NewTag/>}
           </div>
-          <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.tennisStart?` · 구력 ${calcCareer(m.tennisStart)||"-"}`:" · 구력 미입력"}</span>
+          <span style={{display:"block",marginTop:2,fontSize:12,color:"#6B7493",wordBreak:"break-all"}}>{[m.email,m.tennisStart?`구력 ${calcCareer(m.tennisStart)||"-"}`:"구력 미입력"].filter(Boolean).join(" · ")}</span>
           {lastSeen&&<span style={{display:"block",fontSize:11,fontWeight:600,color:seenAt(m.uid)?"#4A5578":"#C0C6D9",marginTop:1}}><Ic n="clock" s={11}/> {seenText(seenAt(m.uid))}</span>}
         </div>
       </div>
-      {acts&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>{acts}</div>}
+      {acts&&<div style={{display:"flex",gap:4,justifyContent:"flex-end",alignItems:"center",marginTop:6}}>{acts}</div>}
       {open===m.uid&&(
         <div style={{marginTop:8,fontSize:12,color:"#4A5578",lineHeight:1.7}}>
           {nameEdit&&nameEdit.uid===m.uid?(
@@ -2035,6 +2079,13 @@ function AdminTab(){
               <button type="button" onClick={()=>startName(m)} style={{fontSize:12,fontWeight:600,color:BLUE,background:"none",border:"none",padding:"2px 4px",cursor:"pointer",fontFamily:FONT}}>{m.realName?"수정":"입력"}</button>
             </div>
           )}
+          <div style={{display:"flex",alignItems:"center",gap:6,margin:"4px 0"}}>
+            <span style={{color:"#A3AAC2",display:"inline-block",width:84}}>프로필 사진</span>
+            <span style={{flex:1,color:"#4A5578"}}>{photoOk(m.photo)?<>있음{m.photoBy?<span style={{color:"#A3AAC2"}}> · {m.photoBy} 님이 넣음</span>:null}</>:<span style={{color:"#A3AAC2"}}>없음</span>}</span>
+            <label style={{fontSize:12,fontWeight:600,color:BLUE,padding:"2px 4px",cursor:"pointer"}}>{photoBusy===m.uid?"줄이는 중…":photoOk(m.photo)?"바꾸기":"넣기"}
+              <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ const f=e.target.files[0]; e.target.value=""; if(f) setMemberPhoto(m,f); }}/></label>
+            {photoOk(m.photo)&&<button type="button" onClick={()=>setMemberPhoto(m,null)} style={{fontSize:12,fontWeight:600,color:"#ef4444",background:"none",border:"none",padding:"2px 4px",cursor:"pointer",fontFamily:FONT}}>빼기</button>}
+          </div>
           {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
             ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo],
             ["마지막 접속",seenAt(m.uid)&&new Date(seenAt(m.uid)).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})],
@@ -2044,17 +2095,12 @@ function AdminTab(){
       )}
     </div>
   );
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
-      <Card>
-        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
-        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
-          </div>
-        )}
-        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
-      </Card>
+  const MENU=[["notify","bell","알림 보내기","회원에게 앱 알림"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
+  if(sec) return (
+    <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+      {back}
+      {sec==="notify"&&<>
       <Card>
         <SectionTitle>알림 보내기</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
@@ -2063,6 +2109,11 @@ function AdminTab(){
           {chosen.length>0&&chip("선택 해제",()=>setSel({}))}
         </div>
         <p style={{margin:"0 0 10px",fontSize:13,fontWeight:600,color:chosen.length?BLUE:"#A3AAC2"}}>{chosen.length?`${chosen.length}명 선택됨 · ${chosen.slice(0,5).map(m=>m.nickname).join(", ")}${chosen.length>5?" 외":""}`:"아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"}</p>
+        <div className="sstc-rows" style={{display:"flex",flexDirection:"column",marginBottom:4}}>
+          {pageOf(live,pg.notify).map(m=>row(m,null,true))}
+        </div>
+        <Pager page={pg.notify} total={live.length} onChange={n=>goPage("notify",n)} label="회원"/>
+        <div style={{height:12}}/>
         <select aria-label="알림 종류" value={kind} onChange={e=>setMsgKind(e.target.value)} style={{...inputStyle,marginBottom:8}}>
           {ADMIN_MSG.map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
@@ -2074,24 +2125,51 @@ function AdminTab(){
         {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}><Ic n="check" s={14}/> {sent}</p>}
         <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 알림 목록에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
       </Card>
+      </>}
+      {sec==="active"&&<>
       <Card>
         <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={toggleSortSeen}>정회원 ({active.length}명)</SectionTitle>
         {!lastSeen&&<p style={{margin:"0 0 8px",fontSize:12,color:"#C2610C",lineHeight:1.6}}>마지막 접속을 보려면 README의 새 파이어베이스 규칙을 콘솔에 붙여넣어 주세요.</p>}
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
           {pageOf(activeShown,pg.active).map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
         <Pager page={pg.active} total={activeShown.length} onChange={n=>goPage("active",n)} label="정회원"/>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있고, 본명도 대신 넣거나 고칠 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
-      {gone.length>0&&<Card>
-        <SectionTitle action={showGone?"접기":"펼치기"} onAction={()=>setShowGone(v=>!v)}>탈퇴 회원 ({gone.length}명)</SectionTitle>
-        {showGone&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
+      </>}
+      {sec==="gone"&&<>
+      <Card>
+        <SectionTitle>탈퇴 회원 ({gone.length}명)</SectionTitle>
+        {gone.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>탈퇴한 회원이 없어요.</p>:<div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
           {pageOf(gone,pg.gone).map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
         </div>}
-        {showGone&&<Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>}
-        {showGone&&<p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>}
-      </Card>}
-      <AdSettings/>
+        <Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>
+        <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>
+      </Card>
+      </>}
+      {sec==="banner"&&<AdSettings/>}
+    </div>
+  );
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
+      <Card>
+        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
+        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
+          <div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
+            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,padding:"9px 14px",borderRadius:10,background:BLUE,fontWeight:700}}>정회원 승인</button></>))}
+          </div>
+        )}
+        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
+      </Card>
+      <Card style={{padding:"4px 18px"}}>
+        {MENU.map(([k,ic,t,sub],i)=>(
+          <button key={k} type="button" onClick={()=>{setSec(k);try{window.scrollTo(0,0);}catch(e){}}} style={{display:"flex",alignItems:"center",gap:14,width:"100%",padding:"14px 0",border:"none",borderBottom:i<MENU.length-1?"1px solid #E8ECF4":"none",background:"none",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
+            <span aria-hidden="true" style={{width:40,height:40,borderRadius:12,background:BLUE_LIGHT,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={ic} size={19} color={BLUE} stroke={1.9}/></span>
+            <span style={{flex:1,minWidth:0}}><span style={{display:"block",fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{t}</span><span style={{display:"block",marginTop:2,fontSize:13,color:"#6B7493"}}>{sub}</span></span>
+            <Icon name="chevR" size={18} color="#A3AAC2"/>
+          </button>
+        ))}
+      </Card>
     </div>
   );
 }
@@ -2717,7 +2795,7 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,min
     <div style={{position:"relative",flex:1,minWidth:0}}>
       {hits.length>0&&<div role="listbox" aria-label="언급할 회원" style={{position:"absolute",left:0,right:0,bottom:"100%",marginBottom:6,background:"#fff",borderRadius:14,boxShadow:"0 8px 24px rgba(16,24,64,0.18)",padding:4,zIndex:5,maxHeight:220,overflowY:"auto"}}>
         {hits.map(x=><button key={x.uid} type="button" role="option" aria-selected="false" onMouseDown={e=>e.preventDefault()} onClick={()=>pick(x.nickname)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"none",borderRadius:10,cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
-          <span style={{width:26,height:26,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{x.nickname.slice(0,1)}</span>
+          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12}/>
           <span style={{fontSize:14,fontWeight:600,color:INK}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
@@ -2770,7 +2848,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
         {all.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>첫 댓글을 남겨 보세요. @로 회원을 부르면 알림이 가요.</p>}
         {all.map(c=>{ const mine=c.uid===uid, editing=edit&&edit.id===c.id; return(
           <div key={c.id} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-            <span style={{width:32,height:32,borderRadius:"50%",background:c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:c.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{c.anon?"?":(curNick(c.uid,c.name)||"?").slice(0,1)}</span>
+            <Avatar name={c.anon?"?":curNick(c.uid,c.name)} photo={c.anon?"":photoOf(c.uid)} size={32} radius={16} bg={c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT} color={c.anon?"#8A93B2":mine?"#fff":BLUE} font={13}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":INK}}>{shown(c)}</span>
@@ -3519,7 +3597,7 @@ function Podium({rank}){
     <div style={{display:"flex",alignItems:"flex-end",gap:8,marginTop:6}}>
       {order.map(r=>{ const first=r===top[0]; return(
         <div key={r.name} style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",alignItems:"center"}}>
-          <span aria-hidden="true" style={{width:38,height:38,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",background:r.isMe?BALL:BLUE_LIGHT,color:INK,fontSize:16,fontWeight:900}}>{r.name.slice(0,1)}</span>
+          <Avatar name={r.name} photo={PHOTO_BY_NICK[r.name]} size={38} radius={12} bg={r.isMe?BALL:BLUE_LIGHT} font={16}/>
           <span style={{margin:"6px 0 8px",fontSize:13,fontWeight:700,color:INK,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</span>
           <div style={{width:"100%",height:hgt[top.indexOf(r)+1],borderRadius:"14px 14px 6px 6px",background:first?BLUE:INK,color:"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
             <span style={{fontSize:22,fontWeight:900,lineHeight:1}}>{r.rank}</span>
@@ -3616,7 +3694,7 @@ async function changeNickname(uid,oldNick,newNick){
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
-const PROFILE_FIELDS=["realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
+const PROFILE_FIELDS=["photo","realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
 function ProfileEdit({account,onDone,onCancel}) {
   const pr=(account&&account.profile)||{};
   const [data,setData]=useState(()=>{
@@ -3632,6 +3710,8 @@ function ProfileEdit({account,onDone,onCancel}) {
     const patch={};
     PROFILE_FIELDS.forEach(k=>{ patch[k]=data[k]===undefined?null:data[k]; });
     patch.region=data.region==="타지역"?(data.regionCustom||"타지역"):data.region;
+    patch.photo=photoOk(data.photo)?data.photo:null;
+    if(patch.photo!==(photoOk(pr.photo)?pr.photo:null)){ patch.photoBy=null; }   // 본인이 바꾸면 '관리자가 넣음' 표시를 지워요
     patch.realName=(data.realName||"").trim();
     if(patch.realName!==(pr.realName||"")){ patch.realNameBy=null; patch.realNameAt=null; }   // 본인이 고치면 '관리자가 입력' 표시를 지워요
     patch.updatedAt=Date.now();
@@ -4317,7 +4397,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
   const back=<button type="button" onClick={()=>setOpenId(null)} style={{...small,fontSize:14,alignSelf:"flex-start",color:BLUE,fontWeight:600,padding:"2px 4px"}}><Ic n="chevL" s={16}/> 목록으로</button>;
   const head=p=>{ const mine=p.uid===uid; return(
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-      <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(curNick(p.uid,p.name)||"?").slice(0,1)}</span>
+      <Avatar name={p.anon?"?":curNick(p.uid,p.name)} photo={p.anon?"":photoOf(p.uid)} size={38} radius={19} bg={p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT} color={p.anon?"#8A93B2":mine?"#fff":BLUE} font={15}/>
       <div style={{flex:1,minWidth:0}}>
         <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":INK}}>{p.anon?"익명":curNick(p.uid,p.name)}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
         <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
@@ -4370,9 +4450,9 @@ function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:12,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
-        {[["list","회원 목록","users"],["board",BOARD_NAME,"message"]].map(([k,l,ic])=>{ const n=newCounts[k]||0; return(
-          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:12,border:"none",background:view===k?INK:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{fontSize:10,fontWeight:800,lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff"}}>NEW {n}</span>}</button>
+      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",gap:18,padding:"2px 4px 0"}}>
+        {[["list","회원 목록"],["board",BOARD_NAME]].map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickView(k)} style={{padding:"4px 0 6px",border:"none",borderBottom:`2.5px solid ${on?INK:"transparent"}`,background:"none",color:on?INK:"#A3AAC2",fontSize:17,fontWeight:800,letterSpacing:"-0.03em",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:FONT}}>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{color:"#ef4444",fontWeight:800}}>{n}</span>}</button>
         );})}
       </div>
       {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
@@ -4408,37 +4488,31 @@ function MemberList({onOpenMeeting}){
       {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
       {groups.map(gr=>(<React.Fragment key={gr.label||"all"}>
       {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
-      {gr.items.map(m=>{
+      <Card style={{padding:"4px 18px"}}>
+      {gr.items.map((m,i)=>{
         const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
+        const meta=[career||"구력 미입력",hand,sort==="region"?null:m.region,cnt?`이달 ${cnt}회`:null].filter(Boolean).join(" · ");
         return(
-          <div key={m.uid} role="button" tabIndex={0} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+          <div key={m.uid} role="button" tabIndex={0} aria-expanded={open===m.uid} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} onKeyDown={e=>{if(e.key==="Enter")setOpen(open===m.uid?null:m.uid);}} style={{cursor:"pointer",padding:"14px 0",borderBottom:i<gr.items.length-1?"1px solid #E8ECF4":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:700,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
+              <Avatar name={m.nickname} photo={m.photo} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:15,fontWeight:700,color:INK}}>{m.nickname}</span>
-                  {realNameOf(m)&&<span style={{fontSize:13,fontWeight:500,color:"#4A5578"}}>({realNameOf(m)})</span>}
-                  {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
-                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:12,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
+                <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                  <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname}</span>
+                  {realNameOf(m)&&<span style={{fontSize:14,fontWeight:500,color:"#6B7493"}}>{realNameOf(m)}</span>}
+                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:6,background:INK,color:"#fff"}}>운영진</span>}
                   {isNew(memberNewItem(m))&&<NewTag/>}
                 </div>
-                <span style={{fontSize:12,color:"#A3AAC2"}}>{cnt?`이달 ${cnt}회 참석`:"이달 참석 기록 없음"}</span>
+                <p style={{margin:"3px 0 0",fontSize:13,color:"#6B7493",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{meta}</p>
               </div>
-              <div style={{textAlign:"center",flexShrink:0}}>
-                <p style={{margin:0,fontSize:10,color:"#A3AAC2"}}>NTRP</p>
-                <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE}}>{m.ntrp||"-"}</p>
-              </div>
+              <span aria-label={`NTRP ${m.ntrp||"없음"}`} style={{flexShrink:0,minWidth:40,textAlign:"center",padding:"6px 8px",borderRadius:10,background:"#EDF0F6",fontSize:15,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums"}}>{m.ntrp||"-"}</span>
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
-              {chip("clock",career?`구력 ${career}`:"구력 미입력")}
+            {open===m.uid&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
               {chip("pin",m.region||"동네 미입력")}
-              {hand&&(sort==="hand"||open===m.uid)&&chip("user",hand)}
-              {open===m.uid&&<>
-                {m.court&&chip("ball",m.court)}
-                {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
-                {m.lessonStatus&&chip("users",m.lessonStatus)}
-              </>}
-            </div>
+              {m.court&&chip("ball",m.court)}
+              {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
+              {m.lessonStatus&&chip("users",m.lessonStatus)}
+            </div>}
             {open===m.uid&&(()=>{ const up=upcomingOf(m.uid); return(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
                 <p style={{margin:"0 0 6px",fontSize:11,fontWeight:600,color:"#8A93B2"}}>참가 예정 모임</p>
@@ -4453,11 +4527,12 @@ function MemberList({onOpenMeeting}){
                   ))}
                 </div>)}
               </div>); })()}
-          </Card></div>
+          </div>
         );
       })}
+      </Card>
       </React.Fragment>))}
-      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
+      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>회원을 누르면 동네·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
     </>
   );
 }
@@ -4506,7 +4581,7 @@ const GLOBAL_CSS = `
 :root{color-scheme:only light}
 body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
-.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
+.sstc-rows>div:last-child{border-bottom:none!important}.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
@@ -4582,12 +4657,12 @@ function StatsHead(){
     </div>);
 }
 function AdminHead({pending=0,members=0,banners=0}){
-  const tile=(label,val,hot)=>(
-    <div key={label} style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:14,background:hot?BALL:"rgba(255,255,255,0.12)",color:hot?INK:"#fff"}}>
-      <p style={{margin:0,fontSize:12,fontWeight:600,opacity:hot?0.8:0.75}}>{label}</p>
-      <p style={{margin:"2px 0 0",fontSize:24,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{val}</p>
+  const tile=(label,val,unit,hot)=>(
+    <div key={label} style={{flex:1,minWidth:0,padding:"12px 13px",borderRadius:16,background:hot?BALL:"rgba(255,255,255,0.14)",color:hot?INK:"#fff"}}>
+      <p style={{margin:0,fontSize:12,fontWeight:600,opacity:hot?0.8:0.8}}>{label}</p>
+      <p style={{margin:"3px 0 0",fontSize:28,fontWeight:800,lineHeight:"32px",letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{val}<span style={{fontSize:13,fontWeight:700,marginLeft:2}}>{unit}</span></p>
     </div>);
-  return <div style={{position:"relative",marginTop:14,display:"flex",gap:8}}>{tile("승인 대기",pending,pending>0)}{tile("정회원",members)}{tile("배너",banners)}</div>;
+  return <div style={{position:"relative",marginTop:16,display:"flex",gap:8}}>{tile("승인 대기",pending,"명",pending>0)}{tile("정회원",members,"명")}{tile("배너",banners,"개")}</div>;
 }
 const iconBtn={width:40,height:40,borderRadius:12,border:"none",background:"rgba(255,255,255,0.14)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
@@ -4908,7 +4983,7 @@ export default function App() {
   const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
   const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
     if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
-  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
+  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"gear"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
   const isAdminUser=adminOn||!FB;
@@ -4924,7 +4999,7 @@ export default function App() {
       <style>{GLOBAL_CSS}</style><UpdateBanner/>
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
-        <CourtLines/>
+        {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
             ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
@@ -4935,7 +5010,7 @@ export default function App() {
               {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #2152E6"}}>{club.unread>9?"9+":club.unread}</span>}
             </button>
             <div style={{position:"relative"}}>
-              <button type="button" onClick={()=>setMenu(v=>!v)} style={iconBtn} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}><Icon name="user" size={19}/></button>
+              <button type="button" onClick={()=>setMenu(v=>!v)} style={{...iconBtn,overflow:"hidden",padding:0}} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}>{photoOf(myUid())?<img src={photoOf(myUid())} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="user" size={19}/>}</button>
             </div>
           </div>
         </div>
@@ -4969,6 +5044,7 @@ export default function App() {
                 <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}{tab==="members"&&clubData&&<span style={{marginLeft:8,opacity:0.55,fontWeight:600}}>{activeMembers(clubData).length}</span>}</p>
                 {tab==="booking"&&<ViewToggle view={bookView} onView={setBookView} dark/>}
                 {tab==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
+                {tab==="admin"&&realAdmin&&<button type="button" onClick={toggleView} style={{...headChip,fontSize:13,padding:"8px 12px",border:"none",cursor:"pointer",fontFamily:FONT}}><Icon name="swap" size={14} stroke={2.2}/>회원 모드로</button>}
               </div>
               {tab==="booking"&&bookView!=="map"&&<MiniCalendar part="grid" onOpen={id=>openM(id,"info","booking")}/>}
               {tab==="members"&&<MemberSearchHead/>}
