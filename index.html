@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=e146434e55">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=e146434e55">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=3b7fc7ae48">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=3b7fc7ae48">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -4864,7 +4864,7 @@ function HomeTab({
     style: {
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 12,
       paddingBottom: 24
     }
   }, !next ? /*#__PURE__*/React.createElement(Card, {
@@ -4879,7 +4879,7 @@ function HomeTab({
       background: next.cancelled ? GONE.bg : "#fff",
       border: next.cancelled ? `1.5px solid ${GONE.line}` : isFull(next) ? `1.5px solid ${FULL.line}` : "1.5px solid transparent",
       borderRadius: 22,
-      padding: 18,
+      padding: "16px 18px",
       boxShadow: "0 12px 32px rgba(11,30,91,0.14)"
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -4891,11 +4891,11 @@ function HomeTab({
     },
     style: {
       cursor: "pointer",
-      marginBottom: 14
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "0 0 10px",
+      margin: "0 0 8px",
       display: "flex",
       alignItems: "center",
       gap: 6,
@@ -4951,7 +4951,7 @@ function HomeTab({
     }
   }, next.cancelled.memo)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 14
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4999,21 +4999,21 @@ function HomeTab({
     onVote: vote
   }), myGoing ? /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "8px 0 0",
+      margin: "6px 0 0",
       fontSize: 12,
       textAlign: "center",
       color: myGoing.ok ? BLUE : "#C2610C"
     }
   }, myGoing.label, "\uC774\uC5D0\uC694") : myStatus === "absent" ? /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "8px 0 0",
+      margin: "6px 0 0",
       fontSize: 12,
       textAlign: "center",
       color: "#6B7493"
     }
   }, "\uBD88\uCC38\uC73C\uB85C \uD45C\uC2DC\uD588\uC5B4\uC694") : /*#__PURE__*/React.createElement("p", {
     style: {
-      margin: "8px 0 0",
+      margin: "6px 0 0",
       fontSize: 12,
       textAlign: "center",
       color: "#A3AAC2"
@@ -5061,7 +5061,7 @@ function HomeTab({
       boxSizing: "border-box",
       background: m.cancelled ? GONE.bg : "#fff",
       borderRadius: 18,
-      padding: "14px 14px 13px",
+      padding: "12px 14px 11px",
       cursor: "pointer",
       scrollSnapAlign: "start",
       border: isFull(m) ? `1.5px solid ${FULL.line}` : "1.5px solid transparent"
@@ -5072,7 +5072,7 @@ function HomeTab({
       justifyContent: "space-between",
       alignItems: "center",
       gap: 6,
-      marginBottom: 12
+      marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement(KindBadge, {
     m: m
@@ -15827,7 +15827,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "e146434e55";
+const BUILD_ID = "3b7fc7ae48";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
