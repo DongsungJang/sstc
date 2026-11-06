@@ -95,10 +95,12 @@ const NTRP_LEVELS = [
 const MEMBER_NTRP = {};
 // 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
 let MEMBER_BY_UID = {};
+let PHOTO_BY_NICK = {};   // 닉네임 → 프로필 사진 (랭킹처럼 이름만 있는 곳에서 써요)
 function setMemberInfo(members){
-  MEMBER_BY_UID={};
-  Object.entries(members||{}).forEach(([uid,m])=>{ if(m&&m.nickname){ MEMBER_BY_UID[uid]={nickname:m.nickname,ntrp:m.ntrp||""}; if(m.ntrp) MEMBER_NTRP[m.nickname]=m.ntrp; } });
+  MEMBER_BY_UID={}; PHOTO_BY_NICK={};
+  Object.entries(members||{}).forEach(([uid,m])=>{ if(m&&m.nickname){ const ph=photoOk(m.photo)?m.photo:""; MEMBER_BY_UID[uid]={nickname:m.nickname,ntrp:m.ntrp||"",photo:ph}; if(ph) PHOTO_BY_NICK[m.nickname]=ph; if(m.ntrp) MEMBER_NTRP[m.nickname]=m.ntrp; } });
 }
+const photoOf=uid=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].photo)||"";
 // uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
 const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)||name;
 
@@ -519,8 +521,9 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   const [nickChecked,setNickChecked]=useState(false);
   const [nickMsg,setNickMsg]=useState("");
   const fileRef=useRef();
-  const [preview,setPreview]=useState(null);
-  const handlePhoto=e=>{const f=e.target.files[0];if(!f)return;onChange("photo",f);setPreview(URL.createObjectURL(f));};
+  const [photoBusy,setPhotoBusy]=useState(false), [photoErr,setPhotoErr]=useState("");
+  const handlePhoto=e=>{const f=e.target.files[0]; e.target.value=""; if(!f)return; setPhotoBusy(true); setPhotoErr("");
+    shrinkPhoto(f).then(d=>onChange("photo",d)).catch(err=>setPhotoErr(err.message)).finally(()=>setPhotoBusy(false));};
   const checkNick=async()=>{
     if(!data.nickname.trim()){setErrors(p=>({...p,nickname:"닉네임을 먼저 입력해주세요"}));return;}
     const myUid=FB&&FB.auth.currentUser&&FB.auth.currentUser.uid;
@@ -546,13 +549,17 @@ function Step2({data,onChange,onNext,onBack,isAdmin,editing,origNick}) {
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       {isAdmin&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"8px 14px",fontSize:12,color:"#a16207"}}><Ic n="crown" s={13}/> 관리자 모드 — 필수 입력값을 건너뛸 수 있어요</div>}
-      {!editing&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <div onClick={()=>fileRef.current.click()} style={{width:88,height:88,borderRadius:"50%",border:"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F1F4FA"}}>
-          {preview?<img src={preview} alt="프로필" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+        <button type="button" onClick={()=>fileRef.current.click()} aria-label={photoOk(data.photo)?"프로필 사진 바꾸기":"프로필 사진 넣기"} style={{width:96,height:96,borderRadius:30,border:photoOk(data.photo)?"none":"2px dashed #D6DEF7",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",background:"#F1F4FA",padding:0,position:"relative"}}>
+          {photoOk(data.photo)?<img src={data.photo} alt="프로필 미리보기" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="camera" size={30} color="#A3AAC2" stroke={1.6}/>}
+        </button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button type="button" onClick={()=>fileRef.current.click()} style={{...btnSmall,background:"#fff",color:BLUE,border:`1.5px solid ${BLUE}`}}>{photoBusy?"줄이는 중…":photoOk(data.photo)?"사진 바꾸기":"프로필 사진 넣기"}</button>
+          {photoOk(data.photo)&&<button type="button" onClick={()=>onChange("photo","")} style={{...btnSmall,background:"#fff",color:"#ef4444",border:"1.5px solid #FBD5D5"}}>빼기</button>}
         </div>
-        <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>클릭해서 프로필 사진 추가 (선택)</p>
+        <p style={{fontSize:12,color:photoErr?"#ef4444":"#A3AAC2",margin:0}}>{photoErr||"선택이에요. 회원 목록과 랭킹에 닉네임 대신 사진이 보여요"}</p>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
-      </div>}
+      </div>
       <FieldWrap label="본명" required error={errors.realName}>
         <input type="text" value={data.realName||""} style={inputStyle} onChange={e=>onChange("realName",e.target.value)} placeholder="실명" autoComplete="name"/>
         <p style={{fontSize:12,color:"#A3AAC2",margin:0}}>회원 확인용이에요. 모임 화면에는 닉네임만 보여요</p>
@@ -771,6 +778,34 @@ function shrinkLogo(file){
     img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
     img.src=src;
   });
+}
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX=192, PHOTO_BYTES=60000;
+function photoOk(v){ return typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=PHOTO_BYTES; }
+function shrinkPhoto(file){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img=new Image(), src=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(src);
+      const side=Math.min(img.width,img.height), S=Math.max(1,Math.min(PHOTO_MAX,side));
+      const c=document.createElement("canvas"); c.width=S; c.height=S; const g=c.getContext("2d");
+      g.fillStyle="#fff"; g.fillRect(0,0,S,S); g.imageSmoothingQuality="high";
+      g.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
+      let out="", q=0.85;
+      while(q>=0.4){ out=c.toDataURL("image/jpeg",q); if(out.length<=PHOTO_BYTES) break; q-=0.15; }
+      photoOk(out)?res(out):rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
+    img.src=src;
+  });
+}
+// 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style}){
+  const r=radius===undefined?Math.round(size*0.3):radius;
+  const box={width:size,height:size,borderRadius:r,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",...style};
+  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}><img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
+  return <span aria-hidden="true" style={{...box,background:bg,color,fontSize:font||Math.round(size*0.4),fontWeight:900}}>{(name||"?").slice(0,1)}</span>;
 }
 const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=AD_LOGO_BYTES;
 // 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
@@ -1877,7 +1912,7 @@ async function signUpMember(form){
   const cred=await FB.auth.createUserWithEmailAndPassword(form.email.trim(),form.password);
   const uid=cred.user.uid;
   const {password,passwordConfirm,photo,...rest}=form;
-  const profile={...JSON.parse(JSON.stringify(rest)),email:form.email.trim(),nickname:nick,realName:(form.realName||"").trim(),
+  const profile={...JSON.parse(JSON.stringify(rest)),...(photoOk(photo)?{photo}:{}),email:form.email.trim(),nickname:nick,realName:(form.realName||"").trim(),
     region:form.region==="타지역"?(form.regionCustom||"타지역"):form.region,createdAt:Date.now()};
   await FB.club.child("members/"+uid).set(profile);
   await FB.club.child("nicknames/"+nickKey(nick)).set(uid);
@@ -1941,7 +1976,8 @@ function AdminTab(){
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
   const [pg,setPg]=useState({pending:0,active:0,gone:0,notify:0});   // 목록별 페이지 (5명씩)
-  const [sec,setSec]=useState(null);   // 관리 메뉴에서 연 화면 (null이면 메뉴)
+  const [sec,setSec]=useState(null);
+  const [photoBusy,setPhotoBusy]=useState(null);   // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
   const toggleSortSeen=()=>{ setSortSeen(v=>!v); goPage("active",0); };   // 정렬 바꾸면 1페이지로
   useEffect(()=>{
@@ -1984,6 +2020,12 @@ function AdminTab(){
     FB.club.child("members/"+m.uid).update({realName:v,realNameBy:ME,realNameAt:Date.now()})
       .then(()=>setNameEdit(null)).catch(fail);
   };
+  // 프로필 사진 대신 넣기·빼기 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
+  const setMemberPhoto=(m,file)=>{
+    if(!file){ if(!window.confirm(`${m.nickname} 님의 프로필 사진을 뺄까요?`)) return; FB.club.child("members/"+m.uid).update({photo:null,photoBy:null}).catch(fail); return; }
+    setPhotoBusy(m.uid);
+    shrinkPhoto(file).then(d=>FB.club.child("members/"+m.uid).update({photo:d,photoBy:ME})).catch(e=>window.alert(e.message||authMsg(e))).finally(()=>setPhotoBusy(null));
+  };
   // 알림 보내기
   const pick=list=>setSel(Object.fromEntries(list.map(m=>[m.uid,true])));
   const chosen=live.filter(m=>sel[m.uid]);
@@ -2004,7 +2046,7 @@ function AdminTab(){
   const row=(m,acts,checkable=false)=>(
     <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:checkable&&sel[m.uid]?"12px 10px":"12px 0",margin:checkable&&sel[m.uid]?"0 -10px":0,borderRadius:checkable&&sel[m.uid]?12:0,background:checkable&&sel[m.uid]?BLUE_LIGHT:"transparent"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <span aria-hidden="true" style={{width:40,height:40,borderRadius:12,background:m.uid===myUid()?BALL:BLUE_LIGHT,color:INK,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,flexShrink:0}}>{(m.nickname||"?").slice(0,1)}</span>
+        <Avatar name={m.nickname} photo={m.photo} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
         {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -2037,6 +2079,13 @@ function AdminTab(){
               <button type="button" onClick={()=>startName(m)} style={{fontSize:12,fontWeight:600,color:BLUE,background:"none",border:"none",padding:"2px 4px",cursor:"pointer",fontFamily:FONT}}>{m.realName?"수정":"입력"}</button>
             </div>
           )}
+          <div style={{display:"flex",alignItems:"center",gap:6,margin:"4px 0"}}>
+            <span style={{color:"#A3AAC2",display:"inline-block",width:84}}>프로필 사진</span>
+            <span style={{flex:1,color:"#4A5578"}}>{photoOk(m.photo)?<>있음{m.photoBy?<span style={{color:"#A3AAC2"}}> · {m.photoBy} 님이 넣음</span>:null}</>:<span style={{color:"#A3AAC2"}}>없음</span>}</span>
+            <label style={{fontSize:12,fontWeight:600,color:BLUE,padding:"2px 4px",cursor:"pointer"}}>{photoBusy===m.uid?"줄이는 중…":photoOk(m.photo)?"바꾸기":"넣기"}
+              <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{ const f=e.target.files[0]; e.target.value=""; if(f) setMemberPhoto(m,f); }}/></label>
+            {photoOk(m.photo)&&<button type="button" onClick={()=>setMemberPhoto(m,null)} style={{fontSize:12,fontWeight:600,color:"#ef4444",background:"none",border:"none",padding:"2px 4px",cursor:"pointer",fontFamily:FONT}}>빼기</button>}
+          </div>
           {[["연락처",m.phone],["생년월일",m.birthdate],["지역",m.region],["자주 가는 코트",m.court],["테니스 시작",m.tennisStart&&`${m.tennisStart} (${calcCareer(m.tennisStart)})`],
             ["사용 손",(m.hand||[]).join(", ")],["레슨",m.lessonStatus],["주 운동",m.weeklyFreq],["추천인",m.referrer],["특이사항",m.memo],
             ["마지막 접속",seenAt(m.uid)&&new Date(seenAt(m.uid)).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false})],
@@ -2746,7 +2795,7 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,min
     <div style={{position:"relative",flex:1,minWidth:0}}>
       {hits.length>0&&<div role="listbox" aria-label="언급할 회원" style={{position:"absolute",left:0,right:0,bottom:"100%",marginBottom:6,background:"#fff",borderRadius:14,boxShadow:"0 8px 24px rgba(16,24,64,0.18)",padding:4,zIndex:5,maxHeight:220,overflowY:"auto"}}>
         {hits.map(x=><button key={x.uid} type="button" role="option" aria-selected="false" onMouseDown={e=>e.preventDefault()} onClick={()=>pick(x.nickname)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"none",borderRadius:10,cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
-          <span style={{width:26,height:26,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{x.nickname.slice(0,1)}</span>
+          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12}/>
           <span style={{fontSize:14,fontWeight:600,color:INK}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
@@ -2799,7 +2848,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
         {all.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>첫 댓글을 남겨 보세요. @로 회원을 부르면 알림이 가요.</p>}
         {all.map(c=>{ const mine=c.uid===uid, editing=edit&&edit.id===c.id; return(
           <div key={c.id} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-            <span style={{width:32,height:32,borderRadius:"50%",background:c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:c.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,flexShrink:0}}>{c.anon?"?":(curNick(c.uid,c.name)||"?").slice(0,1)}</span>
+            <Avatar name={c.anon?"?":curNick(c.uid,c.name)} photo={c.anon?"":photoOf(c.uid)} size={32} radius={16} bg={c.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT} color={c.anon?"#8A93B2":mine?"#fff":BLUE} font={13}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":INK}}>{shown(c)}</span>
@@ -3548,7 +3597,7 @@ function Podium({rank}){
     <div style={{display:"flex",alignItems:"flex-end",gap:8,marginTop:6}}>
       {order.map(r=>{ const first=r===top[0]; return(
         <div key={r.name} style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",alignItems:"center"}}>
-          <span aria-hidden="true" style={{width:38,height:38,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",background:r.isMe?BALL:BLUE_LIGHT,color:INK,fontSize:16,fontWeight:900}}>{r.name.slice(0,1)}</span>
+          <Avatar name={r.name} photo={PHOTO_BY_NICK[r.name]} size={38} radius={12} bg={r.isMe?BALL:BLUE_LIGHT} font={16}/>
           <span style={{margin:"6px 0 8px",fontSize:13,fontWeight:700,color:INK,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</span>
           <div style={{width:"100%",height:hgt[top.indexOf(r)+1],borderRadius:"14px 14px 6px 6px",background:first?BLUE:INK,color:"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
             <span style={{fontSize:22,fontWeight:900,lineHeight:1}}>{r.rank}</span>
@@ -3645,7 +3694,7 @@ async function changeNickname(uid,oldNick,newNick){
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
-const PROFILE_FIELDS=["realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
+const PROFILE_FIELDS=["photo","realName","birthdate","phone","region","regionCustom","court","tennisStart","lessonStatus","lessonMemo","ntrp","hand","weeklyFreq","otherClub","otherClubName","award","awardList","memo"];
 function ProfileEdit({account,onDone,onCancel}) {
   const pr=(account&&account.profile)||{};
   const [data,setData]=useState(()=>{
@@ -3661,6 +3710,8 @@ function ProfileEdit({account,onDone,onCancel}) {
     const patch={};
     PROFILE_FIELDS.forEach(k=>{ patch[k]=data[k]===undefined?null:data[k]; });
     patch.region=data.region==="타지역"?(data.regionCustom||"타지역"):data.region;
+    patch.photo=photoOk(data.photo)?data.photo:null;
+    if(patch.photo!==(photoOk(pr.photo)?pr.photo:null)){ patch.photoBy=null; }   // 본인이 바꾸면 '관리자가 넣음' 표시를 지워요
     patch.realName=(data.realName||"").trim();
     if(patch.realName!==(pr.realName||"")){ patch.realNameBy=null; patch.realNameAt=null; }   // 본인이 고치면 '관리자가 입력' 표시를 지워요
     patch.updatedAt=Date.now();
@@ -4346,7 +4397,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
   const back=<button type="button" onClick={()=>setOpenId(null)} style={{...small,fontSize:14,alignSelf:"flex-start",color:BLUE,fontWeight:600,padding:"2px 4px"}}><Ic n="chevL" s={16}/> 목록으로</button>;
   const head=p=>{ const mine=p.uid===uid; return(
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-      <span style={{width:38,height:38,borderRadius:"50%",background:p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT,color:p.anon?"#8A93B2":mine?"#fff":BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,flexShrink:0}}>{p.anon?"?":(curNick(p.uid,p.name)||"?").slice(0,1)}</span>
+      <Avatar name={p.anon?"?":curNick(p.uid,p.name)} photo={p.anon?"":photoOf(p.uid)} size={38} radius={19} bg={p.anon?"#E4E7F0":mine?GRAD:BLUE_LIGHT} color={p.anon?"#8A93B2":mine?"#fff":BLUE} font={15}/>
       <div style={{flex:1,minWidth:0}}>
         <span style={{display:"block",fontSize:14,fontWeight:700,color:p.anon?"#6B7493":INK}}>{p.anon?"익명":curNick(p.uid,p.name)}{mine&&<span style={{marginLeft:6,fontSize:10,background:p.anon?"#A3AAC2":BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,verticalAlign:"2px"}}>{p.anon?"내 글":"나"}</span>}{isNew(postNewItem(p))&&<NewTag style={{marginLeft:6,verticalAlign:"2px"}}/>}</span>
         <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
@@ -4444,7 +4495,7 @@ function MemberList({onOpenMeeting}){
         return(
           <div key={m.uid} role="button" tabIndex={0} aria-expanded={open===m.uid} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} onKeyDown={e=>{if(e.key==="Enter")setOpen(open===m.uid?null:m.uid);}} style={{cursor:"pointer",padding:"14px 0",borderBottom:i<gr.items.length-1?"1px solid #E8ECF4":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div aria-hidden="true" style={{width:42,height:42,borderRadius:13,background:isMe?BALL:BLUE_LIGHT,color:INK,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
+              <Avatar name={m.nickname} photo={m.photo} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
                   <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname}</span>
@@ -4959,7 +5010,7 @@ export default function App() {
               {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #2152E6"}}>{club.unread>9?"9+":club.unread}</span>}
             </button>
             <div style={{position:"relative"}}>
-              <button type="button" onClick={()=>setMenu(v=>!v)} style={iconBtn} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}><Icon name="user" size={19}/></button>
+              <button type="button" onClick={()=>setMenu(v=>!v)} style={{...iconBtn,overflow:"hidden",padding:0}} title="내 메뉴" aria-label="내 메뉴" aria-expanded={menu}>{photoOf(myUid())?<img src={photoOf(myUid())} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Icon name="user" size={19}/>}</button>
             </div>
           </div>
         </div>

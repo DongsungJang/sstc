@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=ca82273063">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=ca82273063">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fae3049555">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=fae3049555">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -264,18 +264,24 @@ const NTRP_LEVELS = [{
 const MEMBER_NTRP = {};
 // 회원 정보(club/members) 최신 값: uid → {nickname, ntrp}. 투표·댓글·글에 저장된 옛 이름 대신 이걸로 보여 줘요
 let MEMBER_BY_UID = {};
+let PHOTO_BY_NICK = {}; // 닉네임 → 프로필 사진 (랭킹처럼 이름만 있는 곳에서 써요)
 function setMemberInfo(members) {
   MEMBER_BY_UID = {};
+  PHOTO_BY_NICK = {};
   Object.entries(members || {}).forEach(([uid, m]) => {
     if (m && m.nickname) {
+      const ph = photoOk(m.photo) ? m.photo : "";
       MEMBER_BY_UID[uid] = {
         nickname: m.nickname,
-        ntrp: m.ntrp || ""
+        ntrp: m.ntrp || "",
+        photo: ph
       };
+      if (ph) PHOTO_BY_NICK[m.nickname] = ph;
       if (m.ntrp) MEMBER_NTRP[m.nickname] = m.ntrp;
     }
   });
 }
+const photoOf = uid => uid && MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].photo || "";
 // uid로 지금 닉네임 찾기 (모르면 저장된 이름 그대로)
 const curNick = (uid, name) => uid && MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].nickname || name;
 
@@ -1452,12 +1458,15 @@ function Step2({
   const [nickChecked, setNickChecked] = useState(false);
   const [nickMsg, setNickMsg] = useState("");
   const fileRef = useRef();
-  const [preview, setPreview] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(false),
+    [photoErr, setPhotoErr] = useState("");
   const handlePhoto = e => {
     const f = e.target.files[0];
+    e.target.value = "";
     if (!f) return;
-    onChange("photo", f);
-    setPreview(URL.createObjectURL(f));
+    setPhotoBusy(true);
+    setPhotoErr("");
+    shrinkPhoto(f).then(d => onChange("photo", d)).catch(err => setPhotoErr(err.message)).finally(() => setPhotoBusy(false));
   };
   const checkNick = async () => {
     if (!data.nickname.trim()) {
@@ -1549,30 +1558,34 @@ function Step2({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "crown",
     s: 13
-  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), !editing && /*#__PURE__*/React.createElement("div", {
+  }), " \uAD00\uB9AC\uC790 \uBAA8\uB4DC \u2014 \uD544\uC218 \uC785\uB825\uAC12\uC744 \uAC74\uB108\uB6F8 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => fileRef.current.click(),
+    "aria-label": photoOk(data.photo) ? "프로필 사진 바꾸기" : "프로필 사진 넣기",
     style: {
-      width: 88,
-      height: 88,
-      borderRadius: "50%",
-      border: "2px dashed #D6DEF7",
+      width: 96,
+      height: 96,
+      borderRadius: 30,
+      border: photoOk(data.photo) ? "none" : "2px dashed #D6DEF7",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       cursor: "pointer",
       overflow: "hidden",
-      background: "#F1F4FA"
+      background: "#F1F4FA",
+      padding: 0,
+      position: "relative"
     }
-  }, preview ? /*#__PURE__*/React.createElement("img", {
-    src: preview,
-    alt: "\uD504\uB85C\uD544",
+  }, photoOk(data.photo) ? /*#__PURE__*/React.createElement("img", {
+    src: data.photo,
+    alt: "\uD504\uB85C\uD544 \uBBF8\uB9AC\uBCF4\uAE30",
     style: {
       width: "100%",
       height: "100%",
@@ -1583,13 +1596,37 @@ function Step2({
     size: 30,
     color: "#A3AAC2",
     stroke: 1.6
-  })), /*#__PURE__*/React.createElement("p", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => fileRef.current.click(),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: BLUE,
+      border: `1.5px solid ${BLUE}`
+    }
+  }, photoBusy ? "줄이는 중…" : photoOk(data.photo) ? "사진 바꾸기" : "프로필 사진 넣기"), photoOk(data.photo) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => onChange("photo", ""),
+    style: {
+      ...btnSmall,
+      background: "#fff",
+      color: "#ef4444",
+      border: "1.5px solid #FBD5D5"
+    }
+  }, "\uBE7C\uAE30")), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
-      color: "#A3AAC2",
+      color: photoErr ? "#ef4444" : "#A3AAC2",
       margin: 0
     }
-  }, "\uD074\uB9AD\uD574\uC11C \uD504\uB85C\uD544 \uC0AC\uC9C4 \uCD94\uAC00 (\uC120\uD0DD)"), /*#__PURE__*/React.createElement("input", {
+  }, photoErr || "선택이에요. 회원 목록과 랭킹에 닉네임 대신 사진이 보여요"), /*#__PURE__*/React.createElement("input", {
     ref: fileRef,
     type: "file",
     accept: "image/*",
@@ -2384,6 +2421,96 @@ function shrinkLogo(file) {
     };
     img.src = src;
   });
+}
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX = 192,
+  PHOTO_BYTES = 60000;
+function photoOk(v) {
+  return typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= PHOTO_BYTES;
+}
+function shrinkPhoto(file) {
+  return new Promise((res, rej) => {
+    if (!file || !/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img = new Image(),
+      src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(src);
+      const side = Math.min(img.width, img.height),
+        S = Math.max(1, Math.min(PHOTO_MAX, side));
+      const c = document.createElement("canvas");
+      c.width = S;
+      c.height = S;
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, S, S);
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+      let out = "",
+        q = 0.85;
+      while (q >= 0.4) {
+        out = c.toDataURL("image/jpeg", q);
+        if (out.length <= PHOTO_BYTES) break;
+        q -= 0.15;
+      }
+      photoOk(out) ? res(out) : rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(src);
+      rej(new Error("사진을 읽지 못했어요"));
+    };
+    img.src = src;
+  });
+}
+// 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+function Avatar({
+  name,
+  photo,
+  size = 40,
+  radius,
+  bg = BLUE_LIGHT,
+  color = INK,
+  font,
+  style
+}) {
+  const r = radius === undefined ? Math.round(size * 0.3) : radius;
+  const box = {
+    width: size,
+    height: size,
+    borderRadius: r,
+    flexShrink: 0,
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    ...style
+  };
+  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: "#E4E9F4"
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: photo,
+    alt: "",
+    draggable: false,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block"
+    }
+  }));
+  return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: bg,
+      color,
+      fontSize: font || Math.round(size * 0.4),
+      fontWeight: 900
+    }
+  }, (name || "?").slice(0, 1));
 }
 const adLogoOk = v => typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= AD_LOGO_BYTES;
 // 자동으로 넘어가는 시간(초): club/ads/interval (관리 탭에서 2~30초, 없으면 5초). 모든 회원 홈에 같이 적용돼요
@@ -5665,6 +5792,9 @@ async function signUpMember(form) {
   } = form;
   const profile = {
     ...JSON.parse(JSON.stringify(rest)),
+    ...(photoOk(photo) ? {
+      photo
+    } : {}),
     email: form.email.trim(),
     nickname: nick,
     realName: (form.realName || "").trim(),
@@ -5814,7 +5944,8 @@ function AdminTab() {
     gone: 0,
     notify: 0
   }); // 목록별 페이지 (5명씩)
-  const [sec, setSec] = useState(null); // 관리 메뉴에서 연 화면 (null이면 메뉴)
+  const [sec, setSec] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(null); // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage = (k, n) => setPg(p => ({
     ...p,
     [k]: n
@@ -5921,6 +6052,22 @@ function AdminTab() {
       realNameAt: Date.now()
     }).then(() => setNameEdit(null)).catch(fail);
   };
+  // 프로필 사진 대신 넣기·빼기 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
+  const setMemberPhoto = (m, file) => {
+    if (!file) {
+      if (!window.confirm(`${m.nickname} 님의 프로필 사진을 뺄까요?`)) return;
+      FB.club.child("members/" + m.uid).update({
+        photo: null,
+        photoBy: null
+      }).catch(fail);
+      return;
+    }
+    setPhotoBusy(m.uid);
+    shrinkPhoto(file).then(d => FB.club.child("members/" + m.uid).update({
+      photo: d,
+      photoBy: ME
+    })).catch(e => window.alert(e.message || authMsg(e))).finally(() => setPhotoBusy(null));
+  };
   // 알림 보내기
   const pick = list => setSel(Object.fromEntries(list.map(m => [m.uid, true])));
   const chosen = live.filter(m => sel[m.uid]);
@@ -6007,22 +6154,13 @@ function AdminTab() {
       alignItems: "center",
       gap: 12
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    "aria-hidden": "true",
-    style: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      background: m.uid === myUid() ? BALL : BLUE_LIGHT,
-      color: INK,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 16,
-      fontWeight: 900,
-      flexShrink: 0
-    }
-  }, (m.nickname || "?").slice(0, 1)), checkable && /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: m.nickname,
+    photo: m.photo,
+    size: 40,
+    radius: 12,
+    bg: m.uid === myUid() ? BALL : BLUE_LIGHT
+  }), checkable && /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
     "aria-label": `${m.nickname} 선택`,
     checked: !!sel[m.uid],
@@ -6193,7 +6331,65 @@ function AdminTab() {
       cursor: "pointer",
       fontFamily: FONT
     }
-  }, m.realName ? "수정" : "입력")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["마지막 접속", seenAt(m.uid) && new Date(seenAt(m.uid)).toLocaleString("ko-KR", {
+  }, m.realName ? "수정" : "입력")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      margin: "4px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      display: "inline-block",
+      width: 84
+    }
+  }, "\uD504\uB85C\uD544 \uC0AC\uC9C4"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      color: "#4A5578"
+    }
+  }, photoOk(m.photo) ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uC788\uC74C", m.photoBy ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, " \xB7 ", m.photoBy, " \uB2D8\uC774 \uB123\uC74C") : null) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2"
+    }
+  }, "\uC5C6\uC74C")), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: BLUE,
+      padding: "2px 4px",
+      cursor: "pointer"
+    }
+  }, photoBusy === m.uid ? "줄이는 중…" : photoOk(m.photo) ? "바꾸기" : "넣기", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (f) setMemberPhoto(m, f);
+    }
+  })), photoOk(m.photo) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setMemberPhoto(m, null),
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#ef4444",
+      background: "none",
+      border: "none",
+      padding: "2px 4px",
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, "\uBE7C\uAE30")), [["연락처", m.phone], ["생년월일", m.birthdate], ["지역", m.region], ["자주 가는 코트", m.court], ["테니스 시작", m.tennisStart && `${m.tennisStart} (${calcCareer(m.tennisStart)})`], ["사용 손", (m.hand || []).join(", ")], ["레슨", m.lessonStatus], ["주 운동", m.weeklyFreq], ["추천인", m.referrer], ["특이사항", m.memo], ["마지막 접속", seenAt(m.uid) && new Date(seenAt(m.uid)).toLocaleString("ko-KR", {
     year: "numeric",
     month: "numeric",
     day: "numeric",
@@ -8633,20 +8829,14 @@ function MentionInput({
       textAlign: "left",
       fontFamily: FONT
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      width: 26,
-      height: 26,
-      borderRadius: "50%",
-      background: BLUE_LIGHT,
-      color: BLUE,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 12,
-      fontWeight: 700
-    }
-  }, x.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: x.nickname,
+    photo: photoOf(x.uid),
+    size: 26,
+    radius: 13,
+    color: BLUE,
+    font: 12
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
       fontWeight: 600,
@@ -8822,21 +9012,15 @@ function CommentBox({
         gap: 10,
         alignItems: "flex-start"
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 32,
-        height: 32,
-        borderRadius: "50%",
-        background: c.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
-        color: c.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, c.anon ? "?" : (curNick(c.uid, c.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: c.anon ? "?" : curNick(c.uid, c.name),
+      photo: c.anon ? "" : photoOf(c.uid),
+      size: 32,
+      radius: 16,
+      bg: c.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+      color: c.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
+      font: 13
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -11768,21 +11952,14 @@ function Podium({
         flexDirection: "column",
         alignItems: "center"
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      "aria-hidden": "true",
-      style: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: r.isMe ? BALL : BLUE_LIGHT,
-        color: INK,
-        fontSize: 16,
-        fontWeight: 900
-      }
-    }, r.name.slice(0, 1)), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: r.name,
+      photo: PHOTO_BY_NICK[r.name],
+      size: 38,
+      radius: 12,
+      bg: r.isMe ? BALL : BLUE_LIGHT,
+      font: 16
+    }), /*#__PURE__*/React.createElement("span", {
       style: {
         margin: "6px 0 8px",
         fontSize: 13,
@@ -12070,7 +12247,7 @@ async function changeNickname(uid, oldNick, newNick) {
 }
 
 // ─── 내 정보 수정 (가입 2·3단계 화면을 그대로 씀, 이메일은 고정) ─────────
-const PROFILE_FIELDS = ["realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
+const PROFILE_FIELDS = ["photo", "realName", "birthdate", "phone", "region", "regionCustom", "court", "tennisStart", "lessonStatus", "lessonMemo", "ntrp", "hand", "weeklyFreq", "otherClub", "otherClubName", "award", "awardList", "memo"];
 function ProfileEdit({
   account,
   onDone,
@@ -12108,6 +12285,10 @@ function ProfileEdit({
       patch[k] = data[k] === undefined ? null : data[k];
     });
     patch.region = data.region === "타지역" ? data.regionCustom || "타지역" : data.region;
+    patch.photo = photoOk(data.photo) ? data.photo : null;
+    if (patch.photo !== (photoOk(pr.photo) ? pr.photo : null)) {
+      patch.photoBy = null;
+    } // 본인이 바꾸면 '관리자가 넣음' 표시를 지워요
     patch.realName = (data.realName || "").trim();
     if (patch.realName !== (pr.realName || "")) {
       patch.realNameBy = null;
@@ -14374,21 +14555,15 @@ function FreeBoard({
         gap: 10,
         marginBottom: 10
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 38,
-        height: 38,
-        borderRadius: "50%",
-        background: p.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
-        color: p.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 15,
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, p.anon ? "?" : (curNick(p.uid, p.name) || "?").slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: p.anon ? "?" : curNick(p.uid, p.name),
+      photo: p.anon ? "" : photoOf(p.uid),
+      size: 38,
+      radius: 19,
+      bg: p.anon ? "#E4E7F0" : mine ? GRAD : BLUE_LIGHT,
+      color: p.anon ? "#8A93B2" : mine ? "#fff" : BLUE,
+      font: 15
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -14794,22 +14969,14 @@ function MemberList({
         alignItems: "center",
         gap: 12
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      "aria-hidden": "true",
-      style: {
-        width: 42,
-        height: 42,
-        borderRadius: 13,
-        background: isMe ? BALL : BLUE_LIGHT,
-        color: INK,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 16,
-        fontWeight: 900,
-        flexShrink: 0
-      }
-    }, m.nickname.slice(0, 1)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: m.nickname,
+      photo: m.photo,
+      size: 42,
+      radius: 13,
+      bg: isMe ? BALL : BLUE_LIGHT,
+      font: 16
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -14959,7 +15126,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "ca82273063";
+const BUILD_ID = "fae3049555";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -16656,11 +16823,23 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setMenu(v => !v),
-    style: iconBtn,
+    style: {
+      ...iconBtn,
+      overflow: "hidden",
+      padding: 0
+    },
     title: "\uB0B4 \uBA54\uB274",
     "aria-label": "\uB0B4 \uBA54\uB274",
     "aria-expanded": menu
-  }, /*#__PURE__*/React.createElement(Icon, {
+  }, photoOf(myUid()) ? /*#__PURE__*/React.createElement("img", {
+    src: photoOf(myUid()),
+    alt: "",
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement(Icon, {
     name: "user",
     size: 19
   }))))), isHome ? /*#__PURE__*/React.createElement("div", {
