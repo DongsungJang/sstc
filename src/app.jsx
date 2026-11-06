@@ -37,6 +37,7 @@ const ICON_PATHS = {
   zap:["M13 2 3 14h9l-1 8 10-12h-9l1-8z"],
   check:["M20 6 9 17l-5-5"],
   checkCircle:["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4 12 14.01l-3-3"],
+  gear:["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M12 2.8v2.4","M12 18.8v2.4","M2.8 12h2.4","M18.8 12h2.4","M5.5 5.5l1.7 1.7","M16.8 16.8l1.7 1.7","M5.5 18.5l1.7-1.7","M16.8 7.2l1.7-1.7"],
   search:["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z","M21 21l-4.35-4.35"],
   x:["M18 6 6 18","M6 6l12 12"],
   mail:["M3 5h18v14H3z","M21 7l-9 6-9-6"],
@@ -1936,11 +1937,11 @@ function AdminTab(){
   const [text,setText]=useState(()=>ADMIN_MSG[0][2](upcoming[0]));
   const [sent,setSent]=useState("");
   const [busy,setBusy]=useState(false);
-  const [showGone,setShowGone]=useState(false);
   const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
-  const [pg,setPg]=useState({pending:0,active:0,gone:0});   // 목록별 페이지 (5명씩)
+  const [pg,setPg]=useState({pending:0,active:0,gone:0,notify:0});   // 목록별 페이지 (5명씩)
+  const [sec,setSec]=useState(null);   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
   const toggleSortSeen=()=>{ setSortSeen(v=>!v); goPage("active",0); };   // 정렬 바꾸면 1페이지로
   useEffect(()=>{
@@ -1999,25 +2000,26 @@ function AdminTab(){
   };
   const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:12,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
   const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:12,background:bg,color:c}}>{t}</span>;
-  const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,background:"#fff",color:danger?"#ef4444":"#6B7493",border:`1.5px solid ${danger?"#FBD5D5":"#D6DEF7"}`}}>{label}</button>;
-  const row=(m,acts,checkable=true)=>(
-    <div key={m.uid} style={{borderRadius:14,background:sel[m.uid]?BLUE_LIGHT:"#F1F4FA",padding:"10px 12px",border:sel[m.uid]?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
+  const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,padding:"9px 8px",background:"none",color:danger?"#E5484D":"#5E6A8E",fontWeight:700}}>{label}</button>;
+  const row=(m,acts,checkable=false)=>(
+    <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:checkable&&sel[m.uid]?"12px 10px":"12px 0",margin:checkable&&sel[m.uid]?"0 -10px":0,borderRadius:checkable&&sel[m.uid]?12:0,background:checkable&&sel[m.uid]?BLUE_LIGHT:"transparent"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <span aria-hidden="true" style={{width:40,height:40,borderRadius:12,background:m.uid===myUid()?BALL:BLUE_LIGHT,color:INK,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,flexShrink:0}}>{(m.nickname||"?").slice(0,1)}</span>
         {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:14,fontWeight:600,color:INK}}>{m.nickname||"(닉네임 없음)"}</span>
-            {m.realName?<span style={{fontSize:12,color:"#4A5578"}}>({m.realName})</span>
+            <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname||"(닉네임 없음)"}</span>
+            {m.realName?<span style={{fontSize:13,color:"#6B7493"}}>{m.realName}</span>
               :<button type="button" onClick={e=>{e.stopPropagation();startName(m);}} style={{fontSize:12,fontWeight:600,color:"#C2610C",background:"#FFF4E5",border:"none",borderRadius:12,padding:"2px 8px",cursor:"pointer",fontFamily:FONT}}>본명 미입력 · 입력하기</button>}
             {m.ntrp&&<span style={{fontSize:11,color:"#A3AAC2"}}>NTRP {m.ntrp}</span>}
-            {admins[m.uid]&&tag("관리자",GRAD,"#fff")}
+            {admins[m.uid]&&tag("운영진",INK,"#fff")}
             {!approved[m.uid]&&!admins[m.uid]&&!m.withdrawn&&isNew(pendingNewItem(m))&&<NewTag/>}
           </div>
-          <span style={{fontSize:11,color:"#A3AAC2"}}>{m.email}{m.tennisStart?` · 구력 ${calcCareer(m.tennisStart)||"-"}`:" · 구력 미입력"}</span>
+          <span style={{display:"block",marginTop:2,fontSize:12,color:"#6B7493",wordBreak:"break-all"}}>{[m.email,m.tennisStart?`구력 ${calcCareer(m.tennisStart)||"-"}`:"구력 미입력"].filter(Boolean).join(" · ")}</span>
           {lastSeen&&<span style={{display:"block",fontSize:11,fontWeight:600,color:seenAt(m.uid)?"#4A5578":"#C0C6D9",marginTop:1}}><Ic n="clock" s={11}/> {seenText(seenAt(m.uid))}</span>}
         </div>
       </div>
-      {acts&&<div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:8}}>{acts}</div>}
+      {acts&&<div style={{display:"flex",gap:4,justifyContent:"flex-end",alignItems:"center",marginTop:6}}>{acts}</div>}
       {open===m.uid&&(
         <div style={{marginTop:8,fontSize:12,color:"#4A5578",lineHeight:1.7}}>
           {nameEdit&&nameEdit.uid===m.uid?(
@@ -2044,17 +2046,12 @@ function AdminTab(){
       )}
     </div>
   );
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
-      <Card>
-        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
-        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,background:GRAD}}>정회원 승인</button></>))}
-          </div>
-        )}
-        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
-      </Card>
+  const MENU=[["notify","bell","알림 보내기","회원에게 앱 알림"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
+  if(sec) return (
+    <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+      {back}
+      {sec==="notify"&&<>
       <Card>
         <SectionTitle>알림 보내기</SectionTitle>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
@@ -2063,6 +2060,11 @@ function AdminTab(){
           {chosen.length>0&&chip("선택 해제",()=>setSel({}))}
         </div>
         <p style={{margin:"0 0 10px",fontSize:13,fontWeight:600,color:chosen.length?BLUE:"#A3AAC2"}}>{chosen.length?`${chosen.length}명 선택됨 · ${chosen.slice(0,5).map(m=>m.nickname).join(", ")}${chosen.length>5?" 외":""}`:"아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"}</p>
+        <div className="sstc-rows" style={{display:"flex",flexDirection:"column",marginBottom:4}}>
+          {pageOf(live,pg.notify).map(m=>row(m,null,true))}
+        </div>
+        <Pager page={pg.notify} total={live.length} onChange={n=>goPage("notify",n)} label="회원"/>
+        <div style={{height:12}}/>
         <select aria-label="알림 종류" value={kind} onChange={e=>setMsgKind(e.target.value)} style={{...inputStyle,marginBottom:8}}>
           {ADMIN_MSG.map(([k,l])=><option key={k} value={k}>{l}</option>)}
         </select>
@@ -2074,24 +2076,51 @@ function AdminTab(){
         {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}><Ic n="check" s={14}/> {sent}</p>}
         <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 알림 목록에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
       </Card>
+      </>}
+      {sec==="active"&&<>
       <Card>
         <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={toggleSortSeen}>정회원 ({active.length}명)</SectionTitle>
         {!lastSeen&&<p style={{margin:"0 0 8px",fontSize:12,color:"#C2610C",lineHeight:1.6}}>마지막 접속을 보려면 README의 새 파이어베이스 규칙을 콘솔에 붙여넣어 주세요.</p>}
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
           {pageOf(activeShown,pg.active).map(m=>row(m,admins[m.uid]?null:<>{small("준회원으로",()=>demote(m))}{small("탈퇴",()=>withdraw(m),true)}</>))}
         </div>
         <Pager page={pg.active} total={activeShown.length} onChange={n=>goPage("active",n)} label="정회원"/>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>이름을 누르면 가입 정보를 볼 수 있고, 본명도 대신 넣거나 고칠 수 있어요. 관리자 지정은 파이어베이스 콘솔의 club/admins에서 해요.</p>
       </Card>
-      {gone.length>0&&<Card>
-        <SectionTitle action={showGone?"접기":"펼치기"} onAction={()=>setShowGone(v=>!v)}>탈퇴 회원 ({gone.length}명)</SectionTitle>
-        {showGone&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
+      </>}
+      {sec==="gone"&&<>
+      <Card>
+        <SectionTitle>탈퇴 회원 ({gone.length}명)</SectionTitle>
+        {gone.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>탈퇴한 회원이 없어요.</p>:<div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
           {pageOf(gone,pg.gone).map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
         </div>}
-        {showGone&&<Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>}
-        {showGone&&<p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>}
-      </Card>}
-      <AdSettings/>
+        <Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>
+        <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>
+      </Card>
+      </>}
+      {sec==="banner"&&<AdSettings/>}
+    </div>
+  );
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
+      <Card>
+        <SectionTitle>가입 승인 대기 ({pending.length}명)</SectionTitle>
+        {pending.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>기다리는 사람이 없어요.</p>:(
+          <div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
+            {pageOf(pending,pg.pending).map(m=>row(m,<>{small("탈퇴",()=>withdraw(m),true)}<button type="button" onClick={()=>approve(m.uid)} style={{...btnSmall,padding:"9px 14px",borderRadius:10,background:BLUE,fontWeight:700}}>정회원 승인</button></>))}
+          </div>
+        )}
+        <Pager page={pg.pending} total={pending.length} onChange={n=>goPage("pending",n)} label="준회원"/>
+      </Card>
+      <Card style={{padding:"4px 18px"}}>
+        {MENU.map(([k,ic,t,sub],i)=>(
+          <button key={k} type="button" onClick={()=>{setSec(k);try{window.scrollTo(0,0);}catch(e){}}} style={{display:"flex",alignItems:"center",gap:14,width:"100%",padding:"14px 0",border:"none",borderBottom:i<MENU.length-1?"1px solid #E8ECF4":"none",background:"none",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
+            <span aria-hidden="true" style={{width:40,height:40,borderRadius:12,background:BLUE_LIGHT,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={ic} size={19} color={BLUE} stroke={1.9}/></span>
+            <span style={{flex:1,minWidth:0}}><span style={{display:"block",fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{t}</span><span style={{display:"block",marginTop:2,fontSize:13,color:"#6B7493"}}>{sub}</span></span>
+            <Icon name="chevR" size={18} color="#A3AAC2"/>
+          </button>
+        ))}
+      </Card>
     </div>
   );
 }
@@ -4370,9 +4399,9 @@ function MembersTab({onOpenMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",background:"#fff",borderRadius:12,padding:4,boxShadow:"0 4px 16px rgba(40,70,180,0.08)"}}>
-        {[["list","회원 목록","users"],["board",BOARD_NAME,"message"]].map(([k,l,ic])=>{ const n=newCounts[k]||0; return(
-          <button key={k} type="button" role="tab" aria-selected={view===k} onClick={()=>pickView(k)} style={{flex:1,padding:"9px 0",borderRadius:12,border:"none",background:view===k?INK:"transparent",color:view===k?"#fff":"#4A5578",fontSize:14,fontWeight:view===k?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontFamily:FONT}}><Ic n={ic} s={15}/>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{fontSize:10,fontWeight:800,lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff"}}>NEW {n}</span>}</button>
+      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",gap:18,padding:"2px 4px 0"}}>
+        {[["list","회원 목록"],["board",BOARD_NAME]].map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
+          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickView(k)} style={{padding:"4px 0 6px",border:"none",borderBottom:`2.5px solid ${on?INK:"transparent"}`,background:"none",color:on?INK:"#A3AAC2",fontSize:17,fontWeight:800,letterSpacing:"-0.03em",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:FONT}}>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{color:"#ef4444",fontWeight:800}}>{n}</span>}</button>
         );})}
       </div>
       {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
@@ -4408,37 +4437,31 @@ function MemberList({onOpenMeeting}){
       {list.length===0&&<Empty>{q?"찾는 회원이 없어요.":total?"아직 정회원이 없어요.":"아직 회원이 없어요."}</Empty>}
       {groups.map(gr=>(<React.Fragment key={gr.label||"all"}>
       {gr.label&&<p style={{margin:"6px 4px 0",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n={sort==="hand"?"user":"pin"} s={14} c={BLUE}/>{gr.label}<span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{gr.items.length}명</span></p>}
-      {gr.items.map(m=>{
+      <Card style={{padding:"4px 18px"}}>
+      {gr.items.map((m,i)=>{
         const isMe=m.nickname===ME, career=calcCareer(m.tennisStart), hand=Array.isArray(m.hand)?m.hand.join(", "):m.hand, cnt=monthCount[m.nickname]||0;
+        const meta=[career||"구력 미입력",hand,sort==="region"?null:m.region,cnt?`이달 ${cnt}회`:null].filter(Boolean).join(" · ");
         return(
-          <div key={m.uid} role="button" tabIndex={0} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} style={{cursor:"pointer"}}><Card style={{padding:16,border:isMe?`1.5px solid ${BLUE}`:"1.5px solid transparent"}}>
+          <div key={m.uid} role="button" tabIndex={0} aria-expanded={open===m.uid} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} onKeyDown={e=>{if(e.key==="Enter")setOpen(open===m.uid?null:m.uid);}} style={{cursor:"pointer",padding:"14px 0",borderBottom:i<gr.items.length-1?"1px solid #E8ECF4":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:700,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
+              <div aria-hidden="true" style={{width:42,height:42,borderRadius:13,background:isMe?BALL:BLUE_LIGHT,color:INK,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:900,flexShrink:0}}>{m.nickname.slice(0,1)}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:15,fontWeight:700,color:INK}}>{m.nickname}</span>
-                  {realNameOf(m)&&<span style={{fontSize:13,fontWeight:500,color:"#4A5578"}}>({realNameOf(m)})</span>}
-                  {isMe&&<span style={{fontSize:10,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10}}>나</span>}
-                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:12,background:BLUE_LIGHT,color:BLUE}}>운영진</span>}
+                <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                  <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname}</span>
+                  {realNameOf(m)&&<span style={{fontSize:14,fontWeight:500,color:"#6B7493"}}>{realNameOf(m)}</span>}
+                  {data.admins[m.uid]&&<span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:6,background:INK,color:"#fff"}}>운영진</span>}
                   {isNew(memberNewItem(m))&&<NewTag/>}
                 </div>
-                <span style={{fontSize:12,color:"#A3AAC2"}}>{cnt?`이달 ${cnt}회 참석`:"이달 참석 기록 없음"}</span>
+                <p style={{margin:"3px 0 0",fontSize:13,color:"#6B7493",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{meta}</p>
               </div>
-              <div style={{textAlign:"center",flexShrink:0}}>
-                <p style={{margin:0,fontSize:10,color:"#A3AAC2"}}>NTRP</p>
-                <p style={{margin:0,fontSize:18,fontWeight:700,color:BLUE}}>{m.ntrp||"-"}</p>
-              </div>
+              <span aria-label={`NTRP ${m.ntrp||"없음"}`} style={{flexShrink:0,minWidth:40,textAlign:"center",padding:"6px 8px",borderRadius:10,background:"#EDF0F6",fontSize:15,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums"}}>{m.ntrp||"-"}</span>
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
-              {chip("clock",career?`구력 ${career}`:"구력 미입력")}
+            {open===m.uid&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
               {chip("pin",m.region||"동네 미입력")}
-              {hand&&(sort==="hand"||open===m.uid)&&chip("user",hand)}
-              {open===m.uid&&<>
-                {m.court&&chip("ball",m.court)}
-                {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
-                {m.lessonStatus&&chip("users",m.lessonStatus)}
-              </>}
-            </div>
+              {m.court&&chip("ball",m.court)}
+              {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
+              {m.lessonStatus&&chip("users",m.lessonStatus)}
+            </div>}
             {open===m.uid&&(()=>{ const up=upcomingOf(m.uid); return(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
                 <p style={{margin:"0 0 6px",fontSize:11,fontWeight:600,color:"#8A93B2"}}>참가 예정 모임</p>
@@ -4453,11 +4476,12 @@ function MemberList({onOpenMeeting}){
                   ))}
                 </div>)}
               </div>); })()}
-          </Card></div>
+          </div>
         );
       })}
+      </Card>
       </React.Fragment>))}
-      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>카드를 누르면 손·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
+      {list.length>0&&<p style={{margin:0,fontSize:11,color:"#A3AAC2",textAlign:"center"}}>회원을 누르면 동네·자주 가는 코트·운동 횟수와 참가 예정 모임도 보여요. 연락처는 보이지 않아요.</p>}
     </>
   );
 }
@@ -4506,7 +4530,7 @@ const GLOBAL_CSS = `
 :root{color-scheme:only light}
 body{margin:0;background:${PAGE_BG};font-family:${FONT};color:${INK};-webkit-font-smoothing:antialiased;letter-spacing:-0.015em}
 button,input,select,textarea{font-family:inherit}
-.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
+.sstc-rows>div:last-child{border-bottom:none!important}.sstc-hscroll{scrollbar-width:none}.sstc-hscroll::-webkit-scrollbar{display:none}
 input:focus,select:focus,textarea:focus{border-color:${BLUE}!important;box-shadow:0 0 0 4px rgba(33,82,230,0.12)}
 button:focus-visible{outline:2px solid ${BLUE};outline-offset:2px}
 ::placeholder{color:#A3AAC2}
@@ -4582,12 +4606,12 @@ function StatsHead(){
     </div>);
 }
 function AdminHead({pending=0,members=0,banners=0}){
-  const tile=(label,val,hot)=>(
-    <div key={label} style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:14,background:hot?BALL:"rgba(255,255,255,0.12)",color:hot?INK:"#fff"}}>
-      <p style={{margin:0,fontSize:12,fontWeight:600,opacity:hot?0.8:0.75}}>{label}</p>
-      <p style={{margin:"2px 0 0",fontSize:24,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{val}</p>
+  const tile=(label,val,unit,hot)=>(
+    <div key={label} style={{flex:1,minWidth:0,padding:"12px 13px",borderRadius:16,background:hot?BALL:"rgba(255,255,255,0.14)",color:hot?INK:"#fff"}}>
+      <p style={{margin:0,fontSize:12,fontWeight:600,opacity:hot?0.8:0.8}}>{label}</p>
+      <p style={{margin:"3px 0 0",fontSize:28,fontWeight:800,lineHeight:"32px",letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{val}<span style={{fontSize:13,fontWeight:700,marginLeft:2}}>{unit}</span></p>
     </div>);
-  return <div style={{position:"relative",marginTop:14,display:"flex",gap:8}}>{tile("승인 대기",pending,pending>0)}{tile("정회원",members)}{tile("배너",banners)}</div>;
+  return <div style={{position:"relative",marginTop:16,display:"flex",gap:8}}>{tile("승인 대기",pending,"명",pending>0)}{tile("정회원",members,"명")}{tile("배너",banners,"개")}</div>;
 }
 const iconBtn={width:40,height:40,borderRadius:12,border:"none",background:"rgba(255,255,255,0.14)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
@@ -4908,7 +4932,7 @@ export default function App() {
   const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
   const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
     if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
-  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"user"}]:TABS;
+  const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"gear"}]:TABS;
   const isHome=tab==="home";
   const curMeeting=tab==="booking"&&openMeeting?MEETINGS.find(m=>m.id===openMeeting.id):null;
   const isAdminUser=adminOn||!FB;
@@ -4924,7 +4948,7 @@ export default function App() {
       <style>{GLOBAL_CSS}</style><UpdateBanner/>
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
-        <CourtLines/>
+        {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
             ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
@@ -4969,6 +4993,7 @@ export default function App() {
                 <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}{tab==="members"&&clubData&&<span style={{marginLeft:8,opacity:0.55,fontWeight:600}}>{activeMembers(clubData).length}</span>}</p>
                 {tab==="booking"&&<ViewToggle view={bookView} onView={setBookView} dark/>}
                 {tab==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
+                {tab==="admin"&&realAdmin&&<button type="button" onClick={toggleView} style={{...headChip,fontSize:13,padding:"8px 12px",border:"none",cursor:"pointer",fontFamily:FONT}}><Icon name="swap" size={14} stroke={2.2}/>회원 모드로</button>}
               </div>
               {tab==="booking"&&bookView!=="map"&&<MiniCalendar part="grid" onOpen={id=>openM(id,"info","booking")}/>}
               {tab==="members"&&<MemberSearchHead/>}
