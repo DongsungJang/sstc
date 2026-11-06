@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=04a58e87be">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=04a58e87be">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=23b1a2e6ff">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=23b1a2e6ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -2422,9 +2422,9 @@ function shrinkLogo(file) {
     img.src = src;
   });
 }
-// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
-const PHOTO_MAX = 192,
-  PHOTO_BYTES = 60000;
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 400px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX = 400,
+  PHOTO_BYTES = 90000; // 눌러서 크게 볼 수 있게 400px까지 (예전 192px 사진도 그대로 보여요)
 function photoOk(v) {
   return typeof v === "string" && /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= PHOTO_BYTES;
 }
@@ -2450,7 +2450,7 @@ function shrinkPhoto(file) {
       while (q >= 0.4) {
         out = c.toDataURL("image/jpeg", q);
         if (out.length <= PHOTO_BYTES) break;
-        q -= 0.15;
+        q -= 0.1;
       }
       photoOk(out) ? res(out) : rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
     };
@@ -2461,7 +2461,90 @@ function shrinkPhoto(file) {
     img.src = src;
   });
 }
+// 프로필 사진 크게 보기: openPhoto({photo,name,sub})로 열고, 바깥이나 X를 누르면 닫혀요
+let PHOTO_VIEW_SET = null;
+const openPhoto = v => {
+  if (PHOTO_VIEW_SET && photoOk(v && v.photo)) PHOTO_VIEW_SET(v);
+};
+function PhotoViewer() {
+  const [v, setV] = useState(null);
+  useEffect(() => {
+    PHOTO_VIEW_SET = setV;
+    return () => {
+      PHOTO_VIEW_SET = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!v) return;
+    const k = e => {
+      if (e.key === "Escape") setV(null);
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [v]);
+  if (!v) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `${v.name || ""} 프로필 사진`,
+    onClick: () => setV(null),
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 120,
+      background: "rgba(11,30,91,0.82)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      boxSizing: "border-box",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "\uB2EB\uAE30",
+    onClick: () => setV(null),
+    style: {
+      position: "absolute",
+      top: "calc(14px + env(safe-area-inset-top,0px))",
+      right: 16,
+      ...iconBtn
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 20
+  })), /*#__PURE__*/React.createElement("img", {
+    src: v.photo,
+    alt: `${v.name || ""} 프로필 사진`,
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: "min(86vw,380px)",
+      height: "min(86vw,380px)",
+      objectFit: "cover",
+      borderRadius: 28,
+      boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+      background: "#fff"
+    }
+  }), v.name && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "16px 0 0",
+      color: "#fff",
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: "-0.02em"
+    }
+  }, v.name, v.sub && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 6,
+      fontSize: 15,
+      fontWeight: 500,
+      opacity: 0.7
+    }
+  }, v.sub)));
+}
 // 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
+// 사진이 있으면 눌러서 크게 볼 수 있어요 (zoom={false}면 그냥 그림. 누를 때 둘레 카드가 펼쳐지지 않게 막아요)
 function Avatar({
   name,
   photo,
@@ -2470,7 +2553,9 @@ function Avatar({
   bg = BLUE_LIGHT,
   color = INK,
   font,
-  style
+  style,
+  zoom = true,
+  sub
 }) {
   const r = radius === undefined ? Math.round(size * 0.3) : radius;
   const box = {
@@ -2484,13 +2569,7 @@ function Avatar({
     justifyContent: "center",
     ...style
   };
-  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
-    "aria-hidden": "true",
-    style: {
-      ...box,
-      background: "#E4E9F4"
-    }
-  }, /*#__PURE__*/React.createElement("img", {
+  const img = /*#__PURE__*/React.createElement("img", {
     src: photo,
     alt: "",
     draggable: false,
@@ -2500,7 +2579,44 @@ function Avatar({
       objectFit: "cover",
       display: "block"
     }
-  }));
+  });
+  if (photoOk(photo) && zoom) return /*#__PURE__*/React.createElement("span", {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": `${name || ""} 사진 크게 보기`,
+    onClick: e => {
+      e.stopPropagation();
+      e.preventDefault();
+      openPhoto({
+        photo,
+        name,
+        sub
+      });
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.stopPropagation();
+        e.preventDefault();
+        openPhoto({
+          photo,
+          name,
+          sub
+        });
+      }
+    },
+    style: {
+      ...box,
+      background: "#E4E9F4",
+      cursor: "zoom-in"
+    }
+  }, img);
+  if (photoOk(photo)) return /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      ...box,
+      background: "#E4E9F4"
+    }
+  }, img);
   return /*#__PURE__*/React.createElement("span", {
     "aria-hidden": "true",
     style: {
@@ -6753,6 +6869,7 @@ function AdminTab() {
   }, /*#__PURE__*/React.createElement(Avatar, {
     name: m.nickname,
     photo: m.photo,
+    sub: m.realName,
     size: 40,
     radius: 12,
     bg: m.uid === myUid() ? BALL : BLUE_LIGHT
@@ -9317,7 +9434,8 @@ function MentionInput({
     size: 26,
     radius: 13,
     color: BLUE,
-    font: 12
+    font: 12,
+    zoom: false
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
@@ -15454,6 +15572,7 @@ function MemberList({
     }, /*#__PURE__*/React.createElement(Avatar, {
       name: m.nickname,
       photo: m.photo,
+      sub: realNameOf(m),
       size: 42,
       radius: 13,
       bg: isMe ? BALL : BLUE_LIGHT,
@@ -15608,7 +15727,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "04a58e87be";
+const BUILD_ID = "23b1a2e6ff";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -17217,7 +17336,7 @@ function App() {
       flexDirection: "column",
       fontFamily: FONT
     }
-  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), loginPopup.popup && /*#__PURE__*/React.createElement(LoginPopup, {
+  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement(PhotoViewer, null), loginPopup.popup && /*#__PURE__*/React.createElement(LoginPopup, {
     popup: loginPopup.popup,
     left: loginPopup.left,
     onClose: q => loginPopup.close(loginPopup.popup, q)

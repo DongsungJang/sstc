@@ -779,8 +779,8 @@ function shrinkLogo(file){
     img.src=src;
   });
 }
-// ─── 프로필 사진: 가운데를 정사각형으로 잘라 192px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
-const PHOTO_MAX=192, PHOTO_BYTES=60000;
+// ─── 프로필 사진: 가운데를 정사각형으로 잘라 400px로 줄여 members/<uid>/photo에 data URL로 저장 (Storage 없이) ───
+const PHOTO_MAX=400, PHOTO_BYTES=90000;   // 눌러서 크게 볼 수 있게 400px까지 (예전 192px 사진도 그대로 보여요)
 function photoOk(v){ return typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=PHOTO_BYTES; }
 function shrinkPhoto(file){
   return new Promise((res,rej)=>{
@@ -793,18 +793,38 @@ function shrinkPhoto(file){
       g.fillStyle="#fff"; g.fillRect(0,0,S,S); g.imageSmoothingQuality="high";
       g.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
       let out="", q=0.85;
-      while(q>=0.4){ out=c.toDataURL("image/jpeg",q); if(out.length<=PHOTO_BYTES) break; q-=0.15; }
+      while(q>=0.4){ out=c.toDataURL("image/jpeg",q); if(out.length<=PHOTO_BYTES) break; q-=0.1; }
       photoOk(out)?res(out):rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요"));
     };
     img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
     img.src=src;
   });
 }
+// 프로필 사진 크게 보기: openPhoto({photo,name,sub})로 열고, 바깥이나 X를 누르면 닫혀요
+let PHOTO_VIEW_SET=null;
+const openPhoto=v=>{ if(PHOTO_VIEW_SET&&photoOk(v&&v.photo)) PHOTO_VIEW_SET(v); };
+function PhotoViewer(){
+  const [v,setV]=useState(null);
+  useEffect(()=>{ PHOTO_VIEW_SET=setV; return ()=>{ PHOTO_VIEW_SET=null; }; },[]);
+  useEffect(()=>{ if(!v) return; const k=e=>{ if(e.key==="Escape") setV(null); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[v]);
+  if(!v) return null;
+  return(
+    <div role="dialog" aria-modal="true" aria-label={`${v.name||""} 프로필 사진`} onClick={()=>setV(null)} style={{position:"fixed",inset:0,zIndex:120,background:"rgba(11,30,91,0.82)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,boxSizing:"border-box",fontFamily:FONT}}>
+      <button type="button" aria-label="닫기" onClick={()=>setV(null)} style={{position:"absolute",top:"calc(14px + env(safe-area-inset-top,0px))",right:16,...iconBtn}}><Icon name="x" size={20}/></button>
+      <img src={v.photo} alt={`${v.name||""} 프로필 사진`} onClick={e=>e.stopPropagation()} style={{width:"min(86vw,380px)",height:"min(86vw,380px)",objectFit:"cover",borderRadius:28,boxShadow:"0 20px 60px rgba(0,0,0,0.35)",background:"#fff"}}/>
+      {v.name&&<p style={{margin:"16px 0 0",color:"#fff",fontSize:20,fontWeight:800,letterSpacing:"-0.02em"}}>{v.name}{v.sub&&<span style={{marginLeft:6,fontSize:15,fontWeight:500,opacity:0.7}}>{v.sub}</span>}</p>}
+    </div>);
+}
 // 동그란(또는 둥근 네모) 프로필: 사진이 있으면 사진, 없으면 닉네임 첫 글자
-function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style}){
+// 사진이 있으면 눌러서 크게 볼 수 있어요 (zoom={false}면 그냥 그림. 누를 때 둘레 카드가 펼쳐지지 않게 막아요)
+function Avatar({name,photo,size=40,radius,bg=BLUE_LIGHT,color=INK,font,style,zoom=true,sub}){
   const r=radius===undefined?Math.round(size*0.3):radius;
   const box={width:size,height:size,borderRadius:r,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",...style};
-  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}><img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
+  const img=<img src={photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>;
+  if(photoOk(photo)&&zoom) return <span role="button" tabIndex={0} aria-label={`${name||""} 사진 크게 보기`}
+    onClick={e=>{e.stopPropagation();e.preventDefault();openPhoto({photo,name,sub});}} onKeyDown={e=>{ if(e.key==="Enter"||e.key===" "){ e.stopPropagation();e.preventDefault();openPhoto({photo,name,sub}); } }}
+    style={{...box,background:"#E4E9F4",cursor:"zoom-in"}}>{img}</span>;
+  if(photoOk(photo)) return <span aria-hidden="true" style={{...box,background:"#E4E9F4"}}>{img}</span>;
   return <span aria-hidden="true" style={{...box,background:bg,color,fontSize:font||Math.round(size*0.4),fontWeight:900}}>{(name||"?").slice(0,1)}</span>;
 }
 const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<=AD_LOGO_BYTES;
@@ -2195,7 +2215,7 @@ function AdminTab(){
   const row=(m,acts)=>(
     <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:"12px 0"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <Avatar name={m.nickname} photo={m.photo} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
+        <Avatar name={m.nickname} photo={m.photo} sub={m.realName} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname||"(닉네임 없음)"}</span>
@@ -2918,7 +2938,7 @@ function MentionInput({value,onChange,members,placeholder,autoFocus,onSubmit,min
     <div style={{position:"relative",flex:1,minWidth:0}}>
       {hits.length>0&&<div role="listbox" aria-label="언급할 회원" style={{position:"absolute",left:0,right:0,bottom:"100%",marginBottom:6,background:"#fff",borderRadius:14,boxShadow:"0 8px 24px rgba(16,24,64,0.18)",padding:4,zIndex:5,maxHeight:220,overflowY:"auto"}}>
         {hits.map(x=><button key={x.uid} type="button" role="option" aria-selected="false" onMouseDown={e=>e.preventDefault()} onClick={()=>pick(x.nickname)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"none",borderRadius:10,cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
-          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12}/>
+          <Avatar name={x.nickname} photo={photoOf(x.uid)} size={26} radius={13} color={BLUE} font={12} zoom={false}/>
           <span style={{fontSize:14,fontWeight:600,color:INK}}>{x.nickname}</span><span style={{fontSize:11,color:"#A3AAC2"}}>{x.ntrp||""}</span>
         </button>)}
       </div>}
@@ -4618,7 +4638,7 @@ function MemberList({onOpenMeeting}){
         return(
           <div key={m.uid} role="button" tabIndex={0} aria-expanded={open===m.uid} onClick={()=>{ const x=memberNewItem(m); markItemSeen(x.id,x.at); setOpen(open===m.uid?null:m.uid); }} onKeyDown={e=>{if(e.key==="Enter")setOpen(open===m.uid?null:m.uid);}} style={{cursor:"pointer",padding:"14px 0",borderBottom:i<gr.items.length-1?"1px solid #E8ECF4":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <Avatar name={m.nickname} photo={m.photo} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>
+              <Avatar name={m.nickname} photo={m.photo} sub={realNameOf(m)} size={42} radius={13} bg={isMe?BALL:BLUE_LIGHT} font={16}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
                   <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname}</span>
@@ -5120,7 +5140,7 @@ export default function App() {
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
-      <style>{GLOBAL_CSS}</style><UpdateBanner/>
+      <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
