@@ -1194,6 +1194,185 @@ function AdSettings(){
     </Card>);
 }
 
+// ─── 접속 팝업 (관리 탭에서 작성 → 회원이 앱을 열면 창으로 떠요) ──────────────────
+// club/popups/p<만든 시각> = {enabled, title, text, mode(once 한 번만 | daily 하루 한 번 | always 열 때마다), start, end, ver, createdAt, updatedAt, updatedByUid}
+// 본 기록: club/popupSeen/<uid>/<팝업> = {at, day, ver, quiet(열 때마다 팝업에서 "오늘 그만 보기"를 누른 날)}. 본인만 쓰고 관리자가 읽어요.
+// ver는 "본 사람에게도 다시 보여 주기"를 누를 때마다 1씩 올라가요. 기록의 ver가 다르면 아직 안 본 걸로 쳐요.
+// 규칙을 아직 안 붙여넣어 기록을 못 쓰면 기기(localStorage)에만 남겨서 같은 폰에서는 다시 안 떠요.
+const POPUP_MODES=[["once","한 번만","회원마다 처음 한 번만 떠요"],["daily","하루 한 번","기간 동안 하루에 한 번씩 떠요"],["always","열 때마다","앱을 열 때마다 떠요 (회원이 '오늘 그만 보기'로 그날은 끌 수 있어요)"]];
+const POPUP_EMPTY={title:"",text:"",mode:"once",start:"",end:""};
+const POPUP_FIELDS=["title","text","mode","start","end"];
+const popupMode=m=>POPUP_MODES.find(x=>x[0]===m)||POPUP_MODES[0];
+const popupList=v=>Object.entries(v||{}).filter(([id,p])=>p&&typeof p==="object"&&/^p\d+$/.test(id)).map(([id,p])=>({id,...p})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+const POPUP_LS=uid=>"sstc-popup-"+uid;
+const lsGetJSON=k=>{ try{ return JSON.parse(lsGet(k)||"{}")||{}; }catch(e){ return {}; } };
+const lsSetJSON=(k,v)=>lsSet(k,JSON.stringify(v));
+const popupShownNow=new Set();   // 이번에 앱을 연 동안 이미 띄운 팝업 (열 때마다 팝업이 탭을 옮길 때마다 뜨지 않게)
+// 이 회원에게 지금 띄울지: 켜짐 + 기간 안 + 내용 있음, 그리고 본 기록에 따라
+function popupDue(p,seen,day=adToday()){
+  if(!p||!p.enabled||!String(p.title||p.text||"").trim()||adPhase(p,day)!=="live") return false;
+  const s=seen&&(seen.ver||1)===(p.ver||1)?seen:null;
+  if(p.mode==="always") return !popupShownNow.has(p.id)&&!(s&&s.quiet===day);
+  if(p.mode==="daily") return !(s&&s.day===day);
+  return !s;
+}
+function useLoginPopups(uid,on){
+  const [list,setList]=useState(null);
+  const [seen,setSeen]=useState(null);
+  useEffect(()=>{ if(!FB||!on||!uid) return;
+    const r=FB.club.child("popups"), h=s=>setList(popupList(s.val())); r.on("value",h,()=>setList([]));
+    const local=lsGetJSON(POPUP_LS(uid));
+    once(FB.club.child("popupSeen/"+uid)).then(v=>setSeen({...local,...(v||{})})).catch(()=>setSeen(local));
+    return ()=>r.off("value",h);
+  },[uid,on]);
+  // 앱을 열 때(목록·기록을 처음 다 불러왔을 때) 띄울 팝업을 정해 둬요. 쓰는 도중에 새로 켠 팝업은 다음에 열 때 떠요
+  const [queue,setQueue]=useState(null);
+  useEffect(()=>{ if(list&&seen&&queue===null) setQueue(list.filter(p=>popupDue(p,seen[p.id])).map(p=>p.id)); },[list,seen,queue]);
+  const due=list&&seen&&queue?queue.map(id=>list.find(p=>p.id===id)).filter(p=>p&&popupDue(p,seen[p.id])):[];
+  const close=(p,quiet)=>{
+    const day=adToday(), prev=seen&&seen[p.id]&&(seen[p.id].ver||1)===(p.ver||1)?seen[p.id]:{};
+    const rec={at:Date.now(),day,ver:p.ver||1,...(p.mode==="always"&&(quiet||prev.quiet)?{quiet:quiet?day:prev.quiet}:{})};
+    popupShownNow.add(p.id);
+    setSeen(s=>{ const n={...(s||{}),[p.id]:rec}; lsSetJSON(POPUP_LS(uid),n); return n; });
+    FB.club.child("popupSeen/"+uid+"/"+p.id).set(rec).catch(()=>{});
+  };
+  return {popup:due[0]||null,left:due.length,close};
+}
+function LoginPopup({popup,left=1,onClose,preview}){
+  const [quiet,setQuiet]=useState(false);
+  useEffect(()=>{ setQuiet(false); },[popup&&popup.id]);
+  useEffect(()=>{ const k=e=>{ if(e.key==="Escape") onClose(false); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[onClose]);
+  if(!popup) return null;
+  const always=popup.mode==="always";
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div role="dialog" aria-modal="true" aria-label={popup.title||"알림"} style={{width:"100%",maxWidth:360,maxHeight:"80vh",display:"flex",flexDirection:"column",background:"#fff",borderRadius:24,boxSizing:"border-box",boxShadow:"0 20px 50px rgba(15,23,60,0.3)",fontFamily:FONT,overflow:"hidden"}}>
+        <div style={{background:GRAD,color:"#fff",padding:"18px 20px 16px",position:"relative",overflow:"hidden"}}>
+          <CourtLines opacity={0.12}/>
+          <p style={{position:"relative",margin:0,fontSize:11,fontWeight:700,letterSpacing:"0.06em",opacity:0.75}}>SSTC 알림{preview?" · 미리보기":left>1?` · 1/${left}`:""}</p>
+          {popup.title&&<p style={{position:"relative",margin:"6px 0 0",fontSize:19,fontWeight:800,lineHeight:1.35,letterSpacing:"-0.02em",wordBreak:"keep-all"}}>{popup.title}</p>}
+        </div>
+        <div style={{padding:"16px 20px 4px",overflowY:"auto"}}>
+          {popup.text&&<p style={{margin:0,fontSize:15,color:INK,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{popup.text}</p>}
+        </div>
+        <div style={{padding:"14px 20px 18px"}}>
+          {always&&!preview&&<label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#6B7493",cursor:"pointer",marginBottom:10}}>
+            <input type="checkbox" checked={quiet} onChange={e=>setQuiet(e.target.checked)} style={{width:18,height:18,accentColor:BLUE,margin:0}}/>오늘은 그만 보기
+          </label>}
+          <button type="button" onClick={()=>onClose(quiet)} style={btnPrimary}>{left>1&&!preview?"확인 · 다음":"확인"}</button>
+        </div>
+      </div>
+    </div>);
+}
+function PopupSettings(){
+  const [list,setList]=useState(undefined);
+  const [seenAll,setSeenAll]=useState({});   // uid → {팝업 → 기록} (규칙을 아직 안 붙여넣었으면 null)
+  const [cur,setCur]=useState(null);
+  const [f,setF]=useState(POPUP_EMPTY);
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState("");
+  const [preview,setPreview]=useState(false);
+  useEffect(()=>{
+    const r=FB.club.child("popups"), h=s=>setList(popupList(s.val()));
+    r.on("value",h,e=>{ setList([]); setMsg(authMsg(e)); });
+    const r2=FB.club.child("popupSeen"), h2=s=>setSeenAll(s.val()||{});
+    r2.on("value",h2,()=>setSeenAll(null));
+    return ()=>{ r.off("value",h); r2.off("value",h2); };
+  },[]);
+  const all=list||[];
+  const saved=all.find(p=>p.id===cur)||null;
+  const known=useRef(new Set());
+  useEffect(()=>{ if(list===undefined) return; all.forEach(p=>known.current.add(p.id)); if(cur==="new"||saved) return;
+    if(cur===null||known.current.has(cur)) pick(all[0]?all[0].id:"new"); },[list,cur]);
+  function pick(id){ const p=all.find(x=>x.id===id); setCur(id); setF({...POPUP_EMPTY,...(p||{})}); setMsg(""); }
+  const set=(k,v)=>{ setF(p=>({...p,[k]:v})); setMsg(""); };
+  const unlimited=!f.start&&!f.end;
+  const rangeBad=!!(f.start&&f.end&&f.end<f.start);
+  const dirty=cur==="new"?POPUP_FIELDS.some(k=>k!=="mode"&&f[k]):!!saved&&POPUP_FIELDS.some(k=>(f[k]||"")!==(saved[k]||""));
+  const empty=!f.title.trim()&&!f.text.trim();
+  const seenCount=p=>seenAll?Object.values(seenAll).filter(u=>u&&u[p.id]&&(u[p.id].ver||1)===(p.ver||1)).length:null;
+  const save=(enabled,again)=>{
+    if(empty){ setMsg("제목이나 내용을 넣어 주세요"); return; }
+    if(rangeBad){ setMsg("종료일은 시작일과 같거나 뒤여야 해요"); return; }
+    const now=Date.now(), id=cur==="new"?"p"+now:cur;
+    const v={title:f.title.trim().slice(0,40),text:String(f.text||"").trim().slice(0,1000),mode:popupMode(f.mode)[0],start:f.start||"",end:f.end||"",enabled:!!enabled,
+      ver:((saved&&saved.ver)||1)+(again?1:0),createdAt:(saved&&saved.createdAt)||now,updatedAt:now,updatedByUid:myUid()};
+    setBusy(true);
+    FB.club.child("popups/"+id).set(v).then(()=>{ setCur(id); setF({...POPUP_EMPTY,...v}); const ph=adPhase(v);
+      setMsg(again?"본 회원에게도 다음에 앱을 열 때 다시 떠요":!enabled?"저장했어요. 지금은 꺼져 있어요":ph==="live"?"켰어요. 회원이 앱을 열면 떠요":ph==="before"?`켰어요. ${v.start.replace(/-/g,".")}부터 떠요`:"켰지만 기간이 이미 끝났어요"); })
+      .catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+  };
+  const remove=()=>{
+    if(cur==="new"){ pick(all[0]?all[0].id:"new"); return; }
+    if(!window.confirm(`팝업 "${saved.title||"(제목 없음)"}"을(를) 지울까요?`)) return;
+    setBusy(true); FB.club.child("popups/"+cur).remove().then(()=>setMsg("지웠어요")).catch(e=>setMsg(authMsg(e))).finally(()=>setBusy(false));
+  };
+  const status=p=>!p.enabled?["꺼짐","#F1F2F5","#6B7280"]:({live:["띄우는 중","#E5F7EE","#067647"],before:["시작 전","#FFF4E5","#C2610C"],after:["기간 끝남","#F1F2F5","#6B7280"]})[adPhase(p)];
+  const live=all.filter(p=>p.enabled&&adPhase(p)==="live").length;
+  const on=!!(saved&&saved.enabled);
+  const tabBtn=(id,label,p)=>{ const sel=cur===id, st=p&&status(p); return (
+    <button key={id} type="button" onClick={()=>pick(id)} style={{padding:"7px 12px",borderRadius:12,fontSize:13,fontWeight:sel?700:500,cursor:"pointer",whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5,
+      border:`1.5px solid ${sel?BLUE:"#D6DEF7"}`,background:sel?BLUE:"#fff",color:sel?"#fff":"#4A5578",fontFamily:FONT}}>
+      {st&&<span aria-hidden="true" style={{width:7,height:7,borderRadius:"50%",background:st[0]==="띄우는 중"?"#12B76A":st[0]==="시작 전"?"#F59E0B":"#C4C9D4",boxShadow:sel?"0 0 0 1.5px #fff":"none"}}/>}{label}</button>); };
+  const n=saved?seenCount(saved):null;
+  return (
+    <Card>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:15,fontWeight:700,color:INK}}>접속 팝업</span>
+        <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:12,background:live?"#E5F7EE":"#F1F2F5",color:live?"#067647":"#6B7280"}}>{list===undefined?"불러오는 중":live?`${live}개 띄우는 중`:"안 띄워요"}</span>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+        {all.map((p,k)=>tabBtn(p.id,`팝업${k+1}`,p))}
+        {cur==="new"?tabBtn("new",`팝업${all.length+1}`,null)
+          :<button type="button" onClick={()=>{ setCur("new"); setF(POPUP_EMPTY); setMsg(""); }} style={{padding:"7px 12px",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",border:`1.5px dashed ${BLUE}`,background:"#fff",color:BLUE,fontFamily:FONT}}>+ 팝업 추가</button>}
+      </div>
+      {list!==undefined&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {saved&&(()=>{ const st=status(saved); return <p style={{margin:0,fontSize:12,color:"#6B7493",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+          <span style={{fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:12,background:st[1],color:st[2]}}>{st[0]}</span>{popupMode(saved.mode)[1]} · {adPeriod(saved)}{n!=null&&<> · <b style={{color:INK}}>{n}명</b> 확인</>}</p>; })()}
+        {saved&&seenAll===null&&<p style={{margin:0,fontSize:12,color:"#C2610C",lineHeight:1.6}}>몇 명이 봤는지 세려면 README의 새 파이어베이스 규칙을 콘솔에 붙여넣어 주세요.</p>}
+        <FieldWrap label="얼마나 자주 띄울까요">
+          <div style={{display:"flex",gap:6}}>
+            {POPUP_MODES.map(([k,l])=>{ const sel=popupMode(f.mode)[0]===k; return <button key={k} type="button" aria-pressed={sel} onClick={()=>set("mode",k)} style={{flex:1,padding:"9px 4px",borderRadius:12,fontSize:13,fontWeight:sel?700:500,cursor:"pointer",fontFamily:FONT,
+              border:`1.5px solid ${sel?BLUE:"#D6DEF7"}`,background:sel?BLUE:"#fff",color:sel?"#fff":"#4A5578"}}>{l}</button>; })}
+          </div>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>{popupMode(f.mode)[2]}</p>
+        </FieldWrap>
+        <FieldWrap label="제목"><input value={f.title} maxLength={40} onChange={e=>set("title",e.target.value)} placeholder="예: 12월 정기모임 회비 안내" style={inputStyle}/></FieldWrap>
+        <FieldWrap label="내용">
+          <textarea value={f.text} maxLength={1000} rows={5} onChange={e=>set("text",e.target.value)} placeholder={"예: 12월부터 회비가 월 2만 원으로 바뀌어요.\n총무 계좌로 10일까지 보내 주세요."} style={{...inputStyle,borderRadius:18,resize:"vertical",lineHeight:1.6}}/>
+          <p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2",textAlign:"right"}}>{String(f.text||"").length}/1000자</p>
+        </FieldWrap>
+        <FieldWrap label="띄울 기간" error={rangeBad?"종료일은 시작일과 같거나 뒤여야 해요":""}>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:INK,cursor:"pointer",padding:"2px 0 4px"}}>
+            <input type="checkbox" checked={unlimited} onChange={e=>{ if(e.target.checked){ set("start",""); set("end",""); } else { set("start",adToday()); } }} style={{width:18,height:18,accentColor:BLUE}}/>
+            기간 무제한 (끌 때까지 계속)
+          </label>
+          {!unlimited&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+            <input type="date" aria-label="시작일" value={f.start} onChange={e=>set("start",e.target.value)} style={{...inputStyle,flex:1,minWidth:0,padding:"10px 12px"}}/>
+            <span style={{color:"#A3AAC2"}}>~</span>
+            <input type="date" aria-label="종료일" value={f.end} min={f.start||undefined} onChange={e=>set("end",e.target.value)} style={{...inputStyle,flex:1,minWidth:0,padding:"10px 12px"}}/>
+          </div>}
+          {!unlimited&&<p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2"}}>시작일·종료일 당일도 떠요. 한쪽을 비우면 그쪽은 제한 없어요.</p>}
+        </FieldWrap>
+        {!empty&&<button type="button" onClick={()=>setPreview(true)} style={{...btnSecondary,color:BLUE}}>미리보기</button>}
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          {on?<>
+            <button type="button" disabled={busy} onClick={()=>save(false)} style={{...btnSecondary,color:"#6B7493"}}>끄기</button>
+            <button type="button" disabled={busy||!dirty} onClick={()=>save(true)} style={{...btnSecondary,background:GRAD,color:"#fff",border:"none",opacity:dirty?1:0.5}}>고친 내용 저장</button>
+          </>:<>
+            <button type="button" disabled={busy||!dirty} onClick={()=>save(false)} style={{...btnSecondary,opacity:dirty?1:0.5}}>저장만</button>
+            <button type="button" disabled={busy} onClick={()=>save(true)} style={{...btnSecondary,background:GRAD,color:"#fff",border:"none"}}>켜기</button>
+          </>}
+        </div>
+        {on&&saved.mode!=="always"&&<button type="button" disabled={busy} onClick={()=>{ if(window.confirm("이미 본 회원에게도 다음에 앱을 열 때 다시 띄울까요?")) save(true,true); }} style={{background:"none",border:"none",color:BLUE,fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>본 회원에게도 다시 띄우기</button>}
+        {(saved||cur==="new")&&<button type="button" disabled={busy} onClick={remove} style={{background:"none",border:"none",color:"#ef4444",fontSize:13,fontWeight:600,cursor:"pointer",padding:"2px 0",fontFamily:FONT}}>{cur==="new"?"새 팝업 취소":`팝업${all.findIndex(p=>p.id===cur)+1} 지우기`}</button>}
+        {msg&&<p style={{margin:0,fontSize:13,color:/확인|넣어|권한|오류|실패|뒤여야|끝났/.test(msg)?"#ef4444":BLUE,textAlign:"center"}}>{msg}</p>}
+        <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>켜져 있고 기간 안인 팝업만 정회원이 앱을 열었을 때 화면 가운데 창으로 떠요. 여러 개면 하나씩 차례로 떠요. 꺼 두면 내용은 남아 있어요. 내용을 고쳐도 이미 본 회원에게 다시 뜨지는 않으니, 꼭 다시 보여야 하면 "본 회원에게도 다시 띄우기"를 눌러 주세요.</p>
+      </div>}
+      {preview&&<LoginPopup popup={{...f,title:f.title.trim(),text:String(f.text||"").trim()}} preview onClose={()=>setPreview(false)}/>}
+    </Card>);
+}
+
 function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ads=[],adSecs}) {
   const [goingN,setGoingN]=useState(3);
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
@@ -1933,15 +2112,8 @@ function PendingScreen({profile,onRefresh,onLogout}){
   );
 }
 
-// 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 회원별 알림 보내기
+// 관리자 탭: 회원 등급(준회원·정회원·탈퇴), 접속 팝업, 홈 화면 배너
 // 준회원 = 가입했지만 승인 전, 정회원 = 승인됨(club/approved), 탈퇴 = members/<uid>/withdrawn (로그인하면 바로 로그아웃돼요)
-const ADMIN_MSG=[
-  ["vote","모임 투표 독려",m=>m?`${m.date} ${m.place} 모임 참석 투표해 주세요!`:"다가오는 모임 참석 투표해 주세요!"],
-  ["profile","정보 수정 요청",()=>"프로필 정보를 최신으로 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
-  ["realName","본명 입력 요청",()=>"본명을 입력해 주세요. 내 정보 → 정보 수정하기에서 넣을 수 있어요."],
-  ["career","구력 확인 요청",()=>"구력(테니스 시작 시기)을 정확하게 수정해 주세요. 내 정보 → 정보 수정하기에서 바꿀 수 있어요."],
-  ["custom","직접 쓰기",()=>""],
-];
 // 관리 탭 회원 목록: 5명씩 끊어 보기 (이전 / 1 / 6 / 다음)
 const PAGE_SIZE=5;
 const pageCount=total=>Math.max(1,Math.ceil(total/PAGE_SIZE));
@@ -1965,17 +2137,10 @@ function AdminTab(){
   const [admins,setAdmins]=useState({});
   const [err,setErr]=useState("");
   const [open,setOpen]=useState(null);
-  const [sel,setSel]=useState({});
-  const [kind,setKind]=useState("vote");
-  const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
-  const [mid,setMid]=useState(()=>upcoming[0]?String(upcoming[0].id):"");
-  const [text,setText]=useState(()=>ADMIN_MSG[0][2](upcoming[0]));
-  const [sent,setSent]=useState("");
-  const [busy,setBusy]=useState(false);
   const [nameEdit,setNameEdit]=useState(null); // {uid,value} 관리자가 본명 대신 입력
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
-  const [pg,setPg]=useState({pending:0,active:0,gone:0,notify:0});   // 목록별 페이지 (5명씩)
+  const [pg,setPg]=useState({pending:0,active:0,gone:0});   // 목록별 페이지 (5명씩)
   const [sec,setSec]=useState(null);
   const [photoBusy,setPhotoBusy]=useState(null);   // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
@@ -2008,8 +2173,7 @@ function AdminTab(){
     FB.club.child("approved/"+m.uid).remove().catch(fail); };
   const withdraw=m=>{ if(!window.confirm(`${m.nickname} 님을 탈퇴시킬까요? 다음에 앱을 열면 로그아웃되고 다시 들어올 수 없어요.`)) return;
     FB.club.child("approved/"+m.uid).remove()
-      .then(()=>FB.club.child("members/"+m.uid).update({withdrawn:true,withdrawnAt:Date.now()})).catch(fail);
-    setSel(s=>{const n={...s};delete n[m.uid];return n;}); };
+      .then(()=>FB.club.child("members/"+m.uid).update({withdrawn:true,withdrawnAt:Date.now()})).catch(fail); };
   const restore=m=>FB.club.child("members/"+m.uid).update({withdrawn:null,withdrawnAt:null}).catch(fail);
   // 본명 대신 입력·수정 (관리자만. 규칙상 관리자는 members/<uid>를 쓸 수 있어요)
   const startName=m=>{ setOpen(m.uid); setNameEdit({uid:m.uid,value:m.realName||""}); };
@@ -2026,28 +2190,12 @@ function AdminTab(){
     setPhotoBusy(m.uid);
     shrinkPhoto(file).then(d=>FB.club.child("members/"+m.uid).update({photo:d,photoBy:ME})).catch(e=>window.alert(e.message||authMsg(e))).finally(()=>setPhotoBusy(null));
   };
-  // 알림 보내기
-  const pick=list=>setSel(Object.fromEntries(list.map(m=>[m.uid,true])));
-  const chosen=live.filter(m=>sel[m.uid]);
-  const meeting=upcoming.find(m=>String(m.id)===mid);
-  const setMsgKind=k=>{ setKind(k); setSent(""); setText(ADMIN_MSG.find(x=>x[0]===k)[2](k==="vote"?meeting:null)); };
-  const setMeeting=v=>{ setMid(v); if(kind==="vote") setText(ADMIN_MSG[0][2](upcoming.find(m=>String(m.id)===v))); };
-  const send=()=>{
-    const t=text.trim(); if(!t||chosen.length===0) return;
-    const msg={type:"admin",text:t,by:ME,byUid:(FB.auth.currentUser&&FB.auth.currentUser.uid)||"",
-      ...(kind==="vote"&&meeting?{meetingId:meeting.id}:{}),...(kind==="profile"||kind==="realName"||kind==="career"?{action:"profile"}:{})};
-    setBusy(true); setSent("");
-    Promise.all(chosen.map(m=>inbox(m.uid,msg))).then(()=>{setSent(`${chosen.length}명에게 보냈어요`);setSel({});})
-      .catch(fail).finally(()=>setBusy(false));
-  };
-  const chip=(label,on)=><button type="button" onClick={on} style={{fontSize:12,fontWeight:600,padding:"6px 11px",borderRadius:12,border:"1.5px solid #D6DEF7",background:"#fff",color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>{label}</button>;
   const tag=(t,bg,c)=><span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:12,background:bg,color:c}}>{t}</span>;
   const small=(label,onClick,danger)=><button type="button" onClick={onClick} style={{...btnSmall,padding:"9px 8px",background:"none",color:danger?"#E5484D":"#5E6A8E",fontWeight:700}}>{label}</button>;
-  const row=(m,acts,checkable=false)=>(
-    <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:checkable&&sel[m.uid]?"12px 10px":"12px 0",margin:checkable&&sel[m.uid]?"0 -10px":0,borderRadius:checkable&&sel[m.uid]?12:0,background:checkable&&sel[m.uid]?BLUE_LIGHT:"transparent"}}>
+  const row=(m,acts)=>(
+    <div key={m.uid} style={{borderBottom:"1px solid #E8ECF4",padding:"12px 0"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
         <Avatar name={m.nickname} photo={m.photo} size={40} radius={12} bg={m.uid===myUid()?BALL:BLUE_LIGHT}/>
-        {checkable&&<input type="checkbox" aria-label={`${m.nickname} 선택`} checked={!!sel[m.uid]} onChange={e=>setSel(s=>({...s,[m.uid]:e.target.checked}))} style={{width:18,height:18,accentColor:BLUE,margin:0,flexShrink:0,cursor:"pointer"}}/>}
         <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{ markItemSeen("a"+m.uid,m.createdAt); setOpen(open===m.uid?null:m.uid); }}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontSize:16,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{m.nickname||"(닉네임 없음)"}</span>
@@ -2095,37 +2243,12 @@ function AdminTab(){
       )}
     </div>
   );
-  const MENU=[["notify","bell","알림 보내기","회원에게 앱 알림"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
   const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
   if(sec) return (
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       {back}
-      {sec==="notify"&&<>
-      <Card>
-        <SectionTitle>알림 보내기</SectionTitle>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-          {chip("전체",()=>pick(live))}{chip("정회원 전체",()=>pick(active))}{chip("준회원 전체",()=>pick(pending))}
-          {chip("본명 미입력",()=>pick(live.filter(m=>!m.realName)))}{chip("구력 미입력",()=>pick(live.filter(m=>!m.tennisStart)))}
-          {chosen.length>0&&chip("선택 해제",()=>setSel({}))}
-        </div>
-        <p style={{margin:"0 0 10px",fontSize:13,fontWeight:600,color:chosen.length?BLUE:"#A3AAC2"}}>{chosen.length?`${chosen.length}명 선택됨 · ${chosen.slice(0,5).map(m=>m.nickname).join(", ")}${chosen.length>5?" 외":""}`:"아래 회원 목록에서 고르거나 위 버튼으로 한 번에 골라요"}</p>
-        <div className="sstc-rows" style={{display:"flex",flexDirection:"column",marginBottom:4}}>
-          {pageOf(live,pg.notify).map(m=>row(m,null,true))}
-        </div>
-        <Pager page={pg.notify} total={live.length} onChange={n=>goPage("notify",n)} label="회원"/>
-        <div style={{height:12}}/>
-        <select aria-label="알림 종류" value={kind} onChange={e=>setMsgKind(e.target.value)} style={{...inputStyle,marginBottom:8}}>
-          {ADMIN_MSG.map(([k,l])=><option key={k} value={k}>{l}</option>)}
-        </select>
-        {kind==="vote"&&(upcoming.length?<select aria-label="모임" value={mid} onChange={e=>setMeeting(e.target.value)} style={{...inputStyle,marginBottom:8}}>
-          {upcoming.map(m=><option key={m.id} value={String(m.id)}>{m.date} · {m.place}</option>)}
-        </select>:<p style={{margin:"0 0 8px",fontSize:12,color:"#A3AAC2"}}>다가오는 모임이 없어요.</p>)}
-        <textarea aria-label="알림 내용" value={text} onChange={e=>{setText(e.target.value);setSent("");}} rows={3} placeholder="보낼 내용을 써 주세요" style={{...inputStyle,borderRadius:18,resize:"none",marginBottom:10}}/>
-        <button type="button" disabled={busy||!chosen.length||!text.trim()} onClick={send} style={{...btnPrimary,opacity:busy||!chosen.length||!text.trim()?0.5:1}}>{busy?"보내는 중…":`${chosen.length||""}${chosen.length?"명에게 ":""}알림 보내기`}</button>
-        {sent&&<p style={{margin:"8px 0 0",fontSize:13,color:BLUE,textAlign:"center"}}><Ic n="check" s={14}/> {sent}</p>}
-        <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>받은 사람의 알림 목록에 떠요. 투표 독려는 누르면 그 모임으로, 정보 수정 요청은 누르면 정보 수정 화면으로 가요.</p>
-      </Card>
-      </>}
+      {sec==="popup"&&<PopupSettings/>}
       {sec==="active"&&<>
       <Card>
         <SectionTitle action={lastSeen?(sortSeen?"가입순":"최근 접속순"):null} onAction={toggleSortSeen}>정회원 ({active.length}명)</SectionTitle>
@@ -2141,7 +2264,7 @@ function AdminTab(){
       <Card>
         <SectionTitle>탈퇴 회원 ({gone.length}명)</SectionTitle>
         {gone.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>탈퇴한 회원이 없어요.</p>:<div className="sstc-rows" style={{display:"flex",flexDirection:"column"}}>
-          {pageOf(gone,pg.gone).map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m)),false))}
+          {pageOf(gone,pg.gone).map(m=>row(m,small("되돌리기 (준회원)",()=>restore(m))))}
         </div>}
         <Pager page={pg.gone} total={gone.length} onChange={n=>goPage("gone",n)} label="탈퇴 회원"/>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>계정 자체를 완전히 지우려면 파이어베이스 콘솔 Authentication에서 삭제해요.</p>
@@ -4904,6 +5027,7 @@ export default function App() {
   const inMain=screen==="main"&&(!FB||!!(account&&account.user&&(account.admin||account.approved)));
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
+  const loginPopup=useLoginPopups(myId,inMain);   // 관리자가 써 둔 접속 팝업 (관리 탭 → 접속 팝업)
   // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
   const clubSeen=useRef(null);
   if(clubData&&clubSeen.current!==clubData){ clubSeen.current=clubData; setMemberInfo(clubData.members); buildMeetings(RAW_MEETINGS); }
@@ -4997,6 +5121,7 @@ export default function App() {
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style><UpdateBanner/>
+      {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`14px 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
         {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
