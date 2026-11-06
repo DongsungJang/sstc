@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=3b7fc7ae48">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=3b7fc7ae48">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=7a3347f49a">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=7a3347f49a">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -152,24 +152,27 @@ const ICON_PATHS = {
   coin: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5", "M12 6v2", "M12 16v2"],
   leave: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"]
 };
-// 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
+// 랭킹 순위: "1위"처럼 위를 붙여 횟수와 헷갈리지 않게. 1~3위는 파란 알약, 그 밖은 글자만
 const RankNo = ({
   r
 }) => /*#__PURE__*/React.createElement("span", {
   style: {
-    width: 22,
+    minWidth: 34,
     height: 22,
-    borderRadius: "50%",
+    padding: "0 7px",
+    boxSizing: "border-box",
+    borderRadius: 11,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: 12,
     fontWeight: 700,
     flexShrink: 0,
+    whiteSpace: "nowrap",
     background: r.top ? r.rank === 1 ? BLUE : BLUE_LIGHT : "transparent",
     color: r.top ? r.rank === 1 ? "#fff" : BLUE : "#A3AAC2"
   }
-}, r.rank);
+}, r.rank, "\uC704");
 // 글자 사이에 넣는 작은 선 아이콘
 const Ic = ({
   n,
@@ -12605,7 +12608,13 @@ function Podium({
         fontWeight: 900,
         lineHeight: 1
       }
-    }, r.rank), /*#__PURE__*/React.createElement("span", {
+    }, r.rank, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginLeft: 1
+      }
+    }, "\uC704")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         opacity: 0.75,
@@ -12627,13 +12636,14 @@ function Podium({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      width: 18,
+      minWidth: 30,
       fontSize: 15,
       fontWeight: 800,
       color: "#A3AAC2",
-      fontVariantNumeric: "tabular-nums"
+      fontVariantNumeric: "tabular-nums",
+      whiteSpace: "nowrap"
     }
-  }, r.rank), /*#__PURE__*/React.createElement("span", {
+  }, r.rank, "\uC704"), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
       fontSize: 15,
@@ -15827,7 +15837,7 @@ function MemberList({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "3b7fc7ae48";
+const BUILD_ID = "7a3347f49a";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

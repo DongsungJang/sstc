@@ -54,9 +54,9 @@ const ICON_PATHS = {
   coin:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5","M12 6v2","M12 16v2"],
   leave:["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
 };
-// 랭킹 순위: 1~3위는 파란 원, 그 밖은 숫자만
-const RankNo=({r})=><span style={{width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0,
-  background:r.top?(r.rank===1?BLUE:BLUE_LIGHT):"transparent",color:r.top?(r.rank===1?"#fff":BLUE):"#A3AAC2"}}>{r.rank}</span>;
+// 랭킹 순위: "1위"처럼 위를 붙여 횟수와 헷갈리지 않게. 1~3위는 파란 알약, 그 밖은 글자만
+const RankNo=({r})=><span style={{minWidth:34,height:22,padding:"0 7px",boxSizing:"border-box",borderRadius:11,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",
+  background:r.top?(r.rank===1?BLUE:BLUE_LIGHT):"transparent",color:r.top?(r.rank===1?"#fff":BLUE):"#A3AAC2"}}>{r.rank}위</span>;
 // 글자 사이에 넣는 작은 선 아이콘
 const Ic=({n,s=14,c="currentColor",w=1.9,style})=><span style={{display:"inline-flex",verticalAlign:"-0.15em",flexShrink:0,...style}}><Icon name={n} size={s} color={c} stroke={w}/></span>;
 function Icon({name,size=22,color="currentColor",stroke=2}) {
@@ -3743,7 +3743,7 @@ function Podium({rank}){
           <Avatar name={r.name} photo={PHOTO_BY_NICK[r.name]} size={38} radius={12} bg={r.isMe?BALL:BLUE_LIGHT} font={16}/>
           <span style={{margin:"6px 0 8px",fontSize:13,fontWeight:700,color:INK,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</span>
           <div style={{width:"100%",height:hgt[top.indexOf(r)+1],borderRadius:"14px 14px 6px 6px",background:first?BLUE:INK,color:"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontSize:22,fontWeight:900,lineHeight:1}}>{r.rank}</span>
+            <span style={{fontSize:22,fontWeight:900,lineHeight:1}}>{r.rank}<span style={{fontSize:14,fontWeight:800,marginLeft:1}}>위</span></span>
             <span style={{fontSize:12,opacity:0.75,marginTop:4}}>{r.count}회</span>
           </div>
         </div>);})}
@@ -3751,7 +3751,7 @@ function Podium({rank}){
     {rest.length>0&&<div style={{marginTop:6}}>
       {rest.map((r,i)=>(
         <div key={r.name} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 2px",borderBottom:i<rest.length-1?"1px solid #EEF1FA":"none"}}>
-          <span style={{width:18,fontSize:15,fontWeight:800,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{r.rank}</span>
+          <span style={{minWidth:30,fontSize:15,fontWeight:800,color:"#A3AAC2",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{r.rank}위</span>
           <span style={{flex:1,fontSize:15,fontWeight:700,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BALL,color:INK,padding:"1px 6px",borderRadius:6,marginLeft:6}}>나</span>}</span>
           <span style={{fontSize:15,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums"}}>{r.count}회</span>
         </div>
