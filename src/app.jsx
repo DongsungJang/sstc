@@ -120,7 +120,7 @@ const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)
 let GUILDS = {}, VIP = {}, ME_ADMIN = false;
 const GUILD_BG=["#0B1E5B","#2152E6","#12B76A","#F59E0B","#E5484D","#D6336C","#7C3AED","#FFFFFF"];
 const GUILD_FG=["#D7F24A","#FFFFFF","#0B1E5B","#FFE066","#FF9EB5","#2152E6"];
-const GUILD_NAME_MAX=6, GUILD_ABBR_MAX=2, GUILD_PHOTO_PX=160, GUILD_PHOTO_BYTES=30000;
+const GUILD_NAME_MAX=6, GUILD_INTRO_MAX=40, GUILD_ABBR_MAX=2, GUILD_PHOTO_PX=160, GUILD_PHOTO_BYTES=30000;
 const guildList=()=>Object.keys(GUILDS||{}).filter(id=>GUILDS[id]&&GUILDS[id].name).map(id=>({id,...GUILDS[id]})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 const inGuild=(g,uid)=>!!(g&&uid&&g.members&&g.members[uid]);
 const guildsOf=uid=>guildList().filter(g=>inGuild(g,uid));
@@ -4852,10 +4852,15 @@ function MemberPicker({data,exclude,onPick,placeholder="닉네임·본명으로 
 }
 
 // 길드 만들기·엠블럼 바꾸기
+function GuildIntro({g,style}){
+  if(!g||!g.intro) return null;
+  return <span style={{display:"block",fontSize:12.5,color:"#5E6A8E",lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",...style}}>{g.intro}</span>;
+}
+
 function GuildForm({initial,data,onClose,onSaved}){
   const editing=!!initial, me=myUid();
-  const [f,setF]=useState(()=>initial?{name:initial.name||"",abbr:initial.abbr||"",bg:initial.bg||GUILD_BG[0],fg:initial.fg||GUILD_FG[0],photo:photoOk(initial.photo)?initial.photo:"",mode:photoOk(initial.photo)?"photo":"text"}
-    :{name:"",abbr:"",bg:GUILD_BG[0],fg:GUILD_FG[0],photo:"",mode:"text"});
+  const [f,setF]=useState(()=>initial?{name:initial.name||"",abbr:initial.abbr||"",bg:initial.bg||GUILD_BG[0],fg:initial.fg||GUILD_FG[0],photo:photoOk(initial.photo)?initial.photo:"",mode:photoOk(initial.photo)?"photo":"text",intro:initial.intro||""}
+    :{name:"",intro:"",abbr:"",bg:GUILD_BG[0],fg:GUILD_FG[0],photo:"",mode:"text"});
   const [abbrTouched,setAbbrTouched]=useState(editing);
   const [invites,setInvites]=useState([]);
   const [busy,setBusy]=useState(false), [photoBusy,setPhotoBusy]=useState(false), [err,setErr]=useState("");
@@ -4869,7 +4874,8 @@ function GuildForm({initial,data,onClose,onSaved}){
     if(f.mode==="text"&&!abbr) return setErr("엠블럼 글자를 1~2자 넣어 주세요");
     if(f.mode==="photo"&&!photoOk(f.photo)) return setErr("엠블럼 사진을 골라 주세요");
     if(guildList().some(g=>g.name===name&&(!editing||g.id!==initial.id))) return setErr("이미 있는 길드 이름이에요");
-    const look={name,abbr:abbr||Array.from(name).slice(0,2).join(""),bg:f.bg,fg:f.fg,photo:f.mode==="photo"?f.photo:null};
+    const intro=f.intro.trim().slice(0,GUILD_INTRO_MAX);
+    const look={name,intro:intro||null,abbr:abbr||Array.from(name).slice(0,2).join(""),bg:f.bg,fg:f.fg,photo:f.mode==="photo"?f.photo:null};
     setBusy(true); setErr("");
     let job;
     if(editing) job=guildRef(initial.id).update({...look,updatedAt:Date.now()}).then(()=>initial.id);
@@ -4904,6 +4910,11 @@ function GuildForm({initial,data,onClose,onSaved}){
             <input value={f.abbr} onChange={e=>{setAbbrTouched(true);setF(p=>({...p,abbr:Array.from(e.target.value).slice(0,GUILD_ABBR_MAX).join("")}));}} aria-label="엠블럼 글자" placeholder="1~2자" disabled={f.mode==="photo"} style={{...inputStyle,flex:1,fontSize:16,opacity:f.mode==="photo"?0.5:1}}/>
           </div>
           <p style={{margin:"6px 2px 0",fontSize:11.5,color:"#A3AAC2"}}>오른쪽 칸은 엠블럼에 들어갈 글자예요 (1~2자).</p>
+        </div>
+        <div>
+          {label("한 줄 소개")}
+          <input value={f.intro} onChange={e=>setF(p=>({...p,intro:e.target.value.slice(0,GUILD_INTRO_MAX)}))} aria-label="길드 한 줄 소개" placeholder="예) 토요일 아침마다 랠리하는 길드" maxLength={GUILD_INTRO_MAX} style={{...inputStyle,width:"100%",boxSizing:"border-box",fontSize:16}}/>
+          <p style={{margin:"6px 2px 0",fontSize:11.5,color:"#A3AAC2",display:"flex",justifyContent:"space-between"}}><span>회원 탭 길드 목록에 한 줄로 보여요 (안 써도 돼요)</span><span>{f.intro.length}/{GUILD_INTRO_MAX}</span></p>
         </div>
         <div>
           {label("엠블럼")}
@@ -4964,6 +4975,7 @@ function GuildView({onOpenMeeting,onCreateMeeting}){
     return(
       <button key={x.id} type="button" onClick={()=>{setOpenId(x.id);try{window.scrollTo(0,0);}catch(e){}}} style={{display:"block",width:"100%",textAlign:"left",background:"#fff",border:"none",borderRadius:20,padding:16,cursor:"pointer",fontFamily:FONT}}>
         <span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><GuildTag g={x} size={30} font={16}/>{role&&<span style={{fontSize:12,fontWeight:700,color:"#6B7493"}}>{role}</span>}</span>
+        <GuildIntro g={x} style={{marginTop:8}}/>
         <span style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
           <span style={{display:"flex"}}>{mems.map((u,i)=><span key={u} style={{marginLeft:i?-7:0,borderRadius:"50%",boxShadow:"0 0 0 2px #fff",display:"inline-flex"}}><Avatar name={nickOf(u)} photo={photoOf(u)} size={24} radius={12} zoom={false}/></span>)}</span>
           <span style={{fontSize:12.5,color:"#6B7493"}}>길드원 {n}명</span>
@@ -4976,7 +4988,7 @@ function GuildView({onOpenMeeting,onCreateMeeting}){
         <SectionTitle>받은 길드 초대 ({invited.length})</SectionTitle>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {invited.map(x=><div key={x.id} style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{flex:1,minWidth:0}}><GuildTag g={x} size={26}/><p style={{margin:"4px 0 0",fontSize:12,color:"#6B7493"}}>{(x.invites[me]&&x.invites[me].by)||nickOf(x.leader)} 님이 초대 · 길드원 {guildCount(x)}명</p></div>
+            <div style={{flex:1,minWidth:0}}><GuildTag g={x} size={26}/><GuildIntro g={x} style={{marginTop:4}}/><p style={{margin:"4px 0 0",fontSize:12,color:"#6B7493"}}>{(x.invites[me]&&x.invites[me].by)||nickOf(x.leader)} 님이 초대 · 길드원 {guildCount(x)}명</p></div>
             <button type="button" onClick={()=>decline(x)} style={{...btnSmall,background:"#EDF0F6",color:"#5E6A8E",fontWeight:700}}>거절</button>
             <button type="button" onClick={()=>accept(x)} style={{...btnSmall,background:BLUE,fontWeight:700}}>수락</button>
           </div>)}
@@ -4990,7 +5002,7 @@ function GuildView({onOpenMeeting,onCreateMeeting}){
         <p style={{margin:"8px 4px 0",fontSize:14,fontWeight:800,color:INK}}>다른 길드 <span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{others.length}개</span></p>
         <Card style={{padding:"4px 16px"}}>
           {others.map((x,i)=><button key={x.id} type="button" onClick={()=>setOpenId(x.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"12px 0",border:"none",borderBottom:i<others.length-1?"1px solid #EEF1F7":"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
-            <span style={{flex:1,minWidth:0}}><GuildTag g={x} size={24}/></span><span style={{fontSize:12,color:"#6B7493"}}>길드장 {nickOf(x.leader)} · {guildCount(x)}명</span><Icon name="chevR" size={16} color="#A3AAC2"/></button>)}
+            <span style={{flex:1,minWidth:0}}><GuildTag g={x} size={24}/><GuildIntro g={x} style={{marginTop:3,fontSize:12}}/></span><span style={{fontSize:12,color:"#6B7493",whiteSpace:"nowrap"}}>길드장 {nickOf(x.leader)} · {guildCount(x)}명</span><Icon name="chevR" size={16} color="#A3AAC2"/></button>)}
         </Card>
       </>}
       {formEl}
@@ -5039,6 +5051,7 @@ function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
           </div>
           {isLeader&&<span style={{fontSize:11,fontWeight:800,padding:"4px 8px",borderRadius:8,background:BALL,color:INK,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="crown" size={11} stroke={2.4}/>내가 길드장</span>}
         </div>
+        {g.intro&&<p style={{margin:"12px 0 0",padding:"10px 12px",borderRadius:12,background:"#F4F6FB",fontSize:13.5,color:INK,lineHeight:1.45,wordBreak:"keep-all"}}>{g.intro}</p>}
         {g.invites&&g.invites[me]&&!member&&<div style={{display:"flex",gap:8,marginTop:14}}>
           <button type="button" onClick={()=>{ if(window.confirm(`'${g.name}' 길드 초대를 거절할까요?`)) guildRef(g.id,"invites/"+me).remove().catch(guildFail); }} style={{...btnPrimary,flex:1,background:"#EDF0F6",color:"#5E6A8E"}}>거절</button>
           <button type="button" onClick={()=>guildRef(g.id).update({["members/"+me]:true,["invites/"+me]:null}).then(()=>guildNotify(g.leader,g.id,`${ME} 님이 '${g.name}' 길드에 들어왔어요`)).catch(guildFail)} style={{...btnPrimary,flex:2}}>초대 수락</button>

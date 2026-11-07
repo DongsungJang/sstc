@@ -177,6 +177,7 @@
           ".write": "auth != null && (root.child('club/admins/' + auth.uid).exists() || (data.exists() && data.child('leader').val() === auth.uid) || (!data.exists() && root.child('club/vip/' + auth.uid).exists() && newData.child('leader').val() === auth.uid && newData.child('members/' + auth.uid).val() === true))",
           ".validate": "newData.hasChildren(['name', 'leader']) && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 6",
           "photo": { ".validate": "newData.isString() && newData.val().length <= 40000" },
+          "intro": { ".validate": "newData.isString() && newData.val().length <= 40" },
           "members": {
             "$uid": {
               ".write": "auth != null && auth.uid === $uid && (!newData.exists() || data.parent().parent().child('invites/' + $uid).exists())",
