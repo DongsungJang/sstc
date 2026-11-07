@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=d4891b9183">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=d4891b9183">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f357eb790d">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f357eb790d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -311,6 +311,7 @@ let GUILDS = {},
 const GUILD_BG = ["#0B1E5B", "#2152E6", "#12B76A", "#F59E0B", "#E5484D", "#D6336C", "#7C3AED", "#FFFFFF"];
 const GUILD_FG = ["#D7F24A", "#FFFFFF", "#0B1E5B", "#FFE066", "#FF9EB5", "#2152E6"];
 const GUILD_NAME_MAX = 6,
+  GUILD_INTRO_MAX = 40,
   GUILD_ABBR_MAX = 2,
   GUILD_PHOTO_PX = 160,
   GUILD_PHOTO_BYTES = 30000;
@@ -16476,6 +16477,24 @@ function MemberPicker({
 }
 
 // 길드 만들기·엠블럼 바꾸기
+function GuildIntro({
+  g,
+  style
+}) {
+  if (!g || !g.intro) return null;
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 12.5,
+      color: "#5E6A8E",
+      lineHeight: 1.4,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      ...style
+    }
+  }, g.intro);
+}
 function GuildForm({
   initial,
   data,
@@ -16490,9 +16509,11 @@ function GuildForm({
     bg: initial.bg || GUILD_BG[0],
     fg: initial.fg || GUILD_FG[0],
     photo: photoOk(initial.photo) ? initial.photo : "",
-    mode: photoOk(initial.photo) ? "photo" : "text"
+    mode: photoOk(initial.photo) ? "photo" : "text",
+    intro: initial.intro || ""
   } : {
     name: "",
+    intro: "",
     abbr: "",
     bg: GUILD_BG[0],
     fg: GUILD_FG[0],
@@ -16535,8 +16556,10 @@ function GuildForm({
     if (f.mode === "text" && !abbr) return setErr("엠블럼 글자를 1~2자 넣어 주세요");
     if (f.mode === "photo" && !photoOk(f.photo)) return setErr("엠블럼 사진을 골라 주세요");
     if (guildList().some(g => g.name === name && (!editing || g.id !== initial.id))) return setErr("이미 있는 길드 이름이에요");
+    const intro = f.intro.trim().slice(0, GUILD_INTRO_MAX);
     const look = {
       name,
+      intro: intro || null,
       abbr: abbr || Array.from(name).slice(0, 2).join(""),
       bg: f.bg,
       fg: f.fg,
@@ -16719,7 +16742,30 @@ function GuildForm({
       fontSize: 11.5,
       color: "#A3AAC2"
     }
-  }, "\uC624\uB978\uCABD \uCE78\uC740 \uC5E0\uBE14\uB7FC\uC5D0 \uB4E4\uC5B4\uAC08 \uAE00\uC790\uC608\uC694 (1~2\uC790).")), /*#__PURE__*/React.createElement("div", null, label("엠블럼"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC624\uB978\uCABD \uCE78\uC740 \uC5E0\uBE14\uB7FC\uC5D0 \uB4E4\uC5B4\uAC08 \uAE00\uC790\uC608\uC694 (1~2\uC790).")), /*#__PURE__*/React.createElement("div", null, label("한 줄 소개"), /*#__PURE__*/React.createElement("input", {
+    value: f.intro,
+    onChange: e => setF(p => ({
+      ...p,
+      intro: e.target.value.slice(0, GUILD_INTRO_MAX)
+    })),
+    "aria-label": "\uAE38\uB4DC \uD55C \uC904 \uC18C\uAC1C",
+    placeholder: "\uC608) \uD1A0\uC694\uC77C \uC544\uCE68\uB9C8\uB2E4 \uB7A0\uB9AC\uD558\uB294 \uAE38\uB4DC",
+    maxLength: GUILD_INTRO_MAX,
+    style: {
+      ...inputStyle,
+      width: "100%",
+      boxSizing: "border-box",
+      fontSize: 16
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 2px 0",
+      fontSize: 11.5,
+      color: "#A3AAC2",
+      display: "flex",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "\uD68C\uC6D0 \uD0ED \uAE38\uB4DC \uBAA9\uB85D\uC5D0 \uD55C \uC904\uB85C \uBCF4\uC5EC\uC694 (\uC548 \uC368\uB3C4 \uB3FC\uC694)"), /*#__PURE__*/React.createElement("span", null, f.intro.length, "/", GUILD_INTRO_MAX))), /*#__PURE__*/React.createElement("div", null, label("엠블럼"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       background: "#fff",
@@ -16993,7 +17039,12 @@ function GuildView({
         fontWeight: 700,
         color: "#6B7493"
       }
-    }, role)), /*#__PURE__*/React.createElement("span", {
+    }, role)), /*#__PURE__*/React.createElement(GuildIntro, {
+      g: x,
+      style: {
+        marginTop: 8
+      }
+    }), /*#__PURE__*/React.createElement("span", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -17066,6 +17117,11 @@ function GuildView({
   }, /*#__PURE__*/React.createElement(GuildTag, {
     g: x,
     size: 26
+  }), /*#__PURE__*/React.createElement(GuildIntro, {
+    g: x,
+    style: {
+      marginTop: 4
+    }
   }), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "4px 0 0",
@@ -17162,10 +17218,17 @@ function GuildView({
   }, /*#__PURE__*/React.createElement(GuildTag, {
     g: x,
     size: 24
+  }), /*#__PURE__*/React.createElement(GuildIntro, {
+    g: x,
+    style: {
+      marginTop: 3,
+      fontSize: 12
+    }
   })), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
-      color: "#6B7493"
+      color: "#6B7493",
+      whiteSpace: "nowrap"
     }
   }, "\uAE38\uB4DC\uC7A5 ", nickOf(x.leader), " \xB7 ", guildCount(x), "\uBA85"), /*#__PURE__*/React.createElement(Icon, {
     name: "chevR",
@@ -17364,7 +17427,18 @@ function GuildDetail({
     name: "crown",
     size: 11,
     stroke: 2.4
-  }), "\uB0B4\uAC00 \uAE38\uB4DC\uC7A5")), g.invites && g.invites[me] && !member && /*#__PURE__*/React.createElement("div", {
+  }), "\uB0B4\uAC00 \uAE38\uB4DC\uC7A5")), g.intro && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "12px 0 0",
+      padding: "10px 12px",
+      borderRadius: 12,
+      background: "#F4F6FB",
+      fontSize: 13.5,
+      color: INK,
+      lineHeight: 1.45,
+      wordBreak: "keep-all"
+    }
+  }, g.intro), g.invites && g.invites[me] && !member && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -17939,7 +18013,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "d4891b9183";
+const BUILD_ID = "f357eb790d";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
