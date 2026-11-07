@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=dc7b653d0e">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=dc7b653d0e">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=d4891b9183">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=d4891b9183">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -15793,12 +15793,6 @@ function MembersTab({
       return "list";
     }
   });
-  const pickView = k => {
-    setView(k);
-    try {
-      sessionStorage.setItem("sstc-members-view", k);
-    } catch (e) {}
-  };
   useEffect(() => {
     if (boardFocus) setView("board");
   }, [boardFocus]);
@@ -15809,46 +15803,7 @@ function MembersTab({
       gap: 12,
       paddingBottom: 24
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    role: "tablist",
-    "aria-label": "\uD68C\uC6D0 \uD0ED \uBCF4\uAE30",
-    style: {
-      display: "flex",
-      gap: 18,
-      padding: "2px 4px 0"
-    }
-  }, [["list", "회원 목록"], ["guild", "길드"], ["board", BOARD_NAME]].map(([k, l]) => {
-    const n = newCounts[k] || 0,
-      on = view === k;
-    return /*#__PURE__*/React.createElement("button", {
-      key: k,
-      type: "button",
-      role: "tab",
-      "aria-selected": on,
-      onClick: () => pickView(k),
-      style: {
-        padding: "4px 0 6px",
-        border: "none",
-        borderBottom: `2.5px solid ${on ? INK : "transparent"}`,
-        background: "none",
-        color: on ? INK : "#A3AAC2",
-        fontSize: 17,
-        fontWeight: 800,
-        letterSpacing: "-0.03em",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        fontFamily: FONT
-      }
-    }, l, n > 0 && /*#__PURE__*/React.createElement("span", {
-      "aria-label": `새 항목 ${n}개`,
-      style: {
-        color: "#ef4444",
-        fontWeight: 800
-      }
-    }, n));
-  })), view === "board" ? /*#__PURE__*/React.createElement(FreeBoard, {
+  }, view === "board" ? /*#__PURE__*/React.createElement(FreeBoard, {
     canWrite: canWrite,
     isAdmin: isAdmin,
     focus: boardFocus
@@ -17134,13 +17089,7 @@ function GuildView({
       background: BLUE,
       fontWeight: 700
     }
-  }, "\uC218\uB77D"))))), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: "-2px 4px 0",
-      fontSize: 12,
-      color: "#8A93B2"
-    }
-  }, "\uB0B4\uAC00 \uC18D\uD55C \uAE38\uB4DC ", mine.length, "\uAC1C \xB7 \uC5EC\uB7EC \uAE38\uB4DC\uC5D0 \uB4E4\uC5B4\uAC08 \uC218 \uC788\uC5B4\uC694"), mine.length === 0 && /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uC18D\uD55C \uAE38\uB4DC\uAC00 \uC5C6\uC5B4\uC694.", !canCreate && " 길드장에게 초대를 받으면 들어갈 수 있어요."), mine.map(x => card(x, x.leader === me ? "길드장" : "길드원")), canCreate ? /*#__PURE__*/React.createElement("button", {
+  }, "\uC218\uB77D"))))), mine.length === 0 && /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uC18D\uD55C \uAE38\uB4DC\uAC00 \uC5C6\uC5B4\uC694.", !canCreate && " 길드장에게 초대를 받으면 들어갈 수 있어요."), mine.map(x => card(x, x.leader === me ? "길드장" : "길드원")), canCreate ? /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setForm({
       initial: null
@@ -17990,7 +17939,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "dc7b653d0e";
+const BUILD_ID = "d4891b9183";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -18316,7 +18265,79 @@ function BoardSearchHead() {
     }
   }, l))));
 }
-function MemberSearchHead() {
+// 회원 탭 윗단: 회원 목록 / 길드 / 소곤소곤 알약 버튼 + 보기마다 검색·정렬
+function MemberSearchHead({
+  newCounts = {}
+}) {
+  const [view, setView] = useShared("memView", () => {
+    try {
+      return sessionStorage.getItem("sstc-members-view") || "list";
+    } catch (e) {
+      return "list";
+    }
+  });
+  const pick = k => {
+    setView(k);
+    try {
+      sessionStorage.setItem("sstc-members-view", k);
+    } catch (e) {}
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    role: "tablist",
+    "aria-label": "\uD68C\uC6D0 \uD0ED \uBCF4\uAE30",
+    style: {
+      position: "relative",
+      marginTop: 14,
+      display: "flex",
+      gap: 4,
+      padding: 4,
+      borderRadius: 14,
+      background: "rgba(255,255,255,0.12)"
+    }
+  }, [["list", "회원 목록"], ["guild", "길드"], ["board", BOARD_NAME]].map(([k, l]) => {
+    const n = newCounts[k] || 0,
+      on = view === k;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      role: "tab",
+      "aria-selected": on,
+      onClick: () => pick(k),
+      style: {
+        flex: 1,
+        padding: "9px 0",
+        borderRadius: 10,
+        border: "none",
+        background: on ? BALL : "transparent",
+        color: on ? INK : "rgba(255,255,255,0.8)",
+        fontSize: 14,
+        fontWeight: 800,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 5,
+        fontFamily: FONT,
+        letterSpacing: "-0.02em"
+      }
+    }, l, n > 0 && /*#__PURE__*/React.createElement("span", {
+      "aria-label": `새 항목 ${n}개`,
+      style: {
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        background: "#ef4444",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        lineHeight: "18px",
+        padding: "0 5px",
+        boxSizing: "border-box"
+      }
+    }, n));
+  })), /*#__PURE__*/React.createElement(MemberViewHead, null));
+}
+function MemberViewHead() {
   const [view] = useShared("memView", () => {
     try {
       return sessionStorage.getItem("sstc-members-view") || "list";
@@ -18348,27 +18369,14 @@ function MemberSearchHead() {
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 14,
-        color: "rgba(255,255,255,0.85)"
+        fontSize: 13,
+        color: "rgba(255,255,255,0.8)"
       }
     }, "\uB0B4\uAC00 \uC18D\uD55C \uAE38\uB4DC ", /*#__PURE__*/React.createElement("b", {
       style: {
-        color: BALL,
-        fontSize: 18
+        color: BALL
       }
-    }, mine.length), "\uAC1C"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        display: "flex",
-        gap: 4
-      }
-    }, mine.slice(0, 6).map(g => /*#__PURE__*/React.createElement(GuildEmblem, {
-      key: g.id,
-      g: g,
-      size: 26,
-      style: {
-        boxShadow: "0 0 0 1.5px rgba(255,255,255,0.35)"
-      }
-    }))), inv > 0 && /*#__PURE__*/React.createElement("span", {
+    }, mine.length), "\uAC1C \xB7 \uC5EC\uB7EC \uAE38\uB4DC\uC5D0 \uB4E4\uC5B4\uAC08 \uC218 \uC788\uC5B4\uC694"), inv > 0 && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         fontWeight: 800,
@@ -18377,13 +18385,7 @@ function MemberSearchHead() {
         background: BALL,
         color: INK
       }
-    }, "\uBC1B\uC740 \uCD08\uB300 ", inv), VIP[me] && /*#__PURE__*/React.createElement(VipBadge, {
-      style: {
-        marginLeft: "auto",
-        fontSize: 12,
-        padding: "4px 9px 4px 7px"
-      }
-    }));
+    }, "\uBC1B\uC740 \uCD08\uB300 ", inv));
   }
   const setSort = k => {
     setSortRaw(k);
@@ -20119,7 +20121,9 @@ function App() {
   }), "\uD68C\uC6D0 \uBAA8\uB4DC\uB85C")), tab === "booking" && bookView !== "map" && /*#__PURE__*/React.createElement(MiniCalendar, {
     part: "grid",
     onOpen: id => openM(id, "info", "booking")
-  }), tab === "members" && /*#__PURE__*/React.createElement(MemberSearchHead, null), tab === "stats" && /*#__PURE__*/React.createElement(StatsHead, null), tab === "admin" && adminOn && /*#__PURE__*/React.createElement(AdminHead, {
+  }), tab === "members" && /*#__PURE__*/React.createElement(MemberSearchHead, {
+    newCounts: membersNew
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsHead, null), tab === "admin" && adminOn && /*#__PURE__*/React.createElement(AdminHead, {
     pending: newPending.length,
     members: clubData ? activeMembers(clubData).length : 0,
     banners: ads.length

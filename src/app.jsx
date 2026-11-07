@@ -4687,15 +4687,9 @@ function FreeBoard({canWrite,isAdmin,focus}){
 
 function MembersTab({onOpenMeeting,onCreateMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
   const [view,setView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
-  const pickView=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
   useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      <div role="tablist" aria-label="회원 탭 보기" style={{display:"flex",gap:18,padding:"2px 4px 0"}}>
-        {[["list","회원 목록"],["guild","길드"],["board",BOARD_NAME]].map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
-          <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickView(k)} style={{padding:"4px 0 6px",border:"none",borderBottom:`2.5px solid ${on?INK:"transparent"}`,background:"none",color:on?INK:"#A3AAC2",fontSize:17,fontWeight:800,letterSpacing:"-0.03em",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:FONT}}>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{color:"#ef4444",fontWeight:800}}>{n}</span>}</button>
-        );})}
-      </div>
       {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:view==="guild"?<GuildView onOpenMeeting={onOpenMeeting} onCreateMeeting={onCreateMeeting}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
     </div>);
 }
@@ -4988,7 +4982,6 @@ function GuildView({onOpenMeeting,onCreateMeeting}){
           </div>)}
         </div>
       </Card>}
-      <p style={{margin:"-2px 4px 0",fontSize:12,color:"#8A93B2"}}>내가 속한 길드 {mine.length}개 · 여러 길드에 들어갈 수 있어요</p>
       {mine.length===0&&<Empty>아직 속한 길드가 없어요.{!canCreate&&" 길드장에게 초대를 받으면 들어갈 수 있어요."}</Empty>}
       {mine.map(x=>card(x,x.leader===me?"길드장":"길드원"))}
       {canCreate?<button type="button" onClick={()=>setForm({initial:null})} style={{...btnPrimary,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="plus" size={18} stroke={2.4}/>길드 만들기</button>
@@ -5253,17 +5246,28 @@ function BoardSearchHead(){
       </div>
     </div>);
 }
-function MemberSearchHead(){
+// 회원 탭 윗단: 회원 목록 / 길드 / 소곤소곤 알약 버튼 + 보기마다 검색·정렬
+function MemberSearchHead({newCounts={}}){
+  const [view,setView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const pick=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
+  return(<>
+    <div role="tablist" aria-label="회원 탭 보기" style={{position:"relative",marginTop:14,display:"flex",gap:4,padding:4,borderRadius:14,background:"rgba(255,255,255,0.12)"}}>
+      {[["list","회원 목록"],["guild","길드"],["board",BOARD_NAME]].map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
+        <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pick(k)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.8)",fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontFamily:FONT,letterSpacing:"-0.02em"}}>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",padding:"0 5px",boxSizing:"border-box"}}>{n}</span>}</button>
+      );})}
+    </div>
+    <MemberViewHead/>
+  </>);
+}
+function MemberViewHead(){
   const [view]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const [q,setQ]=useShared("memQ","");
   const [sort,setSortRaw]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
   if(view==="board") return <BoardSearchHead/>;
   if(view==="guild"){ const me=myUid(), mine=guildsOf(me), inv=guildList().filter(g=>g.invites&&g.invites[me]&&!inGuild(g,me)).length;
     return <div style={{position:"relative",marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-      <span style={{fontSize:14,color:"rgba(255,255,255,0.85)"}}>내가 속한 길드 <b style={{color:BALL,fontSize:18}}>{mine.length}</b>개</span>
-      <span style={{display:"flex",gap:4}}>{mine.slice(0,6).map(g=><GuildEmblem key={g.id} g={g} size={26} style={{boxShadow:"0 0 0 1.5px rgba(255,255,255,0.35)"}}/>)}</span>
+      <span style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>내가 속한 길드 <b style={{color:BALL}}>{mine.length}</b>개 · 여러 길드에 들어갈 수 있어요</span>
       {inv>0&&<span style={{fontSize:12,fontWeight:800,padding:"4px 9px",borderRadius:8,background:BALL,color:INK}}>받은 초대 {inv}</span>}
-      {VIP[me]&&<VipBadge style={{marginLeft:"auto",fontSize:12,padding:"4px 9px 4px 7px"}}/>}
     </div>; }
   const setSort=k=>{setSortRaw(k);try{sessionStorage.setItem("sstc-members-sort",k);}catch(e){}};
   return(
@@ -5708,7 +5712,7 @@ export default function App() {
                 {tab==="admin"&&realAdmin&&<button type="button" onClick={toggleView} style={{...headChip,fontSize:13,padding:"8px 12px",border:"none",cursor:"pointer",fontFamily:FONT}}><Icon name="swap" size={14} stroke={2.2}/>회원 모드로</button>}
               </div>
               {tab==="booking"&&bookView!=="map"&&<MiniCalendar part="grid" onOpen={id=>openM(id,"info","booking")}/>}
-              {tab==="members"&&<MemberSearchHead/>}
+              {tab==="members"&&<MemberSearchHead newCounts={membersNew}/>}
               {tab==="stats"&&<StatsHead/>}
               {tab==="admin"&&adminOn&&<AdminHead pending={newPending.length} members={clubData?activeMembers(clubData).length:0} banners={ads.length}/>}
             </div>
