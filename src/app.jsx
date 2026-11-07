@@ -4782,17 +4782,20 @@ function MemberList({onOpenMeeting}){
 
 // ─── 길드 화면 ──────────────────────────────────────────────────────────────────
 // 엠블럼: 늘 같은 크기 정사각형. 사진이 있으면 사진, 없으면 엠블럼 글자(1~2자)를 배경색·글자색으로
-function GuildEmblem({g,size=20,style}){
+function GuildEmblem({g,size=20,style,peek=true}){
   if(!g) return null;
+  // 누르면 길드 엠블럼 크게 + 한 줄 소개 (GuildPeek). 미리 보기처럼 peek={false}면 그냥 그림
+  if(peek&&g.id&&GUILD_PEEK_SET){ const go=e=>{e.stopPropagation();e.preventDefault();openGuildPeek(g.id);};
+    return <span role="button" tabIndex={0} aria-label={`${g.name} 길드 보기`} onClick={go} onKeyDown={e=>{ if(e.key==="Enter"||e.key===" ") go(e); }} style={{display:"inline-flex",flexShrink:0,cursor:"pointer",verticalAlign:"middle",borderRadius:Math.round(size*0.28)}}><GuildEmblem g={g} size={size} style={style} peek={false}/></span>; }
   const box={width:size,height:size,borderRadius:Math.round(size*0.28),flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",overflow:"hidden",verticalAlign:"middle",boxShadow:"inset 0 0 0 1px rgba(11,30,91,0.1)",boxSizing:"border-box",...style};
   if(photoOk(g.photo)) return <span role="img" aria-label={`${g.name} 길드`} title={g.name} style={{...box,background:"#E4E9F4"}}><img src={g.photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
   const ab=String(g.abbr||g.name||"?").slice(0,GUILD_ABBR_MAX);
   return <span role="img" aria-label={`${g.name} 길드`} title={g.name} style={{...box,background:g.bg||INK,color:g.fg||BALL,fontSize:Math.round(size*(ab.length===1?0.52:0.4)*10)/10,fontWeight:900,letterSpacing:"-0.06em",lineHeight:1,fontFamily:FONT}}>{ab}</span>;
 }
 // 엠블럼 + 길드명 (자리가 넉넉한 곳)
-function GuildTag({g,size=18,font,color=INK}){
+function GuildTag({g,size=18,font,color=INK,peek=true}){
   if(!g) return null;
-  return <span style={{display:"inline-flex",alignItems:"center",gap:Math.max(5,Math.round(size*0.3)),minWidth:0,verticalAlign:"middle"}}><GuildEmblem g={g} size={size}/><span style={{fontSize:font||Math.max(12,Math.round(size*0.62)),fontWeight:800,color,whiteSpace:"nowrap",letterSpacing:"-0.02em"}}>{g.name}</span></span>;
+  return <span role={peek&&g.id?"button":undefined} onClick={peek&&g.id&&GUILD_PEEK_SET?e=>{e.stopPropagation();e.preventDefault();openGuildPeek(g.id);}:undefined} style={{cursor:peek&&g.id?"pointer":undefined,display:"inline-flex",alignItems:"center",gap:Math.max(5,Math.round(size*0.3)),minWidth:0,verticalAlign:"middle"}}><GuildEmblem g={g} size={size} peek={false}/><span style={{fontSize:font||Math.max(12,Math.round(size*0.62)),fontWeight:800,color,whiteSpace:"nowrap",letterSpacing:"-0.02em"}}>{g.name}</span></span>;
 }
 // 이름 옆: 대표 길드 엠블럼 하나 + 길드가 더 있으면 +n
 function NameEmblem({uid,size=18}){
@@ -4805,7 +4808,7 @@ function LeaderTag(){ return <span style={{display:"inline-flex",alignItems:"cen
 function GuildMeetTag({gid}){
   const g=guildById(gid);
   return <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
-    <span style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:800,padding:"3px 7px 3px 6px",borderRadius:7,background:BALL,color:INK,whiteSpace:"nowrap"}}><Icon name="lock" size={11} stroke={2.6}/>길드 모임</span>
+    <span role={g?"button":undefined} onClick={g?e=>{e.stopPropagation();e.preventDefault();openGuildPeek(g.id);}:undefined} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:800,padding:"3px 7px 3px 6px",borderRadius:7,background:BALL,color:INK,whiteSpace:"nowrap",cursor:g?"pointer":undefined}}><Icon name="lock" size={11} stroke={2.6}/>길드 모임</span>
     {g&&<GuildEmblem g={g} size={20}/>}</span>;
 }
 // 길드·우수회원 실시간 구독 (길드가 없거나 규칙을 아직 안 붙여넣었으면 빈 값)
@@ -4852,6 +4855,34 @@ function MemberPicker({data,exclude,onPick,placeholder="닉네임·본명으로 
 }
 
 // 길드 만들기·엠블럼 바꾸기
+// 엠블럼·길드 표시를 누르면: 엠블럼 크게 + 길드명 + 한 줄 소개 + 길드 보러 가기
+let GUILD_PEEK_SET=null, GUILD_GO=null;
+const openGuildPeek=gid=>{ if(GUILD_PEEK_SET&&gid) GUILD_PEEK_SET(gid); };
+function GuildPeek(){
+  const [gid,setGid]=useState(null);
+  useEffect(()=>{ GUILD_PEEK_SET=setGid; return ()=>{ GUILD_PEEK_SET=null; }; },[]);
+  useEffect(()=>{ if(!gid) return; const k=e=>{ if(e.key==="Escape") setGid(null); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[gid]);
+  const g=gid&&guildById(gid);
+  if(!g) return null;
+  const me=myUid(), member=inGuild(g,me), invited=!member&&g.invites&&g.invites[me];
+  const big="min(58vw,230px)";
+  return(
+    <div role="dialog" aria-modal="true" aria-label={`${g.name} 길드`} onClick={()=>setGid(null)} style={{position:"fixed",inset:0,zIndex:125,background:"rgba(11,30,91,0.84)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,boxSizing:"border-box",fontFamily:FONT}}>
+      <button type="button" aria-label="닫기" onClick={()=>setGid(null)} style={{position:"absolute",top:"calc(14px + env(safe-area-inset-top,0px))",right:16,...iconBtn}}><Icon name="x" size={20}/></button>
+      <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+        {photoOk(g.photo)?<img src={g.photo} alt={`${g.name} 엠블럼`} style={{width:big,height:big,objectFit:"cover",borderRadius:44,boxShadow:"0 20px 60px rgba(0,0,0,0.35)",background:"#fff"}}/>
+          :<span role="img" aria-label={`${g.name} 엠블럼`} style={{width:big,height:big,borderRadius:44,background:g.bg||INK,color:g.fg||BALL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:`calc(${big} * ${String(g.abbr||g.name).length===1?0.5:0.38})`,fontWeight:900,letterSpacing:"-0.06em",boxShadow:"0 20px 60px rgba(0,0,0,0.35)"}}>{String(g.abbr||g.name||"?").slice(0,GUILD_ABBR_MAX)}</span>}
+        <p style={{margin:"18px 0 0",color:"#fff",fontSize:24,fontWeight:900,letterSpacing:"-0.03em"}}>{g.name}</p>
+        <p style={{margin:"4px 0 0",color:"rgba(255,255,255,0.7)",fontSize:13}}>길드장 {nickOf(g.leader)} · 길드원 {guildCount(g)}명{member?" · 내 길드":""}</p>
+      </div>
+      <div onClick={e=>e.stopPropagation()} style={{marginTop:16,width:"min(86vw,330px)",background:"#fff",borderRadius:20,padding:"16px 16px 14px",boxSizing:"border-box"}}>
+        <p style={{margin:0,fontSize:11.5,fontWeight:800,color:"#A3AAC2"}}>길드 소개</p>
+        <p style={{margin:"6px 0 0",fontSize:15.5,fontWeight:700,color:g.intro?INK:"#A3AAC2",lineHeight:1.5,wordBreak:"keep-all"}}>{g.intro||"아직 소개 문구가 없어요."}</p>
+        {GUILD_GO&&<button type="button" onClick={()=>{ setGid(null); GUILD_GO(g.id); }} style={{...btnPrimary,marginTop:14,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>{invited?"초대 확인하러 가기":"길드 보러 가기"}<Icon name="chevR" size={16} stroke={2.4}/></button>}
+      </div>
+    </div>);
+}
+
 function GuildIntro({g,style}){
   if(!g||!g.intro) return null;
   return <span style={{display:"block",fontSize:12.5,color:"#5E6A8E",lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",...style}}>{g.intro}</span>;
@@ -5009,6 +5040,91 @@ function GuildView({onOpenMeeting,onCreateMeeting}){
     </>);
 }
 
+// 길드 게시판: club/guildPosts/<gid>/<pid> {uid,name,text,at,pinned?,editedAt?,likes,comments}. 길드원(과 관리자)만 읽고 써요
+const GUILD_POST_MAX=1000;
+const guildPostRef=(gid,path)=>FB.club.child("guildPosts/"+gid+(path?"/"+path:""));
+function useGuildPosts(gid,on){
+  const [posts,setPosts]=useState(null);
+  useEffect(()=>{ if(!FB||!on||!gid){ setPosts([]); return; }
+    const r=guildPostRef(gid), h=s=>setPosts(toList(s.val()||{}).filter(p=>p&&p.text).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||b.at-a.at));
+    r.on("value",h,()=>setPosts([])); return ()=>r.off("value",h); },[gid,on]);
+  return posts;
+}
+function GuildPostForm({g,initial,onClose}){
+  const me=myUid(), canPin=g.leader===me||ME_ADMIN;
+  const [text,setText]=useState(initial?initial.text:""), [pinned,setPinned]=useState(!!(initial&&initial.pinned)), [busy,setBusy]=useState(false);
+  const submit=()=>{ const t=text.trim(); if(!t||busy) return; setBusy(true);
+    const job=initial?guildPostRef(g.id,initial.id).update({text:t,editedAt:Date.now(),pinned:canPin&&pinned?true:null})
+      :guildPostRef(g.id,newId()).set({uid:me,name:ME,text:t,at:Date.now(),...(canPin&&pinned?{pinned:true}:{})});
+    job.then(()=>onClose(true)).catch(e=>{ setBusy(false); window.alert(authMsg(e)); }); };
+  return(
+    <Sheet title={initial?"글 수정":`${g.name} 게시판 글쓰기`} onClose={()=>onClose(false)}>
+      <textarea value={text} onChange={e=>setText(e.target.value.slice(0,GUILD_POST_MAX))} autoFocus rows={7} aria-label="글 내용" placeholder={"길드원에게만 보여요.\n다음 모임 얘기, 연습 후기, 아무 얘기나 좋아요."} style={{...inputStyle,width:"100%",boxSizing:"border-box",fontSize:16,lineHeight:1.55,resize:"none",marginTop:12}}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
+        {canPin&&<button type="button" role="switch" aria-checked={pinned} onClick={()=>setPinned(v=>!v)} style={{display:"inline-flex",alignItems:"center",gap:8,background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:FONT,fontSize:13,fontWeight:700,color:pinned?BLUE:"#6B7493"}}>
+          <span style={{width:36,height:20,borderRadius:12,background:pinned?BLUE:"#D6DEF7",position:"relative",flexShrink:0}}><span style={{position:"absolute",top:2,left:pinned?18:2,width:16,height:16,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></span>공지로 맨 위에 고정</button>}
+        <span style={{fontSize:12,color:"#A3AAC2",marginLeft:"auto"}}>{text.length}/{GUILD_POST_MAX}</span>
+        <button type="button" disabled={!text.trim()||busy} onClick={submit} style={{padding:"11px 22px",borderRadius:12,border:"none",background:text.trim()?GRAD:"#E4E9F7",color:"#fff",fontSize:14,fontWeight:700,cursor:text.trim()?"pointer":"default",fontFamily:FONT}}>{busy?"올리는 중…":initial?"저장":"올리기"}</button>
+      </div>
+    </Sheet>);
+}
+function GuildBoard({g}){
+  const me=myUid(), manage=g.leader===me||ME_ADMIN;
+  const posts=useGuildPosts(g.id,true);
+  const {names}=useMentions();
+  const [form,setForm]=useState(null), [openId,setOpenId]=useState(null);
+  if(!posts) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>게시판을 불러오는 중이에요…</p></Card>;
+  const like=p=>{ const on=!!(p.likes&&p.likes[me]); guildPostRef(g.id,`${p.id}/likes/${me}`).set(on?null:true).catch(guildFail); };
+  const del=p=>{ if(window.confirm("이 글을 지울까요? 댓글도 같이 지워져요.")) guildPostRef(g.id,p.id).remove().then(()=>setOpenId(null)).catch(guildFail); };
+  const small={background:"none",border:"none",padding:0,fontSize:12,color:"#8A93B2",cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4};
+  const who=(p,sz)=><div style={{display:"flex",alignItems:"center",gap:8}}>
+    <Avatar name={curNick(p.uid,p.name)} photo={photoOf(p.uid)} size={sz} radius={Math.round(sz*0.32)} bg={p.uid===me?BALL:BLUE_LIGHT} font={Math.round(sz*0.42)}/>
+    <span style={{fontSize:sz>30?14:13,fontWeight:700,color:INK}}>{curNick(p.uid,p.name)}</span>{p.uid===g.leader&&<LeaderTag/>}
+    <span style={{fontSize:12,color:"#A3AAC2"}}>{ago(p.at)}{p.editedAt?" · 수정됨":""}</span>
+    {p.pinned&&<span style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:800,padding:"3px 7px",borderRadius:7,background:BALL,color:INK}}><Ic n="megaphone" s={11}/>공지</span>}
+  </div>;
+  const open=openId&&posts.find(p=>p.id===openId);
+  if(openId){
+    const back=<button type="button" onClick={()=>setOpenId(null)} style={{...small,fontSize:14,alignSelf:"flex-start",color:BLUE,fontWeight:600,padding:"2px 4px"}}><Ic n="chevL" s={16}/> 게시판으로</button>;
+    if(!open) return <>{back}<Empty>지워진 글이에요.</Empty></>;
+    const lk=Object.keys(open.likes||{}).length, on=!!(open.likes&&open.likes[me]);
+    return(<>
+      {back}
+      <Card>
+        {who(open,36)}
+        <p style={{margin:"12px 0 0",fontSize:15,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"keep-all"}}><CommentText text={open.text} names={names}/></p>
+        <div style={{display:"flex",alignItems:"center",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
+          <button type="button" aria-pressed={on} onClick={()=>like(open)} style={{...small,fontSize:13,color:on?"#ef4444":"#8A93B2"}}><svg width="17" height="17" viewBox="0 0 24 24" fill={on?"#ef4444":"none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON_PATHS.heart[0]}/></svg>{lk||"좋아요"}</button>
+          {(open.uid===me||manage)&&<span style={{marginLeft:"auto",display:"flex",gap:14}}>
+            {open.uid===me&&<button type="button" onClick={()=>setForm({initial:open})} style={small}><Ic n="pencil" s={12}/> 수정</button>}
+            <button type="button" onClick={()=>del(open)} style={{...small,color:"#ef4444"}}><Ic n="trash" s={12}/> 삭제</button></span>}
+        </div>
+      </Card>
+      <CommentBox comments={open.comments} isAdmin={manage} canWrite save={(cid,v)=>guildPostRef(g.id,`${open.id}/comments/${cid}`).set(v)}
+        where={`'${g.name}' 길드 게시판`} link={{type:"guild",guildId:g.id}}
+        onAdded={(t,ment)=>{ if(open.uid&&open.uid!==me&&!(ment&&ment[open.uid])) guildNotify(open.uid,g.id,`'${g.name}' 길드 게시판 내 글 "${clip(open.text,15)}"에 댓글이 달렸어요`); }}/>
+      {form&&<GuildPostForm g={g} initial={form.initial} onClose={()=>setForm(null)}/>}
+    </>);
+  }
+  return(<>
+    <button type="button" onClick={()=>setForm({})} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"#fff",border:"none",borderRadius:18,padding:"12px 14px",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
+      <Avatar name={ME} photo={photoOf(me)} size={32} radius={10} zoom={false} bg={BALL}/>
+      <span style={{flex:1,fontSize:14,color:"#A3AAC2"}}>길드원에게 한마디 남겨 보세요</span>
+      <span style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:13,fontWeight:800,color:BLUE}}><Ic n="pencil" s={13}/>글쓰기</span>
+    </button>
+    {posts.length===0?<Empty>아직 글이 없어요. 첫 글을 남겨 보세요!</Empty>
+      :posts.map(p=>{ const nC=toList(p.comments).filter(c=>c&&c.text).length, lk=Object.keys(p.likes||{}).length;
+        return <div key={p.id} role="button" tabIndex={0} onClick={()=>{setOpenId(p.id);try{window.scrollTo(0,0);}catch(e){}}} onKeyDown={e=>{if(e.key==="Enter")setOpenId(p.id);}} style={{cursor:"pointer"}}>
+          <Card style={{padding:16,...(p.pinned?{boxShadow:`inset 0 0 0 1.5px ${BALL}`}:{})}}>
+            {who(p,28)}
+            <p style={{margin:"10px 0 0",fontSize:14.5,color:INK,lineHeight:1.55,whiteSpace:"pre-wrap",wordBreak:"keep-all",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}><CommentText text={p.text} names={names}/></p>
+            <div style={{display:"flex",gap:14,marginTop:10,fontSize:12,color:"#6B7493"}}><span>댓글 {nC}</span><span>좋아요 {lk}</span></div>
+          </Card></div>; })}
+    <p style={{margin:0,fontSize:11.5,color:"#A3AAC2",textAlign:"center"}}><Ic n="lock" s={11}/> {g.name} 길드원만 볼 수 있는 게시판이에요</p>
+    {form&&<GuildPostForm g={g} initial={form.initial} onClose={()=>setForm(null)}/>}
+  </>);
+}
+
 function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
   const me=myUid(), isLeader=g.leader===me, member=inGuild(g,me), manage=isLeader||ME_ADMIN;
   const [tab,setTab]=useState("members");
@@ -5020,7 +5136,7 @@ function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
   const seeMeets=member||ME_ADMIN;
   const meets=MEETINGS.filter(m=>m.guildId===g.id);
   const up=meets.filter(m=>m.status==="upcoming"), past=meets.filter(m=>m.status==="past").slice(0,5);
-  const tabs=[["members","길드원"],...(seeMeets?[["meetings","길드 모임"]]:[]),...(manage?[["manage","관리"]]:[])];
+  const tabs=[["members","길드원"],...(seeMeets?[["board","게시판"],["meetings","길드 모임"]]:[]),...(manage?[["manage","관리"]]:[])];
   const kick=u=>{ if(window.confirm(`${nickOf(u)} 님을 '${g.name}' 길드에서 내보낼까요? 지난 길드 모임 기록은 그대로 남아요.`)) guildRef(g.id,"members/"+u).remove().catch(guildFail); };
   const cancelInvite=u=>guildRef(g.id,"invites/"+u).remove().catch(guildFail);
   const invite=u=>guildRef(g.id,"invites/"+u).set({at:Date.now(),by:ME}).then(()=>guildNotify(u,g.id,`${ME} 님이 '${g.name}' 길드에 초대했어요. 회원 탭 → 길드에서 수락할 수 있어요`)).catch(guildFail);
@@ -5082,6 +5198,7 @@ function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
         {member&&myGuilds.length>1&&<p style={{margin:0,fontSize:11.5,color:"#A3AAC2",textAlign:"center"}}>이름 옆에는 대표 길드 하나만 떠요. 나머지는 프로필을 누르면 보여요.</p>}
         {!seeMeets&&<p style={{margin:0,fontSize:12,color:"#A3AAC2",textAlign:"center"}}>길드 모임은 길드원만 볼 수 있어요.</p>}
       </>}
+      {tab==="board"&&seeMeets&&<GuildBoard g={g}/>}
       {tab==="meetings"&&seeMeets&&<>
         {member&&<button type="button" onClick={()=>onCreateMeeting&&onCreateMeeting(g.id)} style={{...btnPrimary,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic n="zap" s={16}/>{g.name} 길드 번개 만들기</button>}
         <Card style={{padding:"4px 16px"}}>
@@ -5594,6 +5711,7 @@ export default function App() {
   const [memView,setMemView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const [,setBoardWrite]=useShared("boardWrite",0);
   const [,setGuildOpen]=useShared("guildOpen",null);
+  GUILD_GO=gid=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
   if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
@@ -5671,7 +5789,7 @@ export default function App() {
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
-      <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/>
+      <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/><GuildPeek/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
