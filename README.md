@@ -186,6 +186,21 @@
           },
           "invites": {
             "$uid": { ".write": "auth != null && auth.uid === $uid && !newData.exists()" }
+          },
+          "requests": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && (!newData.exists() || !data.parent().parent().child('members/' + $uid).exists())",
+              ".validate": "newData.hasChildren(['at'])"
+            }
+          }
+        }
+      },
+      "guildPosts": {
+        "$gid": {
+          ".read": "auth != null && (root.child('club/guilds/' + $gid + '/members/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())",
+          ".write": "auth != null && (root.child('club/guilds/' + $gid + '/members/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())",
+          "$pid": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'text', 'at']) && newData.child('text').isString() && newData.child('text').val().length <= 1000)"
           }
         }
       },

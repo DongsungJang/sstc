@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f357eb790d">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f357eb790d">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=def5b50423">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=def5b50423">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -16132,9 +16132,39 @@ function MemberList({
 function GuildEmblem({
   g,
   size = 20,
-  style
+  style,
+  peek = true
 }) {
   if (!g) return null;
+  // 누르면 길드 엠블럼 크게 + 한 줄 소개 (GuildPeek). 미리 보기처럼 peek={false}면 그냥 그림
+  if (peek && g.id && GUILD_PEEK_SET) {
+    const go = e => {
+      e.stopPropagation();
+      e.preventDefault();
+      openGuildPeek(g.id);
+    };
+    return /*#__PURE__*/React.createElement("span", {
+      role: "button",
+      tabIndex: 0,
+      "aria-label": `${g.name} 길드 보기`,
+      onClick: go,
+      onKeyDown: e => {
+        if (e.key === "Enter" || e.key === " ") go(e);
+      },
+      style: {
+        display: "inline-flex",
+        flexShrink: 0,
+        cursor: "pointer",
+        verticalAlign: "middle",
+        borderRadius: Math.round(size * 0.28)
+      }
+    }, /*#__PURE__*/React.createElement(GuildEmblem, {
+      g: g,
+      size: size,
+      style: style,
+      peek: false
+    }));
+  }
   const box = {
     width: size,
     height: size,
@@ -16190,11 +16220,19 @@ function GuildTag({
   g,
   size = 18,
   font,
-  color = INK
+  color = INK,
+  peek = true
 }) {
   if (!g) return null;
   return /*#__PURE__*/React.createElement("span", {
+    role: peek && g.id ? "button" : undefined,
+    onClick: peek && g.id && GUILD_PEEK_SET ? e => {
+      e.stopPropagation();
+      e.preventDefault();
+      openGuildPeek(g.id);
+    } : undefined,
     style: {
+      cursor: peek && g.id ? "pointer" : undefined,
       display: "inline-flex",
       alignItems: "center",
       gap: Math.max(5, Math.round(size * 0.3)),
@@ -16203,7 +16241,8 @@ function GuildTag({
     }
   }, /*#__PURE__*/React.createElement(GuildEmblem, {
     g: g,
-    size: size
+    size: size,
+    peek: false
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: font || Math.max(12, Math.round(size * 0.62)),
@@ -16301,6 +16340,12 @@ function GuildMeetTag({
       gap: 4
     }
   }, /*#__PURE__*/React.createElement("span", {
+    role: g ? "button" : undefined,
+    onClick: g ? e => {
+      e.stopPropagation();
+      e.preventDefault();
+      openGuildPeek(g.id);
+    } : undefined,
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -16311,7 +16356,8 @@ function GuildMeetTag({
       borderRadius: 7,
       background: BALL,
       color: INK,
-      whiteSpace: "nowrap"
+      whiteSpace: "nowrap",
+      cursor: g ? "pointer" : undefined
     }
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "lock",
@@ -16368,6 +16414,84 @@ const guildNotify = (to, gid, text) => to && to !== myUid() && postFeed({
   to,
   text
 });
+// 가입 신청: club/guilds/<gid>/requests/<uid> {at,name}. 본인이 넣고 빼고, 길드장(관리자)이 수락·거절
+const guildRequests = g => Object.keys(g && g.requests || {}).filter(u => !inGuild(g, u)).sort((a, b) => (g.requests[a].at || 0) - (g.requests[b].at || 0));
+const guildApply = g => guildRef(g.id, "requests/" + myUid()).set({
+  at: Date.now(),
+  name: ME
+}).then(() => guildNotify(g.leader, g.id, `${ME} 님이 '${g.name}' 길드에 가입 신청했어요. 길드 화면에서 수락할 수 있어요`)).catch(guildFail);
+const guildCancelApply = g => {
+  if (window.confirm(`'${g.name}' 길드 가입 신청을 취소할까요?`)) guildRef(g.id, "requests/" + myUid()).remove().catch(guildFail);
+};
+const guildAcceptReq = (g, u) => guildRef(g.id).update({
+  ["members/" + u]: true,
+  ["requests/" + u]: null,
+  ["invites/" + u]: null
+}).then(() => guildNotify(u, g.id, `'${g.name}' 길드 가입 신청이 수락됐어요. 환영해요!`)).catch(guildFail);
+const guildRejectReq = (g, u) => {
+  if (window.confirm(`${nickOf(u)} 님의 가입 신청을 거절할까요?`)) guildRef(g.id, "requests/" + u).remove().catch(guildFail);
+};
+// 가입 신청 버튼 (길드원도 아니고 초대도 안 받은 회원)
+function GuildApplyButton({
+  g,
+  style
+}) {
+  const me = myUid();
+  if (!me || inGuild(g, me) || g.invites && g.invites[me]) return null;
+  const sent = !!(g.requests && g.requests[me]);
+  return sent ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+      padding: "13px 0",
+      borderRadius: 14,
+      background: BLUE_LIGHT,
+      color: BLUE,
+      fontSize: 14,
+      fontWeight: 800
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "check",
+    size: 15,
+    stroke: 2.6
+  }), "\uAC00\uC785 \uC2E0\uCCAD \uBCF4\uB0C4 \xB7 \uAE38\uB4DC\uC7A5 \uD655\uC778 \uC911"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => guildCancelApply(g),
+    style: {
+      ...btnSmall,
+      background: "#EDF0F6",
+      color: "#5E6A8E",
+      fontWeight: 700,
+      padding: "13px 12px"
+    }
+  }, "\uCDE8\uC18C")) : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => guildApply(g),
+    style: {
+      ...btnPrimary,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      width: "100%",
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "userPlus",
+    size: 17,
+    stroke: 2.2
+  }), "\uAC00\uC785 \uC2E0\uCCAD\uD558\uAE30");
+}
 const guildUpcoming = gid => ALL_MEETINGS.filter(m => m.guildId === gid && m.status === "upcoming" && !m.cancelled);
 const nickOf = uid => MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].nickname || "(탈퇴 회원)";
 
@@ -16477,6 +16601,173 @@ function MemberPicker({
 }
 
 // 길드 만들기·엠블럼 바꾸기
+// 엠블럼·길드 표시를 누르면: 엠블럼 크게 + 길드명 + 한 줄 소개 + 길드 보러 가기
+let GUILD_PEEK_SET = null,
+  GUILD_GO = null;
+const openGuildPeek = gid => {
+  if (GUILD_PEEK_SET && gid) GUILD_PEEK_SET(gid);
+};
+function GuildPeek() {
+  const [gid, setGid] = useState(null);
+  useEffect(() => {
+    GUILD_PEEK_SET = setGid;
+    return () => {
+      GUILD_PEEK_SET = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!gid) return;
+    const k = e => {
+      if (e.key === "Escape") setGid(null);
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [gid]);
+  const g = gid && guildById(gid);
+  if (!g) return null;
+  const me = myUid(),
+    member = inGuild(g, me),
+    invited = !member && g.invites && g.invites[me];
+  const big = "min(58vw,230px)";
+  return /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `${g.name} 길드`,
+    onClick: () => setGid(null),
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 125,
+      background: "rgba(11,30,91,0.92)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      boxSizing: "border-box",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "\uB2EB\uAE30",
+    onClick: () => setGid(null),
+    style: {
+      position: "absolute",
+      top: "calc(14px + env(safe-area-inset-top,0px))",
+      right: 16,
+      ...iconBtn
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "x",
+    size: 20
+  })), /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center"
+    }
+  }, photoOk(g.photo) ? /*#__PURE__*/React.createElement("img", {
+    src: g.photo,
+    alt: `${g.name} 엠블럼`,
+    style: {
+      width: big,
+      height: big,
+      objectFit: "cover",
+      borderRadius: 44,
+      boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+      background: "#fff"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    role: "img",
+    "aria-label": `${g.name} 엠블럼`,
+    style: {
+      width: big,
+      height: big,
+      borderRadius: 44,
+      background: g.bg || INK,
+      color: g.fg || BALL,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: `calc(${big} * ${String(g.abbr || g.name).length === 1 ? 0.5 : 0.38})`,
+      fontWeight: 900,
+      letterSpacing: "-0.06em",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.35)"
+    }
+  }, String(g.abbr || g.name || "?").slice(0, GUILD_ABBR_MAX)), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "18px 0 0",
+      color: "#fff",
+      fontSize: 24,
+      fontWeight: 900,
+      letterSpacing: "-0.03em"
+    }
+  }, g.name), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      color: "rgba(255,255,255,0.7)",
+      fontSize: 13
+    }
+  }, "\uAE38\uB4DC\uC7A5 ", nickOf(g.leader), " \xB7 \uAE38\uB4DC\uC6D0 ", guildCount(g), "\uBA85", member ? " · 내 길드" : "")), /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      marginTop: 16,
+      width: "min(86vw,330px)",
+      background: "#fff",
+      borderRadius: 20,
+      padding: "16px 16px 14px",
+      boxSizing: "border-box"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11.5,
+      fontWeight: 800,
+      color: "#A3AAC2"
+    }
+  }, "\uAE38\uB4DC \uC18C\uAC1C"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 15.5,
+      fontWeight: 700,
+      color: g.intro ? INK : "#A3AAC2",
+      lineHeight: 1.5,
+      wordBreak: "keep-all"
+    }
+  }, g.intro || "아직 소개 문구가 없어요."), !member && !invited && /*#__PURE__*/React.createElement(GuildApplyButton, {
+    g: g,
+    style: {
+      marginTop: 14
+    }
+  }), GUILD_GO && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setGid(null);
+      GUILD_GO(g.id);
+    },
+    style: {
+      ...btnPrimary,
+      ...(!member && !invited ? {
+        background: "#fff",
+        color: BLUE,
+        boxShadow: `inset 0 0 0 1.5px ${BLUE}`,
+        marginTop: 8
+      } : {
+        marginTop: 14
+      }),
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4
+    }
+  }, invited ? "초대 확인하러 가기" : "길드 보러 가기", /*#__PURE__*/React.createElement(Icon, {
+    name: "chevR",
+    size: 16,
+    stroke: 2.4
+  }))));
+}
 function GuildIntro({
   g,
   style
@@ -17074,9 +17365,19 @@ function GuildView({
         fontSize: 12.5,
         color: "#6B7493"
       }
-    }, "\uAE38\uB4DC\uC6D0 ", n, "\uBA85"), up > 0 && inGuild(x, me) && /*#__PURE__*/React.createElement("span", {
+    }, "\uAE38\uB4DC\uC6D0 ", n, "\uBA85"), x.leader === me && guildRequests(x).length > 0 && /*#__PURE__*/React.createElement("span", {
       style: {
         marginLeft: "auto",
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#fff",
+        background: "#ef4444",
+        padding: "4px 8px",
+        borderRadius: 7
+      }
+    }, "\uAC00\uC785 \uC2E0\uCCAD ", guildRequests(x).length), up > 0 && inGuild(x, me) && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: x.leader === me && guildRequests(x).length > 0 ? 0 : "auto",
         fontSize: 12,
         fontWeight: 700,
         color: "#C2610C",
@@ -17224,7 +17525,17 @@ function GuildView({
       marginTop: 3,
       fontSize: 12
     }
-  })), /*#__PURE__*/React.createElement("span", {
+  })), x.requests && x.requests[me] ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      fontWeight: 700,
+      color: BLUE,
+      background: BLUE_LIGHT,
+      padding: "3px 7px",
+      borderRadius: 6,
+      whiteSpace: "nowrap"
+    }
+  }, "\uC2E0\uCCAD\uD568") : /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: "#6B7493",
@@ -17235,6 +17546,435 @@ function GuildView({
     size: 16,
     color: "#A3AAC2"
   }))))), formEl);
+}
+
+// 길드 게시판: club/guildPosts/<gid>/<pid> {uid,name,text,at,pinned?,editedAt?,likes,comments}. 길드원(과 관리자)만 읽고 써요
+const GUILD_POST_MAX = 1000;
+const guildPostRef = (gid, path) => FB.club.child("guildPosts/" + gid + (path ? "/" + path : ""));
+function useGuildPosts(gid, on) {
+  const [posts, setPosts] = useState(null);
+  useEffect(() => {
+    if (!FB || !on || !gid) {
+      setPosts([]);
+      return;
+    }
+    const r = guildPostRef(gid),
+      h = s => setPosts(toList(s.val() || {}).filter(p => p && p.text).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.at - a.at));
+    r.on("value", h, () => setPosts([]));
+    return () => r.off("value", h);
+  }, [gid, on]);
+  return posts;
+}
+function GuildPostForm({
+  g,
+  initial,
+  onClose
+}) {
+  const me = myUid(),
+    canPin = g.leader === me || ME_ADMIN;
+  const [text, setText] = useState(initial ? initial.text : ""),
+    [pinned, setPinned] = useState(!!(initial && initial.pinned)),
+    [busy, setBusy] = useState(false);
+  const submit = () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    const job = initial ? guildPostRef(g.id, initial.id).update({
+      text: t,
+      editedAt: Date.now(),
+      pinned: canPin && pinned ? true : null
+    }) : guildPostRef(g.id, newId()).set({
+      uid: me,
+      name: ME,
+      text: t,
+      at: Date.now(),
+      ...(canPin && pinned ? {
+        pinned: true
+      } : {})
+    });
+    job.then(() => onClose(true)).catch(e => {
+      setBusy(false);
+      window.alert(authMsg(e));
+    });
+  };
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: initial ? "글 수정" : `${g.name} 게시판 글쓰기`,
+    onClose: () => onClose(false)
+  }, /*#__PURE__*/React.createElement("textarea", {
+    value: text,
+    onChange: e => setText(e.target.value.slice(0, GUILD_POST_MAX)),
+    autoFocus: true,
+    rows: 7,
+    "aria-label": "\uAE00 \uB0B4\uC6A9",
+    placeholder: "길드원에게만 보여요.\n다음 모임 얘기, 연습 후기, 아무 얘기나 좋아요.",
+    style: {
+      ...inputStyle,
+      width: "100%",
+      boxSizing: "border-box",
+      fontSize: 16,
+      lineHeight: 1.55,
+      resize: "none",
+      marginTop: 12
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginTop: 12
+    }
+  }, canPin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "switch",
+    "aria-checked": pinned,
+    onClick: () => setPinned(v => !v),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      background: "none",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      fontWeight: 700,
+      color: pinned ? BLUE : "#6B7493"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 36,
+      height: 20,
+      borderRadius: 12,
+      background: pinned ? BLUE : "#D6DEF7",
+      position: "relative",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: 2,
+      left: pinned ? 18 : 2,
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      background: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+    }
+  })), "\uACF5\uC9C0\uB85C \uB9E8 \uC704\uC5D0 \uACE0\uC815"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2",
+      marginLeft: "auto"
+    }
+  }, text.length, "/", GUILD_POST_MAX), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: !text.trim() || busy,
+    onClick: submit,
+    style: {
+      padding: "11px 22px",
+      borderRadius: 12,
+      border: "none",
+      background: text.trim() ? GRAD : "#E4E9F7",
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: text.trim() ? "pointer" : "default",
+      fontFamily: FONT
+    }
+  }, busy ? "올리는 중…" : initial ? "저장" : "올리기")));
+}
+function GuildBoard({
+  g
+}) {
+  const me = myUid(),
+    manage = g.leader === me || ME_ADMIN;
+  const posts = useGuildPosts(g.id, true);
+  const {
+    names
+  } = useMentions();
+  const [form, setForm] = useState(null),
+    [openId, setOpenId] = useState(null);
+  if (!posts) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 14,
+      color: "#6B7493"
+    }
+  }, "\uAC8C\uC2DC\uD310\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\uC774\uC5D0\uC694\u2026"));
+  const like = p => {
+    const on = !!(p.likes && p.likes[me]);
+    guildPostRef(g.id, `${p.id}/likes/${me}`).set(on ? null : true).catch(guildFail);
+  };
+  const del = p => {
+    if (window.confirm("이 글을 지울까요? 댓글도 같이 지워져요.")) guildPostRef(g.id, p.id).remove().then(() => setOpenId(null)).catch(guildFail);
+  };
+  const small = {
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: 12,
+    color: "#8A93B2",
+    cursor: "pointer",
+    fontFamily: FONT,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4
+  };
+  const who = (p, sz) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: curNick(p.uid, p.name),
+    photo: photoOf(p.uid),
+    size: sz,
+    radius: Math.round(sz * 0.32),
+    bg: p.uid === me ? BALL : BLUE_LIGHT,
+    font: Math.round(sz * 0.42)
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: sz > 30 ? 14 : 13,
+      fontWeight: 700,
+      color: INK
+    }
+  }, curNick(p.uid, p.name)), p.uid === g.leader && /*#__PURE__*/React.createElement(LeaderTag, null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#A3AAC2"
+    }
+  }, ago(p.at), p.editedAt ? " · 수정됨" : ""), p.pinned && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: "auto",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 7px",
+      borderRadius: 7,
+      background: BALL,
+      color: INK
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "megaphone",
+    s: 11
+  }), "\uACF5\uC9C0"));
+  const open = openId && posts.find(p => p.id === openId);
+  if (openId) {
+    const back = /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setOpenId(null),
+      style: {
+        ...small,
+        fontSize: 14,
+        alignSelf: "flex-start",
+        color: BLUE,
+        fontWeight: 600,
+        padding: "2px 4px"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "chevL",
+      s: 16
+    }), " \uAC8C\uC2DC\uD310\uC73C\uB85C");
+    if (!open) return /*#__PURE__*/React.createElement(React.Fragment, null, back, /*#__PURE__*/React.createElement(Empty, null, "\uC9C0\uC6CC\uC9C4 \uAE00\uC774\uC5D0\uC694."));
+    const lk = Object.keys(open.likes || {}).length,
+      on = !!(open.likes && open.likes[me]);
+    return /*#__PURE__*/React.createElement(React.Fragment, null, back, /*#__PURE__*/React.createElement(Card, null, who(open, 36), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "12px 0 0",
+        fontSize: 15,
+        color: INK,
+        lineHeight: 1.6,
+        whiteSpace: "pre-wrap",
+        wordBreak: "keep-all"
+      }
+    }, /*#__PURE__*/React.createElement(CommentText, {
+      text: open.text,
+      names: names
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        marginTop: 12,
+        paddingTop: 10,
+        borderTop: "1px solid #EEF1FA"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-pressed": on,
+      onClick: () => like(open),
+      style: {
+        ...small,
+        fontSize: 13,
+        color: on ? "#ef4444" : "#8A93B2"
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      width: "17",
+      height: "17",
+      viewBox: "0 0 24 24",
+      fill: on ? "#ef4444" : "none",
+      stroke: "currentColor",
+      strokeWidth: "1.9",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": "true"
+    }, /*#__PURE__*/React.createElement("path", {
+      d: ICON_PATHS.heart[0]
+    })), lk || "좋아요"), (open.uid === me || manage) && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        display: "flex",
+        gap: 14
+      }
+    }, open.uid === me && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setForm({
+        initial: open
+      }),
+      style: small
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "pencil",
+      s: 12
+    }), " \uC218\uC815"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => del(open),
+      style: {
+        ...small,
+        color: "#ef4444"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "trash",
+      s: 12
+    }), " \uC0AD\uC81C")))), /*#__PURE__*/React.createElement(CommentBox, {
+      comments: open.comments,
+      isAdmin: manage,
+      canWrite: true,
+      save: (cid, v) => guildPostRef(g.id, `${open.id}/comments/${cid}`).set(v),
+      where: `'${g.name}' 길드 게시판`,
+      link: {
+        type: "guild",
+        guildId: g.id
+      },
+      onAdded: (t, ment) => {
+        if (open.uid && open.uid !== me && !(ment && ment[open.uid])) guildNotify(open.uid, g.id, `'${g.name}' 길드 게시판 내 글 "${clip(open.text, 15)}"에 댓글이 달렸어요`);
+      }
+    }), form && /*#__PURE__*/React.createElement(GuildPostForm, {
+      g: g,
+      initial: form.initial,
+      onClose: () => setForm(null)
+    }));
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setForm({}),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      width: "100%",
+      background: "#fff",
+      border: "none",
+      borderRadius: 18,
+      padding: "12px 14px",
+      cursor: "pointer",
+      fontFamily: FONT,
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: ME,
+    photo: photoOf(me),
+    size: 32,
+    radius: 10,
+    zoom: false,
+    bg: BALL
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 14,
+      color: "#A3AAC2"
+    }
+  }, "\uAE38\uB4DC\uC6D0\uC5D0\uAC8C \uD55C\uB9C8\uB514 \uB0A8\uACA8 \uBCF4\uC138\uC694"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 3,
+      fontSize: 13,
+      fontWeight: 800,
+      color: BLUE
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pencil",
+    s: 13
+  }), "\uAE00\uC4F0\uAE30")), posts.length === 0 ? /*#__PURE__*/React.createElement(Empty, null, "\uC544\uC9C1 \uAE00\uC774 \uC5C6\uC5B4\uC694. \uCCAB \uAE00\uC744 \uB0A8\uACA8 \uBCF4\uC138\uC694!") : posts.map(p => {
+    const nC = toList(p.comments).filter(c => c && c.text).length,
+      lk = Object.keys(p.likes || {}).length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      role: "button",
+      tabIndex: 0,
+      onClick: () => {
+        setOpenId(p.id);
+        try {
+          window.scrollTo(0, 0);
+        } catch (e) {}
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter") setOpenId(p.id);
+      },
+      style: {
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement(Card, {
+      style: {
+        padding: 16,
+        ...(p.pinned ? {
+          boxShadow: `inset 0 0 0 1.5px ${BALL}`
+        } : {})
+      }
+    }, who(p, 28), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "10px 0 0",
+        fontSize: 14.5,
+        color: INK,
+        lineHeight: 1.55,
+        whiteSpace: "pre-wrap",
+        wordBreak: "keep-all",
+        display: "-webkit-box",
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement(CommentText, {
+      text: p.text,
+      names: names
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 14,
+        marginTop: 10,
+        fontSize: 12,
+        color: "#6B7493"
+      }
+    }, /*#__PURE__*/React.createElement("span", null, "\uB313\uAE00 ", nC), /*#__PURE__*/React.createElement("span", null, "\uC88B\uC544\uC694 ", lk))));
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11.5,
+      color: "#A3AAC2",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "lock",
+    s: 11
+  }), " ", g.name, " \uAE38\uB4DC\uC6D0\uB9CC \uBCFC \uC218 \uC788\uB294 \uAC8C\uC2DC\uD310\uC774\uC5D0\uC694"), form && /*#__PURE__*/React.createElement(GuildPostForm, {
+    g: g,
+    initial: form.initial,
+    onClose: () => setForm(null)
+  }));
 }
 function GuildDetail({
   g,
@@ -17252,14 +17992,33 @@ function GuildDetail({
   const [inviting, setInviting] = useState(false);
   const [handing, setHanding] = useState(false);
   const uids = Object.keys(g.members || {}).sort((a, b) => a === g.leader ? -1 : b === g.leader ? 1 : nickOf(a).localeCompare(nickOf(b), "ko"));
-  const invites = Object.keys(g.invites || {}).filter(u => !inGuild(g, u));
+  const invites = Object.keys(g.invites || {}).filter(u => !inGuild(g, u)),
+    reqs = guildRequests(g);
   const myGuilds = guildsOf(me),
     isMain = member && mainGuildOf(me) && mainGuildOf(me).id === g.id;
   const seeMeets = member || ME_ADMIN;
   const meets = MEETINGS.filter(m => m.guildId === g.id);
   const up = meets.filter(m => m.status === "upcoming"),
     past = meets.filter(m => m.status === "past").slice(0, 5);
-  const tabs = [["members", "길드원"], ...(seeMeets ? [["meetings", "길드 모임"]] : []), ...(manage ? [["manage", "관리"]] : [])];
+  const tabs = [["members", manage && reqs.length ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uAE38\uB4DC\uC6D0", /*#__PURE__*/React.createElement("span", {
+    "aria-label": `가입 신청 ${reqs.length}명`,
+    style: {
+      marginLeft: 4,
+      display: "inline-flex",
+      minWidth: 17,
+      height: 17,
+      padding: "0 4px",
+      boxSizing: "border-box",
+      borderRadius: 9,
+      background: "#ef4444",
+      color: "#fff",
+      fontSize: 10.5,
+      fontWeight: 800,
+      alignItems: "center",
+      justifyContent: "center",
+      verticalAlign: "1px"
+    }
+  }, reqs.length)) : "길드원"], ...(seeMeets ? [["board", "게시판"], ["meetings", "길드 모임"]] : []), ...(manage ? [["manage", "관리"]] : [])];
   const kick = u => {
     if (window.confirm(`${nickOf(u)} 님을 '${g.name}' 길드에서 내보낼까요? 지난 길드 모임 기록은 그대로 남아요.`)) guildRef(g.id, "members/" + u).remove().catch(guildFail);
   };
@@ -17438,7 +18197,12 @@ function GuildDetail({
       lineHeight: 1.45,
       wordBreak: "keep-all"
     }
-  }, g.intro), g.invites && g.invites[me] && !member && /*#__PURE__*/React.createElement("div", {
+  }, g.intro), /*#__PURE__*/React.createElement(GuildApplyButton, {
+    g: g,
+    style: {
+      marginTop: 14
+    }
+  }), g.invites && g.invites[me] && !member && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -17532,7 +18296,68 @@ function GuildDetail({
       fontWeight: 700,
       padding: "7px 10px"
     }
-  }, "\uB0B4\uBCF4\uB0B4\uAE30")))), manage && invites.length > 0 && /*#__PURE__*/React.createElement(Card, {
+  }, "\uB0B4\uBCF4\uB0B4\uAE30")))), manage && reqs.length > 0 && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      padding: "12px 16px",
+      border: `1.5px solid ${BLUE}`
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 6px",
+      fontSize: 13,
+      fontWeight: 800,
+      color: INK
+    }
+  }, "\uAC00\uC785 \uC2E0\uCCAD ", reqs.length, "\uBA85"), reqs.map(u => /*#__PURE__*/React.createElement("div", {
+    key: u,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "6px 0"
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: nickOf(u),
+    photo: photoOf(u),
+    size: 32,
+    radius: 10
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 14,
+      fontWeight: 700,
+      color: INK
+    }
+  }, nickOf(u)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: "#A3AAC2"
+    }
+  }, ago(g.requests[u].at || 0), " \uC2E0\uCCAD")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => guildRejectReq(g, u),
+    style: {
+      ...btnSmall,
+      background: "#EDF0F6",
+      color: "#5E6A8E",
+      fontWeight: 700,
+      padding: "7px 10px"
+    }
+  }, "\uAC70\uC808"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => guildAcceptReq(g, u),
+    style: {
+      ...btnSmall,
+      background: BLUE,
+      fontWeight: 700,
+      padding: "7px 12px"
+    }
+  }, "\uC218\uB77D")))), manage && invites.length > 0 && /*#__PURE__*/React.createElement(Card, {
     style: {
       padding: "12px 16px"
     }
@@ -17619,7 +18444,9 @@ function GuildDetail({
       color: "#A3AAC2",
       textAlign: "center"
     }
-  }, "\uAE38\uB4DC \uBAA8\uC784\uC740 \uAE38\uB4DC\uC6D0\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.")), tab === "meetings" && seeMeets && /*#__PURE__*/React.createElement(React.Fragment, null, member && /*#__PURE__*/React.createElement("button", {
+  }, "\uAE38\uB4DC \uBAA8\uC784\uC740 \uAE38\uB4DC\uC6D0\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.")), tab === "board" && seeMeets && /*#__PURE__*/React.createElement(GuildBoard, {
+    g: g
+  }), tab === "meetings" && seeMeets && /*#__PURE__*/React.createElement(React.Fragment, null, member && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => onCreateMeeting && onCreateMeeting(g.id),
     style: {
@@ -18013,7 +18840,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "f357eb790d";
+const BUILD_ID = "def5b50423";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -19574,6 +20401,23 @@ function App() {
   });
   const [, setBoardWrite] = useShared("boardWrite", 0);
   const [, setGuildOpen] = useShared("guildOpen", null);
+  GUILD_GO = gid => {
+    if (openMeeting) {
+      try {
+        if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+      } catch (e) {}
+      setOpenMeeting(null);
+    }
+    setTab("members");
+    setMemView("guild");
+    try {
+      sessionStorage.setItem("sstc-members-view", "guild");
+    } catch (e) {}
+    setGuildOpen(gid && guildById(gid) ? gid : null);
+    try {
+      window.scrollTo(0, 0);
+    } catch (e) {}
+  };
   if (splash) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SplashScreen, {
     onStart: () => setSplash(false)
   }), /*#__PURE__*/React.createElement(UpdateBanner, null));
@@ -19851,7 +20695,7 @@ function App() {
       flexDirection: "column",
       fontFamily: FONT
     }
-  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement(PhotoViewer, null), loginPopup.popup && /*#__PURE__*/React.createElement(LoginPopup, {
+  }, /*#__PURE__*/React.createElement("style", null, GLOBAL_CSS), /*#__PURE__*/React.createElement(UpdateBanner, null), /*#__PURE__*/React.createElement(PhotoViewer, null), /*#__PURE__*/React.createElement(GuildPeek, null), loginPopup.popup && /*#__PURE__*/React.createElement(LoginPopup, {
     popup: loginPopup.popup,
     left: loginPopup.left,
     onClose: q => loginPopup.close(loginPopup.popup, q)
