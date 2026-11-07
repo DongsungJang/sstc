@@ -167,6 +167,27 @@
           }
         }
       },
+      "vip": {
+        ".read": "auth != null",
+        "$uid": { ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()", ".validate": "newData.val() === true" }
+      },
+      "guilds": {
+        ".read": "auth != null",
+        "$gid": {
+          ".write": "auth != null && (root.child('club/admins/' + auth.uid).exists() || (data.exists() && data.child('leader').val() === auth.uid) || (!data.exists() && root.child('club/vip/' + auth.uid).exists() && newData.child('leader').val() === auth.uid && newData.child('members/' + auth.uid).val() === true))",
+          ".validate": "newData.hasChildren(['name', 'leader']) && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 6",
+          "photo": { ".validate": "newData.isString() && newData.val().length <= 40000" },
+          "members": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && (!newData.exists() || data.parent().parent().child('invites/' + $uid).exists())",
+              ".validate": "newData.val() === true"
+            }
+          },
+          "invites": {
+            "$uid": { ".write": "auth != null && auth.uid === $uid && !newData.exists()" }
+          }
+        }
+      },
       "lastSeen": {
         ".read": "auth != null && root.child('club/admins/' + auth.uid).exists()",
         "$uid": {
@@ -188,6 +209,9 @@
 - 광고 배너(`ads/<id>`)는 관리자만 쓰고, 로그인한 사람이 읽어요. 관리 탭에서 광고1·광고2… 로 여러 개 넣을 수 있고, 켜져 있고(`enabled: true`) 기간(`start`~`end`, 비우면 무제한) 안인 것만 홈에 보여요.
 - 광고 노출·클릭(`adStats/<광고>/<날짜>/views|clicks/<uid>`)은 회원이 자기 칸에 `true`만 써요. 같은 회원·같은 날은 한 번으로 세요. 읽기와 지우기는 관리자만 해요.
 - 마지막 접속(`lastSeen/<uid>`)은 앱을 열 때와 쓰는 동안 10분에 한 번까지 본인 칸에만 시각을 써요. 읽기는 관리자만 할 수 있어서 관리 탭 회원 목록에서만 보여요.
+- 우수회원(`vip/<uid>`)은 관리자만 지정·해제해요. 정회원 위 등급이고, 우수회원만 길드를 만들 수 있어요.
+- 길드(`guilds/<gid>`)는 로그인한 사람이 읽어요. 우수회원이 자기를 길드장·길드원으로 넣어서 새로 만들 수 있고, 그다음부터는 길드장과 관리자만 고치거나(엠블럼·이름·초대·내보내기·길드장 넘기기) 없앨 수 있어요. 회원은 받은 초대가 있을 때만 자기 칸(`members/<uid>`)에 들어가고, 언제든 나가거나 초대를 거절할 수 있어요. 길드 이름은 6자까지, 엠블럼 사진은 작게 줄여 저장해요.
+- 길드 모임은 모임 정보(`info.guildId`)에 길드가 적혀 있고, 앱이 그 길드원·만든 사람·관리자에게만 보여 줘요. 모임 기록 전체를 읽는 규칙(`meetings`)은 그대로라서, 데이터베이스를 직접 들여다보면 볼 수 있어요.
 - 소곤소곤(`board`, 회원 탭 게시판)은 정회원과 관리자만 읽고 글·댓글·좋아요를 써요. 익명 글·댓글도 실제 uid는 저장돼요(본인 수정·삭제용). 앱 화면에는 안 보이지만 데이터베이스를 직접 들여다보면 알 수 있어요. 글과 댓글은 쓴 사람만 고치고 지울 수 있고, 관리자는 남의 글·댓글을 지울 수만 있어요. 좋아요는 자기 칸(`likes/<uid>`)에만 눌러요. 글은 1000자까지예요.
 
 ## 고치는 법
