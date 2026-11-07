@@ -127,12 +127,22 @@ const guildsOf=uid=>guildList().filter(g=>inGuild(g,uid));
 const mainGuildOf=uid=>{ const gs=guildsOf(uid); if(!gs.length) return null; const p=MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].mainGuild; return gs.find(g=>g.id===p)||gs[0]; };
 const guildCount=g=>Object.keys((g&&g.members)||{}).length;
 const guildById=id=>id&&GUILDS[id]&&GUILDS[id].name?{id,...GUILDS[id]}:null;
-// 길드 모임은 그 길드원만 봐요 (관리자, 만든 사람, 이미 투표한 사람도 봐요)
+// 길드 모임: info.guildIds(여러 길드) — 예전 모임은 info.guildId 하나만 있어요
+const meetGuildIds=info=>{ if(!info) return []; const a=info.guildIds?Object.values(info.guildIds).filter(Boolean):[]; return a.length?a:info.guildId?[info.guildId]:[]; };
+const meetGuilds=info=>meetGuildIds(info).map(guildById).filter(Boolean);
+const meetGuildNames=info=>meetGuilds(info).map(g=>g.name).join("·");
+const inMeetGuild=(info,uid)=>meetGuildIds(info).some(gid=>inGuild(GUILDS[gid],uid));
+// 비공개 길드 모임은 선택된 길드원만 봐요 (관리자, 만든 사람, 이미 투표한 사람도 봐요). 공개 길드 모임(guildOpen)은 모두 봐요
 function canSeeMeeting(info,rec){
-  const gid=info&&info.guildId; if(!gid||!FB) return true;
+  if(!meetGuildIds(info).length||!FB||info.guildOpen) return true;
+  return canJoinMeeting(info,rec);
+}
+// 길드 모임 참석은 선택된 길드원만 (관리자, 만든 사람, 이미 투표한 사람은 그대로 돼요)
+function canJoinMeeting(info,rec){
+  if(!meetGuildIds(info).length||!FB) return true;
   const me=myUid(); if(!me) return false;
   if(ME_ADMIN||info.createdByUid===me||(rec&&rec.votes&&rec.votes[me])) return true;
-  return inGuild(GUILDS[gid],me);
+  return inMeetGuild(info,me);
 }
 let ALL_MEETINGS = [];   // 볼 수 없는 길드 모임까지 모두 (랭킹·참석 횟수 셈용)
 let MEETINGS = [];
@@ -194,7 +204,7 @@ function toMeeting(id,rec,series){
     place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:"")+(info.surface?` · ${info.surface}`:""), surface:info.surface||"", placeName:info.place, courtNo:info.courtNo||"", address:info.address||"", lat:info.lat!=null&&Number.isFinite(+info.lat)?+info.lat:null, lng:info.lng!=null&&Number.isFinite(+info.lng)?+info.lng:null,
     kind:kindOf(info), flashType:info.kind==="flash"?(info.flashType||"game"):"", courtFee:+info.courtFee||0, capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
-    status:isEnded(info)?"past":"upcoming", guildId:info.guildId||"", createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
+    status:isEnded(info)?"past":"upcoming", guildId:meetGuildIds(info)[0]||"", guildIds:meetGuildIds(info), guildOpen:!!(info.guildOpen&&meetGuildIds(info).length), createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
     cancelled:info.cancel&&info.cancel.at?info.cancel:null, votes:votesFromRec(rec) };
 }
 // 다가오는 모임은 가까운 날짜부터, 지난 모임은 최근 것부터
@@ -1478,7 +1488,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           </div>
           <div style={{height:6,background:isFull(next)?FULL.line:"#E4E9F4",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>
-        {isOpen(next)?(
+        {isOpen(next)&&!canJoinMeeting(next.info,next.rec)?<GuildJoinNotice m={next}/>:isOpen(next)?(
         <><AttendButtons status={myStatus} onVote={vote}/>
         {myGoing?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
           :myStatus==="absent"?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
@@ -3137,8 +3147,8 @@ function meetingShareText(m){
   const when=d===0?"오늘":d===1?"내일":d===2?"모레":d>0?`D-${d}`:"지난";
   const nm=v=>v.isGuest?`${v.name}(게스트)`:v.name;
   const url=location.origin+location.pathname+"#meeting-"+m.id;
-  const gd=m.guildId&&guildById(m.guildId);
-  const L=[gd?`🔒 [${gd.name} 길드 모임] ${gd.name} 길드원만 열 수 있어요`:null,`[SSTC] ${m.cancelled?"모임 무산 안내":`${when} ${m.kind==="flash"?"번개":"정기"} 모임 안내`}`,
+  const gn=meetGuildNames(m.info);
+  const L=[gn?(m.guildOpen?`[${gn} 길드 모임] 참석은 ${gn} 길드원만 할 수 있어요`:`🔒 [${gn} 길드 모임] ${gn} 길드원만 열 수 있어요`):null,`[SSTC] ${m.cancelled?"모임 무산 안내":`${when} ${m.kind==="flash"?"번개":"정기"} 모임 안내`}`,
     `${m.date} ${m.time}`, m.place, m.address?`주소: ${m.address}`:null];
   if(m.cancelled){ L.push(`사유: ${m.cancelled.reason||"기타"}${m.cancelled.memo?` · ${m.cancelled.memo}`:""}`); }
   else{
@@ -3316,7 +3326,8 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         )}
         {!gone&&isPast&&<p style={{margin:0,fontSize:14,fontWeight:600,textAlign:"center",color:"#8A93B2",background:"#EEF1FA",borderRadius:12,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="clock" size={16} stroke={1.9}/>종료된 모임</p>}
         {!gone&&!isPast&&!open&&<p data-attend="" style={{margin:0,fontSize:13,textAlign:"center",color:"#6B7493",background:"#F1F4FA",borderRadius:12,padding:"10px 0"}}><Ic n="calendar" s={13}/> 예약은 {meeting.openDate}에 열려요</p>}
-        {!gone&&!isPast&&open&&(
+        {!gone&&!isPast&&open&&!canJoinMeeting(meeting.info,meeting.rec)&&<GuildJoinNotice m={meeting}/>}
+        {!gone&&!isPast&&open&&canJoinMeeting(meeting.info,meeting.rec)&&(
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
             <AttendButtons status={myStatus} onVote={setMyStatus}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
@@ -4107,7 +4118,7 @@ function ensureSeries(all){
 }
 function KindBadge({m}){
   const flash=m.kind==="flash", col=KIND_COLOR[kindKey(m)];
-  if(m.guildId) return <span style={{display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap",verticalAlign:"middle"}}><KindBadge m={{...m,guildId:""}}/><GuildMeetTag gid={m.guildId}/></span>;
+  if(m.guildId) return <span style={{display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap",verticalAlign:"middle"}}><KindBadge m={{...m,guildId:""}}/><GuildMeetTag m={m}/></span>;
   return <span style={{fontSize:12,fontWeight:700,padding:"3px 9px",borderRadius:7,background:col.bg,color:col.c,whiteSpace:"nowrap"}}>{flash?<><Ic n="zap" s={11}/> 번개{m.flashType?` · ${FLASH_TYPE[m.flashType]}`:""}</>:m.seriesId?<><Ic n="repeat" s={11}/> 정기</>:"정기"}</span>;
 }
 function Pills({value,options,onChange,label}){
@@ -4270,8 +4281,8 @@ function PlaceInput({value,onChange,onPick,picked}) {
 function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
   const editing=!!initial;
   const [f,setF]=useState(()=>initial
-    ?{...initial.info,guildId:initial.info.guildId||"",kind:kindOf(initial.info),flashType:initial.info.flashType||"game",courtFee:initial.info.courtFee?String(initial.info.courtFee):"",capacity:String(initial.info.capacity),guestCap:String(initial.info.guestCap||0),openAt:initial.info.openAt||"",repeat:"none",applyFuture:false,scope:"one"}
-    :(()=>{const date=nextSaturday();return {guildId:defaultGuild||"",kind:defaultKind==="flash"||defaultGuild?"flash":"regular",flashType:"game",courtFee:"",date,start:"08:00",end:"12:00",place:"",capacity:defaultKind==="flash"?"4":"12",guestCap:"0",openAt:weekBefore(date),desc:"",
+    ?{...initial.info,guildIds:meetGuildIds(initial.info),guildMode:meetGuildIds(initial.info).length>0,guildOpen:!!initial.info.guildOpen,kind:kindOf(initial.info),flashType:initial.info.flashType||"game",courtFee:initial.info.courtFee?String(initial.info.courtFee):"",capacity:String(initial.info.capacity),guestCap:String(initial.info.guestCap||0),openAt:initial.info.openAt||"",repeat:"none",applyFuture:false,scope:"one"}
+    :(()=>{const date=nextSaturday();return {guildIds:defaultGuild?[defaultGuild]:[],guildMode:!!defaultGuild,guildOpen:false,kind:defaultKind==="flash"||defaultGuild?"flash":"regular",flashType:"game",courtFee:"",date,start:"08:00",end:"12:00",place:"",capacity:defaultKind==="flash"?"4":"12",guestCap:"0",openAt:weekBefore(date),desc:"",
       repeat:"none",openDow:"0",openTime:"21:00",endDate:""};})());
   const [errors,setErrors]=useState({});
   const [saving,setSaving]=useState(false);
@@ -4294,9 +4305,11 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     const gcap=f.guestCap===""?0:parseInt(f.guestCap,10); if(!(gcap>=0&&gcap<=50)) e.guestCap="게스트는 0~50명이에요";
     if(repeating){ if(!f.openTime) e.openAt="예약 오픈 시각을 넣어 주세요"; if(f.endDate&&f.date&&f.endDate<f.date) e.endDate="종료일은 첫 모임 날짜 뒤여야 해요"; }
     else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
+    const gids=f.kind==="flash"&&f.guildMode?(f.guildIds||[]).filter(Boolean):[];
+    if(f.kind==="flash"&&f.guildMode&&!gids.length) e.guild="길드를 하나 이상 선택해 주세요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:f.kind==="flash"&&f.guildId?f.guildId:null};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -4323,9 +4336,9 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
           ...later.map(k=>saveMeetingPath(k+"/info",{...RAW_MEETINGS[k].info,...tmpl,updatedAt:Date.now()}))]);
       }).then(()=>{
         const text=`새 ${KIND_LABEL[f.kind]}${f.kind==="flash"?`(${FLASH_TYPE[f.flashType||"game"]})`:""}: ${fmtDate(info.date)} ${info.start} · ${info.place}`;
-        const gd=info.guildId&&guildById(info.guildId);
-        // 길드 모임은 길드원에게만 알려요 (전체 알림에 안 올라가요)
-        if(!editing&&gd) Object.keys(gd.members||{}).forEach(u=>u!==uid&&postFeed({type:"meeting",meetingId:id,to:u,text:`[${gd.name} 길드] ${text}`}));
+        const gds=meetGuilds(info);
+        // 길드 모임은 선택된 길드원에게만 알려요 (전체 알림에 안 올라가요). 여러 길드에 속한 사람은 한 번만
+        if(!editing&&gds.length){ const to=new Set(); gds.forEach(g=>Object.keys(g.members||{}).forEach(u=>u!==uid&&to.add(u))); const nm=gds.map(g=>g.name).join("·"); to.forEach(u=>postFeed({type:"meeting",meetingId:id,to:u,text:`[${nm} 길드] ${text}`})); }
         else if(!editing) postFeed({type:"meeting",meetingId:id,text});
         return id;
       });
@@ -4350,23 +4363,36 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
             <Pills label="번개 종류" value={f.flashType||"game"} onChange={v=>set("flashType",v)} options={[["game","게임 모임"],["training","훈련 모임"]]}/>
             {hint(f.flashType==="training"?"훈련 모임은 대진표 없이 진행해요.":"게임 모임은 대진표·스코어를 쓸 수 있어요.")}
           </FieldWrap>}
-          {f.kind==="flash"&&(()=>{ const me=myUid(), gs=ME_ADMIN?guildList():guildsOf(me);
-            const cur=f.guildId&&guildById(f.guildId), opts=cur&&!gs.some(g=>g.id===cur.id)?[cur,...gs]:gs;
-            if(!opts.length&&!f.guildId) return null;
+          {f.kind==="flash"&&(()=>{ const me=myUid(), gs=ME_ADMIN?guildList():guildsOf(me), sel=f.guildIds||[];
+            // 수정할 때: 이미 선택된 길드가 내 길드 목록에 없어도 보여 줘요
+            const extra=sel.map(guildById).filter(g=>g&&!gs.some(x=>x.id===g.id)), opts=[...extra,...gs];
+            if(!opts.length&&!f.guildMode) return null;
+            const toggle=id=>setF(p=>{ const a=p.guildIds||[]; return {...p,guildIds:a.includes(id)?a.filter(x=>x!==id):[...a,id]}; });
             const opt=(on,title,sub,onClick,extra)=>(
               <div role="radio" aria-checked={on} tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter")onClick();}} style={{display:"flex",gap:11,background:"#fff",borderRadius:14,padding:"13px 14px",border:`1.5px solid ${on?BLUE:"#E2E6F0"}`,boxShadow:on?"0 0 0 3px rgba(33,82,230,0.1)":"none",cursor:"pointer"}}>
                 <span style={{width:20,height:20,borderRadius:"50%",border:on?`6px solid ${BLUE}`:"2px solid #C8CFE2",boxSizing:"border-box",flexShrink:0,marginTop:1}}/>
                 <div style={{flex:1,minWidth:0}}><p style={{margin:0,fontSize:14.5,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:4}}>{title}</p><p style={{margin:"2px 0 0",fontSize:12,color:"#6B7493"}}>{sub}</p>{extra}</div>
               </div>);
-            return <FieldWrap label="누구에게 보일까요">
+            const seg=(on,label,v)=><button type="button" aria-pressed={on} onClick={()=>set("guildOpen",v)} style={{flex:1,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:4,padding:"8px 0",borderRadius:9,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:13,fontWeight:700,fontFamily:FONT,cursor:"pointer",boxShadow:on?"0 2px 6px rgba(33,82,230,0.25)":"none"}}>{label}</button>;
+            return <FieldWrap label="누구에게 보일까요" error={errors.guild}>
               <div role="radiogroup" aria-label="공개 범위" style={{display:"flex",flexDirection:"column",gap:8}}>
-                {opt(!f.guildId,"전체 공개","정회원 모두 보고 참석할 수 있어요",()=>set("guildId",""))}
-                {opt(!!f.guildId,<><Icon name="lock" size={14} stroke={2.4}/>길드 모임</>,"고른 길드 사람만 보고 참석할 수 있어요",()=>{ if(!f.guildId&&opts[0]) set("guildId",opts[0].id); },
-                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>{opts.map(g=>{ const on=f.guildId===g.id; return(
-                    <button key={g.id} type="button" onClick={e=>{e.stopPropagation();set("guildId",g.id);}} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 8px 5px 5px",borderRadius:10,border:`1.5px solid ${on?INK:"transparent"}`,background:on?"#fff":"#F4F6FB",cursor:"pointer",fontFamily:FONT}}>
-                      <GuildTag g={g} size={18}/><span style={{fontSize:11,fontWeight:600,color:"#6B7493"}}>{guildCount(g)}명</span></button>); })}</div>)}
+                {opt(!f.guildMode,"전체 공개","정회원 모두 보고 참석할 수 있어요",()=>set("guildMode",false))}
+                {opt(!!f.guildMode,<><Icon name="shield" size={14} stroke={2.4}/>길드 모임</>,"선택된 길드가 여는 모임이에요",()=>{ if(!f.guildMode) setF(p=>({...p,guildMode:true,guildIds:(p.guildIds||[]).length?p.guildIds:opts[0]?[opts[0].id]:[]})); },
+                  f.guildMode&&<div onClick={e=>e.stopPropagation()} style={{cursor:"default"}}>
+                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>{opts.map(g=>{ const on=sel.includes(g.id); return(
+                    <button key={g.id} type="button" role="checkbox" aria-checked={on} onClick={()=>toggle(g.id)} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 8px 5px 5px",borderRadius:10,border:`1.5px solid ${on?INK:"transparent"}`,background:on?"#fff":"#F4F6FB",cursor:"pointer",fontFamily:FONT}}>
+                      <span style={{width:16,height:16,borderRadius:5,boxSizing:"border-box",border:`1.6px solid ${on?INK:"#C8CFE2"}`,background:on?INK:"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{on&&<Icon name="check" size={11} color="#fff" stroke={3}/>}</span>
+                      <GuildTag g={g} size={18} peek={false}/><span style={{fontSize:11,fontWeight:600,color:"#6B7493"}}>{guildCount(g)}명</span></button>); })}</div>
+                  <p style={{margin:"8px 0 0",fontSize:11.5,fontWeight:700,color:sel.length?BLUE:"#E5484D"}}>{sel.length?`${sel.length}개 길드 선택됨`:"길드를 하나 이상 선택해 주세요"}</p>
+                  <div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed #E2E6F0"}}>
+                    <p style={{margin:"0 0 7px",fontSize:12.5,fontWeight:700,color:INK}}>길드 모임 공개 범위</p>
+                    <div role="group" aria-label="길드 모임 공개 범위" style={{display:"flex",background:"#F4F6FB",borderRadius:11,padding:3,gap:3}}>
+                      {seg(!!f.guildOpen,"공개",true)}{seg(!f.guildOpen,<><Icon name="lock" size={13} stroke={2.4}/>비공개</>,false)}</div>
+                    <p style={{margin:"7px 0 0",fontSize:11.5,color:"#6B7493",lineHeight:1.5}}>{f.guildOpen?"정회원 모두 볼 수 있지만, 참석은 선택된 길드원만 할 수 있어요.":"선택된 길드 사람만 보고 참석할 수 있어요."}</p>
+                  </div></div>)}
               </div>
-              {f.guildId&&hint("길드 모임은 그 길드원한테만 목록·달력·홈에 보여요. 카톡으로 공유해도 길드원이 아니면 열 수 없어요.")}
+              {f.guildMode&&hint(f.guildOpen?"공개 길드 모임은 목록·달력·홈에 모두에게 보여요. 길드원이 아닌 회원에겐 참석 버튼 대신 길드 가입 신청 버튼이 나와요."
+                :"비공개 길드 모임은 그 길드원한테만 목록·달력·홈에 보여요. 카톡으로 공유해도 길드원이 아니면 열 수 없어요.")}
             </FieldWrap>; })()}
           {!editing&&f.kind==="regular"&&<FieldWrap label="반복">
             <Pills label="반복" value={f.repeat} onChange={v=>set("repeat",v)} options={[["none","한 번만"],["1","매주"],["2","격주"]]}/>
@@ -4460,7 +4486,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
             </FieldWrap>
           </div>}
           {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
-          <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?"저장 중…":editing?"수정 완료":repeating?"반복 모임 만들기":f.kind==="flash"&&f.guildId&&guildById(f.guildId)?`${guildById(f.guildId).name} 길드 번개 만들기`:"모임 만들기"}</button>
+          <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?"저장 중…":editing?"수정 완료":repeating?"반복 모임 만들기":f.kind==="flash"&&f.guildMode&&meetGuildNames({guildIds:f.guildIds})?`${meetGuildNames({guildIds:f.guildIds})} 길드 번개 만들기`:"모임 만들기"}</button>
         </div>
       </div>
     </div>
@@ -4805,11 +4831,13 @@ function NameEmblem({uid,size=18}){
 function VipBadge({style}){ return <span style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10.5,fontWeight:800,padding:"2px 6px 2px 4px",borderRadius:6,background:BALL,color:INK,whiteSpace:"nowrap",lineHeight:"14px",...style}}><Icon name="star" size={10} stroke={2.6}/>우수회원</span>; }
 function LeaderTag(){ return <span style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:10.5,fontWeight:700,padding:"2px 6px",borderRadius:6,background:"#FFF4E5",color:"#C2610C",whiteSpace:"nowrap",lineHeight:"14px"}}><Icon name="crown" size={10} stroke={2.4}/>길드장</span>; }
 // 모임 목록·상세의 길드 모임 표식
-function GuildMeetTag({gid}){
-  const g=guildById(gid);
+// 비공개: 공 색 + 자물쇠, 공개: 연두색 (자물쇠 없음). 선택된 길드 엠블럼을 모두 보여요
+const GUILD_OPEN_BG="#EAF7C2";
+function GuildMeetTag({m}){
+  const gs=meetGuilds(m.info||m), g=gs[0], open=!!m.guildOpen;
   return <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
-    <span role={g?"button":undefined} onClick={g?e=>{e.stopPropagation();e.preventDefault();openGuildPeek(g.id);}:undefined} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:800,padding:"3px 7px 3px 6px",borderRadius:7,background:BALL,color:INK,whiteSpace:"nowrap",cursor:g?"pointer":undefined}}><Icon name="lock" size={11} stroke={2.6}/>길드 모임</span>
-    {g&&<GuildEmblem g={g} size={20}/>}</span>;
+    <span role={g?"button":undefined} onClick={g?e=>{e.stopPropagation();e.preventDefault();openGuildPeek(g.id);}:undefined} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:800,padding:open?"3px 7px":"3px 7px 3px 6px",borderRadius:7,background:open?GUILD_OPEN_BG:BALL,color:INK,whiteSpace:"nowrap",cursor:g?"pointer":undefined}}>{!open&&<Icon name="lock" size={11} stroke={2.6}/>}길드 모임</span>
+    {gs.map(x=><GuildEmblem key={x.id} g={x} size={20}/>)}</span>;
 }
 // 길드·우수회원 실시간 구독 (길드가 없거나 규칙을 아직 안 붙여넣었으면 빈 값)
 function useGuilds(enabled){
@@ -4844,7 +4872,26 @@ function GuildApplyButton({g,style}){
       <button type="button" onClick={()=>guildCancelApply(g)} style={{...btnSmall,background:"#EDF0F6",color:"#5E6A8E",fontWeight:700,padding:"13px 12px"}}>취소</button></div>
     :<button type="button" onClick={()=>guildApply(g)} style={{...btnPrimary,display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",...style}}><Icon name="userPlus" size={17} stroke={2.2}/>가입 신청하기</button>;
 }
-const guildUpcoming=gid=>ALL_MEETINGS.filter(m=>m.guildId===gid&&m.status==="upcoming"&&!m.cancelled);
+// 공개 길드 모임인데 길드원이 아닐 때: 참석 버튼 대신 잠긴 버튼 + 길드마다 가입 신청
+function GuildJoinNotice({m}){
+  const me=myUid(), gs=meetGuilds(m.info);
+  const pill={flex:1,textAlign:"center",padding:"12px 0",borderRadius:999,fontSize:14,fontWeight:800,color:"#A3AAC2",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:4};
+  const small={fontSize:12,fontWeight:800,padding:"6px 11px",borderRadius:999,border:"none",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"};
+  return <div data-attend="" style={{display:"flex",flexDirection:"column"}}>
+    <div aria-hidden="true" style={{display:"flex",gap:8}}><span style={{...pill,background:"#E9ECF4"}}><Icon name="lock" size={14} stroke={2.4}/>참석하기</span><span style={{...pill,background:"#F4F6FB",boxShadow:"inset 0 0 0 1.5px #E2E6F0"}}>불참</span></div>
+    <p style={{margin:"10px 0 0",fontSize:13,fontWeight:800,color:INK}}>이 모임은 길드원만 참석할 수 있어요</p>
+    <p style={{margin:"3px 0 10px",fontSize:12,color:"#6B7493",lineHeight:1.5,wordBreak:"keep-all"}}>참석하고 싶으면 길드 가입을 신청해 주세요. 길드장이 수락하면 바로 참석할 수 있어요.</p>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>{gs.map(g=>{ const sent=!!(g.requests&&g.requests[me]), invited=!!(g.invites&&g.invites[me]);
+      return <div key={g.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F4F6FB",borderRadius:12,padding:"8px 9px"}}>
+        <span style={{flex:1,minWidth:0}}><GuildTag g={g} size={22} font={13.5}/></span>
+        {invited?<button type="button" onClick={()=>openGuildPeek(g.id)} style={{...small,background:BALL,color:INK}}>초대 받음 · 확인</button>
+          :sent?<button type="button" onClick={()=>guildCancelApply(g)} style={{...small,background:"#fff",color:"#6B7493",boxShadow:"inset 0 0 0 1.5px #E2E6F0"}}>신청함 · 취소</button>
+          :<button type="button" onClick={()=>guildApply(g)} style={{...small,background:BLUE,color:"#fff"}}>가입 신청하기</button>}
+      </div>; })}</div>
+    {gs.length>1&&<p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2"}}>이 중 한 길드만 가입돼도 참석할 수 있어요.</p>}
+  </div>;
+}
+const guildUpcoming=gid=>ALL_MEETINGS.filter(m=>m.guildIds.includes(gid)&&m.status==="upcoming"&&!m.cancelled);
 const nickOf=uid=>(MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)||"(탈퇴 회원)";
 
 // 회원 찾기: 닉네임·본명 부분 일치 (한글 치는 중·초성도). exclude에 있는 회원은 빼요
@@ -5151,7 +5198,7 @@ function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
   const invites=Object.keys(g.invites||{}).filter(u=>!inGuild(g,u)), reqs=guildRequests(g);
   const myGuilds=guildsOf(me), isMain=member&&mainGuildOf(me)&&mainGuildOf(me).id===g.id;
   const seeMeets=member||ME_ADMIN;
-  const meets=MEETINGS.filter(m=>m.guildId===g.id);
+  const meets=MEETINGS.filter(m=>m.guildIds.includes(g.id));
   const up=meets.filter(m=>m.status==="upcoming"), past=meets.filter(m=>m.status==="past").slice(0,5);
   const tabs=[["members",manage&&reqs.length?<>길드원<span aria-label={`가입 신청 ${reqs.length}명`} style={{marginLeft:4,display:"inline-flex",minWidth:17,height:17,padding:"0 4px",boxSizing:"border-box",borderRadius:9,background:"#ef4444",color:"#fff",fontSize:10.5,fontWeight:800,alignItems:"center",justifyContent:"center",verticalAlign:"1px"}}>{reqs.length}</span></>:"길드원"],...(seeMeets?[["board","게시판"],["meetings","길드 모임"]]:[]),...(manage?[["manage","관리"]]:[])];
   const kick=u=>{ if(window.confirm(`${nickOf(u)} 님을 '${g.name}' 길드에서 내보낼까요? 지난 길드 모임 기록은 그대로 남아요.`)) guildRef(g.id,"members/"+u).remove().catch(guildFail); };
@@ -5278,7 +5325,7 @@ function AdminGuilds(){
           return(
           <div key={g.id} style={{padding:"12px 0",borderBottom:i<list.length-1?"1px solid #EEF1F7":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{flex:1,minWidth:0}}><GuildTag g={g} size={28}/></span><span style={{fontSize:13,fontWeight:700,color:"#6B7493",marginRight:4}}>{mems.length}명</span>{small("길드장 바꾸기",()=>setPick(pick===g.id?null:g.id))}{small("없애기",()=>remove(g),true)}</div>
-            <p style={{margin:"7px 0 0",fontSize:12,color:"#6B7493"}}>길드장 {nickOf(g.leader)} · 길드 모임 {ALL_MEETINGS.filter(m=>m.guildId===g.id).length}회</p>
+            <p style={{margin:"7px 0 0",fontSize:12,color:"#6B7493"}}>길드장 {nickOf(g.leader)} · 길드 모임 {ALL_MEETINGS.filter(m=>m.guildIds.includes(g.id)).length}회</p>
             {warn&&<p style={{margin:"7px 0 0",fontSize:12,color:"#C2610C",background:"#FFF4E5",borderRadius:8,padding:"6px 9px",fontWeight:600}}>{warn}</p>}
             {pick===g.id&&<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
               {mems.filter(u=>u!==g.leader).length===0?<p style={{margin:0,fontSize:12,color:"#A3AAC2"}}>넘겨받을 길드원이 없어요.</p>:mems.filter(u=>u!==g.leader).map(u=><button key={u} type="button" onClick={()=>handTo(g,u)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:12,border:"none",background:"#F4F6FB",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
@@ -5292,14 +5339,14 @@ function AdminGuilds(){
 
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 function GuildLockSheet({meeting,onClose}){
-  const g=guildById(meeting&&meeting.guildId);
+  const gs=meetGuilds(meeting&&meeting.info), g=gs[0], names=gs.map(x=>x.name).join("·");
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(11,30,91,0.55)",zIndex:70,display:"flex",alignItems:"center",justifyContent:"center",padding:24,boxSizing:"border-box"}}>
       <div role="dialog" aria-label="길드 모임" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,background:"#fff",borderRadius:26,padding:"24px 20px 18px",textAlign:"center",fontFamily:FONT,boxShadow:"0 24px 60px rgba(11,30,91,0.35)"}}>
         <span style={{width:60,height:60,borderRadius:18,background:BALL,display:"inline-flex",alignItems:"center",justifyContent:"center"}}><Icon name="lock" size={28} color={INK} stroke={2.2}/></span>
         <p style={{margin:"14px 0 0",fontSize:19,fontWeight:900,color:INK}}>길드 모임이라 볼 수 없어요</p>
-        {g&&<div style={{marginTop:12}}><GuildTag g={g} size={30} font={16}/></div>}
-        <p style={{margin:"12px 0 0",fontSize:13.5,color:"#5E6A8E",lineHeight:1.65,wordBreak:"keep-all"}}>이 모임은 <b style={{color:INK}}>{g?g.name:"어느"}</b> 길드원만 볼 수 있어요.{g&&<><br/>참석하고 싶으면 길드장 <b style={{color:INK}}>{nickOf(g.leader)}</b> 님에게 문의해 주세요.</>}</p>
+        {gs.length>0&&<div style={{marginTop:12,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>{gs.map(x=><GuildTag key={x.id} g={x} size={30} font={16}/>)}</div>}
+        <p style={{margin:"12px 0 0",fontSize:13.5,color:"#5E6A8E",lineHeight:1.65,wordBreak:"keep-all"}}>이 모임은 <b style={{color:INK}}>{g?names:"어느"}</b> 길드원만 볼 수 있어요.{g&&<><br/>참석하고 싶으면 {gs.length>1?"길드장에게":<>길드장 <b style={{color:INK}}>{nickOf(g.leader)}</b> 님에게</>} 문의해 주세요.</>}</p>
         <button type="button" onClick={onClose} style={{...btnPrimary,marginTop:18}}>확인</button>
       </div>
     </div>);
@@ -5852,7 +5899,7 @@ export default function App() {
             <div style={{position:"relative",marginTop:16}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 <span style={headChip}>{curMeeting.kind==="flash"?<><Ic n="zap" s={12}/> 번개{curMeeting.flashType?` · ${FLASH_TYPE[curMeeting.flashType]}`:""}</>:"정기 모임"}</span>
-                {curMeeting.guildId&&<span style={{...headChip,background:BALL,color:INK,gap:5}}><Icon name="lock" size={12} stroke={2.6}/>{guildById(curMeeting.guildId)?`${guildById(curMeeting.guildId).name} 길드 모임`:"길드 모임"}</span>}
+                {curMeeting.guildId&&<span style={{...headChip,background:curMeeting.guildOpen?GUILD_OPEN_BG:BALL,color:INK,gap:5}}>{!curMeeting.guildOpen&&<Icon name="lock" size={12} stroke={2.6}/>}{meetGuildNames(curMeeting.info)?`${meetGuildNames(curMeeting.info)} 길드 모임`:"길드 모임"}</span>}
                 {curMeeting.status==="upcoming"&&!curMeeting.cancelled&&<span style={{...headChip,background:BALL,color:INK}}>{dDay(curMeeting.iso)}</span>}
                 {curMeeting.cancelled&&<span style={{...headChip,background:"#fff",color:GONE.c}}>{goneLabel(curMeeting)}</span>}
               </div>

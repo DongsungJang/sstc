@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=def5b50423">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=def5b50423">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=7d9cc5cb81">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=7d9cc5cb81">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -332,14 +332,27 @@ const guildById = id => id && GUILDS[id] && GUILDS[id].name ? {
   id,
   ...GUILDS[id]
 } : null;
-// 길드 모임은 그 길드원만 봐요 (관리자, 만든 사람, 이미 투표한 사람도 봐요)
+// 길드 모임: info.guildIds(여러 길드) — 예전 모임은 info.guildId 하나만 있어요
+const meetGuildIds = info => {
+  if (!info) return [];
+  const a = info.guildIds ? Object.values(info.guildIds).filter(Boolean) : [];
+  return a.length ? a : info.guildId ? [info.guildId] : [];
+};
+const meetGuilds = info => meetGuildIds(info).map(guildById).filter(Boolean);
+const meetGuildNames = info => meetGuilds(info).map(g => g.name).join("·");
+const inMeetGuild = (info, uid) => meetGuildIds(info).some(gid => inGuild(GUILDS[gid], uid));
+// 비공개 길드 모임은 선택된 길드원만 봐요 (관리자, 만든 사람, 이미 투표한 사람도 봐요). 공개 길드 모임(guildOpen)은 모두 봐요
 function canSeeMeeting(info, rec) {
-  const gid = info && info.guildId;
-  if (!gid || !FB) return true;
+  if (!meetGuildIds(info).length || !FB || info.guildOpen) return true;
+  return canJoinMeeting(info, rec);
+}
+// 길드 모임 참석은 선택된 길드원만 (관리자, 만든 사람, 이미 투표한 사람은 그대로 돼요)
+function canJoinMeeting(info, rec) {
+  if (!meetGuildIds(info).length || !FB) return true;
   const me = myUid();
   if (!me) return false;
   if (ME_ADMIN || info.createdByUid === me || rec && rec.votes && rec.votes[me]) return true;
-  return inGuild(GUILDS[gid], me);
+  return inMeetGuild(info, me);
 }
 let ALL_MEETINGS = []; // 볼 수 없는 길드 모임까지 모두 (랭킹·참석 횟수 셈용)
 let MEETINGS = [];
@@ -500,7 +513,9 @@ function toMeeting(id, rec, series) {
     openAt: info.openAt || "",
     openDate: fmtOpen(info.openAt),
     status: isEnded(info) ? "past" : "upcoming",
-    guildId: info.guildId || "",
+    guildId: meetGuildIds(info)[0] || "",
+    guildIds: meetGuildIds(info),
+    guildOpen: !!(info.guildOpen && meetGuildIds(info).length),
     createdBy: info.createdBy || "",
     createdByUid: info.createdByUid || "",
     cancelled: info.cancel && info.cancel.at ? info.cancel : null,
@@ -5124,7 +5139,9 @@ function HomeTab({
       background: isFull(next) ? FULL.bar : BLUE,
       borderRadius: 10
     }
-  }))), isOpen(next) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AttendButtons, {
+  }))), isOpen(next) && !canJoinMeeting(next.info, next.rec) ? /*#__PURE__*/React.createElement(GuildJoinNotice, {
+    m: next
+  }) : isOpen(next) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AttendButtons, {
     status: myStatus,
     onVote: vote
   }), myGoing ? /*#__PURE__*/React.createElement("p", {
@@ -10135,8 +10152,8 @@ function meetingShareText(m) {
   const when = d === 0 ? "오늘" : d === 1 ? "내일" : d === 2 ? "모레" : d > 0 ? `D-${d}` : "지난";
   const nm = v => v.isGuest ? `${v.name}(게스트)` : v.name;
   const url = location.origin + location.pathname + "#meeting-" + m.id;
-  const gd = m.guildId && guildById(m.guildId);
-  const L = [gd ? `🔒 [${gd.name} 길드 모임] ${gd.name} 길드원만 열 수 있어요` : null, `[SSTC] ${m.cancelled ? "모임 무산 안내" : `${when} ${m.kind === "flash" ? "번개" : "정기"} 모임 안내`}`, `${m.date} ${m.time}`, m.place, m.address ? `주소: ${m.address}` : null];
+  const gn = meetGuildNames(m.info);
+  const L = [gn ? m.guildOpen ? `[${gn} 길드 모임] 참석은 ${gn} 길드원만 할 수 있어요` : `🔒 [${gn} 길드 모임] ${gn} 길드원만 열 수 있어요` : null, `[SSTC] ${m.cancelled ? "모임 무산 안내" : `${when} ${m.kind === "flash" ? "번개" : "정기"} 모임 안내`}`, `${m.date} ${m.time}`, m.place, m.address ? `주소: ${m.address}` : null];
   if (m.cancelled) {
     L.push(`사유: ${m.cancelled.reason || "기타"}${m.cancelled.memo ? ` · ${m.cancelled.memo}` : ""}`);
   } else {
@@ -10726,7 +10743,9 @@ function MeetingDetail({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "calendar",
     s: 13
-  }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !gone && !isPast && open && /*#__PURE__*/React.createElement("div", {
+  }), " \uC608\uC57D\uC740 ", meeting.openDate, "\uC5D0 \uC5F4\uB824\uC694"), !gone && !isPast && open && !canJoinMeeting(meeting.info, meeting.rec) && /*#__PURE__*/React.createElement(GuildJoinNotice, {
+    m: meeting
+  }), !gone && !isPast && open && canJoinMeeting(meeting.info, meeting.rec) && /*#__PURE__*/React.createElement("div", {
     "data-attend": "",
     style: {
       display: "flex",
@@ -13787,7 +13806,7 @@ function KindBadge({
       guildId: ""
     }
   }), /*#__PURE__*/React.createElement(GuildMeetTag, {
-    gid: m.guildId
+    m: m
   }));
   return /*#__PURE__*/React.createElement("span", {
     style: {
@@ -14317,7 +14336,9 @@ function MeetingForm({
   const editing = !!initial;
   const [f, setF] = useState(() => initial ? {
     ...initial.info,
-    guildId: initial.info.guildId || "",
+    guildIds: meetGuildIds(initial.info),
+    guildMode: meetGuildIds(initial.info).length > 0,
+    guildOpen: !!initial.info.guildOpen,
     kind: kindOf(initial.info),
     flashType: initial.info.flashType || "game",
     courtFee: initial.info.courtFee ? String(initial.info.courtFee) : "",
@@ -14330,7 +14351,9 @@ function MeetingForm({
   } : (() => {
     const date = nextSaturday();
     return {
-      guildId: defaultGuild || "",
+      guildIds: defaultGuild ? [defaultGuild] : [],
+      guildMode: !!defaultGuild,
+      guildOpen: false,
       kind: defaultKind === "flash" || defaultGuild ? "flash" : "regular",
       flashType: "game",
       courtFee: "",
@@ -14387,6 +14410,8 @@ function MeetingForm({
       if (!f.openTime) e.openAt = "예약 오픈 시각을 넣어 주세요";
       if (f.endDate && f.date && f.endDate < f.date) e.endDate = "종료일은 첫 모임 날짜 뒤여야 해요";
     } else if (f.kind !== "flash" && f.openAt && f.date && f.openAt.slice(0, 10) > f.date) e.openAt = "예약 오픈은 모임 날짜보다 빨라야 해요";
+    const gids = f.kind === "flash" && f.guildMode ? (f.guildIds || []).filter(Boolean) : [];
+    if (f.kind === "flash" && f.guildMode && !gids.length) e.guild = "길드를 하나 이상 선택해 주세요";
     setErrors(e);
     if (Object.keys(e).length) return;
     const uid = FB && FB.auth.currentUser && FB.auth.currentUser.uid || "";
@@ -14410,7 +14435,9 @@ function MeetingForm({
       capacity: cap,
       guestCap: gcap,
       desc: (f.desc || "").trim(),
-      guildId: f.kind === "flash" && f.guildId ? f.guildId : null
+      guildId: gids[0] || null,
+      guildIds: gids.length ? gids : null,
+      guildOpen: gids.length ? !!f.guildOpen : null
     };
     setSaving(true);
     setErr("");
@@ -14480,14 +14507,19 @@ function MeetingForm({
         }))]);
       }).then(() => {
         const text = `새 ${KIND_LABEL[f.kind]}${f.kind === "flash" ? `(${FLASH_TYPE[f.flashType || "game"]})` : ""}: ${fmtDate(info.date)} ${info.start} · ${info.place}`;
-        const gd = info.guildId && guildById(info.guildId);
-        // 길드 모임은 길드원에게만 알려요 (전체 알림에 안 올라가요)
-        if (!editing && gd) Object.keys(gd.members || {}).forEach(u => u !== uid && postFeed({
-          type: "meeting",
-          meetingId: id,
-          to: u,
-          text: `[${gd.name} 길드] ${text}`
-        }));else if (!editing) postFeed({
+        const gds = meetGuilds(info);
+        // 길드 모임은 선택된 길드원에게만 알려요 (전체 알림에 안 올라가요). 여러 길드에 속한 사람은 한 번만
+        if (!editing && gds.length) {
+          const to = new Set();
+          gds.forEach(g => Object.keys(g.members || {}).forEach(u => u !== uid && to.add(u)));
+          const nm = gds.map(g => g.name).join("·");
+          to.forEach(u => postFeed({
+            type: "meeting",
+            meetingId: id,
+            to: u,
+            text: `[${nm} 길드] ${text}`
+          }));
+        } else if (!editing) postFeed({
           type: "meeting",
           meetingId: id,
           text
@@ -14597,10 +14629,19 @@ function MeetingForm({
     options: [["game", "게임 모임"], ["training", "훈련 모임"]]
   }), hint(f.flashType === "training" ? "훈련 모임은 대진표 없이 진행해요." : "게임 모임은 대진표·스코어를 쓸 수 있어요.")), f.kind === "flash" && (() => {
     const me = myUid(),
-      gs = ME_ADMIN ? guildList() : guildsOf(me);
-    const cur = f.guildId && guildById(f.guildId),
-      opts = cur && !gs.some(g => g.id === cur.id) ? [cur, ...gs] : gs;
-    if (!opts.length && !f.guildId) return null;
+      gs = ME_ADMIN ? guildList() : guildsOf(me),
+      sel = f.guildIds || [];
+    // 수정할 때: 이미 선택된 길드가 내 길드 목록에 없어도 보여 줘요
+    const extra = sel.map(guildById).filter(g => g && !gs.some(x => x.id === g.id)),
+      opts = [...extra, ...gs];
+    if (!opts.length && !f.guildMode) return null;
+    const toggle = id => setF(p => {
+      const a = p.guildIds || [];
+      return {
+        ...p,
+        guildIds: a.includes(id) ? a.filter(x => x !== id) : [...a, id]
+      };
+    });
     const opt = (on, title, sub, onClick, extra) => /*#__PURE__*/React.createElement("div", {
       role: "radio",
       "aria-checked": on,
@@ -14651,8 +14692,31 @@ function MeetingForm({
         color: "#6B7493"
       }
     }, sub), extra));
+    const seg = (on, label, v) => /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-pressed": on,
+      onClick: () => set("guildOpen", v),
+      style: {
+        flex: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        padding: "8px 0",
+        borderRadius: 9,
+        border: "none",
+        background: on ? BLUE : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        fontSize: 13,
+        fontWeight: 700,
+        fontFamily: FONT,
+        cursor: "pointer",
+        boxShadow: on ? "0 2px 6px rgba(33,82,230,0.25)" : "none"
+      }
+    }, label);
     return /*#__PURE__*/React.createElement(FieldWrap, {
-      label: "\uB204\uAD6C\uC5D0\uAC8C \uBCF4\uC77C\uAE4C\uC694"
+      label: "\uB204\uAD6C\uC5D0\uAC8C \uBCF4\uC77C\uAE4C\uC694",
+      error: errors.guild
     }, /*#__PURE__*/React.createElement("div", {
       role: "radiogroup",
       "aria-label": "\uACF5\uAC1C \uBC94\uC704",
@@ -14661,12 +14725,21 @@ function MeetingForm({
         flexDirection: "column",
         gap: 8
       }
-    }, opt(!f.guildId, "전체 공개", "정회원 모두 보고 참석할 수 있어요", () => set("guildId", "")), opt(!!f.guildId, /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
-      name: "lock",
+    }, opt(!f.guildMode, "전체 공개", "정회원 모두 보고 참석할 수 있어요", () => set("guildMode", false)), opt(!!f.guildMode, /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+      name: "shield",
       size: 14,
       stroke: 2.4
-    }), "\uAE38\uB4DC \uBAA8\uC784"), "고른 길드 사람만 보고 참석할 수 있어요", () => {
-      if (!f.guildId && opts[0]) set("guildId", opts[0].id);
+    }), "\uAE38\uB4DC \uBAA8\uC784"), "선택된 길드가 여는 모임이에요", () => {
+      if (!f.guildMode) setF(p => ({
+        ...p,
+        guildMode: true,
+        guildIds: (p.guildIds || []).length ? p.guildIds : opts[0] ? [opts[0].id] : []
+      }));
+    }, f.guildMode && /*#__PURE__*/React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: {
+        cursor: "default"
+      }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -14675,14 +14748,13 @@ function MeetingForm({
         flexWrap: "wrap"
       }
     }, opts.map(g => {
-      const on = f.guildId === g.id;
+      const on = sel.includes(g.id);
       return /*#__PURE__*/React.createElement("button", {
         key: g.id,
         type: "button",
-        onClick: e => {
-          e.stopPropagation();
-          set("guildId", g.id);
-        },
+        role: "checkbox",
+        "aria-checked": on,
+        onClick: () => toggle(g.id),
         style: {
           display: "inline-flex",
           alignItems: "center",
@@ -14694,9 +14766,28 @@ function MeetingForm({
           cursor: "pointer",
           fontFamily: FONT
         }
-      }, /*#__PURE__*/React.createElement(GuildTag, {
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          width: 16,
+          height: 16,
+          borderRadius: 5,
+          boxSizing: "border-box",
+          border: `1.6px solid ${on ? INK : "#C8CFE2"}`,
+          background: on ? INK : "#fff",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        }
+      }, on && /*#__PURE__*/React.createElement(Icon, {
+        name: "check",
+        size: 11,
+        color: "#fff",
+        stroke: 3
+      })), /*#__PURE__*/React.createElement(GuildTag, {
         g: g,
-        size: 18
+        size: 18,
+        peek: false
       }), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
@@ -14704,7 +14795,48 @@ function MeetingForm({
           color: "#6B7493"
         }
       }, guildCount(g), "\uBA85"));
-    })))), f.guildId && hint("길드 모임은 그 길드원한테만 목록·달력·홈에 보여요. 카톡으로 공유해도 길드원이 아니면 열 수 없어요."));
+    })), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "8px 0 0",
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: sel.length ? BLUE : "#E5484D"
+      }
+    }, sel.length ? `${sel.length}개 길드 선택됨` : "길드를 하나 이상 선택해 주세요"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTop: "1px dashed #E2E6F0"
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "0 0 7px",
+        fontSize: 12.5,
+        fontWeight: 700,
+        color: INK
+      }
+    }, "\uAE38\uB4DC \uBAA8\uC784 \uACF5\uAC1C \uBC94\uC704"), /*#__PURE__*/React.createElement("div", {
+      role: "group",
+      "aria-label": "\uAE38\uB4DC \uBAA8\uC784 \uACF5\uAC1C \uBC94\uC704",
+      style: {
+        display: "flex",
+        background: "#F4F6FB",
+        borderRadius: 11,
+        padding: 3,
+        gap: 3
+      }
+    }, seg(!!f.guildOpen, "공개", true), seg(!f.guildOpen, /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+      name: "lock",
+      size: 13,
+      stroke: 2.4
+    }), "\uBE44\uACF5\uAC1C"), false)), /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "7px 0 0",
+        fontSize: 11.5,
+        color: "#6B7493",
+        lineHeight: 1.5
+      }
+    }, f.guildOpen ? "정회원 모두 볼 수 있지만, 참석은 선택된 길드원만 할 수 있어요." : "선택된 길드 사람만 보고 참석할 수 있어요."))))), f.guildMode && hint(f.guildOpen ? "공개 길드 모임은 목록·달력·홈에 모두에게 보여요. 길드원이 아닌 회원에겐 참석 버튼 대신 길드 가입 신청 버튼이 나와요." : "비공개 길드 모임은 그 길드원한테만 목록·달력·홈에 보여요. 카톡으로 공유해도 길드원이 아니면 열 수 없어요."));
   })(), !editing && f.kind === "regular" && /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBC18\uBCF5"
   }, /*#__PURE__*/React.createElement(Pills, {
@@ -15023,7 +15155,11 @@ function MeetingForm({
       ...btnPrimary,
       opacity: saving ? 0.6 : 1
     }
-  }, saving ? "저장 중…" : editing ? "수정 완료" : repeating ? "반복 모임 만들기" : f.kind === "flash" && f.guildId && guildById(f.guildId) ? `${guildById(f.guildId).name} 길드 번개 만들기` : "모임 만들기"))));
+  }, saving ? "저장 중…" : editing ? "수정 완료" : repeating ? "반복 모임 만들기" : f.kind === "flash" && f.guildMode && meetGuildNames({
+    guildIds: f.guildIds
+  }) ? `${meetGuildNames({
+    guildIds: f.guildIds
+  })} 길드 번개 만들기` : "모임 만들기"))));
 }
 
 // 회원 탭: 정회원끼리 간단한 프로필(닉네임, NTRP, 구력, 동네, 손, 자주 가는 코트, 운동 횟수, 이달 참석)을 봐요.
@@ -16329,10 +16465,14 @@ function LeaderTag() {
   }), "\uAE38\uB4DC\uC7A5");
 }
 // 모임 목록·상세의 길드 모임 표식
+// 비공개: 공 색 + 자물쇠, 공개: 연두색 (자물쇠 없음). 선택된 길드 엠블럼을 모두 보여요
+const GUILD_OPEN_BG = "#EAF7C2";
 function GuildMeetTag({
-  gid
+  m
 }) {
-  const g = guildById(gid);
+  const gs = meetGuilds(m.info || m),
+    g = gs[0],
+    open = !!m.guildOpen;
   return /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
@@ -16352,21 +16492,22 @@ function GuildMeetTag({
       gap: 3,
       fontSize: 11,
       fontWeight: 800,
-      padding: "3px 7px 3px 6px",
+      padding: open ? "3px 7px" : "3px 7px 3px 6px",
       borderRadius: 7,
-      background: BALL,
+      background: open ? GUILD_OPEN_BG : BALL,
       color: INK,
       whiteSpace: "nowrap",
       cursor: g ? "pointer" : undefined
     }
-  }, /*#__PURE__*/React.createElement(Icon, {
+  }, !open && /*#__PURE__*/React.createElement(Icon, {
     name: "lock",
     size: 11,
     stroke: 2.6
-  }), "\uAE38\uB4DC \uBAA8\uC784"), g && /*#__PURE__*/React.createElement(GuildEmblem, {
-    g: g,
+  }), "\uAE38\uB4DC \uBAA8\uC784"), gs.map(x => /*#__PURE__*/React.createElement(GuildEmblem, {
+    key: x.id,
+    g: x,
     size: 20
-  }));
+  })));
 }
 // 길드·우수회원 실시간 구독 (길드가 없거나 규칙을 아직 안 붙여넣었으면 빈 값)
 function useGuilds(enabled) {
@@ -16492,7 +16633,140 @@ function GuildApplyButton({
     stroke: 2.2
   }), "\uAC00\uC785 \uC2E0\uCCAD\uD558\uAE30");
 }
-const guildUpcoming = gid => ALL_MEETINGS.filter(m => m.guildId === gid && m.status === "upcoming" && !m.cancelled);
+// 공개 길드 모임인데 길드원이 아닐 때: 참석 버튼 대신 잠긴 버튼 + 길드마다 가입 신청
+function GuildJoinNotice({
+  m
+}) {
+  const me = myUid(),
+    gs = meetGuilds(m.info);
+  const pill = {
+    flex: 1,
+    textAlign: "center",
+    padding: "12px 0",
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 800,
+    color: "#A3AAC2",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4
+  };
+  const small = {
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 11px",
+    borderRadius: 999,
+    border: "none",
+    cursor: "pointer",
+    fontFamily: FONT,
+    whiteSpace: "nowrap"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    "data-attend": "",
+    style: {
+      display: "flex",
+      flexDirection: "column"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    "aria-hidden": "true",
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...pill,
+      background: "#E9ECF4"
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "lock",
+    size: 14,
+    stroke: 2.4
+  }), "\uCC38\uC11D\uD558\uAE30"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...pill,
+      background: "#F4F6FB",
+      boxShadow: "inset 0 0 0 1.5px #E2E6F0"
+    }
+  }, "\uBD88\uCC38")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 13,
+      fontWeight: 800,
+      color: INK
+    }
+  }, "\uC774 \uBAA8\uC784\uC740 \uAE38\uB4DC\uC6D0\uB9CC \uCC38\uC11D\uD560 \uC218 \uC788\uC5B4\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "3px 0 10px",
+      fontSize: 12,
+      color: "#6B7493",
+      lineHeight: 1.5,
+      wordBreak: "keep-all"
+    }
+  }, "\uCC38\uC11D\uD558\uACE0 \uC2F6\uC73C\uBA74 \uAE38\uB4DC \uAC00\uC785\uC744 \uC2E0\uCCAD\uD574 \uC8FC\uC138\uC694. \uAE38\uB4DC\uC7A5\uC774 \uC218\uB77D\uD558\uBA74 \uBC14\uB85C \uCC38\uC11D\uD560 \uC218 \uC788\uC5B4\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, gs.map(g => {
+    const sent = !!(g.requests && g.requests[me]),
+      invited = !!(g.invites && g.invites[me]);
+    return /*#__PURE__*/React.createElement("div", {
+      key: g.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: "#F4F6FB",
+        borderRadius: 12,
+        padding: "8px 9px"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement(GuildTag, {
+      g: g,
+      size: 22,
+      font: 13.5
+    })), invited ? /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => openGuildPeek(g.id),
+      style: {
+        ...small,
+        background: BALL,
+        color: INK
+      }
+    }, "\uCD08\uB300 \uBC1B\uC74C \xB7 \uD655\uC778") : sent ? /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => guildCancelApply(g),
+      style: {
+        ...small,
+        background: "#fff",
+        color: "#6B7493",
+        boxShadow: "inset 0 0 0 1.5px #E2E6F0"
+      }
+    }, "\uC2E0\uCCAD\uD568 \xB7 \uCDE8\uC18C") : /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => guildApply(g),
+      style: {
+        ...small,
+        background: BLUE,
+        color: "#fff"
+      }
+    }, "\uAC00\uC785 \uC2E0\uCCAD\uD558\uAE30"));
+  })), gs.length > 1 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2"
+    }
+  }, "\uC774 \uC911 \uD55C \uAE38\uB4DC\uB9CC \uAC00\uC785\uB3FC\uB3C4 \uCC38\uC11D\uD560 \uC218 \uC788\uC5B4\uC694."));
+}
+const guildUpcoming = gid => ALL_MEETINGS.filter(m => m.guildIds.includes(gid) && m.status === "upcoming" && !m.cancelled);
 const nickOf = uid => MEMBER_BY_UID[uid] && MEMBER_BY_UID[uid].nickname || "(탈퇴 회원)";
 
 // 회원 찾기: 닉네임·본명 부분 일치 (한글 치는 중·초성도). exclude에 있는 회원은 빼요
@@ -17997,7 +18271,7 @@ function GuildDetail({
   const myGuilds = guildsOf(me),
     isMain = member && mainGuildOf(me) && mainGuildOf(me).id === g.id;
   const seeMeets = member || ME_ADMIN;
-  const meets = MEETINGS.filter(m => m.guildId === g.id);
+  const meets = MEETINGS.filter(m => m.guildIds.includes(g.id));
   const up = meets.filter(m => m.status === "upcoming"),
     past = meets.filter(m => m.status === "past").slice(0, 5);
   const tabs = [["members", manage && reqs.length ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uAE38\uB4DC\uC6D0", /*#__PURE__*/React.createElement("span", {
@@ -18679,7 +18953,7 @@ function AdminGuilds() {
         fontSize: 12,
         color: "#6B7493"
       }
-    }, "\uAE38\uB4DC\uC7A5 ", nickOf(g.leader), " \xB7 \uAE38\uB4DC \uBAA8\uC784 ", ALL_MEETINGS.filter(m => m.guildId === g.id).length, "\uD68C"), warn && /*#__PURE__*/React.createElement("p", {
+    }, "\uAE38\uB4DC\uC7A5 ", nickOf(g.leader), " \xB7 \uAE38\uB4DC \uBAA8\uC784 ", ALL_MEETINGS.filter(m => m.guildIds.includes(g.id)).length, "\uD68C"), warn && /*#__PURE__*/React.createElement("p", {
       style: {
         margin: "7px 0 0",
         fontSize: 12,
@@ -18753,7 +19027,9 @@ function GuildLockSheet({
   meeting,
   onClose
 }) {
-  const g = guildById(meeting && meeting.guildId);
+  const gs = meetGuilds(meeting && meeting.info),
+    g = gs[0],
+    names = gs.map(x => x.name).join("·");
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     style: {
@@ -18803,15 +19079,20 @@ function GuildLockSheet({
       fontWeight: 900,
       color: INK
     }
-  }, "\uAE38\uB4DC \uBAA8\uC784\uC774\uB77C \uBCFC \uC218 \uC5C6\uC5B4\uC694"), g && /*#__PURE__*/React.createElement("div", {
+  }, "\uAE38\uB4DC \uBAA8\uC784\uC774\uB77C \uBCFC \uC218 \uC5C6\uC5B4\uC694"), gs.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 12
+      marginTop: 12,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 8
     }
-  }, /*#__PURE__*/React.createElement(GuildTag, {
-    g: g,
+  }, gs.map(x => /*#__PURE__*/React.createElement(GuildTag, {
+    key: x.id,
+    g: x,
     size: 30,
     font: 16
-  })), /*#__PURE__*/React.createElement("p", {
+  }))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "12px 0 0",
       fontSize: 13.5,
@@ -18823,11 +19104,11 @@ function GuildLockSheet({
     style: {
       color: INK
     }
-  }, g ? g.name : "어느"), " \uAE38\uB4DC\uC6D0\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.", g && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), "\uCC38\uC11D\uD558\uACE0 \uC2F6\uC73C\uBA74 \uAE38\uB4DC\uC7A5 ", /*#__PURE__*/React.createElement("b", {
+  }, g ? names : "어느"), " \uAE38\uB4DC\uC6D0\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.", g && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), "\uCC38\uC11D\uD558\uACE0 \uC2F6\uC73C\uBA74 ", gs.length > 1 ? "길드장에게" : /*#__PURE__*/React.createElement(React.Fragment, null, "\uAE38\uB4DC\uC7A5 ", /*#__PURE__*/React.createElement("b", {
     style: {
       color: INK
     }
-  }, nickOf(g.leader)), " \uB2D8\uC5D0\uAC8C \uBB38\uC758\uD574 \uC8FC\uC138\uC694.")), /*#__PURE__*/React.createElement("button", {
+  }, nickOf(g.leader)), " \uB2D8\uC5D0\uAC8C"), " \uBB38\uC758\uD574 \uC8FC\uC138\uC694.")), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onClose,
     style: {
@@ -18840,7 +19121,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "def5b50423";
+const BUILD_ID = "7d9cc5cb81";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -20930,15 +21211,15 @@ function App() {
   }), " \uBC88\uAC1C", curMeeting.flashType ? ` · ${FLASH_TYPE[curMeeting.flashType]}` : "") : "정기 모임"), curMeeting.guildId && /*#__PURE__*/React.createElement("span", {
     style: {
       ...headChip,
-      background: BALL,
+      background: curMeeting.guildOpen ? GUILD_OPEN_BG : BALL,
       color: INK,
       gap: 5
     }
-  }, /*#__PURE__*/React.createElement(Icon, {
+  }, !curMeeting.guildOpen && /*#__PURE__*/React.createElement(Icon, {
     name: "lock",
     size: 12,
     stroke: 2.6
-  }), guildById(curMeeting.guildId) ? `${guildById(curMeeting.guildId).name} 길드 모임` : "길드 모임"), curMeeting.status === "upcoming" && !curMeeting.cancelled && /*#__PURE__*/React.createElement("span", {
+  }), meetGuildNames(curMeeting.info) ? `${meetGuildNames(curMeeting.info)} 길드 모임` : "길드 모임"), curMeeting.status === "upcoming" && !curMeeting.cancelled && /*#__PURE__*/React.createElement("span", {
     style: {
       ...headChip,
       background: BALL,
