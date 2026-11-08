@@ -4184,21 +4184,18 @@ function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,inout,su
     <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>비워 두면 코트비 없이 만들어져요. 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>
     {sheetEl}
   </div>;
-  return <div style={{...box,borderColor:BLUE,boxShadow:"0 4px 14px rgba(33,82,230,0.08)"}}>
+  return <div style={{...box,padding:"12px 14px",borderColor:BLUE}}>
     {rowsPick}
+    {/* 금액은 한 줄에 작게: [자동] 조건 ……… 금액 */}
     <div style={{display:"flex",alignItems:"center",gap:8}}>
-      <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:BALL,color:INK}}>자동</span>
-      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.label?r.label+" · ":""}${r.hol?"공휴일(주말 요금)":r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:idx==null?"위에서 고르면 계산돼요":"시간을 넣으면 계산돼요"}</span>
+      <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:BALL,color:INK,flexShrink:0}}>자동</span>
+      <span style={{flex:1,minWidth:0,fontSize:12,color:"#6B7493",lineHeight:1.4}}>{r?`${r.label?r.label+" · ":""}${r.hol?"공휴일(주말 요금)":r.we?"주말":"평일"} · ${r.n}면`:idx==null?"위에서 고르면 계산돼요":"시간을 넣으면 계산돼요"}</span>
+      {r&&<span style={{fontSize:17,fontWeight:800,color:INK,letterSpacing:"-0.02em",fontVariantNumeric:"tabular-nums",flexShrink:0}}>{won(r.total)}</span>}
     </div>
-    {r&&<>
-      <p style={{margin:"8px 0 0",fontSize:26,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{won(r.total)}</p>
-      <div style={{marginTop:8,paddingTop:8,borderTop:"1px dashed #E2E6F0",display:"flex",flexDirection:"column",gap:3}}>
-        {r.parts.map((p,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
-          <span><b style={{color:p.label==="야간"?"#5B3FD6":BLUE,fontWeight:700,marginRight:4}}>{p.label||"주간·야간 같음"}</b>{hrsText(p.min)} × {r.n}면 × {won(p.rate)}{r.per===2?"/2시간":""}</span>
-          <span style={{fontWeight:700,color:INK,flexShrink:0}}>{won(p.amt)}</span></div>)}
-      </div>
-    </>}
-    {r&&<p style={{margin:"9px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>관리자가 등록한 코트비 표로 계산했어요 ({feePer(c)===2?"2시간 요금 기준":"1시간 요금 기준"}{c.nightFrom?` · 야간 ${c.nightFrom}부터`:""}). 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>}
+    {r&&<p style={{margin:"6px 0 0",fontSize:11.5,color:"#8A93B0",lineHeight:1.5,fontVariantNumeric:"tabular-nums"}}>
+      {r.parts.map((p,k)=><span key={k}>{k?" + ":""}{p.label&&<b style={{color:p.label==="야간"?"#5B3FD6":BLUE,fontWeight:700,marginRight:3}}>{p.label}</b>}{hrsText(p.min)} × {r.n}면 × {won(p.rate)}{r.per===2?"/2시간":""}</span>)}
+      {" · 1인당 금액은 참석 인원으로 나눠 보여요"}
+    </p>}
     {isAdmin&&feeWho(c)&&<p style={{margin:"4px 0 0",fontSize:11,color:"#8A93B0",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color="#A3AAC2"/>{feeWho(c)}</p>}
     <div style={{display:"flex",gap:14,marginTop:8}}>
       {isAdmin&&link("코트비 수정",()=>setSheet(true))}
