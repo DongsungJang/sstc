@@ -1594,9 +1594,6 @@ function GoingSlider({going,onOpenMeeting,onGoBooking}){
         </div>)}</div>
       ))}
     </div>)}
-    {n>1&&<div aria-hidden="true" style={{display:"flex",justifyContent:"center",gap:5,marginTop:10}}>
-      {pages.map((pg,i)=><span key={i} style={{width:i===idx?16:6,height:6,borderRadius:3,background:i===idx?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}
-    </div>}
   </Card>;
 }
 // 자리 남은 모임: 지금 참석 누를 수 있고 아직 정원이 안 찬 다가오는 모임 (내가 이미 참석한 모임은 빼요)
