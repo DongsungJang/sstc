@@ -3931,7 +3931,7 @@ function StatsTab() {
     </div>
   );
 }
-// 월별 참석 횟수: 내 막대 + 참석 회원 평균은 남색 가로선과 숫자로 (막대 두 개를 나란히 두면 평균이 연해서 잘 안 보였어요)
+// 월별 참석 횟수: 나(파랑)와 참석 회원 평균(남색) 막대를 나란히, 막대마다 숫자 (예전엔 평균 막대가 연한 색이라 잘 안 보였어요)
 function MonthlyChart({rows,maxVal}){
   const cur=rows[rows.length-1], diff=Math.round((cur.me-cur.avg)*10)/10;
   const H=96;
@@ -3945,21 +3945,27 @@ function MonthlyChart({rows,maxVal}){
         </div>))}
     </div>
     {(cur.me>0||cur.avg>0)&&<p style={{margin:"-4px 0 14px",fontSize:13,fontWeight:700,color:diff>0?BLUE:diff<0?"#C2610C":"#6B7493"}}>{diff>0?`평균보다 ${diff}회 더 나왔어요`:diff<0?`평균보다 ${-diff}회 적어요`:"딱 평균만큼 나왔어요"}</p>}
-    <div style={{display:"flex",alignItems:"flex-end",gap:8,padding:"0 2px"}}>
-      {rows.map((r,i)=>{ const last=i===rows.length-1; return(
+    <div style={{display:"flex",alignItems:"flex-end",gap:6,padding:"0 4px"}}>
+      {rows.map(r=>(
         <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-          <div style={{position:"relative",width:"100%",height:H+18,display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"center",gap:3}}>
-            <span style={{position:"relative",zIndex:1,fontSize:12,lineHeight:"15px",color:BLUE,fontWeight:800,fontVariantNumeric:"tabular-nums",background:"#fff",padding:"0 4px",borderRadius:5}}>{r.me}</span>
-            <div style={{width:"62%",background:last?BLUE:"#8FA8F2",borderRadius:"7px 7px 2px 2px",height:Math.max(3,(r.me/maxVal)*H)}}/>
-            {r.avg>0&&<div style={{position:"absolute",left:0,right:0,bottom:(r.avg/maxVal)*H-1.5,height:3,borderRadius:2,background:INK}}/>}
+          <div style={{width:"100%",display:"flex",gap:3,alignItems:"flex-end",height:H+16}}>
+            {[{v:r.me,bg:BLUE,c:BLUE},{v:r.avg,bg:INK,c:INK}].map((x,k)=>(
+              <div key={k} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:2,height:"100%"}}>
+                <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{x.v}</span>
+                <div style={{width:"100%",background:x.bg,borderRadius:"6px 6px 0 0",height:Math.max(4,(x.v/maxVal)*H)}}/>
+              </div>))}
           </div>
-          <span style={{fontSize:11,color:last?INK:"#8A93B2",fontWeight:last?800:500}}>{r.label}</span>
-          <span style={{fontSize:11,color:INK,fontWeight:700,fontVariantNumeric:"tabular-nums",background:"#F1F4FA",borderRadius:6,padding:"1px 5px"}}>{r.avg}</span>
-        </div>); })}
+          <span style={{fontSize:11,color:"#8A93B2"}}>{r.label}</span>
+        </div>
+      ))}
     </div>
-    <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:12}}>
-      <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,background:BLUE,borderRadius:2}}/><span style={{fontSize:12,color:"#6B7493"}}>나</span></div>
-      <div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:14,height:3,background:INK,borderRadius:2}}/><span style={{fontSize:12,color:"#6B7493"}}>참석 회원 평균 (아래 숫자)</span></div>
+    <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
+      {[{bg:BLUE,label:"나"},{bg:INK,label:"참석 회원 평균"}].map(l=>(
+        <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
+          <div style={{width:10,height:10,background:l.bg,borderRadius:2}}/>
+          <span style={{fontSize:12,color:"#6B7493"}}>{l.label}</span>
+        </div>
+      ))}
     </div>
   </Card>;
 }
