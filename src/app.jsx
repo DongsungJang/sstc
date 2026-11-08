@@ -1559,26 +1559,28 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     </div>
   );
 }
-// 홈 "내가 참석할 모임": 한 장씩 < > 로 넘겨 봐요 (손가락으로 밀어도 넘어가요)
+// 홈 "내가 참석할 모임": 3개씩 한 장으로 묶어 < > 로 넘겨 봐요 (손가락으로 밀어도 넘어가요)
 function GoingSlider({going,onOpenMeeting,onGoBooking}){
-  const ref=useRef(null), [idx,setIdx]=useState(0), n=going.length;
+  const ref=useRef(null), [idx,setIdx]=useState(0), total=going.length;
+  const pages=[]; for(let k=0;k<total;k+=3) pages.push(going.slice(k,k+3));   // 한 장에 3개씩
+  const n=pages.length;
   useEffect(()=>{ if(idx>n-1) setIdx(Math.max(0,n-1)); },[n]);
   const go=i=>{ const el=ref.current; if(!el) return; const j=Math.max(0,Math.min(n-1,i)); el.scrollTo({left:j*el.clientWidth,behavior:"smooth"}); setIdx(j); };
   const onScroll=()=>{ const el=ref.current; if(el&&el.clientWidth) setIdx(Math.round(el.scrollLeft/el.clientWidth)); };
   const arrow=(d,ic,label)=>{ const off=d<0?idx<=0:idx>=n-1; return <button type="button" aria-label={label} disabled={off} onClick={()=>go(idx+d)} style={{width:30,height:30,borderRadius:10,border:"none",background:off?"#F1F4FA":BLUE_LIGHT,color:off?"#C5CBDD":BLUE,display:"flex",alignItems:"center",justifyContent:"center",cursor:off?"default":"pointer",padding:0}}><Icon name={ic} size={17} stroke={2.4}/></button>; };
   return <Card>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-      <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>내가 참석할 모임{n>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{n}</span>}</span>
+      <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>내가 참석할 모임{total>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{total}</span>}</span>
       {n>1&&<div style={{display:"flex",alignItems:"center",gap:6}}>
         <span style={{fontSize:12,fontWeight:700,color:"#8A93B2",fontVariantNumeric:"tabular-nums",marginRight:2}}>{idx+1} / {n}</span>
         {arrow(-1,"chevL","이전 모임")}{arrow(1,"chevR","다음 모임")}
       </div>}
     </div>
-    {n===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
+    {total===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
     <div ref={ref} onScroll={onScroll} className="sstc-hscroll" style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory"}}>
-      {going.map(({m,ok,gone,label})=>(
-        <div key={m.id} style={{flex:"0 0 100%",boxSizing:"border-box",scrollSnapAlign:"start"}}>
-        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
+      {pages.map((pg,pi)=>(
+        <div key={pi} style={{flex:"0 0 100%",boxSizing:"border-box",scrollSnapAlign:"start",display:"flex",flexDirection:"column",gap:8}}>
+        {pg.map(({m,ok,gone,label})=><div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
           <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
           <div style={{flex:1,minWidth:0}}>
             <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
@@ -1589,12 +1591,9 @@ function GoingSlider({going,onOpenMeeting,onGoBooking}){
             <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
             {ok&&!gone&&<WaitTag m={m}/>}
           </div>
-        </div></div>
+        </div>)}</div>
       ))}
     </div>)}
-    {n>1&&<div aria-hidden="true" style={{display:"flex",justifyContent:"center",gap:5,marginTop:10}}>
-      {going.map((g,i)=><span key={g.m.id} style={{width:i===idx?16:6,height:6,borderRadius:3,background:i===idx?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}
-    </div>}
   </Card>;
 }
 // 자리 남은 모임: 지금 참석 누를 수 있고 아직 정원이 안 찬 다가오는 모임 (내가 이미 참석한 모임은 빼요)
