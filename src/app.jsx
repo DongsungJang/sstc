@@ -3949,10 +3949,10 @@ function MonthlyChart({rows,maxVal}){
       {rows.map(r=>(
         <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
           <div style={{width:"100%",display:"flex",gap:3,alignItems:"flex-end",height:H}}>
-            {[{v:r.me,bg:BLUE,c:"#fff"},{v:r.avg,bg:"#CBD6F5",c:"#4A5A8A"}].map((x,k)=>(
+            {[{v:r.me,bg:BLUE,c:"#fff"},{v:r.avg,bg:"#CBD6F5",c:"#8593BC",w:600}].map((x,k)=>(
               <div key={k} style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",height:"100%"}}>
                 <div style={{width:"100%",background:x.bg,borderRadius:"6px 6px 0 0",height:Math.max(20,(x.v/maxVal)*H),display:"flex",justifyContent:"center",paddingTop:4,boxSizing:"border-box"}}>
-                  <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:800,fontVariantNumeric:"tabular-nums",letterSpacing:"-0.03em"}}>{x.v}</span>
+                  <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:x.w||800,fontVariantNumeric:"tabular-nums",letterSpacing:"-0.03em"}}>{x.v}</span>
                 </div>
               </div>))}
           </div>
