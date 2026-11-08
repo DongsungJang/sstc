@@ -13,7 +13,7 @@ src=src.replace('import { useState, useRef, useEffect } from "react";','const { 
        .replace('export default function App()','function App()');
 src+='\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));\n';
 const splashCss=fs.readFileSync(path.join(ROOT,'src/splash.css'),'utf8');
-const out=Babel.transform(src,{presets:[['react',{runtime:'classic'}]]}).code;
+const out=Babel.transform(src,{compact:true,presets:[['react',{runtime:'classic'}]]}).code;
 const page=(scripts)=>`<!DOCTYPE html>
 <html lang="ko">
 <head>
