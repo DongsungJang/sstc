@@ -4101,11 +4101,23 @@ const courtCount=v=>{ const s=String(v||"").trim(); if(!s) return 1; let n=0;
 const hmMin=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m?(+m[1])*60+(+m[2]):0; };
 const hrsText=min=>{ const h=min/60; return Number.isInteger(h)?`${h}시간`:`${(Math.round(h*10)/10)}시간`; };
 // 요일(토·일은 주말)·시간(야간 시작 시각으로 나눔)·코트 수로 계산
-// 실내·실외 요금이 다른 곳(inout): wd·we는 실외, indoor.wd·indoor.we는 실내
-const hasInOut=c=>!!(c&&c.inout&&c.indoor);
-function calcCourtFee(c,date,start,end,courtNo,indoor){
+// 조건별 요금(extras): [{in:true|false|null(상관없음), surface:"하드"|…|null, wd, we}]. wd·we는 기본 요금(조건에 안 맞을 때)
+// 예전 데이터(inout + indoor.wd/we)는 {in:true} 조건 요금 하나로 읽어요
+const feeExtras=c=>{ if(!c) return []; const x=Array.isArray(c.extras)?c.extras:Object.values(c.extras||{});
+  return x.length?x.filter(Boolean):(c.inout&&c.indoor?[{in:true,surface:null,wd:c.indoor.wd,we:c.indoor.we}]:[]); };
+const feeUsesInOut=c=>feeExtras(c).some(x=>x.in===true||x.in===false);
+const feeUsesSurface=c=>feeExtras(c).some(x=>!!x.surface);
+const extraLabel=x=>[x.in===true?"실내":x.in===false?"실외":"",x.surface||""].filter(Boolean).join(" · ")||"조건 없음";
+// 모임 조건(실내 여부·코트 종류)에 맞는 요금표: 맞는 조건 요금 중 조건이 가장 많이 걸린 것, 없으면 기본 요금
+function pickFeeSet(c,indoor,surface){
+  let best=null, score=-1;
+  feeExtras(c).forEach(x=>{ const inOk=x.in==null||x.in===!!indoor, sOk=!x.surface||x.surface===surface;
+    if(!inOk||!sOk) return; const sc=(x.in==null?0:1)+(x.surface?1:0); if(sc>score){best=x;score=sc;} });
+  return best?{set:best,label:extraLabel(best)}:{set:c,label:feeExtras(c).length?"기본 요금":""};
+}
+function calcCourtFee(c,date,start,end,courtNo,indoor,surface){
   if(!c||!date||!start||!end||end<=start) return null;
-  const set=hasInOut(c)&&indoor?c.indoor:c;
+  const pick=pickFeeSet(c,indoor,surface), set=pick.set;
   const we=[0,6].includes(dowOf(date)), row=we?set.we:set.wd; if(!row) return null;
   const nf=hmMin(c.nightFrom||"18:00"), s=hmMin(start), e=hmMin(end);
   const dayMin=Math.max(0,Math.min(e,nf)-s), nightMin=Math.max(0,e-Math.max(s,nf));
@@ -4114,7 +4126,7 @@ function calcCourtFee(c,date,start,end,courtNo,indoor){
     :[{label:"주간",min:dayMin,rate:dayRate},{label:"야간",min:nightMin,rate:nightRate}].filter(p=>p.min>0);
   parts.forEach(p=>{ p.amt=Math.round(p.min/60/per*p.rate*n); });
   const total=parts.reduce((a,p)=>a+p.amt,0);
-  return {we,n,per,parts,total,inout:hasInOut(c),indoor:hasInOut(c)&&!!indoor};
+  return {we,n,per,parts,total,label:pick.label};
 }
 const feeDigits=v=>String(v==null?"":v).replace(/[^\d]/g,"").slice(0,7);
 function MoneyInput({value,onChange,label,placeholder,style}){
@@ -4126,11 +4138,11 @@ function MoneyInput({value,onChange,label,placeholder,style}){
 }
 
 // 새 모임 화면의 코트비 칸. manual: 직접 넣은 금액(문자열) 또는 null(자동)
-function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,indoor,onIndoor,manual,onManual,isAdmin}){
+function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,indoor,onIndoor,surface,manual,onManual,isAdmin}){
   const [sheet,setSheet]=useState(false);
-  const c=findCourtFee(fees,place), r=calcCourtFee(c,date,start,end,courtNo,indoor);
+  const c=findCourtFee(fees,place), r=calcCourtFee(c,date,start,end,courtNo,indoor,surface);
   // 실내·실외 요금이 다른 테니스장이면 어느 쪽인지 골라요
-  const inoutPick=hasInOut(c)&&<div role="radiogroup" aria-label="실내·실외" style={{display:"flex",background:"#F4F6FB",borderRadius:11,padding:3,gap:3,marginBottom:10}}>
+  const inoutPick=feeUsesInOut(c)&&<div role="radiogroup" aria-label="실내·실외" style={{display:"flex",background:"#F4F6FB",borderRadius:11,padding:3,gap:3,marginBottom:10}}>
     {[[false,"실외 코트"],[true,"실내 코트"]].map(([v,l])=>{ const on=!!indoor===v; return <button key={l} type="button" role="radio" aria-checked={on} onClick={()=>onIndoor(v)} style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>; })}
   </div>;
   const box={background:"#fff",borderRadius:16,border:"1.5px solid #E2E6F0",padding:"14px 15px"};
@@ -4161,9 +4173,10 @@ function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,indoor,o
   </div>;
   return <div style={{...box,borderColor:BLUE,boxShadow:"0 4px 14px rgba(33,82,230,0.08)"}}>
     {inoutPick}
+    {feeUsesSurface(c)&&!surface&&<p style={{margin:"0 0 8px",fontSize:11.5,fontWeight:700,color:"#C2610C"}}>위에서 코트 종류(하드·인조잔디 등)를 고르면 그 요금으로 계산돼요. 지금은 기본 요금이에요.</p>}
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:BALL,color:INK}}>자동</span>
-      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.inout?(r.indoor?"실내 · ":"실외 · "):""}${r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:"시간을 넣으면 계산돼요"}</span>
+      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.label?r.label+" · ":""}${r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:"시간을 넣으면 계산돼요"}</span>
     </div>
     {r&&<>
       <p style={{margin:"8px 0 0",fontSize:26,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{won(r.total)}</p>
@@ -4219,24 +4232,21 @@ function CourtFeeSettings({jump}){
             <Icon name="pin" size={15} color={BLUE} stroke={2.2}/>
             <span style={{flex:1,minWidth:0,fontSize:15.5,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{c.name}</span>
             {perTag(c)}
-            {hasInOut(c)&&<span style={{fontSize:11,fontWeight:700,color:"#067647",background:"#E6F6EC",padding:"2px 7px",borderRadius:8,flexShrink:0}}>실내·실외</span>}
+            {feeExtras(c).length>0&&<span style={{fontSize:11,fontWeight:700,color:"#067647",background:"#E6F6EC",padding:"2px 7px",borderRadius:8,flexShrink:0}}>조건별 {feeExtras(c).length}</span>}
             {!(c.wd&&c.wd.same&&c.we&&c.we.same)&&<span style={{fontSize:11,fontWeight:700,color:"#5B3FD6",background:"#EFEBFF",padding:"2px 7px",borderRadius:8,flexShrink:0}}>야간 {c.nightFrom||"18:00"}~</span>}
             <Icon name="chevR" size={16} color="#A3AAC2"/>
           </div>
           {c.address&&<p style={{margin:"2px 0 0 21px",fontSize:11.5,color:"#8A93B0"}}>{c.address}</p>}
           {feeWho(c)&&<p style={{margin:"7px 0 0 21px",fontSize:11.5,fontWeight:600,color:"#4A5578",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color={BLUE}/>{feeWho(c)}</p>}
           <div style={{margin:"7px 0 0 21px",display:"grid",gridTemplateColumns:"38px 1fr",rowGap:3,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
-            {hasInOut(c)?<>
-              <span style={{color:"#A3AAC2",fontWeight:600,gridColumn:"1 / -1",marginTop:2}}>실외</span>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
-              <span style={{color:"#A3AAC2",fontWeight:600,gridColumn:"1 / -1",marginTop:4}}>실내</span>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.indoor.wd)}</span>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.indoor.we)}</span>
-            </>:<>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
-              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
-            </>}
+            {feeExtras(c).length>0&&<span style={{color:"#A3AAC2",fontWeight:600,gridColumn:"1 / -1",marginTop:2}}>기본 요금</span>}
+            <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
+            <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
+            {feeExtras(c).map((x,k)=><React.Fragment key={k}>
+              <span style={{color:"#067647",fontWeight:700,gridColumn:"1 / -1",marginTop:4}}>{extraLabel(x)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(x.wd)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(x.we)}</span>
+            </React.Fragment>)}
           </div>
         </button>)}
       </div>
@@ -4249,10 +4259,11 @@ function CourtFeeSettings({jump}){
 function CourtFeeSheet({value,onClose}){
   const row0=r=>({same:!!(r&&r.same),day:r&&r.day?String(r.day):"",night:r&&r.night?String(r.night):""});
   const [f,setF]=useState(()=>({...value,per:feePer(value),nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""},
-    inout:hasInOut(value),iwd:value.indoor&&value.indoor.wd?row0(value.indoor.wd):{same:false,day:"",night:""},iwe:value.indoor&&value.indoor.we?row0(value.indoor.we):{same:true,day:"",night:""}}));
+    extras:feeExtras(value).map(x=>({in:x.in===true||x.in===false?x.in:null,surface:x.surface||null,wd:x.wd?row0(x.wd):{same:false,day:"",night:""},we:x.we?row0(x.we):{same:true,day:"",night:""}}))}));
   const [err,setErr]=useState(""), [busy,setBusy]=useState(false);
   const editing=!!value.id;
-  const block=(k,title,sub)=>{ const row=f[k]; const put=o=>setF(p=>({...p,[k]:{...p[k],...o}}));
+  const putExtra=(i,o)=>setF(p=>({...p,extras:p.extras.map((x,k)=>k===i?{...x,...o}:x)}));
+  const block=(k,title,sub,ei)=>{ const row=ei==null?f[k]:f.extras[ei][k]; const put=o=>ei==null?setF(p=>({...p,[k]:{...p[k],...o}})):putExtra(ei,{[k]:{...f.extras[ei][k],...o}});
     const seg=(on,label,v)=><button type="button" aria-pressed={on} onClick={()=>put({same:v})} style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{label}</button>;
     const lab=(t,c)=><span style={{display:"block",fontSize:11.5,fontWeight:700,color:c,margin:"0 0 4px 2px"}}>{t}</span>;
     return <div style={{background:"#fff",borderRadius:16,padding:"13px 14px",border:"1.5px solid #E2E6F0"}}>
@@ -4265,12 +4276,15 @@ function CourtFeeSheet({value,onClose}){
     const name=String(f.name||"").trim();
     if(!name) return setErr("테니스장 이름을 넣어 주세요");
     const bad=r=>!(+r.day>0)||(!r.same&&!(+r.night>0));
-    if(bad(f.wd)||bad(f.we)||(f.inout&&(bad(f.iwd)||bad(f.iwe)))) return setErr(f.inout?"실외·실내 평일·주말 요금을 모두 넣어 주세요":"평일·주말 요금을 모두 넣어 주세요");
+    if(bad(f.wd)||bad(f.we)) return setErr("기본 요금의 평일·주말 요금을 모두 넣어 주세요");
+    if(f.extras.some(x=>x.in==null&&!x.surface)) return setErr("조건별 요금마다 실내·실외나 코트 종류 중 하나는 골라 주세요");
+    if(f.extras.some(x=>bad(x.wd)||bad(x.we))) return setErr("조건별 요금의 평일·주말 요금을 모두 넣어 주세요");
+    const keys=f.extras.map(extraLabel); if(new Set(keys).size!==keys.length) return setErr("같은 조건의 요금이 두 번 있어요");
     const other=findCourtFee(COURT_FEES,name); if(other&&other.id!==value.id) return setErr("이미 등록된 테니스장이에요. 목록에서 눌러 고쳐 주세요");
     const row=r=>({same:!!r.same,day:+r.day,night:r.same?null:+r.night});
     const now=Date.now(), uid=myUid();
     const data={name,address:(f.address||"").trim()||null,lat:Number.isFinite(+f.lat)&&f.lat!=null?+f.lat:null,lng:Number.isFinite(+f.lng)&&f.lng!=null?+f.lng:null,
-      per:f.per===2?2:1,nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),inout:f.inout?true:null,indoor:f.inout?{wd:row(f.iwd),we:row(f.iwe)}:null,
+      per:f.per===2?2:1,nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),extras:f.extras.length?f.extras.map(x=>({in:x.in,surface:x.surface,wd:row(x.wd),we:row(x.we)})):null,inout:null,indoor:null,
       createdBy:editing?(value.createdBy||null):ME,createdByUid:editing?(value.createdByUid||null):uid,createdAt:editing?(value.createdAt||null):now,
       ...(editing?{updatedBy:ME,updatedByUid:uid,updatedAt:now}:{})};
     const id=value.id||("c"+now);
@@ -4310,18 +4324,25 @@ function CourtFeeSheet({value,onClose}){
       <span style={{fontSize:14,fontWeight:500,color:INK}}>요금 <span style={{color:"#ef4444"}}>*</span></span>
       <span style={{fontSize:11.5,fontWeight:700,color:INK,background:BALL,padding:"3px 9px",borderRadius:8}}>{perText(f)}</span>
     </div>
-    <div role="radiogroup" aria-label="실내·실외 요금" style={{display:"flex",background:"#fff",border:"1.5px solid #E2E6F0",borderRadius:13,padding:3,gap:3}}>
-      {[[false,"요금 한 가지"],[true,"실내·실외 요금이 달라요"]].map(([v,l])=>{ const on=!!f.inout===v; return <button key={l} type="button" role="radio" aria-checked={on} onClick={()=>setF(p=>({...p,inout:v}))} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",background:on?INK:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>; })}
-    </div>
-    {f.inout&&<p style={{margin:"-4px 0 0",fontSize:15,fontWeight:900,color:INK}}>실외 코트</p>}
-    {block("wd",f.inout?"실외 평일":"평일","월~금")}
-    {block("we",f.inout?"실외 주말":"주말","토·일")}
-    {f.inout&&<>
-      <p style={{margin:"4px 0 0",fontSize:15,fontWeight:900,color:INK}}>실내 코트</p>
-      {block("iwd","실내 평일","월~금")}
-      {block("iwe","실내 주말","토·일")}
-      <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>새 모임에서 이 테니스장을 고르면 실외/실내 중에 고르게 돼요. 야간 시작 시각과 요금 기준은 둘이 같아요.</p>
-    </>}
+    {f.extras.length>0&&<p style={{margin:"-4px 0 0",fontSize:15,fontWeight:900,color:INK}}>기본 요금 <span style={{fontSize:11.5,fontWeight:600,color:"#A3AAC2"}}>아래 조건에 안 맞을 때</span></p>}
+    {block("wd","평일","월~금")}
+    {block("we","주말","토·일")}
+    {f.extras.map((x,i)=>{ const pill=(on,label,onClick)=><button key={label} type="button" aria-pressed={on} onClick={onClick} style={{padding:"6px 11px",borderRadius:10,border:`1.5px solid ${on?INK:"#E2E6F0"}`,background:on?INK:"#fff",color:on?"#fff":"#4A5578",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{label}</button>;
+      return <div key={i} style={{display:"flex",flexDirection:"column",gap:10,background:"#F2FBF5",borderRadius:18,padding:12,border:"1.5px solid #CDEBD8"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{flex:1,fontSize:15,fontWeight:900,color:"#067647"}}>조건별 요금 {i+1} · {extraLabel(x)}</span>
+          <button type="button" onClick={()=>setF(p=>({...p,extras:p.extras.filter((_,k)=>k!==i)}))} style={{border:"none",background:"none",color:"#E5484D",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>빼기</button>
+        </div>
+        <div><span style={{display:"block",fontSize:11.5,fontWeight:700,color:"#4A5578",marginBottom:5}}>실내·실외</span>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[[null,"상관없음"],[false,"실외"],[true,"실내"]].map(([v,l])=>pill(x.in===v,l,()=>putExtra(i,{in:v})))}</div></div>
+        <div><span style={{display:"block",fontSize:11.5,fontWeight:700,color:"#4A5578",marginBottom:5}}>코트 종류</span>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[[null,"상관없음"],...SURFACES.map(v=>[v,v])].map(([v,l])=>pill(x.surface===v,l,()=>putExtra(i,{surface:v})))}</div></div>
+        {block("wd",`${extraLabel(x)} 평일`,"월~금",i)}
+        {block("we",`${extraLabel(x)} 주말`,"토·일",i)}
+      </div>; })}
+    <button type="button" onClick={()=>setF(p=>({...p,extras:[...p.extras,{in:null,surface:null,wd:{same:false,day:"",night:""},we:{same:true,day:"",night:""}}]}))}
+      style={{padding:"12px 0",borderRadius:14,border:"1.5px dashed #9FD3B2",background:"#fff",color:"#067647",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>+ 조건별 요금 추가 (실내·실외, 하드·인조잔디 등)</button>
+    <p style={{margin:"-4px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>한 테니스장 안에서 실내·실외나 코트 종류에 따라 값이 다르면 추가해요. 새 모임에서 고른 실내·실외와 코트 종류에 맞는 요금으로 계산하고, 맞는 게 없으면 기본 요금을 써요. 야간 시작 시각과 요금 기준은 같이 써요.</p>
     <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>{editing?"고치면 앞으로 만드는 모임부터 바뀐 금액이 들어가요. 이미 만든 모임 코트비는 그대로예요.":"등록하면 다음부터 이 테니스장으로 번개 모임을 만들 때 자동으로 들어가요."}</p>
     {err&&<p style={{margin:0,fontSize:12.5,color:"#ef4444"}}>{err}</p>}
     <div style={{display:"flex",gap:8,marginTop:4}}>
@@ -4561,8 +4582,8 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(!f.place.trim()) e.place="테니스장 이름을 입력해 주세요";
     if(!String(f.courtNo||"").trim()) e.courtNo="코트 번호를 입력해 주세요";
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
-    const feeRow=findCourtFee(fees,f.place), feeAuto=calcCourtFee(feeRow,f.date,f.start,f.end,f.courtNo,!!f.indoor);
-    const sameSlot=editing&&["place","date","start","end","courtNo"].every(k=>String(f[k]||"")===String(initial.info[k]||""))&&!!f.indoor===!!initial.info.indoor;
+    const feeRow=findCourtFee(fees,f.place), feeAuto=calcCourtFee(feeRow,f.date,f.start,f.end,f.courtNo,!!f.indoor,f.surface||"");
+    const sameSlot=editing&&["place","date","start","end","courtNo"].every(k=>String(f[k]||"")===String(initial.info[k]||""))&&!!f.indoor===!!initial.info.indoor&&String(f.surface||"")===String(initial.info.surface||"");
     // 자동: 수정할 때 장소·날짜·시간·코트를 안 바꿨으면 저장된 금액 그대로 (그사이 코트비 표가 바뀌어도)
     const fee=feeManual!=null?(+feeDigits(feeManual)||0):sameSlot&&initial.info.courtFeeAuto?(+initial.info.courtFee||0):feeRow&&feeAuto?feeAuto.total:0;
     const feeIsAuto=feeManual==null&&!!feeRow;
@@ -4573,7 +4594,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(f.kind==="flash"&&f.guildMode&&!gids.length) e.guild="길드를 하나 이상 선택해 주세요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:fee||0,courtFeeAuto:feeIsAuto&&fee>0?true:null,courtFeeManual:feeManual!=null&&fee>0?true:null}:{flashType:null,courtFee:null,courtFeeAuto:null,courtFeeManual:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",indoor:f.indoor&&hasInOut(findCourtFee(fees,f.place))?true:(f.indoor&&editing&&initial.info.indoor?true:null),address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:fee||0,courtFeeAuto:feeIsAuto&&fee>0?true:null,courtFeeManual:feeManual!=null&&fee>0?true:null}:{flashType:null,courtFee:null,courtFeeAuto:null,courtFeeManual:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",indoor:f.indoor&&feeUsesInOut(findCourtFee(fees,f.place))?true:(f.indoor&&editing&&initial.info.indoor?true:null),address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -4695,7 +4716,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
             {hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")}
           </FieldWrap>
           {f.kind==="flash"&&<FieldWrap label="코트비">
-            <CourtFeeBox fees={fees} place={f.place} address={f.address} lat={f.lat} lng={f.lng} date={f.date} start={f.start} end={f.end} courtNo={f.courtNo} indoor={!!f.indoor} onIndoor={v=>set("indoor",v)} manual={feeManual} onManual={setFeeManual} isAdmin={ME_ADMIN}/>
+            <CourtFeeBox fees={fees} place={f.place} address={f.address} lat={f.lat} lng={f.lng} date={f.date} start={f.start} end={f.end} courtNo={f.courtNo} indoor={!!f.indoor} onIndoor={v=>set("indoor",v)} surface={f.surface||""} manual={feeManual} onManual={setFeeManual} isAdmin={ME_ADMIN}/>
           </FieldWrap>}
           <div style={row}>
             <div style={{flex:1}}><FieldWrap label="정원 (회원)" required error={errors.capacity}>
