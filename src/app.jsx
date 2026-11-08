@@ -4075,7 +4075,7 @@ function Sheet({title,onClose,children}) {
 
 // ─── 코트비 표 (관리 탭) · 새 모임 코트비 자동 계산 ─────────────────────────────
 // club/courtFees/<id> {name,address,lat,lng,nightFrom:"18:00",wd:{same,day,night},we:{same,day,night},createdBy..,updatedBy..}
-// 금액은 코트 1면 · 1시간 기준. 관리자만 씀.
+// 금액은 코트 1면 · per시간(1 또는 2, 없으면 1) 기준. 관리자만 씀.
 // club/courtFeeRequests/<테니스장 키> : 회원이 표에 없는 테니스장으로 번개를 만들면 남는 등록 요청 (관리자만 읽음)
 let COURT_FEES = {};
 function useCourtFees(){
@@ -4091,6 +4091,8 @@ function useCourtFeeRequests(){
 const feeKey=name=>nickKey(placeKey(name)||"_");
 const fmtMD=t=>{ if(!t) return ""; const x=new Date(t); return `${x.getMonth()+1}월 ${x.getDate()}일`; };
 const feeWho=c=>[c.createdBy&&`등록 ${c.createdBy} · ${fmtMD(c.createdAt)}`,c.updatedBy&&`수정 ${c.updatedBy} · ${fmtMD(c.updatedAt)}`].filter(Boolean).join("  ·  ");
+const feePer=c=>+(c&&c.per)===2?2:1;
+const perText=c=>`코트 1면 · ${feePer(c)}시간 기준`;
 const feeList=fs=>Object.entries(fs||{}).map(([id,c])=>({id,...c})).filter(c=>c&&c.name).sort((a,b)=>String(a.name).localeCompare(String(b.name),"ko"));
 const findCourtFee=(fs,place)=>{ const k=placeKey(place); return k?feeList(fs).find(c=>placeKey(c.name)===k)||null:null; };
 // 코트 수: "5, 6" → 2면, "3~5" → 3면, 글자만 있으면 1면
@@ -4104,11 +4106,12 @@ function calcCourtFee(c,date,start,end,courtNo){
   const we=[0,6].includes(dowOf(date)), row=we?c.we:c.wd; if(!row) return null;
   const nf=hmMin(c.nightFrom||"18:00"), s=hmMin(start), e=hmMin(end);
   const dayMin=Math.max(0,Math.min(e,nf)-s), nightMin=Math.max(0,e-Math.max(s,nf));
-  const dayRate=+row.day||0, nightRate=row.same?dayRate:(+row.night||0), n=courtCount(courtNo);
+  const dayRate=+row.day||0, nightRate=row.same?dayRate:(+row.night||0), n=courtCount(courtNo), per=feePer(c);
   const parts=row.same?[{label:"",min:dayMin+nightMin,rate:dayRate}]
     :[{label:"주간",min:dayMin,rate:dayRate},{label:"야간",min:nightMin,rate:nightRate}].filter(p=>p.min>0);
-  const total=Math.round(parts.reduce((a,p)=>a+p.min/60*p.rate,0)*n);
-  return {we,n,parts,total};
+  parts.forEach(p=>{ p.amt=Math.round(p.min/60/per*p.rate*n); });
+  const total=parts.reduce((a,p)=>a+p.amt,0);
+  return {we,n,per,parts,total};
 }
 const feeDigits=v=>String(v==null?"":v).replace(/[^\d]/g,"").slice(0,7);
 function MoneyInput({value,onChange,label,placeholder,style}){
@@ -4157,11 +4160,11 @@ function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,manual,o
       <p style={{margin:"8px 0 0",fontSize:26,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{won(r.total)}</p>
       <div style={{marginTop:8,paddingTop:8,borderTop:"1px dashed #E2E6F0",display:"flex",flexDirection:"column",gap:3}}>
         {r.parts.map((p,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
-          <span><b style={{color:p.label==="야간"?"#5B3FD6":BLUE,fontWeight:700,marginRight:4}}>{p.label||"주간·야간 같음"}</b>{hrsText(p.min)} × {r.n}면 × {won(p.rate)}</span>
-          <span style={{fontWeight:700,color:INK,flexShrink:0}}>{won(Math.round(p.min/60*p.rate*r.n))}</span></div>)}
+          <span><b style={{color:p.label==="야간"?"#5B3FD6":BLUE,fontWeight:700,marginRight:4}}>{p.label||"주간·야간 같음"}</b>{hrsText(p.min)} × {r.n}면 × {won(p.rate)}{r.per===2?"/2시간":""}</span>
+          <span style={{fontWeight:700,color:INK,flexShrink:0}}>{won(p.amt)}</span></div>)}
       </div>
     </>}
-    <p style={{margin:"9px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>관리자가 등록한 코트비 표로 계산했어요{c.nightFrom?` (야간 ${c.nightFrom}부터)`:""}. 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>
+    <p style={{margin:"9px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>관리자가 등록한 코트비 표로 계산했어요 ({feePer(c)===2?"2시간 요금 기준":"1시간 요금 기준"}{c.nightFrom?` · 야간 ${c.nightFrom}부터`:""}). 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>
     {isAdmin&&feeWho(c)&&<p style={{margin:"4px 0 0",fontSize:11,color:"#8A93B0",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color="#A3AAC2"/>{feeWho(c)}</p>}
     <div style={{display:"flex",gap:14,marginTop:8}}>
       {isAdmin&&link("코트비 수정",()=>setSheet(true))}
@@ -4183,6 +4186,7 @@ function CourtFeeSettings({jump}){
     if(c) setEdit(c); else if(r) setEdit(blank(r)); else setEdit(blank({name:jump.place})); },[jump&&jump.n,reqs.length,Object.keys(fees).length]);
   const dismiss=r=>{ if(!window.confirm(`${r.name} 등록 요청을 지울까요? 코트비 표에는 아무것도 안 바뀌어요.`)) return; FB.club.child("courtFeeRequests/"+r.id).remove().catch(e=>setErr(authMsg(e))); };
   const rate=row=>!row?"-":row.same?`${won(row.day)} (주·야 같음)`:`주간 ${won(row.day)} · 야간 ${won(row.night)}`;
+  const perTag=c=><span style={{fontSize:11,fontWeight:700,color:INK,background:feePer(c)===2?BALL:"#EEF1F8",padding:"2px 7px",borderRadius:8,flexShrink:0}}>{feePer(c)}시간</span>;
   return <>
     {err&&<Card><p style={{margin:0,color:"#ef4444",fontSize:13}}>{err}</p></Card>}
     {reqs.length>0&&<Card style={{border:"1.5px solid #FDE2B8",background:"#FFFBF3"}}>
@@ -4205,6 +4209,7 @@ function CourtFeeSettings({jump}){
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <Icon name="pin" size={15} color={BLUE} stroke={2.2}/>
             <span style={{flex:1,minWidth:0,fontSize:15.5,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{c.name}</span>
+            {perTag(c)}
             {!(c.wd&&c.wd.same&&c.we&&c.we.same)&&<span style={{fontSize:11,fontWeight:700,color:"#5B3FD6",background:"#EFEBFF",padding:"2px 7px",borderRadius:8,flexShrink:0}}>야간 {c.nightFrom||"18:00"}~</span>}
             <Icon name="chevR" size={16} color="#A3AAC2"/>
           </div>
@@ -4216,7 +4221,7 @@ function CourtFeeSettings({jump}){
           </div>
         </button>)}
       </div>
-      <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>금액은 코트 1면 · 1시간 기준이에요. 번개 모임을 만들 때 이 테니스장을 고르면 요일·시간·코트 수에 맞춰 코트비가 자동으로 들어가요. 회원은 표에 없는 테니스장일 때 그 모임 코트비만 직접 넣어요.</p>
+      <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>금액은 코트 1면 기준이고, 코트마다 1시간 요금인지 2시간 요금인지 골라요. 번개 모임을 만들 때 이 테니스장을 고르면 요일·시간·코트 수에 맞춰 코트비가 자동으로 들어가요. 회원은 표에 없는 테니스장일 때 그 모임 코트비만 직접 넣어요.</p>
     </Card>
     {edit&&<CourtFeeSheet key={edit.id||(edit.req&&edit.req.id)||edit.name||"new"} value={edit} onClose={()=>setEdit(null)}/>}
   </>;
@@ -4224,7 +4229,7 @@ function CourtFeeSettings({jump}){
 // 코트비 등록·수정 (관리자만)
 function CourtFeeSheet({value,onClose}){
   const row0=r=>({same:!!(r&&r.same),day:r&&r.day?String(r.day):"",night:r&&r.night?String(r.night):""});
-  const [f,setF]=useState(()=>({...value,nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""}}));
+  const [f,setF]=useState(()=>({...value,per:feePer(value),nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""}}));
   const [err,setErr]=useState(""), [busy,setBusy]=useState(false);
   const editing=!!value.id;
   const block=(k,title,sub)=>{ const row=f[k]; const put=o=>setF(p=>({...p,[k]:{...p[k],...o}}));
@@ -4245,7 +4250,7 @@ function CourtFeeSheet({value,onClose}){
     const row=r=>({same:!!r.same,day:+r.day,night:r.same?null:+r.night});
     const now=Date.now(), uid=myUid();
     const data={name,address:(f.address||"").trim()||null,lat:Number.isFinite(+f.lat)&&f.lat!=null?+f.lat:null,lng:Number.isFinite(+f.lng)&&f.lng!=null?+f.lng:null,
-      nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),
+      per:f.per===2?2:1,nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),
       createdBy:editing?(value.createdBy||null):ME,createdByUid:editing?(value.createdByUid||null):uid,createdAt:editing?(value.createdAt||null):now,
       ...(editing?{updatedBy:ME,updatedByUid:uid,updatedAt:now}:{})};
     const id=value.id||("c"+now);
@@ -4275,9 +4280,15 @@ function CourtFeeSheet({value,onClose}){
       <TimeInput label="야간 시작" value={f.nightFrom} onChange={v=>setF(p=>({...p,nightFrom:v}))}/>
       <p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>이 시각부터는 야간 요금이에요. 모임이 걸쳐 있으면 (예: 17~19시) 시간만큼 나눠서 계산해요.</p>
     </FieldWrap>
+    <FieldWrap label="요금 기준" required>
+      <div role="radiogroup" aria-label="요금 기준" style={{display:"flex",background:"#fff",border:"1.5px solid #E2E6F0",borderRadius:13,padding:3,gap:3}}>
+        {[[1,"1시간 요금"],[2,"2시간 요금"]].map(([v,l])=>{ const on=f.per===v; return <button key={v} type="button" role="radio" aria-checked={on} onClick={()=>setF(p=>({...p,per:v}))} style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:13.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>; })}
+      </div>
+      <p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>요금표에 적힌 단위 그대로 골라요. 2시간 요금이면 모임 시간이 3시간일 때 1.5배로 계산해요.</p>
+    </FieldWrap>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <span style={{fontSize:14,fontWeight:500,color:INK}}>요금 <span style={{color:"#ef4444"}}>*</span></span>
-      <span style={{fontSize:11.5,fontWeight:700,color:INK,background:BALL,padding:"3px 9px",borderRadius:8}}>코트 1면 · 1시간 기준</span>
+      <span style={{fontSize:11.5,fontWeight:700,color:INK,background:BALL,padding:"3px 9px",borderRadius:8}}>{perText(f)}</span>
     </div>
     {block("wd","평일","월~금")}
     {block("we","주말","토·일")}
