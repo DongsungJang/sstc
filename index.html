@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=7d9cc5cb81">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=7d9cc5cb81">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=beacc11715">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=beacc11715">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -9368,12 +9368,17 @@ function VoteRow({
   v,
   idx,
   wait,
-  onRemove
+  onRemove,
+  out
 }) {
   const tag = v.isGuest ? {
     t: `게스트 · ${v.guestOf} 초대`,
     bg: "#FFF4E5",
     c: "#C2610C"
+  } : out ? {
+    t: v.by ? `길드 밖 · ${v.by} 님 초대` : "길드 밖",
+    bg: GUILD_OPEN_BG,
+    c: "#3F6212"
   } : v.prio && v.count > 0 ? {
     t: `이달 ${v.count}회 참석`,
     bg: "#EEF1FA",
@@ -9456,7 +9461,7 @@ function VoteRow({
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "leave",
     s: 11
-  }), " ", v.leave, " \uCD9C\uBC1C"), v.by && !v.isGuest && /*#__PURE__*/React.createElement("span", {
+  }), " ", v.leave, " \uCD9C\uBC1C"), v.by && !v.isGuest && !out && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
@@ -9969,8 +9974,16 @@ function MemberAttend({
   const me = myUid();
   const going = k => !!(votes[k] && votes[k].status === "attend" && votes[k].at);
   const absent = k => !!(votes[k] && votes[k].status === "absent");
+  // 길드 모임: 길드원은 길드원만, 길드 밖 회원은 만든 사람·관리자만 초대해서 넣어요
+  const gids = meeting.guildIds || [],
+    guildMeet = gids.length > 0,
+    canOut = !guildMeet || isAdmin || meeting.createdByUid === me;
+  const isOut = m => guildMeet && !inMeetGuild(meeting.info, m.uid);
+  const gname = meetGuildNames(meeting.info) || "길드";
   const add = m => {
-    if (!isAdmin && !window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
+    const out = isOut(m);
+    if (out && !window.confirm(`${m.nickname} 님을 초대할까요?\n${m.nickname} 님은 ${gname} 길드원이 아니에요. 초대하면 이 모임에 참석으로 들어가고, 비공개 모임이어도 ${m.nickname} 님에게 보여요. ${m.nickname} 님에게 알림이 가요.`)) return;
+    if (!out && !isAdmin && !window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${m.uid}`, {
       name: m.nickname,
       ntrp: m.ntrp || "",
@@ -9986,13 +9999,13 @@ function MemberAttend({
         type: "attend",
         to: m.uid,
         meetingId: meeting.id,
-        text: `${ME} 님이 ${meeting.date} ${meeting.placeName || meeting.place} 모임에 나를 참석으로 등록했어요`
+        text: out ? `${ME} 님이 ${meeting.date} ${meeting.placeName || meeting.place} ${gname} 길드 모임에 나를 초대해서 참석으로 등록했어요` : `${ME} 님이 ${meeting.date} ${meeting.placeName || meeting.place} 모임에 나를 참석으로 등록했어요`
       });
     }).catch(e => alert(authMsg(e)));
   };
   const k = searchKey(q);
   // 닉네임·본명 일부만 쳐도 바로 후보가 나와요 (한글 치는 중에도). 앞부분이 맞는 회원이 먼저 나와요.
-  const list = data ? activeMembers(data).filter(m => !going(m.uid) && (isAdmin || m.uid !== me && !absent(m.uid))).map(m => ({
+  const list = data ? activeMembers(data).filter(m => !going(m.uid) && (isAdmin || m.uid !== me && !absent(m.uid)) && (canOut || !isOut(m))).map(m => ({
     m,
     sc: hgMatch(q, [m.nickname, realNameOf(m)])
   })).filter(x => x.sc >= 0).sort((a, b) => a.sc - b.sc || a.m.nickname.localeCompare(b.m.nickname, "ko")).map(x => x.m) : [];
@@ -10028,7 +10041,14 @@ function MemberAttend({
       padding: "5px 12px",
       cursor: "pointer"
     }
-  }, show ? "닫기" : "+ 회원 추가")), /*#__PURE__*/React.createElement("p", {
+  }, show ? "닫기" : "+ 회원 추가")), guildMeet && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 12,
+      color: "#6B7493",
+      lineHeight: 1.6
+    }
+  }, canOut ? "길드 모임이라 길드원이 먼저 나와요. 만든 사람은 길드 밖 회원도 초대해서 넣을 수 있어요." : "길드 모임이라 길드원만 넣을 수 있어요."), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "6px 0 0",
       fontSize: 12,
@@ -10086,7 +10106,16 @@ function MemberAttend({
       textAlign: "center",
       padding: "6px 0"
     }
-  }, k ? "찾는 회원이 없어요" : "더 넣을 수 있는 회원이 없어요"), list.map(m => /*#__PURE__*/React.createElement("div", {
+  }, k ? "찾는 회원이 없어요" : "더 넣을 수 있는 회원이 없어요"), (guildMeet ? [["길드원", list.filter(m => !isOut(m))], ["길드 밖 회원 · 초대해서 넣기", list.filter(isOut)]] : [["", list]]).map(([label, ms]) => ms.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, {
+    key: label
+  }, label && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 11.5,
+      fontWeight: 800,
+      color: "#6B7493"
+    }
+  }, label), ms.map(m => /*#__PURE__*/React.createElement("div", {
     key: m.uid,
     style: {
       display: "flex",
@@ -10118,14 +10147,34 @@ function MemberAttend({
       fontSize: 11,
       color: "#ef4444"
     }
-  }, " \xB7 \uBD88\uCC38 \uD22C\uD45C")), /*#__PURE__*/React.createElement("button", {
+  }, " \xB7 \uBD88\uCC38 \uD22C\uD45C")), isOut(m) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 7px",
+      borderRadius: 12,
+      background: GUILD_OPEN_BG,
+      color: "#3F6212",
+      whiteSpace: "nowrap"
+    }
+  }, "\uAE38\uB4DC \uBC16"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => add(m),
     style: {
       ...btnSmall,
-      padding: "6px 14px"
+      padding: "6px 14px",
+      ...(isOut(m) ? {
+        background: INK
+      } : {})
     }
-  }, "\uCC38\uC11D"))))));
+  }, isOut(m) ? "초대" : "참석"))))), guildMeet && !canOut && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uAE38\uB4DC \uBC16 \uD68C\uC6D0\uC740 \uBAA8\uC784\uC744 \uB9CC\uB4E0 \uC0AC\uB78C\uB9CC \uCD08\uB300\uD560 \uC218 \uC788\uC5B4\uC694."))));
 }
 
 // 공유 링크(#meeting-<id>, 대진표 공유는 #meeting-<id>-bracket)로 처음 열었을 때 기억해 뒀다가 로그인 후 그 모임(탭)을 열어요
@@ -10426,6 +10475,12 @@ function MeetingDetail({
     saveMeetingPath(`m${meeting.id}/votes/${v.key}/guests`, list.filter((g, i) => g && i !== v.gi)).catch(e => alert(authMsg(e)));
   } : null;
   const rowRemove = v => v.isGuest ? kickGuest(v) : kick(v);
+  // 길드 모임에서 길드원이 아닌 참석자 (만든 사람이 초대했거나, 그사이 길드를 나간 회원)
+  const isOut = v => !!meeting.guildIds.length && !v.isGuest && !!v.key && v.key !== meeting.createdByUid && !inMeetGuild(meeting.info, v.key);
+  const me0 = myUid(),
+    guildMeet = meeting.guildIds.length > 0,
+    imOut = guildMeet && !!me0 && !isAdmin && meeting.createdByUid !== me0 && !inMeetGuild(meeting.info, me0);
+  const inviter = guildMeet && mine && mine.byUid ? curNick(mine.byUid, mine.by || "") || "모임 만든 사람" : "";
   const myConfirmIdx = confirmed.findIndex(v => v.isMe),
     myWaitIdx = waitlist.findIndex(v => v.isMe);
   const myMsg = myStatus === "attend" ? myConfirmIdx >= 0 ? `참석 확정 · ${myConfirmIdx + 1}번째` : `대기 ${myWaitIdx + 1}번째 (대기 ${waitlist.length}명 중)${prio && myCount > 0 ? ` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요` : ""}` : myStatus === "absent" ? "불참으로 등록되었어요" : myStatus === "maybe" ? "미정으로 등록되었어요" : "아직 참석 여부를 정하지 않았어요";
@@ -10763,7 +10818,17 @@ function MeetingDetail({
       textAlign: "center",
       color: !myStatus ? "#A3AAC2" : myStatus === "attend" && myConfirmIdx < 0 ? "#C2610C" : "#6B7493"
     }
-  }, myMsg), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
+  }, myMsg), imOut && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11.5,
+      color: "#6B7493",
+      background: "#F4F6FB",
+      borderRadius: 10,
+      padding: "8px 10px",
+      lineHeight: 1.5
+    }
+  }, inviter ? `${inviter} 님 초대로 참석하는 길드 모임이에요.` : "초대받아 참석하는 길드 모임이에요.", " \uBD88\uCC38\uC73C\uB85C \uBC14\uAFD4\uB3C4 \uB2E4\uC2DC \uCC38\uC11D\uD560 \uC218 \uC788\uC5B4\uC694."), myStatus === "attend" && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#F1F4FA",
       borderRadius: 12,
@@ -11013,7 +11078,8 @@ function MeetingDetail({
     key: v.name + i,
     v: v,
     idx: i + 1,
-    onRemove: rowRemove(v)
+    onRemove: rowRemove(v),
+    out: isOut(v)
   })), confirmed.length === 0 && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
@@ -11047,7 +11113,8 @@ function MeetingDetail({
     v: v,
     idx: i + 1,
     wait: true,
-    onRemove: rowRemove(v)
+    onRemove: rowRemove(v),
+    out: isOut(v)
   }))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
@@ -11057,7 +11124,7 @@ function MeetingDetail({
   }, "\uC790\uB9AC\uAC00 \uB098\uBA74 \uB300\uAE30 \uC21C\uC11C\uB300\uB85C \uCC38\uC11D \uD655\uC815\uB3FC\uC694.")), /*#__PURE__*/React.createElement(MeetingComments, {
     meeting: meeting,
     isAdmin: isAdmin
-  }), !gone && (isAdmin || open && !isPast) && /*#__PURE__*/React.createElement(MemberAttend, {
+  }), !gone && (isAdmin || open && !isPast) && !imOut && /*#__PURE__*/React.createElement(MemberAttend, {
     meeting: meeting,
     isAdmin: isAdmin
   }), isAdmin && FB && !gone && !isPast && /*#__PURE__*/React.createElement(MeetingBannerCard, {
@@ -19121,7 +19188,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "7d9cc5cb81";
+const BUILD_ID = "beacc11715";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {

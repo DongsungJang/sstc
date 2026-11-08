@@ -2949,8 +2949,9 @@ function MeetingBracket({meeting,participants,store}) {
 
 // ─── 예약 상세 ────────────────────────────────────────────────────────────────
 // 참석자·대기자 한 줄: 순서, 이름, 투표 시각, 우선순위 표시
-function VoteRow({v,idx,wait,onRemove}) {
+function VoteRow({v,idx,wait,onRemove,out}) {
   const tag=v.isGuest?{t:`게스트 · ${v.guestOf} 초대`,bg:"#FFF4E5",c:"#C2610C"}
+    :out?{t:v.by?`길드 밖 · ${v.by} 님 초대`:"길드 밖",bg:GUILD_OPEN_BG,c:"#3F6212"}
     :v.prio&&v.count>0?{t:`이달 ${v.count}회 참석`,bg:"#EEF1FA",c:"#6B7493"}:null;
   return (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,
@@ -2964,7 +2965,7 @@ function VoteRow({v,idx,wait,onRemove}) {
           {tag&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:tag.bg,color:tag.c}}>{tag.t}</span>}
           {v.arrive&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#EEF4FF",color:BLUE}}><Ic n="arrive" s={11}/> {v.arrive} 도착</span>}
           {v.leave&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#EEF4FF",color:BLUE}}><Ic n="leave" s={11}/> {v.leave} 출발</span>}
-          {v.by&&!v.isGuest&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#FEF9C3",color:"#A16207"}}>대신 등록</span>}
+          {v.by&&!v.isGuest&&!out&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#FEF9C3",color:"#A16207"}}>대신 등록</span>}
           {v.bumped&&<span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:12,background:"#FEF2F2",color:"#ef4444"}}>참석 적은 회원에게 밀림</span>}
         </div>
         <span style={{fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{fmtAt(v.at)} {v.by&&!v.isGuest?`${v.by} 님이 등록`:"투표"}</span>
@@ -3100,15 +3101,21 @@ function MemberAttend({meeting,isAdmin}){
   const me=myUid();
   const going=k=>!!(votes[k]&&votes[k].status==="attend"&&votes[k].at);
   const absent=k=>!!(votes[k]&&votes[k].status==="absent");
+  // 길드 모임: 길드원은 길드원만, 길드 밖 회원은 만든 사람·관리자만 초대해서 넣어요
+  const gids=meeting.guildIds||[], guildMeet=gids.length>0, canOut=!guildMeet||isAdmin||meeting.createdByUid===me;
+  const isOut=m=>guildMeet&&!inMeetGuild(meeting.info,m.uid);
+  const gname=meetGuildNames(meeting.info)||"길드";
   const add=m=>{
-    if(!isAdmin&&!window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
+    const out=isOut(m);
+    if(out&&!window.confirm(`${m.nickname} 님을 초대할까요?\n${m.nickname} 님은 ${gname} 길드원이 아니에요. 초대하면 이 모임에 참석으로 들어가고, 비공개 모임이어도 ${m.nickname} 님에게 보여요. ${m.nickname} 님에게 알림이 가요.`)) return;
+    if(!out&&!isAdmin&&!window.confirm(`${m.nickname} 님을 이 모임에 참석으로 등록할까요? ${m.nickname} 님에게 알림이 가요.`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${m.uid}`,{name:m.nickname,ntrp:m.ntrp||"",status:"attend",at:nowAt(),guests:[],arrive:null,leave:null,by:ME,byUid:me})
-      .then(()=>{ if(m.uid!==me) postFeed({type:"attend",to:m.uid,meetingId:meeting.id,text:`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} 모임에 나를 참석으로 등록했어요`}); })
+      .then(()=>{ if(m.uid!==me) postFeed({type:"attend",to:m.uid,meetingId:meeting.id,text:out?`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} ${gname} 길드 모임에 나를 초대해서 참석으로 등록했어요`:`${ME} 님이 ${meeting.date} ${meeting.placeName||meeting.place} 모임에 나를 참석으로 등록했어요`}); })
       .catch(e=>alert(authMsg(e)));
   };
   const k=searchKey(q);
   // 닉네임·본명 일부만 쳐도 바로 후보가 나와요 (한글 치는 중에도). 앞부분이 맞는 회원이 먼저 나와요.
-  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(isAdmin||(m.uid!==me&&!absent(m.uid))))
+  const list=data?activeMembers(data).filter(m=>!going(m.uid)&&(isAdmin||(m.uid!==me&&!absent(m.uid)))&&(canOut||!isOut(m)))
     .map(m=>({m,sc:hgMatch(q,[m.nickname,realNameOf(m)])})).filter(x=>x.sc>=0)
     .sort((a,b)=>a.sc-b.sc||a.m.nickname.localeCompare(b.m.nickname,"ko")).map(x=>x.m):[];
   return(
@@ -3117,6 +3124,7 @@ function MemberAttend({meeting,isAdmin}){
         <span style={{fontSize:15,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6}}><Ic n="userPlus" s={15} c={BLUE}/>다른 회원 참석 등록</span>
         <button type="button" onClick={()=>setShow(v=>!v)} style={{background:BLUE_LIGHT,border:`1px solid ${BLUE}`,borderRadius:12,color:BLUE,fontSize:12,fontWeight:600,padding:"5px 12px",cursor:"pointer"}}>{show?"닫기":"+ 회원 추가"}</button>
       </div>
+      {guildMeet&&<p style={{margin:"6px 0 0",fontSize:12,color:"#6B7493",lineHeight:1.6}}>{canOut?"길드 모임이라 길드원이 먼저 나와요. 만든 사람은 길드 밖 회원도 초대해서 넣을 수 있어요.":"길드 모임이라 길드원만 넣을 수 있어요."}</p>}
       <p style={{margin:"6px 0 0",fontSize:12,color:"#A3AAC2",lineHeight:1.6}}>같이 치기로 한 회원을 대신 넣어 줄 수 있어요. 넣은 시각으로 투표한 것처럼 순서가 정해지고, 명단에 '대신 등록'으로 표시돼요. 등록된 회원에게 알림이 가요. {isAdmin?"빼려면 명단에서 빼기를 눌러요.":"내가 넣은 회원은 명단에서 빼기로 뺄 수 있어요. 불참을 누른 회원은 넣을 수 없어요."}</p>
       {show&&<div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
         <input type="search" aria-label="추가할 회원 검색" value={q} onChange={e=>setQ(e.target.value)} placeholder="닉네임 또는 본명으로 찾기" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search" style={{...inputStyle,fontSize:16}}/>
@@ -3124,12 +3132,16 @@ function MemberAttend({meeting,isAdmin}){
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto"}}>
           {!data&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>회원 목록을 불러오는 중이에요…</p>}
           {data&&list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"6px 0"}}>{k?"찾는 회원이 없어요":"더 넣을 수 있는 회원이 없어요"}</p>}
-          {list.map(m=>(
+          {(guildMeet?[["길드원",list.filter(m=>!isOut(m))],["길드 밖 회원 · 초대해서 넣기",list.filter(isOut)]]:[["",list]]).map(([label,ms])=>ms.length>0&&<React.Fragment key={label}>
+          {label&&<p style={{margin:"4px 0 0",fontSize:11.5,fontWeight:800,color:"#6B7493"}}>{label}</p>}
+          {ms.map(m=>(
             <div key={m.uid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:14,background:"#F1F4FA"}}>
               <span style={{flex:1,fontSize:14,fontWeight:500,color:INK}}>{m.nickname}{realNameOf(m)&&<span style={{fontSize:13,color:"#4A5578"}}>({realNameOf(m)})</span>} <span style={{fontSize:11,color:"#A3AAC2"}}>{m.ntrp||""}</span>{absent(m.uid)&&<span style={{fontSize:11,color:"#ef4444"}}> · 불참 투표</span>}</span>
-              <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px"}}>참석</button>
+              {isOut(m)&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:12,background:GUILD_OPEN_BG,color:"#3F6212",whiteSpace:"nowrap"}}>길드 밖</span>}
+              <button type="button" onClick={()=>add(m)} style={{...btnSmall,padding:"6px 14px",...(isOut(m)?{background:INK}:{})}}>{isOut(m)?"초대":"참석"}</button>
             </div>
-          ))}
+          ))}</React.Fragment>)}
+          {guildMeet&&!canOut&&<p style={{margin:"2px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>길드 밖 회원은 모임을 만든 사람만 초대할 수 있어요.</p>}
         </div>
       </div>}
     </Card>
@@ -3273,6 +3285,10 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
     if(!window.confirm(`게스트 ${v.name} 님을 이 모임 참석에서 뺄까요?${isPast&&isAdmin?"\n정회원이 됐다면 빼고 나서 '다른 회원 참석 등록'으로 다시 넣어 주세요.":""}`)) return;
     saveMeetingPath(`m${meeting.id}/votes/${v.key}/guests`,list.filter((g,i)=>g&&i!==v.gi)).catch(e=>alert(authMsg(e))); }:null;
   const rowRemove=v=>v.isGuest?kickGuest(v):kick(v);
+  // 길드 모임에서 길드원이 아닌 참석자 (만든 사람이 초대했거나, 그사이 길드를 나간 회원)
+  const isOut=v=>!!meeting.guildIds.length&&!v.isGuest&&!!v.key&&v.key!==meeting.createdByUid&&!inMeetGuild(meeting.info,v.key);
+  const me0=myUid(), guildMeet=meeting.guildIds.length>0, imOut=guildMeet&&!!me0&&!isAdmin&&meeting.createdByUid!==me0&&!inMeetGuild(meeting.info,me0);
+  const inviter=guildMeet&&mine&&mine.byUid?(curNick(mine.byUid,mine.by||"")||"모임 만든 사람"):"";
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
   const myMsg=myStatus==="attend"
     ?(myConfirmIdx>=0?`참석 확정 · ${myConfirmIdx+1}번째`:`대기 ${myWaitIdx+1}번째 (대기 ${waitlist.length}명 중)${prio&&myCount>0?` · 이달 ${myCount}회 참석해서 덜 참석한 회원이 먼저예요`:""}`)
@@ -3331,6 +3347,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
             <AttendButtons status={myStatus} onVote={setMyStatus}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
+            {imOut&&<p style={{margin:0,fontSize:11.5,color:"#6B7493",background:"#F4F6FB",borderRadius:10,padding:"8px 10px",lineHeight:1.5}}>{inviter?`${inviter} 님 초대로 참석하는 길드 모임이에요.`:"초대받아 참석하는 길드 모임이에요."} 불참으로 바꿔도 다시 참석할 수 있어요.</p>}
             {myStatus==="attend"&&(
               <div style={{background:"#F1F4FA",borderRadius:12,padding:12,border:"1px solid #E4E9F7",display:"flex",flexDirection:"column",gap:8}}>
                 <span style={{fontSize:13,fontWeight:600,color:INK}}><Ic n="clock" s={14}/> 늦게 오거나 일찍 가나요?</span>
@@ -3381,7 +3398,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
           ))}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} onRemove={rowRemove(v)}/>)}
+          {confirmed.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} onRemove={rowRemove(v)} out={isOut(v)}/>)}
           {confirmed.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2",textAlign:"center",padding:"8px 0"}}>아직 참석 투표가 없어요</p>}
         </div>
         <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>{prio?"정기 모임 참석 횟수는 달마다 새로 세요. 투표를 빨리 해도 이달 더 많이 참석했으면 덜 참석한 회원 뒤로 가요.":"번개 모임은 투표한 순서대로 확정돼요."}</p>
@@ -3390,13 +3407,13 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         <Card>
           <SectionTitle>예약 대기 ({waitlist.length}명){myWaitIdx>=0&&<span style={{fontSize:12,fontWeight:700,color:"#C2610C",marginLeft:6}}>내 순서 {myWaitIdx+1}번째</span>}</SectionTitle>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={rowRemove(v)}/>)}
+            {waitlist.map((v,i)=><VoteRow key={v.name+i} v={v} idx={i+1} wait onRemove={rowRemove(v)} out={isOut(v)}/>)}
           </div>
           <p style={{margin:"10px 0 0",fontSize:12,color:"#A3AAC2"}}>자리가 나면 대기 순서대로 참석 확정돼요.</p>
         </Card>
       )}
       <MeetingComments meeting={meeting} isAdmin={isAdmin}/>
-      {!gone&&(isAdmin||(open&&!isPast))&&<MemberAttend meeting={meeting} isAdmin={isAdmin}/>}
+      {!gone&&(isAdmin||(open&&!isPast))&&!imOut&&<MemberAttend meeting={meeting} isAdmin={isAdmin}/>}
       {isAdmin&&FB&&!gone&&!isPast&&<MeetingBannerCard meeting={meeting}/>}
       {canManage&&goneForm&&(
         <Card>
