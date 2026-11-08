@@ -1443,7 +1443,6 @@ function PopupSettings(){
 }
 
 function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ads=[],adSecs}) {
-  const [goingN,setGoingN]=useState(3);
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
   const [exp,setExp]=useState(focusId);
   const noticeRef=useRef(null);
@@ -1516,34 +1515,13 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </div>
       </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
-      <Card>
-        <SectionTitle>내가 참석할 모임{going.length>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{going.length}</span>}</SectionTitle>
-        {going.length===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {going.slice(0,goingN).map(({m,ok,gone,label})=>(
-            <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
-              <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
-              <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
-                <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
-                <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
-                {ok&&!gone&&<WaitTag m={m}/>}
-              </div>
-            </div>
-          ))}
-          {going.length>3&&(
-            <MoreButton shown={goingN} total={going.length} onChange={setGoingN}/>
-          )}
-        </div>)}
-      </Card>
+      <GoingSlider going={going} onOpenMeeting={onOpenMeeting} onGoBooking={onGoBooking}/>
+      <OpenSpots onOpenMeeting={onOpenMeeting}/>
       <Card>
         <SectionTitle>이달의 참여 랭킹</SectionTitle>
         {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {monthRank.slice(0,7).map(r=>(
+          {monthRank.slice(0,3).map(r=>(
             <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F1F4FA",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
               <RankNo r={r}/>
               <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
@@ -1551,6 +1529,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
               <span style={{fontSize:13,fontWeight:700,color:BLUE}}>{r.count}회</span>
             </div>
           ))}
+          {(()=>{ const me=monthRank.find(r=>r.isMe); if(monthRank.slice(0,3).includes(me)) return null;
+            return <p style={{margin:"4px 2px 0",fontSize:13,color:"#6B7493",display:"flex",justifyContent:"space-between"}}><span>내 순위</span><span style={{fontWeight:800,color:me?BLUE:"#A3AAC2"}}>{me?`${me.rank}위 · ${me.count}회`:"이번 달 참석 전이에요"}</span></p>; })()}
         </div>)}
       </Card>
       <Card>
@@ -1578,6 +1558,74 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       </Card>
     </div>
   );
+}
+// 홈 "내가 참석할 모임": 한 장씩 < > 로 넘겨 봐요 (손가락으로 밀어도 넘어가요)
+function GoingSlider({going,onOpenMeeting,onGoBooking}){
+  const ref=useRef(null), [idx,setIdx]=useState(0), n=going.length;
+  useEffect(()=>{ if(idx>n-1) setIdx(Math.max(0,n-1)); },[n]);
+  const go=i=>{ const el=ref.current; if(!el) return; const j=Math.max(0,Math.min(n-1,i)); el.scrollTo({left:j*el.clientWidth,behavior:"smooth"}); setIdx(j); };
+  const onScroll=()=>{ const el=ref.current; if(el&&el.clientWidth) setIdx(Math.round(el.scrollLeft/el.clientWidth)); };
+  const arrow=(d,ic,label)=>{ const off=d<0?idx<=0:idx>=n-1; return <button type="button" aria-label={label} disabled={off} onClick={()=>go(idx+d)} style={{width:30,height:30,borderRadius:10,border:"none",background:off?"#F1F4FA":BLUE_LIGHT,color:off?"#C5CBDD":BLUE,display:"flex",alignItems:"center",justifyContent:"center",cursor:off?"default":"pointer",padding:0}}><Icon name={ic} size={17} stroke={2.4}/></button>; };
+  return <Card>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>내가 참석할 모임{n>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{n}</span>}</span>
+      {n>1&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#8A93B2",fontVariantNumeric:"tabular-nums",marginRight:2}}>{idx+1} / {n}</span>
+        {arrow(-1,"chevL","이전 모임")}{arrow(1,"chevR","다음 모임")}
+      </div>}
+    </div>
+    {n===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
+    <div ref={ref} onScroll={onScroll} className="sstc-hscroll" style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory"}}>
+      {going.map(({m,ok,gone,label})=>(
+        <div key={m.id} style={{flex:"0 0 100%",boxSizing:"border-box",scrollSnapAlign:"start"}}>
+        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
+          <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
+            <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
+            <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+            <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
+            {ok&&!gone&&<WaitTag m={m}/>}
+          </div>
+        </div></div>
+      ))}
+    </div>)}
+    {n>1&&<div aria-hidden="true" style={{display:"flex",justifyContent:"center",gap:5,marginTop:10}}>
+      {going.map((g,i)=><span key={g.m.id} style={{width:i===idx?16:6,height:6,borderRadius:3,background:i===idx?BLUE:"#D6DEF7",transition:"width .2s"}}/>)}
+    </div>}
+  </Card>;
+}
+// 자리 남은 모임: 지금 참석 누를 수 있고 아직 정원이 안 찬 다가오는 모임 (내가 이미 참석한 모임은 빼요)
+const seatsLeft=m=>Math.max(0,(m.total||0)-(m.attendees||[]).length);
+const openSpotMeetings=()=>MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled&&isOpen(m)&&canJoinMeeting(m.info,m.rec)&&m.total>0&&!isFull(m)
+  &&!(m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()]&&m.rec.votes[myVoteKey()].status==="attend"));
+function OpenSpots({onOpenMeeting}){
+  const [n,setN]=useState(MORE_STEP);
+  const list=openSpotMeetings();
+  if(!list.length) return null;
+  return <Card>
+    <SectionTitle>자리 남은 모임<span style={{fontSize:12,fontWeight:600,color:"#12B76A",marginLeft:6}}>{list.length}</span></SectionTitle>
+    <p style={{margin:"-6px 0 6px",fontSize:12,color:"#8A93B2"}}>지금 바로 참석할 수 있어요</p>
+    <div style={{display:"flex",flexDirection:"column"}}>
+      {list.slice(0,n).map((m,i,arr)=>{ const left=seatsLeft(m), few=left<=2; return(
+        <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
+          style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<arr.length-1?"1px solid #EEF1FA":"none",cursor:"pointer"}}>
+          <span style={{minWidth:46,textAlign:"center",background:"#F1F4FA",color:INK,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",overflow:"hidden"}}><span>{m.iso.slice(5,7)}.{m.iso.slice(8,10)} ({DOW_KO[new Date(m.iso+"T00:00:00").getDay()]})</span><KindBadge m={m}/></p>
+            <p style={{margin:0,fontSize:12,color:"#4A5578",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.time.split(" ~ ")[0]} · {m.placeName||m.place}</p>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0}}>
+            <span style={{display:"inline-block",fontSize:12,fontWeight:800,padding:"4px 10px",borderRadius:10,background:few?"#FFF4E5":"#E5F7EE",color:few?"#C2610C":"#067647",whiteSpace:"nowrap"}}>{left}자리 남음</span>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"#A3AAC2",fontVariantNumeric:"tabular-nums"}}>{m.attendees.length}/{m.total}명</p>
+          </div>
+        </div>); })}
+      {list.length>MORE_STEP&&<div style={{height:8}}/>}
+      <MoreButton shown={n} total={list.length} onChange={setN}/>
+    </div>
+  </Card>;
 }
 
 // ─── 대진 편성 엔진 ───────────────────────────────────────────────────────────
@@ -3814,8 +3862,10 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
 // 랭킹 시상대: 1~3등은 단상(2·1·3 순서), 4등부터는 줄 목록
-function Podium({rank}){
-  const top=rank.slice(0,3), rest=rank.slice(3);
+function Podium({rank,limit}){
+  const [all,setAll]=useState(false);
+  const top=rank.slice(0,3), restAll=rank.slice(3), rest=limit&&!all?rank.slice(3,limit):restAll;
+  const me=rank.find(r=>r.isMe), hidden=limit?rank.length-limit:0;
   const order=[top[1],top[0],top[2]].filter(Boolean);
   const hgt={1:136,2:104,3:80};
   return <>
@@ -3833,11 +3883,16 @@ function Podium({rank}){
     {rest.length>0&&<div style={{marginTop:6}}>
       {rest.map((r,i)=>(
         <div key={r.name} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 2px",borderBottom:i<rest.length-1?"1px solid #EEF1FA":"none"}}>
-          <span style={{minWidth:30,fontSize:15,fontWeight:800,color:"#A3AAC2",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{r.rank}위</span>
+          <span style={{minWidth:40,fontSize:15,fontWeight:800,color:"#A3AAC2",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{r.rank}위</span>
           <span style={{flex:1,fontSize:15,fontWeight:700,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BALL,color:INK,padding:"1px 6px",borderRadius:6,marginLeft:6}}>나</span>}</span>
           <span style={{fontSize:15,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums"}}>{r.count}회</span>
         </div>
       ))}
+    </div>}
+    {limit&&hidden>0&&<button type="button" onClick={()=>setAll(!all)} style={{width:"100%",marginTop:8,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>{all?"접기":`더보기 (${hidden}명 더)`}</button>}
+    {limit&&<div style={{display:"flex",alignItems:"center",gap:12,marginTop:12,padding:"12px 14px",borderRadius:14,background:me?BALL:"#F1F4FA"}}>
+      <span style={{fontSize:13,fontWeight:700,color:INK,opacity:0.75}}>내 순위</span>
+      <span style={{flex:1,textAlign:"right",fontSize:me?18:13,fontWeight:900,color:me?INK:"#8A93B2",fontVariantNumeric:"tabular-nums"}}>{me?<>{me.rank}위<span style={{fontSize:13,fontWeight:600,opacity:0.6,marginLeft:6}}>{rank.length}명 중 · {me.count}회</span></>:"아직 참석 기록이 없어요"}</span>
     </div>}
   </>;
 }
@@ -3867,35 +3922,81 @@ function StatsTab() {
           </Card>
         ))}
       </div>
-      <Card>
-        <SectionTitle>월별 참석 횟수</SectionTitle>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:120,padding:"0 4px"}}>
-          {rows.map(r=>(
-            <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-              <span style={{fontSize:10,color:BLUE,fontWeight:700}}>{r.me}</span>
-              <div style={{width:"100%",display:"flex",gap:2,alignItems:"flex-end",height:80}}>
-                <div style={{flex:1,background:BLUE,borderRadius:"6px 6px 0 0",height:`${(r.me/maxVal)*100}%`,minHeight:4}}/>
-                <div style={{flex:1,background:"#DCE4FF",borderRadius:"6px 6px 0 0",height:`${(r.avg/maxVal)*100}%`,minHeight:4}}/>
-              </div>
-              <span style={{fontSize:10,color:"#A3AAC2"}}>{r.label}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
-          {[{bg:BLUE,label:"나"},{bg:"#DCE4FF",label:"참석 회원 평균"}].map(l=>(
-            <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:10,height:10,background:l.bg,borderRadius:2}}/>
-              <span style={{fontSize:11,color:"#6B7493"}}>{l.label}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <MonthlyChart rows={rows} maxVal={maxVal}/>
       <Card>
         <SectionTitle>참여 랭킹</SectionTitle>
-        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:<Podium rank={rank}/>}
+        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:<Podium rank={rank} limit={5}/>}
       </Card>
+      <CourtStats held={held}/>
     </div>
   );
+}
+// 월별 참석 횟수: 나(파랑)와 참석 회원 평균(연한 파랑) 막대를 나란히, 숫자는 막대 안 위쪽에
+function MonthlyChart({rows,maxVal}){
+  const cur=rows[rows.length-1], diff=Math.round((cur.me-cur.avg)*10)/10;
+  const H=96;
+  return <Card>
+    <SectionTitle>월별 참석 횟수</SectionTitle>
+    <div style={{display:"flex",gap:8,marginBottom:14}}>
+      {[{l:"이번 달 나",v:cur.me,c:BLUE,bg:BLUE_LIGHT},{l:"참석 회원 평균",v:cur.avg,c:INK,bg:"#F1F4FA"}].map(x=>(
+        <div key={x.l} style={{flex:1,padding:"10px 12px",borderRadius:14,background:x.bg}}>
+          <p style={{margin:0,fontSize:12,color:"#6B7493"}}>{x.l}</p>
+          <p style={{margin:"2px 0 0",fontSize:22,fontWeight:900,color:x.c,fontVariantNumeric:"tabular-nums",letterSpacing:"-0.03em"}}>{x.v}<span style={{fontSize:13,fontWeight:700,marginLeft:2}}>회</span></p>
+        </div>))}
+    </div>
+    {(cur.me>0||cur.avg>0)&&<p style={{margin:"-4px 0 14px",fontSize:13,fontWeight:700,color:diff>0?BLUE:diff<0?"#C2610C":"#6B7493"}}>{diff>0?`평균보다 ${diff}회 더 나왔어요`:diff<0?`평균보다 ${-diff}회 적어요`:"딱 평균만큼 나왔어요"}</p>}
+    <div style={{display:"flex",alignItems:"flex-end",gap:6,padding:"0 4px"}}>
+      {rows.map(r=>(
+        <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+          <div style={{width:"100%",display:"flex",gap:3,alignItems:"flex-end",height:H}}>
+            {[{v:r.me,bg:BLUE,c:"#fff"},{v:r.avg,bg:"#CBD6F5",c:"#8593BC",w:600}].map((x,k)=>(
+              <div key={k} style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",height:"100%"}}>
+                <div style={{width:"100%",background:x.bg,borderRadius:"6px 6px 0 0",height:Math.max(20,(x.v/maxVal)*H),display:"flex",justifyContent:"center",paddingTop:4,boxSizing:"border-box"}}>
+                  <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:x.w||800,fontVariantNumeric:"tabular-nums",letterSpacing:"-0.03em"}}>{x.v}</span>
+                </div>
+              </div>))}
+          </div>
+          <span style={{fontSize:11,color:"#8A93B2"}}>{r.label}</span>
+        </div>
+      ))}
+    </div>
+    <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
+      {[{bg:BLUE,label:"나"},{bg:"#CBD6F5",label:"참석 회원 평균"}].map(l=>(
+        <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
+          <div style={{width:10,height:10,background:l.bg,borderRadius:2}}/>
+          <span style={{fontSize:12,color:"#6B7493"}}>{l.label}</span>
+        </div>
+      ))}
+    </div>
+  </Card>;
+}
+// 코트별 통계: 끝난 모임(무산 제외)을 장소 이름으로 묶어 모임 수·평균 인원·내 참석
+function CourtStats({held}){
+  const [all,setAll]=useState(false);
+  const by={};
+  held.forEach(m=>{ const k=(m.placeName||"").trim()||"장소 미정"; const o=by[k]||(by[k]={name:k,n:0,people:0,me:0,last:""});
+    o.n++; o.people+=(m.attendees||[]).length; if((m.attendees||[]).some(a=>a.isMe)) o.me++; if(m.iso>o.last) o.last=m.iso; });
+  const list=Object.values(by).sort((a,b)=>b.n-a.n||b.me-a.me||a.name.localeCompare(b.name,"ko"));
+  const max=Math.max(1,...list.map(c=>c.n)), shown=all?list:list.slice(0,5);
+  const fav=list.slice().sort((a,b)=>b.me-a.me||b.n-a.n)[0];
+  return <Card>
+    <SectionTitle>코트별 통계</SectionTitle>
+    {list.length===0?<Empty>아직 끝난 모임이 없어요.</Empty>:<>
+    {fav&&fav.me>0&&<p style={{margin:"-4px 0 12px",fontSize:13,color:"#6B7493"}}>내가 가장 많이 간 코트는 <b style={{color:BLUE}}>{fav.name}</b> ({fav.me}회)</p>}
+    <div style={{display:"flex",flexDirection:"column"}}>
+      {shown.map((c,i)=>(
+        <div key={c.name} style={{padding:"11px 0",borderBottom:i<shown.length-1?"1px solid #EEF1FA":"none"}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:6}}>
+            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
+            <span style={{fontSize:14,fontWeight:800,color:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{c.n}<span style={{fontSize:12,fontWeight:600,color:"#8A93B2"}}>회</span></span>
+          </div>
+          <div style={{height:6,background:"#EEF1FA",borderRadius:4,marginBottom:6}}><div style={{height:"100%",width:`${(c.n/max)*100}%`,background:BLUE,borderRadius:4}}/></div>
+          <p style={{margin:0,fontSize:12,color:"#6B7493",fontVariantNumeric:"tabular-nums"}}>평균 {Math.round(c.people/c.n*10)/10}명 · 나 <b style={{color:c.me?BLUE:"#A3AAC2"}}>{c.me}회</b> · 최근 {c.last.slice(2).replace(/-/g,".")}</p>
+        </div>))}
+    </div>
+    {list.length>5&&<button type="button" onClick={()=>setAll(!all)} style={{width:"100%",marginTop:8,padding:"9px 0",background:"#fff",color:BLUE,border:"1.5px solid #D6DEF7",borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>{all?"접기":`더보기 (${list.length-5}곳 더)`}</button>}
+    </>}
+  </Card>;
 }
 
 // 닉네임 바꾸기: 새 닉네임 자리 차지 → 옛 닉네임 자리 비움 → 내 투표·대진표·내가 만든 모임의 이름을 새 닉네임으로
