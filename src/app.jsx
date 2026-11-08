@@ -2102,7 +2102,7 @@ const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 // anon: 소곤소곤 익명 글·댓글에서 보내는 알림은 보낸 사람을 남기지 않아요
 const postFeed = (item,anon) => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:anon?"익명":ME,byUid:anon?"":myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",attend:"check",mention:"message",cancel:"x",boardComment:"message"};
+const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",courtFee:"coin",attend:"check",mention:"message",cancel:"x",boardComment:"message"};
 // 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
 const MEETING_NOTI=["meeting","admin","attend","mention","cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
@@ -2137,7 +2137,7 @@ function useClubFeed(uid){
     });
     return ()=>subs.forEach(f=>f());
   },[uid]);
-  const items=[...toList(st.feed),...toList(st.inbox,{mine:true})].filter(n=>n&&n.at&&(!n.to||n.to===uid)).sort((a,b)=>b.at-a.at).slice(0,50)
+  const items=[...toList(st.feed),...toList(st.inbox,{mine:true})].filter(n=>n&&n.at&&(!n.to||n.to===uid)&&(n.type!=="courtFee"||ME_ADMIN)).sort((a,b)=>b.at-a.at).slice(0,50)
     .map(n=>({...n,unread:n.at>(+st.seen||0)&&n.byUid!==uid}));
   const notices=toList(st.notices).filter(n=>n.title).sort((a,b)=>b.at-a.at);
   const markSeen=()=>FB&&uid&&FB.club.child("members/"+uid+"/notiSeenAt").set(Date.now()).catch(()=>{});
@@ -2199,7 +2199,7 @@ function Pager({page,total,onChange,label}){
     {btn("다음 ›",p+1,p>=pages-1)}
   </div>;
 }
-function AdminTab(){
+function AdminTab({jump}){
   useSeen();
   const [members,setMembers]=useState(null);
   const [approved,setApproved]=useState({});
@@ -2210,7 +2210,9 @@ function AdminTab(){
   const [lastSeen,setLastSeen]=useState({});   // uid → 마지막 접속 시각 (규칙을 아직 안 붙여넣었으면 null)
   const [sortSeen,setSortSeen]=useState(false);   // 정회원 목록 최근 접속순
   const [pg,setPg]=useState({pending:0,active:0,gone:0});   // 목록별 페이지 (5명씩)
-  const [sec,setSec]=useState(null);
+  const [sec,setSec]=useState(()=>jump&&jump.sec||null);
+  useEffect(()=>{ if(jump&&jump.sec) setSec(jump.sec); },[jump&&jump.n]);
+  const feeReqs=useCourtFeeRequests();
   const [photoBusy,setPhotoBusy]=useState(null);   // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage=(k,n)=>setPg(p=>({...p,[k]:n}));
   const toggleSortSeen=()=>{ setSortSeen(v=>!v); goPage("active",0); };   // 정렬 바꾸면 1페이지로
@@ -2319,7 +2321,7 @@ function AdminTab(){
       )}
     </div>
   );
-  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["fees","coin","코트비 관리",`코트 ${feeList(COURT_FEES).length}곳${feeReqs.length?` · 등록 필요 ${feeReqs.length}곳`:""}`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
   const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
   if(sec) return (
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
@@ -2350,6 +2352,7 @@ function AdminTab(){
       </>}
       {sec==="banner"&&<AdSettings/>}
       {sec==="guilds"&&<AdminGuilds/>}
+      {sec==="fees"&&<CourtFeeSettings jump={jump}/>}
     </div>
   );
   return (
@@ -4070,6 +4073,223 @@ function Sheet({title,onClose,children}) {
   return typeof ReactDOM!=="undefined"&&ReactDOM.createPortal?ReactDOM.createPortal(el,document.body):el;
 }
 
+// ─── 코트비 표 (관리 탭) · 새 모임 코트비 자동 계산 ─────────────────────────────
+// club/courtFees/<id> {name,address,lat,lng,nightFrom:"18:00",wd:{same,day,night},we:{same,day,night},createdBy..,updatedBy..}
+// 금액은 코트 1면 · 1시간 기준. 관리자만 씀.
+// club/courtFeeRequests/<테니스장 키> : 회원이 표에 없는 테니스장으로 번개를 만들면 남는 등록 요청 (관리자만 읽음)
+let COURT_FEES = {};
+function useCourtFees(){
+  const [v,setV]=useState(COURT_FEES);
+  useEffect(()=>{ if(!FB) return; const r=FB.club.child("courtFees"); const h=s=>{COURT_FEES=s.val()||{}; setV(COURT_FEES);}; r.on("value",h,()=>{}); return ()=>r.off("value",h); },[]);
+  return v;
+}
+function useCourtFeeRequests(){
+  const [v,setV]=useState({});
+  useEffect(()=>{ if(!FB) return; const r=FB.club.child("courtFeeRequests"); const h=s=>setV(s.val()||{}); r.on("value",h,()=>setV({})); return ()=>r.off("value",h); },[]);
+  return Object.entries(v).map(([id,r])=>({id,...r})).filter(r=>r&&r.name).sort((a,b)=>(b.at||0)-(a.at||0));
+}
+const feeKey=name=>nickKey(placeKey(name)||"_");
+const fmtMD=t=>{ if(!t) return ""; const x=new Date(t); return `${x.getMonth()+1}월 ${x.getDate()}일`; };
+const feeWho=c=>[c.createdBy&&`등록 ${c.createdBy} · ${fmtMD(c.createdAt)}`,c.updatedBy&&`수정 ${c.updatedBy} · ${fmtMD(c.updatedAt)}`].filter(Boolean).join("  ·  ");
+const feeList=fs=>Object.entries(fs||{}).map(([id,c])=>({id,...c})).filter(c=>c&&c.name).sort((a,b)=>String(a.name).localeCompare(String(b.name),"ko"));
+const findCourtFee=(fs,place)=>{ const k=placeKey(place); return k?feeList(fs).find(c=>placeKey(c.name)===k)||null:null; };
+// 코트 수: "5, 6" → 2면, "3~5" → 3면, 글자만 있으면 1면
+const courtCount=v=>{ const s=String(v||"").trim(); if(!s) return 1; let n=0;
+  s.split(/[,·\s]+/).filter(Boolean).forEach(t=>{ const m=/^(\d+)\s*[~\-]\s*(\d+)$/.exec(t); n+=m?Math.min(20,Math.abs(+m[2]-+m[1])+1):1; }); return Math.max(1,n); };
+const hmMin=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m?(+m[1])*60+(+m[2]):0; };
+const hrsText=min=>{ const h=min/60; return Number.isInteger(h)?`${h}시간`:`${(Math.round(h*10)/10)}시간`; };
+// 요일(토·일은 주말)·시간(야간 시작 시각으로 나눔)·코트 수로 계산
+function calcCourtFee(c,date,start,end,courtNo){
+  if(!c||!date||!start||!end||end<=start) return null;
+  const we=[0,6].includes(dowOf(date)), row=we?c.we:c.wd; if(!row) return null;
+  const nf=hmMin(c.nightFrom||"18:00"), s=hmMin(start), e=hmMin(end);
+  const dayMin=Math.max(0,Math.min(e,nf)-s), nightMin=Math.max(0,e-Math.max(s,nf));
+  const dayRate=+row.day||0, nightRate=row.same?dayRate:(+row.night||0), n=courtCount(courtNo);
+  const parts=row.same?[{label:"",min:dayMin+nightMin,rate:dayRate}]
+    :[{label:"주간",min:dayMin,rate:dayRate},{label:"야간",min:nightMin,rate:nightRate}].filter(p=>p.min>0);
+  const total=Math.round(parts.reduce((a,p)=>a+p.min/60*p.rate,0)*n);
+  return {we,n,parts,total};
+}
+const feeDigits=v=>String(v==null?"":v).replace(/[^\d]/g,"").slice(0,7);
+function MoneyInput({value,onChange,label,placeholder,style}){
+  return <div style={{position:"relative",flex:1,minWidth:0,...style}}>
+    <input type="text" inputMode="numeric" aria-label={label} value={value?Number(value).toLocaleString("ko-KR"):""} onChange={e=>onChange(feeDigits(e.target.value))} placeholder={placeholder||"0"}
+      style={{...inputStyle,paddingRight:36,textAlign:"right",fontVariantNumeric:"tabular-nums",fontSize:16}}/>
+    <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#8A93B0"}}>원</span>
+  </div>;
+}
+
+// 새 모임 화면의 코트비 칸. manual: 직접 넣은 금액(문자열) 또는 null(자동)
+function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,manual,onManual,isAdmin}){
+  const [sheet,setSheet]=useState(false);
+  const c=findCourtFee(fees,place), r=calcCourtFee(c,date,start,end,courtNo);
+  const box={background:"#fff",borderRadius:16,border:"1.5px solid #E2E6F0",padding:"14px 15px"};
+  const link=(label,onClick,color)=><button type="button" onClick={onClick} style={{padding:0,border:"none",background:"none",fontSize:12,fontWeight:700,color:color||BLUE,cursor:"pointer",fontFamily:FONT,textDecoration:"underline",textUnderlineOffset:3}}>{label}</button>;
+  const sheetEl=sheet&&<CourtFeeSheet value={c||{name:place,address:address||"",lat,lng}} onClose={()=>setSheet(false)}/>;
+  if(!String(place||"").trim()) return <div style={{...box,background:"#F7F8FC",borderStyle:"dashed"}}><p style={{margin:0,fontSize:13,color:"#8A93B0",display:"flex",alignItems:"center",gap:6}}><Icon name="coin" size={15} color="#A3AAC2"/>테니스장을 고르면 코트비가 자동으로 들어가요</p></div>;
+  if(!c&&isAdmin&&manual==null) return <div style={{...box,background:"#FFF8EC",borderColor:"#FDE2B8"}}>
+    <p style={{margin:0,fontSize:13.5,fontWeight:700,color:"#8A5A12"}}>이 테니스장은 코트비가 아직 등록되지 않았어요</p>
+    <p style={{margin:"4px 0 0",fontSize:12,color:"#9A6B22",lineHeight:1.55}}>지금 등록해 두면 다음부터 자동으로 들어가요.</p>
+    <div style={{display:"flex",gap:6,marginTop:10}}>
+      <button type="button" onClick={()=>setSheet(true)} style={{flex:1,padding:"10px 0",borderRadius:11,border:"none",background:BLUE,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>코트비 등록하기</button>
+      <button type="button" onClick={()=>onManual("")} style={{padding:"10px 12px",borderRadius:11,border:"1.5px solid #F2C77E",background:"#fff",color:"#8A5A12",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>이번만 직접 넣기</button>
+    </div>
+    {sheetEl}
+  </div>;
+  if(!c||manual!=null) return <div style={box}>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:"#FFF1DB",color:"#9A5B00"}}>직접 입력</span>
+      <span style={{fontSize:12,color:"#6B7493"}}>{c?"이번 모임만 금액을 바꿔요":"등록된 코트비가 없는 테니스장이에요"}</span>
+    </div>
+    <MoneyInput label="이번 모임 코트비" value={manual||""} onChange={v=>onManual(v)} placeholder="이번 모임 코트비 (예: 20,000)" style={{marginTop:10}}/>
+    {!c&&!isAdmin&&<p style={{margin:"8px 0 0",fontSize:11.5,color:"#6B7493",lineHeight:1.55,display:"flex",gap:5}}><Icon name="bell" size={13} color={BLUE} stroke={2.2}/><span>모임을 만들면 관리자에게 <b style={{color:INK}}>"코트비 등록 요청"</b> 알림이 가요. 등록되면 다음부터 자동으로 들어가요.</span></p>}
+    {c&&<div style={{marginTop:8}}>{link("자동 계산으로 되돌리기",()=>onManual(null))}</div>}
+    {!c&&isAdmin&&<div style={{marginTop:8}}>{link("코트비 표에 등록하기",()=>setSheet(true))}</div>}
+    <p style={{margin:"8px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>비워 두면 코트비 없이 만들어져요. 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>
+    {sheetEl}
+  </div>;
+  return <div style={{...box,borderColor:BLUE,boxShadow:"0 4px 14px rgba(33,82,230,0.08)"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:BALL,color:INK}}>자동</span>
+      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:"시간을 넣으면 계산돼요"}</span>
+    </div>
+    {r&&<>
+      <p style={{margin:"8px 0 0",fontSize:26,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{won(r.total)}</p>
+      <div style={{marginTop:8,paddingTop:8,borderTop:"1px dashed #E2E6F0",display:"flex",flexDirection:"column",gap:3}}>
+        {r.parts.map((p,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
+          <span><b style={{color:p.label==="야간"?"#5B3FD6":BLUE,fontWeight:700,marginRight:4}}>{p.label||"주간·야간 같음"}</b>{hrsText(p.min)} × {r.n}면 × {won(p.rate)}</span>
+          <span style={{fontWeight:700,color:INK,flexShrink:0}}>{won(Math.round(p.min/60*p.rate*r.n))}</span></div>)}
+      </div>
+    </>}
+    <p style={{margin:"9px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>관리자가 등록한 코트비 표로 계산했어요{c.nightFrom?` (야간 ${c.nightFrom}부터)`:""}. 1인당 금액은 참석 확정 인원으로 나눠 모임 화면에 보여요.</p>
+    {isAdmin&&feeWho(c)&&<p style={{margin:"4px 0 0",fontSize:11,color:"#8A93B0",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color="#A3AAC2"/>{feeWho(c)}</p>}
+    <div style={{display:"flex",gap:14,marginTop:8}}>
+      {isAdmin&&link("코트비 수정",()=>setSheet(true))}
+      {link("이번만 직접 바꾸기",()=>onManual(r?String(r.total):""),"#6B7493")}
+    </div>
+    {sheetEl}
+  </div>;
+}
+
+// 관리 → 코트비 관리
+function CourtFeeSettings({jump}){
+  const fees=useCourtFees(), reqs=useCourtFeeRequests();
+  const [edit,setEdit]=useState(null);
+  const [err,setErr]=useState("");
+  const list=feeList(fees);
+  const blank=r=>({name:r?r.name:"",address:r&&r.address||"",lat:r&&r.lat,lng:r&&r.lng,nightFrom:"18:00",wd:{same:false,day:"",night:""},we:{same:true,day:"",night:""},req:r||null});
+  // 알림에서 눌러서 왔으면 그 테니스장 등록 창을 바로 열어요
+  useEffect(()=>{ if(!jump||!jump.place) return; const c=findCourtFee(fees,jump.place); const r=reqs.find(x=>placeKey(x.name)===placeKey(jump.place));
+    if(c) setEdit(c); else if(r) setEdit(blank(r)); else setEdit(blank({name:jump.place})); },[jump&&jump.n,reqs.length,Object.keys(fees).length]);
+  const dismiss=r=>{ if(!window.confirm(`${r.name} 등록 요청을 지울까요? 코트비 표에는 아무것도 안 바뀌어요.`)) return; FB.club.child("courtFeeRequests/"+r.id).remove().catch(e=>setErr(authMsg(e))); };
+  const rate=row=>!row?"-":row.same?`${won(row.day)} (주·야 같음)`:`주간 ${won(row.day)} · 야간 ${won(row.night)}`;
+  return <>
+    {err&&<Card><p style={{margin:0,color:"#ef4444",fontSize:13}}>{err}</p></Card>}
+    {reqs.length>0&&<Card style={{border:"1.5px solid #FDE2B8",background:"#FFFBF3"}}>
+      <SectionTitle>등록이 필요한 코트 ({reqs.length}곳)</SectionTitle>
+      {reqs.map((r,i)=><div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderTop:i?"1px solid #F6E6C8":"none"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <p style={{margin:0,fontSize:15,fontWeight:800,color:INK}}>{r.name}</p>
+          <p style={{margin:"2px 0 0",fontSize:11.5,color:"#8A5A12",lineHeight:1.5}}>{[r.by&&`${r.by} 님`,r.date&&`${fmtDate(r.date)} 모임`,r.fee?`직접 입력 ${won(r.fee)}`:"금액 없이 만듦"].filter(Boolean).join(" · ")}</p>
+        </div>
+        <button type="button" onClick={()=>dismiss(r)} style={{...btnSmall,background:"none",color:"#8A93B0",padding:"9px 6px"}}>지우기</button>
+        <button type="button" onClick={()=>setEdit(blank(r))} style={{...btnSmall,background:BLUE,fontWeight:700,padding:"9px 13px"}}>등록하기</button>
+      </div>)}
+      <p style={{margin:"6px 0 0",fontSize:11,color:"#B08A4A",lineHeight:1.6}}>회원이 코트비 표에 없는 테니스장으로 번개 모임을 만들면 여기와 알림에 떠요. 등록하면 목록에서 사라져요.</p>
+    </Card>}
+    <Card>
+      <SectionTitle action="+ 코트 추가" onAction={()=>setEdit(blank(null))}>코트비 관리 ({list.length}곳)</SectionTitle>
+      {list.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>아직 등록된 코트가 없어요.</p>}
+      <div style={{display:"flex",flexDirection:"column"}}>
+        {list.map((c,i)=><button key={c.id} type="button" onClick={()=>setEdit(c)} style={{display:"block",width:"100%",textAlign:"left",padding:"12px 0",border:"none",borderTop:i?"1px solid #E8ECF4":"none",background:"none",cursor:"pointer",fontFamily:FONT}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <Icon name="pin" size={15} color={BLUE} stroke={2.2}/>
+            <span style={{flex:1,minWidth:0,fontSize:15.5,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{c.name}</span>
+            {!(c.wd&&c.wd.same&&c.we&&c.we.same)&&<span style={{fontSize:11,fontWeight:700,color:"#5B3FD6",background:"#EFEBFF",padding:"2px 7px",borderRadius:8,flexShrink:0}}>야간 {c.nightFrom||"18:00"}~</span>}
+            <Icon name="chevR" size={16} color="#A3AAC2"/>
+          </div>
+          {c.address&&<p style={{margin:"2px 0 0 21px",fontSize:11.5,color:"#8A93B0"}}>{c.address}</p>}
+          {feeWho(c)&&<p style={{margin:"7px 0 0 21px",fontSize:11.5,fontWeight:600,color:"#4A5578",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color={BLUE}/>{feeWho(c)}</p>}
+          <div style={{margin:"7px 0 0 21px",display:"grid",gridTemplateColumns:"38px 1fr",rowGap:3,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
+            <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
+            <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
+          </div>
+        </button>)}
+      </div>
+      <p style={{margin:"10px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.6}}>금액은 코트 1면 · 1시간 기준이에요. 번개 모임을 만들 때 이 테니스장을 고르면 요일·시간·코트 수에 맞춰 코트비가 자동으로 들어가요. 회원은 표에 없는 테니스장일 때 그 모임 코트비만 직접 넣어요.</p>
+    </Card>
+    {edit&&<CourtFeeSheet key={edit.id||(edit.req&&edit.req.id)||edit.name||"new"} value={edit} onClose={()=>setEdit(null)}/>}
+  </>;
+}
+// 코트비 등록·수정 (관리자만)
+function CourtFeeSheet({value,onClose}){
+  const row0=r=>({same:!!(r&&r.same),day:r&&r.day?String(r.day):"",night:r&&r.night?String(r.night):""});
+  const [f,setF]=useState(()=>({...value,nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""}}));
+  const [err,setErr]=useState(""), [busy,setBusy]=useState(false);
+  const editing=!!value.id;
+  const block=(k,title,sub)=>{ const row=f[k]; const put=o=>setF(p=>({...p,[k]:{...p[k],...o}}));
+    const seg=(on,label,v)=><button type="button" aria-pressed={on} onClick={()=>put({same:v})} style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{label}</button>;
+    const lab=(t,c)=><span style={{display:"block",fontSize:11.5,fontWeight:700,color:c,margin:"0 0 4px 2px"}}>{t}</span>;
+    return <div style={{background:"#fff",borderRadius:16,padding:"13px 14px",border:"1.5px solid #E2E6F0"}}>
+      <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:9}}><span style={{fontSize:15,fontWeight:800,color:INK}}>{title}</span><span style={{fontSize:11.5,color:"#A3AAC2"}}>{sub}</span></div>
+      <div role="group" aria-label={`${title} 주간·야간 요금`} style={{display:"flex",background:"#F4F6FB",borderRadius:11,padding:3,gap:3,marginBottom:10}}>{seg(row.same,"주간·야간 같아요",true)}{seg(!row.same,"주간·야간 달라요",false)}</div>
+      {row.same?<div>{lab("종일 (주간·야간 같음)","#6B7493")}<MoneyInput label={`${title} 종일`} value={row.day} onChange={v=>put({day:v})}/></div>
+        :<div style={{display:"flex",gap:8}}><div style={{flex:1,minWidth:0}}>{lab("주간",BLUE)}<MoneyInput label={`${title} 주간`} value={row.day} onChange={v=>put({day:v})}/></div><div style={{flex:1,minWidth:0}}>{lab("야간","#5B3FD6")}<MoneyInput label={`${title} 야간`} value={row.night} onChange={v=>put({night:v})}/></div></div>}
+    </div>; };
+  const save=()=>{
+    const name=String(f.name||"").trim();
+    if(!name) return setErr("테니스장 이름을 넣어 주세요");
+    const bad=r=>!(+r.day>0)||(!r.same&&!(+r.night>0));
+    if(bad(f.wd)||bad(f.we)) return setErr("평일·주말 요금을 모두 넣어 주세요");
+    const other=findCourtFee(COURT_FEES,name); if(other&&other.id!==value.id) return setErr("이미 등록된 테니스장이에요. 목록에서 눌러 고쳐 주세요");
+    const row=r=>({same:!!r.same,day:+r.day,night:r.same?null:+r.night});
+    const now=Date.now(), uid=myUid();
+    const data={name,address:(f.address||"").trim()||null,lat:Number.isFinite(+f.lat)&&f.lat!=null?+f.lat:null,lng:Number.isFinite(+f.lng)&&f.lng!=null?+f.lng:null,
+      nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),
+      createdBy:editing?(value.createdBy||null):ME,createdByUid:editing?(value.createdByUid||null):uid,createdAt:editing?(value.createdAt||null):now,
+      ...(editing?{updatedBy:ME,updatedByUid:uid,updatedAt:now}:{})};
+    const id=value.id||("c"+now);
+    setBusy(true); setErr("");
+    FB.club.child("courtFees/"+id).set(JSON.parse(JSON.stringify(data)))
+      .then(()=>Promise.all([feeKey(name),value.name&&feeKey(value.name),value.req&&value.req.id].filter(Boolean).map(k=>FB.club.child("courtFeeRequests/"+k).remove().catch(()=>{}))))
+      .then(onClose).catch(e=>{setBusy(false);setErr(authMsg(e));});
+  };
+  const del=()=>{ if(!window.confirm(`${value.name} 코트비를 지울까요? 이미 만든 모임의 코트비는 그대로예요.`)) return;
+    FB.club.child("courtFees/"+value.id).remove().then(onClose).catch(e=>setErr(authMsg(e))); };
+  const req=value.req;
+  return <Sheet title={editing?"코트비 수정":"코트비 등록"} onClose={onClose}>
+    {req&&req.by&&<div style={{background:"#FFF8EC",borderRadius:14,padding:"10px 13px",border:"1px solid #FDE2B8",fontSize:12,color:"#8A5A12",lineHeight:1.6}}>
+      <b>{req.by}</b> 님이 {req.date?`${fmtDate(req.date)} `:""}모임{req.start?`(${req.start}~${req.end}${req.courtNo?` · ${courtLabel(req.courtNo)}`:""})`:""}에 {req.fee?<>코트비를 <b>{won(req.fee)}</b>으로 직접 넣었어요.</>:"코트비 없이 만들었어요."} 참고해서 요금표를 채워 주세요.
+    </div>}
+    {editing&&(value.createdBy||value.updatedBy)&&<div style={{background:"#fff",borderRadius:14,padding:"10px 13px",border:"1px solid #E4E9F7",fontSize:12,color:"#4A5578",lineHeight:1.7}}>
+      {value.createdBy&&<div><span style={{color:"#A3AAC2",display:"inline-block",width:62}}>처음 등록</span><b style={{color:INK}}>{value.createdBy}</b> · {fmtMD(value.createdAt)}</div>}
+      {value.updatedBy&&<div><span style={{color:"#A3AAC2",display:"inline-block",width:62}}>마지막 수정</span><b style={{color:INK}}>{value.updatedBy}</b> · {fmtMD(value.updatedAt)}</div>}
+    </div>}
+    <FieldWrap label="테니스장" required>
+      <PlaceInput value={f.name||""} picked={Number.isFinite(+f.lat)&&f.lat!=null?{name:f.name,address:f.address||""}:null}
+        onChange={v=>setF(p=>({...p,name:v,...(placeKey(v)!==placeKey(p.name)?{lat:null,lng:null}:{})}))}
+        onPick={p=>setF(o=>({...o,name:p.name,address:p.address||o.address||"",lat:p.lat!=null?p.lat:null,lng:p.lng!=null?p.lng:null}))}/>
+      <p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>새 모임에서 쓰는 테니스장 이름과 같아야 자동으로 찾아요.</p>
+    </FieldWrap>
+    <FieldWrap label="야간 요금 시작 시각">
+      <TimeInput label="야간 시작" value={f.nightFrom} onChange={v=>setF(p=>({...p,nightFrom:v}))}/>
+      <p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>이 시각부터는 야간 요금이에요. 모임이 걸쳐 있으면 (예: 17~19시) 시간만큼 나눠서 계산해요.</p>
+    </FieldWrap>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <span style={{fontSize:14,fontWeight:500,color:INK}}>요금 <span style={{color:"#ef4444"}}>*</span></span>
+      <span style={{fontSize:11.5,fontWeight:700,color:INK,background:BALL,padding:"3px 9px",borderRadius:8}}>코트 1면 · 1시간 기준</span>
+    </div>
+    {block("wd","평일","월~금")}
+    {block("we","주말","토·일")}
+    <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>{editing?"고치면 앞으로 만드는 모임부터 바뀐 금액이 들어가요. 이미 만든 모임 코트비는 그대로예요.":"등록하면 다음부터 이 테니스장으로 번개 모임을 만들 때 자동으로 들어가요."}</p>
+    {err&&<p style={{margin:0,fontSize:12.5,color:"#ef4444"}}>{err}</p>}
+    <div style={{display:"flex",gap:8,marginTop:4}}>
+      {editing&&<button type="button" onClick={del} style={{padding:"14px 18px",borderRadius:16,border:"1.5px solid #F3C4C6",background:"#fff",color:"#E5484D",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>삭제</button>}
+      <button type="button" disabled={busy} onClick={save} style={{flex:1,padding:"14px 0",borderRadius:16,border:"none",background:GRAD,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FONT,opacity:busy?0.6:1}}>{busy?"저장 중…":editing?"저장":"등록하기"}</button>
+    </div>
+  </Sheet>;
+}
+
 // ─── 알림함 ───────────────────────────────────────────────────────────────────
 function NotiSheet({items,onClose,onPick,isAdmin}) {
   return(
@@ -4077,12 +4297,13 @@ function NotiSheet({items,onClose,onPick,isAdmin}) {
       {items.length===0?<Empty>새 알림이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {items.map(n=>{
-            const go=n.type==="guild"||n.postId||(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action));
+            const go=n.type==="guild"||n.postId||(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action))||(n.type==="courtFee"&&isAdmin);
             return(
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
                 <span style={{width:34,height:34,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={NOTI_ICON[n.type]||"bell"} size={17} stroke={1.9}/></span>
                 <span style={{flex:1,minWidth:0}}>
                   <span style={{display:"block",fontSize:14,fontWeight:n.unread?700:500,color:INK,lineHeight:1.45,wordBreak:"keep-all"}}>{n.text}</span>
+                  {n.type==="courtFee"&&isAdmin&&<span style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:7,padding:"6px 11px",borderRadius:9,background:BLUE,color:"#fff",fontSize:12,fontWeight:700}}><Icon name="coin" size={13} color="#fff" stroke={2.2}/>코트비 등록하기</span>}
                   <span style={{display:"block",fontSize:11,color:"#A3AAC2",marginTop:3}}>{ago(n.at)}{n.type==="member"&&isAdmin?" · 눌러서 승인하기":go?" · 눌러서 보기":""}</span>
                 </span>
                 {n.unread&&<span style={{width:8,height:8,borderRadius:"50%",background:"#ef4444",marginTop:6,flexShrink:0}}/>}
@@ -4146,27 +4367,6 @@ function Pills({value,options,onChange,label}){
       );})}
     </div>
   );
-}
-// 도로명 주소 검색: 카카오(다음) 우편번호 서비스를 폼 안에 띄워요 (키 없이 무료). 못 불러오면 직접 입력.
-let postcodeLoad=null;
-function loadPostcode(){
-  if(window.daum&&window.daum.Postcode) return Promise.resolve();
-  if(!postcodeLoad) postcodeLoad=new Promise((ok,no)=>{ const sc=document.createElement("script");
-    sc.src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"; sc.onload=ok; sc.onerror=()=>{postcodeLoad=null;no();}; document.head.appendChild(sc); });
-  return postcodeLoad;
-}
-function AddressSearch({onPick}){
-  const box=useRef(null);
-  const [fail,setFail]=useState(false);
-  useEffect(()=>{
-    let alive=true;
-    loadPostcode().then(()=>{ if(!alive||!box.current) return;
-      new window.daum.Postcode({width:"100%",height:"100%",oncomplete:d=>onPick((d.roadAddress||d.jibunAddress||d.address)+(d.buildingName?` (${d.buildingName})`:""))}).embed(box.current);
-    }).catch(()=>alive&&setFail(true));
-    return ()=>{alive=false;};
-  },[]);
-  return fail?<p style={{margin:"8px 0 0",fontSize:12,color:"#ef4444"}}>주소 검색을 불러오지 못했어요. 주소를 직접 입력해 주세요.</p>
-    :<div ref={box} style={{marginTop:8,height:420,border:"1px solid #E4E9F7",borderRadius:14,overflow:"hidden",background:"#fff"}}/>;
 }
 // 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
 const placeKey=v=>String(v||"").replace(/\s+/g,"").toLowerCase();
@@ -4304,7 +4504,9 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
   const [errors,setErrors]=useState({});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
-  const [addrOpen,setAddrOpen]=useState(false);
+  const fees=useCourtFees();
+  // 코트비: null이면 코트비 표로 자동 계산, 문자열이면 직접 넣은 금액. 예전에 직접 넣은 모임은 그대로 보여 줘요
+  const [feeManual,setFeeManual]=useState(()=>initial&&initial.info.courtFee&&!initial.info.courtFeeAuto?String(initial.info.courtFee):null);
   const set=(k,v)=>setF(p=>{const n={...p,[k]:v}; if(k==="date"&&!editing&&v) n.openAt=weekBefore(v); if(k==="kind"&&v==="flash") n.repeat="none";
     if(k==="kind"&&!editing){ if(v==="flash"&&p.capacity==="12") n.capacity="4"; if(v==="regular"&&p.capacity==="4") n.capacity="12"; }   // 기본 인원: 번개 4명, 정기 12명 (직접 바꾼 값은 그대로)
     return n;});
@@ -4318,7 +4520,11 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(!f.place.trim()) e.place="테니스장 이름을 입력해 주세요";
     if(!String(f.courtNo||"").trim()) e.courtNo="코트 번호를 입력해 주세요";
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
-    const fee=String(f.courtFee||"").replace(/[^\d]/g,""); if(f.kind==="flash"&&fee.length>7) e.courtFee="코트비를 확인해 주세요";
+    const feeRow=findCourtFee(fees,f.place), feeAuto=calcCourtFee(feeRow,f.date,f.start,f.end,f.courtNo);
+    const sameSlot=editing&&["place","date","start","end","courtNo"].every(k=>String(f[k]||"")===String(initial.info[k]||""));
+    // 자동: 수정할 때 장소·날짜·시간·코트를 안 바꿨으면 저장된 금액 그대로 (그사이 코트비 표가 바뀌어도)
+    const fee=feeManual!=null?(+feeDigits(feeManual)||0):sameSlot&&initial.info.courtFeeAuto?(+initial.info.courtFee||0):feeRow&&feeAuto?feeAuto.total:0;
+    const feeIsAuto=feeManual==null&&!!feeRow;
     const gcap=f.guestCap===""?0:parseInt(f.guestCap,10); if(!(gcap>=0&&gcap<=50)) e.guestCap="게스트는 0~50명이에요";
     if(repeating){ if(!f.openTime) e.openAt="예약 오픈 시각을 넣어 주세요"; if(f.endDate&&f.date&&f.endDate<f.date) e.endDate="종료일은 첫 모임 날짜 뒤여야 해요"; }
     else if(f.kind!=="flash"&&f.openAt&&f.date&&f.openAt.slice(0,10)>f.date) e.openAt="예약 오픈은 모임 날짜보다 빨라야 해요";
@@ -4326,7 +4532,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(f.kind==="flash"&&f.guildMode&&!gids.length) e.guild="길드를 하나 이상 선택해 주세요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:+fee||0}:{flashType:null,courtFee:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:fee||0,courtFeeAuto:feeIsAuto&&fee>0?true:null,courtFeeManual:feeManual!=null&&fee>0?true:null}:{flashType:null,courtFee:null,courtFeeAuto:null,courtFeeManual:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -4360,7 +4566,12 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
         return id;
       });
     }
-    job.then(id=>onSaved(id)).catch(e=>{setSaving(false);setErr(authMsg(e));});
+    // 회원이 코트비 표에 없는 테니스장으로 번개를 만들면 관리자에게 등록 요청 (관리 탭 목록 + 알림)
+    const needFee=f.kind==="flash"&&!feeRow&&!ME_ADMIN&&base.place&&(!editing||placeKey(initial.info.place)!==placeKey(base.place));
+    job.then(id=>{ if(needFee&&FB){ const k=feeKey(base.place);
+        FB.club.child("courtFeeRequests/"+k).set({name:base.place,address:base.address||null,lat:base.lat,lng:base.lng,by:ME,byUid:uid,fee:fee||0,date:f.date,start:f.start,end:f.end,courtNo:base.courtNo,meetingId:id,at:Date.now()}).catch(()=>{});
+        postFeed({type:"courtFee",place:base.place,meetingId:id,text:`코트비 정보가 없는 테니스장으로 모임이 만들어졌어요. ${base.place} · ${ME} 님${fee?` · 직접 입력 ${won(fee)}`:""}. 코트비를 등록해 주세요.`}); }
+      onSaved(id); }).catch(e=>{setSaving(false);setErr(authMsg(e));});
   };
   const row={display:"flex",gap:10};
   const hint=t=><p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>{t}</p>;
@@ -4442,14 +4653,9 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
             </div>
             {hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")}
           </FieldWrap>
-          <FieldWrap label="테니스장 주소">
-            <div style={row}>
-              <input type="text" aria-label="테니스장 주소" value={f.address||""} onChange={e=>set("address",e.target.value)} placeholder="주소 검색을 눌러 찾아요" style={{...inputStyle,flex:1}}/>
-              <button type="button" onClick={()=>setAddrOpen(v=>!v)} style={{...btnSmall,background:addrOpen?"#fff":GRAD,color:addrOpen?"#6B7493":"#fff",border:addrOpen?"1.5px solid #D6DEF7":"none",flexShrink:0}}>{addrOpen?"닫기":"주소 검색"}</button>
-            </div>
-            {addrOpen&&<AddressSearch onPick={a=>{set("address",a);setAddrOpen(false);}}/>}
-            {hint("선택이에요. 넣으면 모임 화면에서 눌러서 지도로 볼 수 있어요.")}
-          </FieldWrap>
+          {f.kind==="flash"&&<FieldWrap label="코트비">
+            <CourtFeeBox fees={fees} place={f.place} address={f.address} lat={f.lat} lng={f.lng} date={f.date} start={f.start} end={f.end} courtNo={f.courtNo} manual={feeManual} onManual={setFeeManual} isAdmin={ME_ADMIN}/>
+          </FieldWrap>}
           <div style={row}>
             <div style={{flex:1}}><FieldWrap label="정원 (회원)" required error={errors.capacity}>
               <input type="number" inputMode="numeric" min={2} max={99} value={f.capacity} onChange={e=>set("capacity",e.target.value)} style={inputStyle}/>
@@ -4483,13 +4689,6 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
           {repeating&&<FieldWrap label="반복 종료일" error={errors.endDate}>
             <input type="date" aria-label="반복 종료일" value={f.endDate} onChange={e=>set("endDate",e.target.value)} style={inputStyle}/>
             {hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)}
-          </FieldWrap>}
-          {f.kind==="flash"&&<FieldWrap label="코트비 (엔빵)" error={errors.courtFee}>
-            <div style={{position:"relative"}}>
-              <input type="text" inputMode="numeric" aria-label="코트비" value={f.courtFee?Number(String(f.courtFee).replace(/[^\d]/g,"")).toLocaleString("ko-KR"):""} onChange={e=>set("courtFee",e.target.value.replace(/[^\d]/g,""))} placeholder="예: 40,000" style={{...inputStyle,paddingRight:40}}/>
-              <span style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#6B7493"}}>원</span>
-            </div>
-            {hint("모임 회비와 별도로 참석자끼리 나눠 내는 금액이에요. 모임 화면에 1인당 금액이 같이 보여요.")}
           </FieldWrap>}
           <FieldWrap label="모임 설명">
             <textarea value={f.desc} onChange={e=>set("desc",e.target.value)} rows={3} placeholder="진행 방식, 준비물 등" style={{...inputStyle,borderRadius:18,resize:"none"}}/>
@@ -5777,6 +5976,7 @@ export default function App() {
 
   const club=useClubFeed(account&&account.user?account.user.uid:null);   // 알림·공지
   useLastSeenRecorder(account&&account.user?account.user.uid:null);   // 마지막 접속 기록 (10분에 한 번까지)
+  const [adminJump,setAdminJump]=useState(null);   // 알림에서 관리 탭 화면으로 바로 갈 때 {sec,place,n}
   const [noti,setNoti]=useState(null);          // 알림함 (열 때의 목록)
   const [noticeForm,setNoticeForm]=useState(false);
   const [focusNotice,setFocusNotice]=useState(null);
@@ -5973,7 +6173,7 @@ export default function App() {
         {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} onCreateMeeting={openGuildCreate} isAdmin={adminOn} boardFocus={boardFocus} newCounts={membersNew}
           canWrite={!FB||!!(account&&(account.admin||account.approved))}/>}
         {tab==="stats"&&<StatsTab/>}
-        {tab==="admin"&&FB&&adminOn&&<AdminTab/>}
+        {tab==="admin"&&FB&&adminOn&&<AdminTab jump={adminJump}/>}
       </div>
       {/* 새 모임 버튼 (+ 새 모임): 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
       {tab==="booking"&&!curMeeting&&bookView!=="map"&&(
@@ -6016,6 +6216,7 @@ export default function App() {
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
         else if(n.type==="member"&&adminOn){ setOpenMeeting(null); setTab("admin"); }
+        else if(n.type==="courtFee"&&adminOn){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setAdminJump(j=>({sec:"fees",place:n.place,n:(j&&j.n||0)+1})); setTab("admin"); }
         else if(n.type==="guild"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(n.guildId&&guildById(n.guildId)?n.guildId:null); }
       }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
