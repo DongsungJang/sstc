@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f2020c4ace">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f2020c4ace">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=7b01a484ff">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=7b01a484ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -494,7 +494,7 @@ function toMeeting(id, rec, series) {
     date: fmtDate(info.date),
     iso: info.date,
     time: `${info.start} ~ ${info.end}`,
-    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : "") + (info.surface ? ` · ${info.surface}` : ""),
+    place: info.place + (info.courtNo ? ` · ${courtLabel(info.courtNo)}` : "") + (info.indoor ? " · 실내" : "") + (info.surface ? ` · ${info.surface}` : ""),
     surface: info.surface || "",
     placeName: info.place,
     courtNo: info.courtNo || "",
@@ -13703,7 +13703,7 @@ function Sheet({
 
 // ─── 코트비 표 (관리 탭) · 새 모임 코트비 자동 계산 ─────────────────────────────
 // club/courtFees/<id> {name,address,lat,lng,nightFrom:"18:00",wd:{same,day,night},we:{same,day,night},createdBy..,updatedBy..}
-// 금액은 코트 1면 · 1시간 기준. 관리자만 씀.
+// 금액은 코트 1면 · per시간(1 또는 2, 없으면 1) 기준. 관리자만 씀.
 // club/courtFeeRequests/<테니스장 키> : 회원이 표에 없는 테니스장으로 번개를 만들면 남는 등록 요청 (관리자만 읽음)
 let COURT_FEES = {};
 function useCourtFees() {
@@ -13741,6 +13741,8 @@ const fmtMD = t => {
   return `${x.getMonth() + 1}월 ${x.getDate()}일`;
 };
 const feeWho = c => [c.createdBy && `등록 ${c.createdBy} · ${fmtMD(c.createdAt)}`, c.updatedBy && `수정 ${c.updatedBy} · ${fmtMD(c.updatedAt)}`].filter(Boolean).join("  ·  ");
+const feePer = c => +(c && c.per) === 2 ? 2 : 1;
+const perText = c => `코트 1면 · ${feePer(c)}시간 기준`;
 const feeList = fs => Object.entries(fs || {}).map(([id, c]) => ({
   id,
   ...c
@@ -13769,10 +13771,13 @@ const hrsText = min => {
   return Number.isInteger(h) ? `${h}시간` : `${Math.round(h * 10) / 10}시간`;
 };
 // 요일(토·일은 주말)·시간(야간 시작 시각으로 나눔)·코트 수로 계산
-function calcCourtFee(c, date, start, end, courtNo) {
+// 실내·실외 요금이 다른 곳(inout): wd·we는 실외, indoor.wd·indoor.we는 실내
+const hasInOut = c => !!(c && c.inout && c.indoor);
+function calcCourtFee(c, date, start, end, courtNo, indoor) {
   if (!c || !date || !start || !end || end <= start) return null;
+  const set = hasInOut(c) && indoor ? c.indoor : c;
   const we = [0, 6].includes(dowOf(date)),
-    row = we ? c.we : c.wd;
+    row = we ? set.we : set.wd;
   if (!row) return null;
   const nf = hmMin(c.nightFrom || "18:00"),
     s = hmMin(start),
@@ -13781,7 +13786,8 @@ function calcCourtFee(c, date, start, end, courtNo) {
     nightMin = Math.max(0, e - Math.max(s, nf));
   const dayRate = +row.day || 0,
     nightRate = row.same ? dayRate : +row.night || 0,
-    n = courtCount(courtNo);
+    n = courtCount(courtNo),
+    per = feePer(c);
   const parts = row.same ? [{
     label: "",
     min: dayMin + nightMin,
@@ -13795,12 +13801,18 @@ function calcCourtFee(c, date, start, end, courtNo) {
     min: nightMin,
     rate: nightRate
   }].filter(p => p.min > 0);
-  const total = Math.round(parts.reduce((a, p) => a + p.min / 60 * p.rate, 0) * n);
+  parts.forEach(p => {
+    p.amt = Math.round(p.min / 60 / per * p.rate * n);
+  });
+  const total = parts.reduce((a, p) => a + p.amt, 0);
   return {
     we,
     n,
+    per,
     parts,
-    total
+    total,
+    inout: hasInOut(c),
+    indoor: hasInOut(c) && !!indoor
   };
 }
 const feeDigits = v => String(v == null ? "" : v).replace(/[^\d]/g, "").slice(0, 7);
@@ -13855,13 +13867,49 @@ function CourtFeeBox({
   start,
   end,
   courtNo,
+  indoor,
+  onIndoor,
   manual,
   onManual,
   isAdmin
 }) {
   const [sheet, setSheet] = useState(false);
   const c = findCourtFee(fees, place),
-    r = calcCourtFee(c, date, start, end, courtNo);
+    r = calcCourtFee(c, date, start, end, courtNo, indoor);
+  // 실내·실외 요금이 다른 테니스장이면 어느 쪽인지 골라요
+  const inoutPick = hasInOut(c) && /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "\uC2E4\uB0B4\xB7\uC2E4\uC678",
+    style: {
+      display: "flex",
+      background: "#F4F6FB",
+      borderRadius: 11,
+      padding: 3,
+      gap: 3,
+      marginBottom: 10
+    }
+  }, [[false, "실외 코트"], [true, "실내 코트"]].map(([v, l]) => {
+    const on = !!indoor === v;
+    return /*#__PURE__*/React.createElement("button", {
+      key: l,
+      type: "button",
+      role: "radio",
+      "aria-checked": on,
+      onClick: () => onIndoor(v),
+      style: {
+        flex: 1,
+        padding: "8px 0",
+        borderRadius: 9,
+        border: "none",
+        background: on ? BLUE : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        fontSize: 12.5,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, l);
+  }));
   const box = {
     background: "#fff",
     borderRadius: 16,
@@ -13971,7 +14019,7 @@ function CourtFeeBox({
   }, "\uC774\uBC88\uB9CC \uC9C1\uC811 \uB123\uAE30")), sheetEl);
   if (!c || manual != null) return /*#__PURE__*/React.createElement("div", {
     style: box
-  }, /*#__PURE__*/React.createElement("div", {
+  }, inoutPick, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -14039,7 +14087,7 @@ function CourtFeeBox({
       borderColor: BLUE,
       boxShadow: "0 4px 14px rgba(33,82,230,0.08)"
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, inoutPick, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -14059,7 +14107,7 @@ function CourtFeeBox({
       fontSize: 12,
       color: "#6B7493"
     }
-  }, r ? `${r.we ? "주말" : "평일"} · ${r.n}면 · ${start}~${end}` : "시간을 넣으면 계산돼요")), r && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+  }, r ? `${r.inout ? r.indoor ? "실내 · " : "실외 · " : ""}${r.we ? "주말" : "평일"} · ${r.n}면 · ${start}~${end}` : "시간을 넣으면 계산돼요")), r && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "8px 0 0",
       fontSize: 26,
@@ -14093,20 +14141,20 @@ function CourtFeeBox({
       fontWeight: 700,
       marginRight: 4
     }
-  }, p.label || "주간·야간 같음"), hrsText(p.min), " \xD7 ", r.n, "\uBA74 \xD7 ", won(p.rate)), /*#__PURE__*/React.createElement("span", {
+  }, p.label || "주간·야간 같음"), hrsText(p.min), " \xD7 ", r.n, "\uBA74 \xD7 ", won(p.rate), r.per === 2 ? "/2시간" : ""), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
       color: INK,
       flexShrink: 0
     }
-  }, won(Math.round(p.min / 60 * p.rate * r.n))))))), /*#__PURE__*/React.createElement("p", {
+  }, won(p.amt)))))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "9px 0 0",
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.5
     }
-  }, "\uAD00\uB9AC\uC790\uAC00 \uB4F1\uB85D\uD55C \uCF54\uD2B8\uBE44 \uD45C\uB85C \uACC4\uC0B0\uD588\uC5B4\uC694", c.nightFrom ? ` (야간 ${c.nightFrom}부터)` : "", ". 1\uC778\uB2F9 \uAE08\uC561\uC740 \uCC38\uC11D \uD655\uC815 \uC778\uC6D0\uC73C\uB85C \uB098\uB220 \uBAA8\uC784 \uD654\uBA74\uC5D0 \uBCF4\uC5EC\uC694."), isAdmin && feeWho(c) && /*#__PURE__*/React.createElement("p", {
+  }, "\uAD00\uB9AC\uC790\uAC00 \uB4F1\uB85D\uD55C \uCF54\uD2B8\uBE44 \uD45C\uB85C \uACC4\uC0B0\uD588\uC5B4\uC694 (", feePer(c) === 2 ? "2시간 요금 기준" : "1시간 요금 기준", c.nightFrom ? ` · 야간 ${c.nightFrom}부터` : "", "). 1\uC778\uB2F9 \uAE08\uC561\uC740 \uCC38\uC11D \uD655\uC815 \uC778\uC6D0\uC73C\uB85C \uB098\uB220 \uBAA8\uC784 \uD654\uBA74\uC5D0 \uBCF4\uC5EC\uC694."), isAdmin && feeWho(c) && /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "4px 0 0",
       fontSize: 11,
@@ -14169,6 +14217,17 @@ function CourtFeeSettings({
     FB.club.child("courtFeeRequests/" + r.id).remove().catch(e => setErr(authMsg(e)));
   };
   const rate = row => !row ? "-" : row.same ? `${won(row.day)} (주·야 같음)` : `주간 ${won(row.day)} · 야간 ${won(row.night)}`;
+  const perTag = c => /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: INK,
+      background: feePer(c) === 2 ? BALL : "#EEF1F8",
+      padding: "2px 7px",
+      borderRadius: 8,
+      flexShrink: 0
+    }
+  }, feePer(c), "\uC2DC\uAC04");
   return /*#__PURE__*/React.createElement(React.Fragment, null, err && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
@@ -14282,7 +14341,17 @@ function CourtFeeSettings({
       color: INK,
       letterSpacing: "-0.02em"
     }
-  }, c.name), !(c.wd && c.wd.same && c.we && c.we.same) && /*#__PURE__*/React.createElement("span", {
+  }, c.name), perTag(c), hasInOut(c) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#067647",
+      background: "#E6F6EC",
+      padding: "2px 7px",
+      borderRadius: 8,
+      flexShrink: 0
+    }
+  }, "\uC2E4\uB0B4\xB7\uC2E4\uC678"), !(c.wd && c.wd.same && c.we && c.we.same) && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       fontWeight: 700,
@@ -14326,7 +14395,14 @@ function CourtFeeSettings({
       color: "#4A5578",
       fontVariantNumeric: "tabular-nums"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, hasInOut(c) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600,
+      gridColumn: "1 / -1",
+      marginTop: 2
+    }
+  }, "\uC2E4\uC678"), /*#__PURE__*/React.createElement("span", {
     style: {
       color: "#A3AAC2",
       fontWeight: 600
@@ -14336,14 +14412,41 @@ function CourtFeeSettings({
       color: "#A3AAC2",
       fontWeight: 600
     }
-  }, "\uC8FC\uB9D0"), /*#__PURE__*/React.createElement("span", null, rate(c.we)))))), /*#__PURE__*/React.createElement("p", {
+  }, "\uC8FC\uB9D0"), /*#__PURE__*/React.createElement("span", null, rate(c.we)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600,
+      gridColumn: "1 / -1",
+      marginTop: 4
+    }
+  }, "\uC2E4\uB0B4"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uD3C9\uC77C"), /*#__PURE__*/React.createElement("span", null, rate(c.indoor.wd)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uC8FC\uB9D0"), /*#__PURE__*/React.createElement("span", null, rate(c.indoor.we))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uD3C9\uC77C"), /*#__PURE__*/React.createElement("span", null, rate(c.wd)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uC8FC\uB9D0"), /*#__PURE__*/React.createElement("span", null, rate(c.we))))))), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "10px 0 0",
       fontSize: 11,
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uAE08\uC561\uC740 \uCF54\uD2B8 1\uBA74 \xB7 1\uC2DC\uAC04 \uAE30\uC900\uC774\uC5D0\uC694. \uBC88\uAC1C \uBAA8\uC784\uC744 \uB9CC\uB4E4 \uB54C \uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uC694\uC77C\xB7\uC2DC\uAC04\xB7\uCF54\uD2B8 \uC218\uC5D0 \uB9DE\uCDB0 \uCF54\uD2B8\uBE44\uAC00 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694. \uD68C\uC6D0\uC740 \uD45C\uC5D0 \uC5C6\uB294 \uD14C\uB2C8\uC2A4\uC7A5\uC77C \uB54C \uADF8 \uBAA8\uC784 \uCF54\uD2B8\uBE44\uB9CC \uC9C1\uC811 \uB123\uC5B4\uC694.")), edit && /*#__PURE__*/React.createElement(CourtFeeSheet, {
+  }, "\uAE08\uC561\uC740 \uCF54\uD2B8 1\uBA74 \uAE30\uC900\uC774\uACE0, \uCF54\uD2B8\uB9C8\uB2E4 1\uC2DC\uAC04 \uC694\uAE08\uC778\uC9C0 2\uC2DC\uAC04 \uC694\uAE08\uC778\uC9C0 \uACE8\uB77C\uC694. \uBC88\uAC1C \uBAA8\uC784\uC744 \uB9CC\uB4E4 \uB54C \uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uC694\uC77C\xB7\uC2DC\uAC04\xB7\uCF54\uD2B8 \uC218\uC5D0 \uB9DE\uCDB0 \uCF54\uD2B8\uBE44\uAC00 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694. \uD68C\uC6D0\uC740 \uD45C\uC5D0 \uC5C6\uB294 \uD14C\uB2C8\uC2A4\uC7A5\uC77C \uB54C \uADF8 \uBAA8\uC784 \uCF54\uD2B8\uBE44\uB9CC \uC9C1\uC811 \uB123\uC5B4\uC694.")), edit && /*#__PURE__*/React.createElement(CourtFeeSheet, {
     key: edit.id || edit.req && edit.req.id || edit.name || "new",
     value: edit,
     onClose: () => setEdit(null)
@@ -14361,6 +14464,7 @@ function CourtFeeSheet({
   });
   const [f, setF] = useState(() => ({
     ...value,
+    per: feePer(value),
     nightFrom: value.nightFrom || "18:00",
     wd: value.wd ? row0(value.wd) : {
       same: false,
@@ -14368,6 +14472,17 @@ function CourtFeeSheet({
       night: ""
     },
     we: value.we ? row0(value.we) : {
+      same: true,
+      day: "",
+      night: ""
+    },
+    inout: hasInOut(value),
+    iwd: value.indoor && value.indoor.wd ? row0(value.indoor.wd) : {
+      same: false,
+      day: "",
+      night: ""
+    },
+    iwe: value.indoor && value.indoor.we ? row0(value.indoor.we) : {
       same: true,
       day: "",
       night: ""
@@ -14488,7 +14603,7 @@ function CourtFeeSheet({
     const name = String(f.name || "").trim();
     if (!name) return setErr("테니스장 이름을 넣어 주세요");
     const bad = r => !(+r.day > 0) || !r.same && !(+r.night > 0);
-    if (bad(f.wd) || bad(f.we)) return setErr("평일·주말 요금을 모두 넣어 주세요");
+    if (bad(f.wd) || bad(f.we) || f.inout && (bad(f.iwd) || bad(f.iwe))) return setErr(f.inout ? "실외·실내 평일·주말 요금을 모두 넣어 주세요" : "평일·주말 요금을 모두 넣어 주세요");
     const other = findCourtFee(COURT_FEES, name);
     if (other && other.id !== value.id) return setErr("이미 등록된 테니스장이에요. 목록에서 눌러 고쳐 주세요");
     const row = r => ({
@@ -14503,9 +14618,15 @@ function CourtFeeSheet({
       address: (f.address || "").trim() || null,
       lat: Number.isFinite(+f.lat) && f.lat != null ? +f.lat : null,
       lng: Number.isFinite(+f.lng) && f.lng != null ? +f.lng : null,
+      per: f.per === 2 ? 2 : 1,
       nightFrom: f.nightFrom || "18:00",
       wd: row(f.wd),
       we: row(f.we),
+      inout: f.inout ? true : null,
+      indoor: f.inout ? {
+        wd: row(f.iwd),
+        we: row(f.iwe)
+      } : null,
       createdBy: editing ? value.createdBy || null : ME,
       createdByUid: editing ? value.createdByUid || null : uid,
       createdAt: editing ? value.createdAt || null : now,
@@ -14618,7 +14739,52 @@ function CourtFeeSheet({
       color: "#A3AAC2",
       lineHeight: 1.5
     }
-  }, "\uC774 \uC2DC\uAC01\uBD80\uD130\uB294 \uC57C\uAC04 \uC694\uAE08\uC774\uC5D0\uC694. \uBAA8\uC784\uC774 \uAC78\uCCD0 \uC788\uC73C\uBA74 (\uC608: 17~19\uC2DC) \uC2DC\uAC04\uB9CC\uD07C \uB098\uB220\uC11C \uACC4\uC0B0\uD574\uC694.")), /*#__PURE__*/React.createElement("div", {
+  }, "\uC774 \uC2DC\uAC01\uBD80\uD130\uB294 \uC57C\uAC04 \uC694\uAE08\uC774\uC5D0\uC694. \uBAA8\uC784\uC774 \uAC78\uCCD0 \uC788\uC73C\uBA74 (\uC608: 17~19\uC2DC) \uC2DC\uAC04\uB9CC\uD07C \uB098\uB220\uC11C \uACC4\uC0B0\uD574\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC694\uAE08 \uAE30\uC900",
+    required: true
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "\uC694\uAE08 \uAE30\uC900",
+    style: {
+      display: "flex",
+      background: "#fff",
+      border: "1.5px solid #E2E6F0",
+      borderRadius: 13,
+      padding: 3,
+      gap: 3
+    }
+  }, [[1, "1시간 요금"], [2, "2시간 요금"]].map(([v, l]) => {
+    const on = f.per === v;
+    return /*#__PURE__*/React.createElement("button", {
+      key: v,
+      type: "button",
+      role: "radio",
+      "aria-checked": on,
+      onClick: () => setF(p => ({
+        ...p,
+        per: v
+      })),
+      style: {
+        flex: 1,
+        padding: "10px 0",
+        borderRadius: 10,
+        border: "none",
+        background: on ? BLUE : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        fontSize: 13.5,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, l);
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uC694\uAE08\uD45C\uC5D0 \uC801\uD78C \uB2E8\uC704 \uADF8\uB300\uB85C \uACE8\uB77C\uC694. 2\uC2DC\uAC04 \uC694\uAE08\uC774\uBA74 \uBAA8\uC784 \uC2DC\uAC04\uC774 3\uC2DC\uAC04\uC77C \uB54C 1.5\uBC30\uB85C \uACC4\uC0B0\uD574\uC694.")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -14643,7 +14809,63 @@ function CourtFeeSheet({
       padding: "3px 9px",
       borderRadius: 8
     }
-  }, "\uCF54\uD2B8 1\uBA74 \xB7 1\uC2DC\uAC04 \uAE30\uC900")), block("wd", "평일", "월~금"), block("we", "주말", "토·일"), /*#__PURE__*/React.createElement("p", {
+  }, perText(f))), /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "\uC2E4\uB0B4\xB7\uC2E4\uC678 \uC694\uAE08",
+    style: {
+      display: "flex",
+      background: "#fff",
+      border: "1.5px solid #E2E6F0",
+      borderRadius: 13,
+      padding: 3,
+      gap: 3
+    }
+  }, [[false, "요금 한 가지"], [true, "실내·실외 요금이 달라요"]].map(([v, l]) => {
+    const on = !!f.inout === v;
+    return /*#__PURE__*/React.createElement("button", {
+      key: l,
+      type: "button",
+      role: "radio",
+      "aria-checked": on,
+      onClick: () => setF(p => ({
+        ...p,
+        inout: v
+      })),
+      style: {
+        flex: 1,
+        padding: "9px 0",
+        borderRadius: 10,
+        border: "none",
+        background: on ? INK : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        fontSize: 12.5,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, l);
+  })), f.inout && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "-4px 0 0",
+      fontSize: 15,
+      fontWeight: 900,
+      color: INK
+    }
+  }, "\uC2E4\uC678 \uCF54\uD2B8"), block("wd", f.inout ? "실외 평일" : "평일", "월~금"), block("we", f.inout ? "실외 주말" : "주말", "토·일"), f.inout && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 15,
+      fontWeight: 900,
+      color: INK
+    }
+  }, "\uC2E4\uB0B4 \uCF54\uD2B8"), block("iwd", "실내 평일", "월~금"), block("iwe", "실내 주말", "토·일"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.55
+    }
+  }, "\uC0C8 \uBAA8\uC784\uC5D0\uC11C \uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uC2E4\uC678/\uC2E4\uB0B4 \uC911\uC5D0 \uACE0\uB974\uAC8C \uB3FC\uC694. \uC57C\uAC04 \uC2DC\uC791 \uC2DC\uAC01\uACFC \uC694\uAE08 \uAE30\uC900\uC740 \uB458\uC774 \uAC19\uC544\uC694.")), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: 0,
       fontSize: 11,
@@ -15441,8 +15663,8 @@ function MeetingForm({
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
     const feeRow = findCourtFee(fees, f.place),
-      feeAuto = calcCourtFee(feeRow, f.date, f.start, f.end, f.courtNo);
-    const sameSlot = editing && ["place", "date", "start", "end", "courtNo"].every(k => String(f[k] || "") === String(initial.info[k] || ""));
+      feeAuto = calcCourtFee(feeRow, f.date, f.start, f.end, f.courtNo, !!f.indoor);
+    const sameSlot = editing && ["place", "date", "start", "end", "courtNo"].every(k => String(f[k] || "") === String(initial.info[k] || "")) && !!f.indoor === !!initial.info.indoor;
     // 자동: 수정할 때 장소·날짜·시간·코트를 안 바꿨으면 저장된 금액 그대로 (그사이 코트비 표가 바뀌어도)
     const fee = feeManual != null ? +feeDigits(feeManual) || 0 : sameSlot && initial.info.courtFeeAuto ? +initial.info.courtFee || 0 : feeRow && feeAuto ? feeAuto.total : 0;
     const feeIsAuto = feeManual == null && !!feeRow;
@@ -15475,6 +15697,7 @@ function MeetingForm({
       place: f.place.trim(),
       courtNo: String(f.courtNo || "").trim(),
       surface: f.surface || "",
+      indoor: f.indoor && hasInOut(findCourtFee(fees, f.place)) ? true : f.indoor && editing && initial.info.indoor ? true : null,
       address: (f.address || "").trim(),
       lat: f.lat != null && f.lat !== "" && Number.isFinite(+f.lat) ? +f.lat : null,
       lng: f.lng != null && f.lng !== "" && Number.isFinite(+f.lng) ? +f.lng : null,
@@ -16036,6 +16259,8 @@ function MeetingForm({
     start: f.start,
     end: f.end,
     courtNo: f.courtNo,
+    indoor: !!f.indoor,
+    onIndoor: v => set("indoor", v),
     manual: feeManual,
     onManual: setFeeManual,
     isAdmin: ME_ADMIN
@@ -20148,7 +20373,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "f2020c4ace";
+const BUILD_ID = "7b01a484ff";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
