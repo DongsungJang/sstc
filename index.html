@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=beacc11715">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=beacc11715">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=1b7bf78fed">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1b7bf78fed">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -6591,6 +6591,7 @@ const NOTI_ICON = {
   notice: "megaphone",
   approved: "checkCircle",
   admin: "bell",
+  courtFee: "coin",
   attend: "check",
   mention: "message",
   cancel: "x",
@@ -6682,7 +6683,7 @@ function useClubFeed(uid) {
   }, [uid]);
   const items = [...toList(st.feed), ...toList(st.inbox, {
     mine: true
-  })].filter(n => n && n.at && (!n.to || n.to === uid)).sort((a, b) => b.at - a.at).slice(0, 50).map(n => ({
+  })].filter(n => n && n.at && (!n.to || n.to === uid) && (n.type !== "courtFee" || ME_ADMIN)).sort((a, b) => b.at - a.at).slice(0, 50).map(n => ({
     ...n,
     unread: n.at > (+st.seen || 0) && n.byUid !== uid
   }));
@@ -6850,7 +6851,9 @@ function Pager({
     }
   }, p + 1, " / ", pages), btn("다음 ›", p + 1, p >= pages - 1));
 }
-function AdminTab() {
+function AdminTab({
+  jump
+}) {
   useSeen();
   const [members, setMembers] = useState(null);
   const [approved, setApproved] = useState({});
@@ -6865,7 +6868,11 @@ function AdminTab() {
     active: 0,
     gone: 0
   }); // 목록별 페이지 (5명씩)
-  const [sec, setSec] = useState(null);
+  const [sec, setSec] = useState(() => jump && jump.sec || null);
+  useEffect(() => {
+    if (jump && jump.sec) setSec(jump.sec);
+  }, [jump && jump.n]);
+  const feeReqs = useCourtFeeRequests();
   const [photoBusy, setPhotoBusy] = useState(null); // 사진 줄이는 중인 회원 uid   // 관리 메뉴에서 연 화면 (null이면 메뉴)
   const goPage = (k, n) => setPg(p => ({
     ...p,
@@ -7262,7 +7269,7 @@ function AdminTab() {
       width: 84
     }
   }, k), v))));
-  const MENU = [["popup", "message", "접속 팝업", "앱을 열면 뜨는 안내 창"], ["active", "users", "정회원 관리", `정회원 ${active.length}명`], ["gone", "leave", "탈퇴 회원", `${gone.length}명`], ["guilds", "shield", "길드 관리", `길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u => VIP[u]).length}명`], ["banner", "megaphone", "홈 화면 배너", "배너 추가·기간·순서"]];
+  const MENU = [["popup", "message", "접속 팝업", "앱을 열면 뜨는 안내 창"], ["active", "users", "정회원 관리", `정회원 ${active.length}명`], ["gone", "leave", "탈퇴 회원", `${gone.length}명`], ["guilds", "shield", "길드 관리", `길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u => VIP[u]).length}명`], ["fees", "coin", "코트비 관리", `코트 ${feeList(COURT_FEES).length}곳${feeReqs.length ? ` · 등록 필요 ${feeReqs.length}곳` : ""}`], ["banner", "megaphone", "홈 화면 배너", "배너 추가·기간·순서"]];
   const back = /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setSec(null),
@@ -7361,7 +7368,9 @@ function AdminTab() {
       color: "#A3AAC2",
       lineHeight: 1.6
     }
-  }, "\uACC4\uC815 \uC790\uCCB4\uB97C \uC644\uC804\uD788 \uC9C0\uC6B0\uB824\uBA74 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194 Authentication\uC5D0\uC11C \uC0AD\uC81C\uD574\uC694."))), sec === "banner" && /*#__PURE__*/React.createElement(AdSettings, null), sec === "guilds" && /*#__PURE__*/React.createElement(AdminGuilds, null));
+  }, "\uACC4\uC815 \uC790\uCCB4\uB97C \uC644\uC804\uD788 \uC9C0\uC6B0\uB824\uBA74 \uD30C\uC774\uC5B4\uBCA0\uC774\uC2A4 \uCF58\uC194 Authentication\uC5D0\uC11C \uC0AD\uC81C\uD574\uC694."))), sec === "banner" && /*#__PURE__*/React.createElement(AdSettings, null), sec === "guilds" && /*#__PURE__*/React.createElement(AdminGuilds, null), sec === "fees" && /*#__PURE__*/React.createElement(CourtFeeSettings, {
+    jump: jump
+  }));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -13692,6 +13701,1001 @@ function Sheet({
   return typeof ReactDOM !== "undefined" && ReactDOM.createPortal ? ReactDOM.createPortal(el, document.body) : el;
 }
 
+// ─── 코트비 표 (관리 탭) · 새 모임 코트비 자동 계산 ─────────────────────────────
+// club/courtFees/<id> {name,address,lat,lng,nightFrom:"18:00",wd:{same,day,night},we:{same,day,night},createdBy..,updatedBy..}
+// 금액은 코트 1면 · 1시간 기준. 관리자만 씀.
+// club/courtFeeRequests/<테니스장 키> : 회원이 표에 없는 테니스장으로 번개를 만들면 남는 등록 요청 (관리자만 읽음)
+let COURT_FEES = {};
+function useCourtFees() {
+  const [v, setV] = useState(COURT_FEES);
+  useEffect(() => {
+    if (!FB) return;
+    const r = FB.club.child("courtFees");
+    const h = s => {
+      COURT_FEES = s.val() || {};
+      setV(COURT_FEES);
+    };
+    r.on("value", h, () => {});
+    return () => r.off("value", h);
+  }, []);
+  return v;
+}
+function useCourtFeeRequests() {
+  const [v, setV] = useState({});
+  useEffect(() => {
+    if (!FB) return;
+    const r = FB.club.child("courtFeeRequests");
+    const h = s => setV(s.val() || {});
+    r.on("value", h, () => setV({}));
+    return () => r.off("value", h);
+  }, []);
+  return Object.entries(v).map(([id, r]) => ({
+    id,
+    ...r
+  })).filter(r => r && r.name).sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+const feeKey = name => nickKey(placeKey(name) || "_");
+const fmtMD = t => {
+  if (!t) return "";
+  const x = new Date(t);
+  return `${x.getMonth() + 1}월 ${x.getDate()}일`;
+};
+const feeWho = c => [c.createdBy && `등록 ${c.createdBy} · ${fmtMD(c.createdAt)}`, c.updatedBy && `수정 ${c.updatedBy} · ${fmtMD(c.updatedAt)}`].filter(Boolean).join("  ·  ");
+const feeList = fs => Object.entries(fs || {}).map(([id, c]) => ({
+  id,
+  ...c
+})).filter(c => c && c.name).sort((a, b) => String(a.name).localeCompare(String(b.name), "ko"));
+const findCourtFee = (fs, place) => {
+  const k = placeKey(place);
+  return k ? feeList(fs).find(c => placeKey(c.name) === k) || null : null;
+};
+// 코트 수: "5, 6" → 2면, "3~5" → 3면, 글자만 있으면 1면
+const courtCount = v => {
+  const s = String(v || "").trim();
+  if (!s) return 1;
+  let n = 0;
+  s.split(/[,·\s]+/).filter(Boolean).forEach(t => {
+    const m = /^(\d+)\s*[~\-]\s*(\d+)$/.exec(t);
+    n += m ? Math.min(20, Math.abs(+m[2] - +m[1]) + 1) : 1;
+  });
+  return Math.max(1, n);
+};
+const hmMin = t => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t || "");
+  return m ? +m[1] * 60 + +m[2] : 0;
+};
+const hrsText = min => {
+  const h = min / 60;
+  return Number.isInteger(h) ? `${h}시간` : `${Math.round(h * 10) / 10}시간`;
+};
+// 요일(토·일은 주말)·시간(야간 시작 시각으로 나눔)·코트 수로 계산
+function calcCourtFee(c, date, start, end, courtNo) {
+  if (!c || !date || !start || !end || end <= start) return null;
+  const we = [0, 6].includes(dowOf(date)),
+    row = we ? c.we : c.wd;
+  if (!row) return null;
+  const nf = hmMin(c.nightFrom || "18:00"),
+    s = hmMin(start),
+    e = hmMin(end);
+  const dayMin = Math.max(0, Math.min(e, nf) - s),
+    nightMin = Math.max(0, e - Math.max(s, nf));
+  const dayRate = +row.day || 0,
+    nightRate = row.same ? dayRate : +row.night || 0,
+    n = courtCount(courtNo);
+  const parts = row.same ? [{
+    label: "",
+    min: dayMin + nightMin,
+    rate: dayRate
+  }] : [{
+    label: "주간",
+    min: dayMin,
+    rate: dayRate
+  }, {
+    label: "야간",
+    min: nightMin,
+    rate: nightRate
+  }].filter(p => p.min > 0);
+  const total = Math.round(parts.reduce((a, p) => a + p.min / 60 * p.rate, 0) * n);
+  return {
+    we,
+    n,
+    parts,
+    total
+  };
+}
+const feeDigits = v => String(v == null ? "" : v).replace(/[^\d]/g, "").slice(0, 7);
+function MoneyInput({
+  value,
+  onChange,
+  label,
+  placeholder,
+  style
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      flex: 1,
+      minWidth: 0,
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "numeric",
+    "aria-label": label,
+    value: value ? Number(value).toLocaleString("ko-KR") : "",
+    onChange: e => onChange(feeDigits(e.target.value)),
+    placeholder: placeholder || "0",
+    style: {
+      ...inputStyle,
+      paddingRight: 36,
+      textAlign: "right",
+      fontVariantNumeric: "tabular-nums",
+      fontSize: 16
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      right: 14,
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: 13,
+      color: "#8A93B0"
+    }
+  }, "\uC6D0"));
+}
+
+// 새 모임 화면의 코트비 칸. manual: 직접 넣은 금액(문자열) 또는 null(자동)
+function CourtFeeBox({
+  fees,
+  place,
+  address,
+  lat,
+  lng,
+  date,
+  start,
+  end,
+  courtNo,
+  manual,
+  onManual,
+  isAdmin
+}) {
+  const [sheet, setSheet] = useState(false);
+  const c = findCourtFee(fees, place),
+    r = calcCourtFee(c, date, start, end, courtNo);
+  const box = {
+    background: "#fff",
+    borderRadius: 16,
+    border: "1.5px solid #E2E6F0",
+    padding: "14px 15px"
+  };
+  const link = (label, onClick, color) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClick,
+    style: {
+      padding: 0,
+      border: "none",
+      background: "none",
+      fontSize: 12,
+      fontWeight: 700,
+      color: color || BLUE,
+      cursor: "pointer",
+      fontFamily: FONT,
+      textDecoration: "underline",
+      textUnderlineOffset: 3
+    }
+  }, label);
+  const sheetEl = sheet && /*#__PURE__*/React.createElement(CourtFeeSheet, {
+    value: c || {
+      name: place,
+      address: address || "",
+      lat,
+      lng
+    },
+    onClose: () => setSheet(false)
+  });
+  if (!String(place || "").trim()) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...box,
+      background: "#F7F8FC",
+      borderStyle: "dashed"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#8A93B0",
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "coin",
+    size: 15,
+    color: "#A3AAC2"
+  }), "\uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uCF54\uD2B8\uBE44\uAC00 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694"));
+  if (!c && isAdmin && manual == null) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...box,
+      background: "#FFF8EC",
+      borderColor: "#FDE2B8"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13.5,
+      fontWeight: 700,
+      color: "#8A5A12"
+    }
+  }, "\uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC740 \uCF54\uD2B8\uBE44\uAC00 \uC544\uC9C1 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 12,
+      color: "#9A6B22",
+      lineHeight: 1.55
+    }
+  }, "\uC9C0\uAE08 \uB4F1\uB85D\uD574 \uB450\uBA74 \uB2E4\uC74C\uBD80\uD130 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setSheet(true),
+    style: {
+      flex: 1,
+      padding: "10px 0",
+      borderRadius: 11,
+      border: "none",
+      background: BLUE,
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, "\uCF54\uD2B8\uBE44 \uB4F1\uB85D\uD558\uAE30"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => onManual(""),
+    style: {
+      padding: "10px 12px",
+      borderRadius: 11,
+      border: "1.5px solid #F2C77E",
+      background: "#fff",
+      color: "#8A5A12",
+      fontSize: 12.5,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, "\uC774\uBC88\uB9CC \uC9C1\uC811 \uB123\uAE30")), sheetEl);
+  if (!c || manual != null) return /*#__PURE__*/React.createElement("div", {
+    style: box
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 8px",
+      borderRadius: 8,
+      background: "#FFF1DB",
+      color: "#9A5B00"
+    }
+  }, "\uC9C1\uC811 \uC785\uB825"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#6B7493"
+    }
+  }, c ? "이번 모임만 금액을 바꿔요" : "등록된 코트비가 없는 테니스장이에요")), /*#__PURE__*/React.createElement(MoneyInput, {
+    label: "\uC774\uBC88 \uBAA8\uC784 \uCF54\uD2B8\uBE44",
+    value: manual || "",
+    onChange: v => onManual(v),
+    placeholder: "\uC774\uBC88 \uBAA8\uC784 \uCF54\uD2B8\uBE44 (\uC608: 20,000)",
+    style: {
+      marginTop: 10
+    }
+  }), !c && !isAdmin && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11.5,
+      color: "#6B7493",
+      lineHeight: 1.55,
+      display: "flex",
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "bell",
+    size: 13,
+    color: BLUE,
+    stroke: 2.2
+  }), /*#__PURE__*/React.createElement("span", null, "\uBAA8\uC784\uC744 \uB9CC\uB4E4\uBA74 \uAD00\uB9AC\uC790\uC5D0\uAC8C ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: INK
+    }
+  }, "\"\uCF54\uD2B8\uBE44 \uB4F1\uB85D \uC694\uCCAD\""), " \uC54C\uB9BC\uC774 \uAC00\uC694. \uB4F1\uB85D\uB418\uBA74 \uB2E4\uC74C\uBD80\uD130 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694.")), c && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, link("자동 계산으로 되돌리기", () => onManual(null))), !c && isAdmin && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, link("코트비 표에 등록하기", () => setSheet(true))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uBE44\uC6CC \uB450\uBA74 \uCF54\uD2B8\uBE44 \uC5C6\uC774 \uB9CC\uB4E4\uC5B4\uC838\uC694. 1\uC778\uB2F9 \uAE08\uC561\uC740 \uCC38\uC11D \uD655\uC815 \uC778\uC6D0\uC73C\uB85C \uB098\uB220 \uBAA8\uC784 \uD654\uBA74\uC5D0 \uBCF4\uC5EC\uC694."), sheetEl);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...box,
+      borderColor: BLUE,
+      boxShadow: "0 4px 14px rgba(33,82,230,0.08)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 8px",
+      borderRadius: 8,
+      background: BALL,
+      color: INK
+    }
+  }, "\uC790\uB3D9"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#6B7493"
+    }
+  }, r ? `${r.we ? "주말" : "평일"} · ${r.n}면 · ${start}~${end}` : "시간을 넣으면 계산돼요")), r && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: 26,
+      fontWeight: 900,
+      color: INK,
+      letterSpacing: "-0.03em",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, won(r.total)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      paddingTop: 8,
+      borderTop: "1px dashed #E2E6F0",
+      display: "flex",
+      flexDirection: "column",
+      gap: 3
+    }
+  }, r.parts.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 8,
+      fontSize: 12.5,
+      color: "#4A5578",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: p.label === "야간" ? "#5B3FD6" : BLUE,
+      fontWeight: 700,
+      marginRight: 4
+    }
+  }, p.label || "주간·야간 같음"), hrsText(p.min), " \xD7 ", r.n, "\uBA74 \xD7 ", won(p.rate)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: INK,
+      flexShrink: 0
+    }
+  }, won(Math.round(p.min / 60 * p.rate * r.n))))))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "9px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uAD00\uB9AC\uC790\uAC00 \uB4F1\uB85D\uD55C \uCF54\uD2B8\uBE44 \uD45C\uB85C \uACC4\uC0B0\uD588\uC5B4\uC694", c.nightFrom ? ` (야간 ${c.nightFrom}부터)` : "", ". 1\uC778\uB2F9 \uAE08\uC561\uC740 \uCC38\uC11D \uD655\uC815 \uC778\uC6D0\uC73C\uB85C \uB098\uB220 \uBAA8\uC784 \uD654\uBA74\uC5D0 \uBCF4\uC5EC\uC694."), isAdmin && feeWho(c) && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0",
+      fontSize: 11,
+      color: "#8A93B0",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "users",
+    size: 12,
+    color: "#A3AAC2"
+  }), feeWho(c)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 14,
+      marginTop: 8
+    }
+  }, isAdmin && link("코트비 수정", () => setSheet(true)), link("이번만 직접 바꾸기", () => onManual(r ? String(r.total) : ""), "#6B7493")), sheetEl);
+}
+
+// 관리 → 코트비 관리
+function CourtFeeSettings({
+  jump
+}) {
+  const fees = useCourtFees(),
+    reqs = useCourtFeeRequests();
+  const [edit, setEdit] = useState(null);
+  const [err, setErr] = useState("");
+  const list = feeList(fees);
+  const blank = r => ({
+    name: r ? r.name : "",
+    address: r && r.address || "",
+    lat: r && r.lat,
+    lng: r && r.lng,
+    nightFrom: "18:00",
+    wd: {
+      same: false,
+      day: "",
+      night: ""
+    },
+    we: {
+      same: true,
+      day: "",
+      night: ""
+    },
+    req: r || null
+  });
+  // 알림에서 눌러서 왔으면 그 테니스장 등록 창을 바로 열어요
+  useEffect(() => {
+    if (!jump || !jump.place) return;
+    const c = findCourtFee(fees, jump.place);
+    const r = reqs.find(x => placeKey(x.name) === placeKey(jump.place));
+    if (c) setEdit(c);else if (r) setEdit(blank(r));else setEdit(blank({
+      name: jump.place
+    }));
+  }, [jump && jump.n, reqs.length, Object.keys(fees).length]);
+  const dismiss = r => {
+    if (!window.confirm(`${r.name} 등록 요청을 지울까요? 코트비 표에는 아무것도 안 바뀌어요.`)) return;
+    FB.club.child("courtFeeRequests/" + r.id).remove().catch(e => setErr(authMsg(e)));
+  };
+  const rate = row => !row ? "-" : row.same ? `${won(row.day)} (주·야 같음)` : `주간 ${won(row.day)} · 야간 ${won(row.night)}`;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, err && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      color: "#ef4444",
+      fontSize: 13
+    }
+  }, err)), reqs.length > 0 && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      border: "1.5px solid #FDE2B8",
+      background: "#FFFBF3"
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "\uB4F1\uB85D\uC774 \uD544\uC694\uD55C \uCF54\uD2B8 (", reqs.length, "\uACF3)"), reqs.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: r.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 0",
+      borderTop: i ? "1px solid #F6E6C8" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 800,
+      color: INK
+    }
+  }, r.name), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: 11.5,
+      color: "#8A5A12",
+      lineHeight: 1.5
+    }
+  }, [r.by && `${r.by} 님`, r.date && `${fmtDate(r.date)} 모임`, r.fee ? `직접 입력 ${won(r.fee)}` : "금액 없이 만듦"].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => dismiss(r),
+    style: {
+      ...btnSmall,
+      background: "none",
+      color: "#8A93B0",
+      padding: "9px 6px"
+    }
+  }, "\uC9C0\uC6B0\uAE30"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setEdit(blank(r)),
+    style: {
+      ...btnSmall,
+      background: BLUE,
+      fontWeight: 700,
+      padding: "9px 13px"
+    }
+  }, "\uB4F1\uB85D\uD558\uAE30"))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#B08A4A",
+      lineHeight: 1.6
+    }
+  }, "\uD68C\uC6D0\uC774 \uCF54\uD2B8\uBE44 \uD45C\uC5D0 \uC5C6\uB294 \uD14C\uB2C8\uC2A4\uC7A5\uC73C\uB85C \uBC88\uAC1C \uBAA8\uC784\uC744 \uB9CC\uB4E4\uBA74 \uC5EC\uAE30\uC640 \uC54C\uB9BC\uC5D0 \uB5A0\uC694. \uB4F1\uB85D\uD558\uBA74 \uBAA9\uB85D\uC5D0\uC11C \uC0AC\uB77C\uC838\uC694.")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    action: "+ \uCF54\uD2B8 \uCD94\uAC00",
+    onAction: () => setEdit(blank(null))
+  }, "\uCF54\uD2B8\uBE44 \uAD00\uB9AC (", list.length, "\uACF3)"), list.length === 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: "#A3AAC2"
+    }
+  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uCF54\uD2B8\uAC00 \uC5C6\uC5B4\uC694."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column"
+    }
+  }, list.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    type: "button",
+    onClick: () => setEdit(c),
+    style: {
+      display: "block",
+      width: "100%",
+      textAlign: "left",
+      padding: "12px 0",
+      border: "none",
+      borderTop: i ? "1px solid #E8ECF4" : "none",
+      background: "none",
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "pin",
+    size: 15,
+    color: BLUE,
+    stroke: 2.2
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15.5,
+      fontWeight: 800,
+      color: INK,
+      letterSpacing: "-0.02em"
+    }
+  }, c.name), !(c.wd && c.wd.same && c.we && c.we.same) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#5B3FD6",
+      background: "#EFEBFF",
+      padding: "2px 7px",
+      borderRadius: 8,
+      flexShrink: 0
+    }
+  }, "\uC57C\uAC04 ", c.nightFrom || "18:00", "~"), /*#__PURE__*/React.createElement(Icon, {
+    name: "chevR",
+    size: 16,
+    color: "#A3AAC2"
+  })), c.address && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0 21px",
+      fontSize: 11.5,
+      color: "#8A93B0"
+    }
+  }, c.address), feeWho(c) && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "7px 0 0 21px",
+      fontSize: 11.5,
+      fontWeight: 600,
+      color: "#4A5578",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "users",
+    size: 12,
+    color: BLUE
+  }), feeWho(c)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "7px 0 0 21px",
+      display: "grid",
+      gridTemplateColumns: "38px 1fr",
+      rowGap: 3,
+      fontSize: 12.5,
+      color: "#4A5578",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uD3C9\uC77C"), /*#__PURE__*/React.createElement("span", null, rate(c.wd)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      fontWeight: 600
+    }
+  }, "\uC8FC\uB9D0"), /*#__PURE__*/React.createElement("span", null, rate(c.we)))))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "10px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.6
+    }
+  }, "\uAE08\uC561\uC740 \uCF54\uD2B8 1\uBA74 \xB7 1\uC2DC\uAC04 \uAE30\uC900\uC774\uC5D0\uC694. \uBC88\uAC1C \uBAA8\uC784\uC744 \uB9CC\uB4E4 \uB54C \uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uC694\uC77C\xB7\uC2DC\uAC04\xB7\uCF54\uD2B8 \uC218\uC5D0 \uB9DE\uCDB0 \uCF54\uD2B8\uBE44\uAC00 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694. \uD68C\uC6D0\uC740 \uD45C\uC5D0 \uC5C6\uB294 \uD14C\uB2C8\uC2A4\uC7A5\uC77C \uB54C \uADF8 \uBAA8\uC784 \uCF54\uD2B8\uBE44\uB9CC \uC9C1\uC811 \uB123\uC5B4\uC694.")), edit && /*#__PURE__*/React.createElement(CourtFeeSheet, {
+    key: edit.id || edit.name || "new",
+    value: edit,
+    onClose: () => setEdit(null)
+  }));
+}
+// 코트비 등록·수정 (관리자만)
+function CourtFeeSheet({
+  value,
+  onClose
+}) {
+  const row0 = r => ({
+    same: !!(r && r.same),
+    day: r && r.day ? String(r.day) : "",
+    night: r && r.night ? String(r.night) : ""
+  });
+  const [f, setF] = useState(() => ({
+    ...value,
+    nightFrom: value.nightFrom || "18:00",
+    wd: value.wd ? row0(value.wd) : {
+      same: false,
+      day: "",
+      night: ""
+    },
+    we: value.we ? row0(value.we) : {
+      same: true,
+      day: "",
+      night: ""
+    }
+  }));
+  const [err, setErr] = useState(""),
+    [busy, setBusy] = useState(false);
+  const editing = !!value.id;
+  const block = (k, title, sub) => {
+    const row = f[k];
+    const put = o => setF(p => ({
+      ...p,
+      [k]: {
+        ...p[k],
+        ...o
+      }
+    }));
+    const seg = (on, label, v) => /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-pressed": on,
+      onClick: () => put({
+        same: v
+      }),
+      style: {
+        flex: 1,
+        padding: "8px 0",
+        borderRadius: 9,
+        border: "none",
+        background: on ? BLUE : "transparent",
+        color: on ? "#fff" : "#6B7493",
+        fontSize: 12.5,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, label);
+    const lab = (t, c) => /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: c,
+        margin: "0 0 4px 2px"
+      }
+    }, t);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fff",
+        borderRadius: 16,
+        padding: "13px 14px",
+        border: "1.5px solid #E2E6F0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: 6,
+        marginBottom: 9
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 800,
+        color: INK
+      }
+    }, title), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11.5,
+        color: "#A3AAC2"
+      }
+    }, sub)), /*#__PURE__*/React.createElement("div", {
+      role: "group",
+      "aria-label": `${title} 주간·야간 요금`,
+      style: {
+        display: "flex",
+        background: "#F4F6FB",
+        borderRadius: 11,
+        padding: 3,
+        gap: 3,
+        marginBottom: 10
+      }
+    }, seg(row.same, "주간·야간 같아요", true), seg(!row.same, "주간·야간 달라요", false)), row.same ? /*#__PURE__*/React.createElement("div", null, lab("종일 (주간·야간 같음)", "#6B7493"), /*#__PURE__*/React.createElement(MoneyInput, {
+      label: `${title} 종일`,
+      value: row.day,
+      onChange: v => put({
+        day: v
+      })
+    })) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, lab("주간", BLUE), /*#__PURE__*/React.createElement(MoneyInput, {
+      label: `${title} 주간`,
+      value: row.day,
+      onChange: v => put({
+        day: v
+      })
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, lab("야간", "#5B3FD6"), /*#__PURE__*/React.createElement(MoneyInput, {
+      label: `${title} 야간`,
+      value: row.night,
+      onChange: v => put({
+        night: v
+      })
+    }))));
+  };
+  const save = () => {
+    const name = String(f.name || "").trim();
+    if (!name) return setErr("테니스장 이름을 넣어 주세요");
+    const bad = r => !(+r.day > 0) || !r.same && !(+r.night > 0);
+    if (bad(f.wd) || bad(f.we)) return setErr("평일·주말 요금을 모두 넣어 주세요");
+    const other = findCourtFee(COURT_FEES, name);
+    if (other && other.id !== value.id) return setErr("이미 등록된 테니스장이에요. 목록에서 눌러 고쳐 주세요");
+    const row = r => ({
+      same: !!r.same,
+      day: +r.day,
+      night: r.same ? null : +r.night
+    });
+    const now = Date.now(),
+      uid = myUid();
+    const data = {
+      name,
+      address: (f.address || "").trim() || null,
+      lat: Number.isFinite(+f.lat) && f.lat != null ? +f.lat : null,
+      lng: Number.isFinite(+f.lng) && f.lng != null ? +f.lng : null,
+      nightFrom: f.nightFrom || "18:00",
+      wd: row(f.wd),
+      we: row(f.we),
+      createdBy: editing ? value.createdBy || null : ME,
+      createdByUid: editing ? value.createdByUid || null : uid,
+      createdAt: editing ? value.createdAt || null : now,
+      ...(editing ? {
+        updatedBy: ME,
+        updatedByUid: uid,
+        updatedAt: now
+      } : {})
+    };
+    const id = value.id || "c" + now;
+    setBusy(true);
+    setErr("");
+    FB.club.child("courtFees/" + id).set(JSON.parse(JSON.stringify(data))).then(() => Promise.all([feeKey(name), value.name && feeKey(value.name), value.req && value.req.id].filter(Boolean).map(k => FB.club.child("courtFeeRequests/" + k).remove().catch(() => {})))).then(onClose).catch(e => {
+      setBusy(false);
+      setErr(authMsg(e));
+    });
+  };
+  const del = () => {
+    if (!window.confirm(`${value.name} 코트비를 지울까요? 이미 만든 모임의 코트비는 그대로예요.`)) return;
+    FB.club.child("courtFees/" + value.id).remove().then(onClose).catch(e => setErr(authMsg(e)));
+  };
+  const req = value.req;
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: editing ? "코트비 수정" : "코트비 등록",
+    onClose: onClose
+  }, req && req.by && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FFF8EC",
+      borderRadius: 14,
+      padding: "10px 13px",
+      border: "1px solid #FDE2B8",
+      fontSize: 12,
+      color: "#8A5A12",
+      lineHeight: 1.6
+    }
+  }, /*#__PURE__*/React.createElement("b", null, req.by), " \uB2D8\uC774 ", req.date ? `${fmtDate(req.date)} ` : "", "\uBAA8\uC784", req.start ? `(${req.start}~${req.end}${req.courtNo ? ` · ${courtLabel(req.courtNo)}` : ""})` : "", "\uC5D0 ", req.fee ? /*#__PURE__*/React.createElement(React.Fragment, null, "\uCF54\uD2B8\uBE44\uB97C ", /*#__PURE__*/React.createElement("b", null, won(req.fee)), "\uC73C\uB85C \uC9C1\uC811 \uB123\uC5C8\uC5B4\uC694.") : "코트비 없이 만들었어요.", " \uCC38\uACE0\uD574\uC11C \uC694\uAE08\uD45C\uB97C \uCC44\uC6CC \uC8FC\uC138\uC694."), editing && (value.createdBy || value.updatedBy) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff",
+      borderRadius: 14,
+      padding: "10px 13px",
+      border: "1px solid #E4E9F7",
+      fontSize: 12,
+      color: "#4A5578",
+      lineHeight: 1.7
+    }
+  }, value.createdBy && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      display: "inline-block",
+      width: 62
+    }
+  }, "\uCC98\uC74C \uB4F1\uB85D"), /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: INK
+    }
+  }, value.createdBy), " \xB7 ", fmtMD(value.createdAt)), value.updatedBy && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#A3AAC2",
+      display: "inline-block",
+      width: 62
+    }
+  }, "\uB9C8\uC9C0\uB9C9 \uC218\uC815"), /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: INK
+    }
+  }, value.updatedBy), " \xB7 ", fmtMD(value.updatedAt))), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uD14C\uB2C8\uC2A4\uC7A5",
+    required: true
+  }, /*#__PURE__*/React.createElement(PlaceInput, {
+    value: f.name || "",
+    picked: Number.isFinite(+f.lat) && f.lat != null ? {
+      name: f.name,
+      address: f.address || ""
+    } : null,
+    onChange: v => setF(p => ({
+      ...p,
+      name: v,
+      ...(placeKey(v) !== placeKey(p.name) ? {
+        lat: null,
+        lng: null
+      } : {})
+    })),
+    onPick: p => setF(o => ({
+      ...o,
+      name: p.name,
+      address: p.address || o.address || "",
+      lat: p.lat != null ? p.lat : null,
+      lng: p.lng != null ? p.lng : null
+    }))
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uC0C8 \uBAA8\uC784\uC5D0\uC11C \uC4F0\uB294 \uD14C\uB2C8\uC2A4\uC7A5 \uC774\uB984\uACFC \uAC19\uC544\uC57C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uC694.")), /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uC57C\uAC04 \uC694\uAE08 \uC2DC\uC791 \uC2DC\uAC01"
+  }, /*#__PURE__*/React.createElement(TimeInput, {
+    label: "\uC57C\uAC04 \uC2DC\uC791",
+    value: f.nightFrom,
+    onChange: v => setF(p => ({
+      ...p,
+      nightFrom: v
+    }))
+  }), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "6px 0 0",
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.5
+    }
+  }, "\uC774 \uC2DC\uAC01\uBD80\uD130\uB294 \uC57C\uAC04 \uC694\uAE08\uC774\uC5D0\uC694. \uBAA8\uC784\uC774 \uAC78\uCCD0 \uC788\uC73C\uBA74 (\uC608: 17~19\uC2DC) \uC2DC\uAC04\uB9CC\uD07C \uB098\uB220\uC11C \uACC4\uC0B0\uD574\uC694.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: INK
+    }
+  }, "\uC694\uAE08 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#ef4444"
+    }
+  }, "*")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      fontWeight: 700,
+      color: INK,
+      background: BALL,
+      padding: "3px 9px",
+      borderRadius: 8
+    }
+  }, "\uCF54\uD2B8 1\uBA74 \xB7 1\uC2DC\uAC04 \uAE30\uC900")), block("wd", "평일", "월~금"), block("we", "주말", "토·일"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 11,
+      color: "#A3AAC2",
+      lineHeight: 1.55
+    }
+  }, editing ? "고치면 앞으로 만드는 모임부터 바뀐 금액이 들어가요. 이미 만든 모임 코트비는 그대로예요." : "등록하면 다음부터 이 테니스장으로 번개 모임을 만들 때 자동으로 들어가요."), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12.5,
+      color: "#ef4444"
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 4
+    }
+  }, editing && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: del,
+    style: {
+      padding: "14px 18px",
+      borderRadius: 16,
+      border: "1.5px solid #F3C4C6",
+      background: "#fff",
+      color: "#E5484D",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: FONT
+    }
+  }, "\uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: busy,
+    onClick: save,
+    style: {
+      flex: 1,
+      padding: "14px 0",
+      borderRadius: 16,
+      border: "none",
+      background: GRAD,
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: FONT,
+      opacity: busy ? 0.6 : 1
+    }
+  }, busy ? "저장 중…" : editing ? "저장" : "등록하기")));
+}
+
 // ─── 알림함 ───────────────────────────────────────────────────────────────────
 function NotiSheet({
   items,
@@ -13709,7 +14713,7 @@ function NotiSheet({
       gap: 8
     }
   }, items.map(n => {
-    const go = n.type === "guild" || n.postId || MEETING_NOTI.includes(n.type) && n.meetingId || n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin || n.type === "admin" && (n.meetingId || n.action);
+    const go = n.type === "guild" || n.postId || MEETING_NOTI.includes(n.type) && n.meetingId || n.type === "meeting" || n.type === "notice" || n.type === "member" && isAdmin || n.type === "admin" && (n.meetingId || n.action) || n.type === "courtFee" && isAdmin;
     return /*#__PURE__*/React.createElement("button", {
       key: n.id,
       type: "button",
@@ -13758,7 +14762,25 @@ function NotiSheet({
         lineHeight: 1.45,
         wordBreak: "keep-all"
       }
-    }, n.text), /*#__PURE__*/React.createElement("span", {
+    }, n.text), n.type === "courtFee" && isAdmin && /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 7,
+        padding: "6px 11px",
+        borderRadius: 9,
+        background: BLUE,
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "coin",
+      size: 13,
+      color: "#fff",
+      stroke: 2.2
+    }), "\uCF54\uD2B8\uBE44 \uB4F1\uB85D\uD558\uAE30"), /*#__PURE__*/React.createElement("span", {
       style: {
         display: "block",
         fontSize: 11,
@@ -13929,59 +14951,6 @@ function Pills({
       }
     }, l);
   }));
-}
-// 도로명 주소 검색: 카카오(다음) 우편번호 서비스를 폼 안에 띄워요 (키 없이 무료). 못 불러오면 직접 입력.
-let postcodeLoad = null;
-function loadPostcode() {
-  if (window.daum && window.daum.Postcode) return Promise.resolve();
-  if (!postcodeLoad) postcodeLoad = new Promise((ok, no) => {
-    const sc = document.createElement("script");
-    sc.src = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
-    sc.onload = ok;
-    sc.onerror = () => {
-      postcodeLoad = null;
-      no();
-    };
-    document.head.appendChild(sc);
-  });
-  return postcodeLoad;
-}
-function AddressSearch({
-  onPick
-}) {
-  const box = useRef(null);
-  const [fail, setFail] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    loadPostcode().then(() => {
-      if (!alive || !box.current) return;
-      new window.daum.Postcode({
-        width: "100%",
-        height: "100%",
-        oncomplete: d => onPick((d.roadAddress || d.jibunAddress || d.address) + (d.buildingName ? ` (${d.buildingName})` : ""))
-      }).embed(box.current);
-    }).catch(() => alive && setFail(true));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return fail ? /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: "8px 0 0",
-      fontSize: 12,
-      color: "#ef4444"
-    }
-  }, "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC8FC\uC18C\uB97C \uC9C1\uC811 \uC785\uB825\uD574 \uC8FC\uC138\uC694.") : /*#__PURE__*/React.createElement("div", {
-    ref: box,
-    style: {
-      marginTop: 8,
-      height: 420,
-      border: "1px solid #E4E9F7",
-      borderRadius: 14,
-      overflow: "hidden",
-      background: "#fff"
-    }
-  });
 }
 // 테니스장 이름 추천: 지금까지 만든 모임의 장소를 모아서 자주 쓴 곳 → 최근에 쓴 곳 순으로
 const placeKey = v => String(v || "").replace(/\s+/g, "").toLowerCase();
@@ -14441,7 +15410,9 @@ function MeetingForm({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [addrOpen, setAddrOpen] = useState(false);
+  const fees = useCourtFees();
+  // 코트비: null이면 코트비 표로 자동 계산, 문자열이면 직접 넣은 금액. 예전에 직접 넣은 모임은 그대로 보여 줘요
+  const [feeManual, setFeeManual] = useState(() => initial && initial.info.courtFee && !initial.info.courtFeeAuto ? String(initial.info.courtFee) : null);
   const set = (k, v) => setF(p => {
     const n = {
       ...p,
@@ -14469,8 +15440,12 @@ function MeetingForm({
     if (!String(f.courtNo || "").trim()) e.courtNo = "코트 번호를 입력해 주세요";
     const cap = parseInt(f.capacity, 10);
     if (!(cap >= 2 && cap <= 99)) e.capacity = "정원은 2~99명이에요";
-    const fee = String(f.courtFee || "").replace(/[^\d]/g, "");
-    if (f.kind === "flash" && fee.length > 7) e.courtFee = "코트비를 확인해 주세요";
+    const feeRow = findCourtFee(fees, f.place),
+      feeAuto = calcCourtFee(feeRow, f.date, f.start, f.end, f.courtNo);
+    const sameSlot = editing && ["place", "date", "start", "end", "courtNo"].every(k => String(f[k] || "") === String(initial.info[k] || ""));
+    // 자동: 수정할 때 장소·날짜·시간·코트를 안 바꿨으면 저장된 금액 그대로 (그사이 코트비 표가 바뀌어도)
+    const fee = feeManual != null ? +feeDigits(feeManual) || 0 : sameSlot && initial.info.courtFeeAuto ? +initial.info.courtFee || 0 : feeRow && feeAuto ? feeAuto.total : 0;
+    const feeIsAuto = feeManual == null && !!feeRow;
     const gcap = f.guestCap === "" ? 0 : parseInt(f.guestCap, 10);
     if (!(gcap >= 0 && gcap <= 50)) e.guestCap = "게스트는 0~50명이에요";
     if (repeating) {
@@ -14486,10 +15461,14 @@ function MeetingForm({
       kind: f.kind,
       ...(f.kind === "flash" ? {
         flashType: f.flashType || "game",
-        courtFee: +fee || 0
+        courtFee: fee || 0,
+        courtFeeAuto: feeIsAuto && fee > 0 ? true : null,
+        courtFeeManual: feeManual != null && fee > 0 ? true : null
       } : {
         flashType: null,
-        courtFee: null
+        courtFee: null,
+        courtFeeAuto: null,
+        courtFeeManual: null
       }),
       start: f.start,
       end: f.end,
@@ -14594,7 +15573,35 @@ function MeetingForm({
         return id;
       });
     }
-    job.then(id => onSaved(id)).catch(e => {
+    // 회원이 코트비 표에 없는 테니스장으로 번개를 만들면 관리자에게 등록 요청 (관리 탭 목록 + 알림)
+    const needFee = f.kind === "flash" && !feeRow && !ME_ADMIN && base.place && (!editing || placeKey(initial.info.place) !== placeKey(base.place));
+    job.then(id => {
+      if (needFee && FB) {
+        const k = feeKey(base.place);
+        FB.club.child("courtFeeRequests/" + k).set({
+          name: base.place,
+          address: base.address || null,
+          lat: base.lat,
+          lng: base.lng,
+          by: ME,
+          byUid: uid,
+          fee: fee || 0,
+          date: f.date,
+          start: f.start,
+          end: f.end,
+          courtNo: base.courtNo,
+          meetingId: id,
+          at: Date.now()
+        }).catch(() => {});
+        postFeed({
+          type: "courtFee",
+          place: base.place,
+          meetingId: id,
+          text: `코트비 정보가 없는 테니스장으로 모임이 만들어졌어요. ${base.place} · ${ME} 님${fee ? ` · 직접 입력 ${won(fee)}` : ""}. 코트비를 등록해 주세요.`
+        });
+      }
+      onSaved(id);
+    }).catch(e => {
       setSaving(false);
       setErr(authMsg(e));
     });
@@ -15017,36 +16024,22 @@ function MeetingForm({
         color: on ? "#fff" : "#4A5578"
       }
     }, v);
-  })), hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")), /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: row
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    "aria-label": "\uD14C\uB2C8\uC2A4\uC7A5 \uC8FC\uC18C",
-    value: f.address || "",
-    onChange: e => set("address", e.target.value),
-    placeholder: "\uC8FC\uC18C \uAC80\uC0C9\uC744 \uB20C\uB7EC \uCC3E\uC544\uC694",
-    style: {
-      ...inputStyle,
-      flex: 1
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setAddrOpen(v => !v),
-    style: {
-      ...btnSmall,
-      background: addrOpen ? "#fff" : GRAD,
-      color: addrOpen ? "#6B7493" : "#fff",
-      border: addrOpen ? "1.5px solid #D6DEF7" : "none",
-      flexShrink: 0
-    }
-  }, addrOpen ? "닫기" : "주소 검색")), addrOpen && /*#__PURE__*/React.createElement(AddressSearch, {
-    onPick: a => {
-      set("address", a);
-      setAddrOpen(false);
-    }
-  }), hint("선택이에요. 넣으면 모임 화면에서 눌러서 지도로 볼 수 있어요.")), /*#__PURE__*/React.createElement("div", {
+  })), hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")), f.kind === "flash" && /*#__PURE__*/React.createElement(FieldWrap, {
+    label: "\uCF54\uD2B8\uBE44"
+  }, /*#__PURE__*/React.createElement(CourtFeeBox, {
+    fees: fees,
+    place: f.place,
+    address: f.address,
+    lat: f.lat,
+    lng: f.lng,
+    date: f.date,
+    start: f.start,
+    end: f.end,
+    courtNo: f.courtNo,
+    manual: feeManual,
+    onManual: setFeeManual,
+    isAdmin: ME_ADMIN
+  })), /*#__PURE__*/React.createElement("div", {
     style: row
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15154,34 +16147,7 @@ function MeetingForm({
     value: f.endDate,
     onChange: e => set("endDate", e.target.value),
     style: inputStyle
-  }), hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)), f.kind === "flash" && /*#__PURE__*/React.createElement(FieldWrap, {
-    label: "\uCF54\uD2B8\uBE44 (\uC5D4\uBE75)",
-    error: errors.courtFee
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    inputMode: "numeric",
-    "aria-label": "\uCF54\uD2B8\uBE44",
-    value: f.courtFee ? Number(String(f.courtFee).replace(/[^\d]/g, "")).toLocaleString("ko-KR") : "",
-    onChange: e => set("courtFee", e.target.value.replace(/[^\d]/g, "")),
-    placeholder: "\uC608: 40,000",
-    style: {
-      ...inputStyle,
-      paddingRight: 40
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      position: "absolute",
-      right: 16,
-      top: "50%",
-      transform: "translateY(-50%)",
-      fontSize: 14,
-      color: "#6B7493"
-    }
-  }, "\uC6D0")), hint("모임 회비와 별도로 참석자끼리 나눠 내는 금액이에요. 모임 화면에 1인당 금액이 같이 보여요.")), /*#__PURE__*/React.createElement(FieldWrap, {
+  }), hint(`비우면 계속 반복해요. 다가오는 ${SERIES_AHEAD}회분이 미리 만들어지고, 모임 화면에서 언제든 반복을 멈출 수 있어요.`)), /*#__PURE__*/React.createElement(FieldWrap, {
     label: "\uBAA8\uC784 \uC124\uBA85"
   }, /*#__PURE__*/React.createElement("textarea", {
     value: f.desc,
@@ -19188,7 +20154,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "beacc11715";
+const BUILD_ID = "1b7bf78fed";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -20654,6 +21620,7 @@ function App() {
   }));
   const club = useClubFeed(account && account.user ? account.user.uid : null); // 알림·공지
   useLastSeenRecorder(account && account.user ? account.user.uid : null); // 마지막 접속 기록 (10분에 한 번까지)
+  const [adminJump, setAdminJump] = useState(null); // 알림에서 관리 탭 화면으로 바로 갈 때 {sec,place,n}
   const [noti, setNoti] = useState(null); // 알림함 (열 때의 목록)
   const [noticeForm, setNoticeForm] = useState(false);
   const [focusNotice, setFocusNotice] = useState(null);
@@ -21476,7 +22443,9 @@ function App() {
     boardFocus: boardFocus,
     newCounts: membersNew,
     canWrite: !FB || !!(account && (account.admin || account.approved))
-  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, null)), tab === "booking" && !curMeeting && bookView !== "map" && /*#__PURE__*/React.createElement("button", {
+  }), tab === "stats" && /*#__PURE__*/React.createElement(StatsTab, null), tab === "admin" && FB && adminOn && /*#__PURE__*/React.createElement(AdminTab, {
+    jump: adminJump
+  })), tab === "booking" && !curMeeting && bookView !== "map" && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: openCreate,
     title: "\uC0C8 \uBAA8\uC784 \uB9CC\uB4E4\uAE30",
@@ -21709,6 +22678,19 @@ function App() {
         setFocusNotice(n.noticeId + "#" + Date.now());
       } else if (n.type === "member" && adminOn) {
         setOpenMeeting(null);
+        setTab("admin");
+      } else if (n.type === "courtFee" && adminOn) {
+        if (openMeeting) {
+          try {
+            if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+          } catch (e) {}
+          setOpenMeeting(null);
+        }
+        setAdminJump(j => ({
+          sec: "fees",
+          place: n.place,
+          n: (j && j.n || 0) + 1
+        }));
         setTab("admin");
       } else if (n.type === "guild") {
         if (openMeeting) {
