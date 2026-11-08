@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2152E6">
 <!-- 폰 브라우저의 "강제 다크 모드"가 색을 멋대로 뒤집지 않게 (앱이 직접 정한 색만 써요) -->
 <meta name="color-scheme" content="only light">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=1b7bf78fed">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1b7bf78fed">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=f2020c4ace">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=f2020c4ace">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/Fredoka.ttf" as="font" type="font/ttf" crossorigin>
 <meta name="apple-mobile-web-app-title" content="SSTC">
@@ -14344,7 +14344,7 @@ function CourtFeeSettings({
       lineHeight: 1.6
     }
   }, "\uAE08\uC561\uC740 \uCF54\uD2B8 1\uBA74 \xB7 1\uC2DC\uAC04 \uAE30\uC900\uC774\uC5D0\uC694. \uBC88\uAC1C \uBAA8\uC784\uC744 \uB9CC\uB4E4 \uB54C \uC774 \uD14C\uB2C8\uC2A4\uC7A5\uC744 \uACE0\uB974\uBA74 \uC694\uC77C\xB7\uC2DC\uAC04\xB7\uCF54\uD2B8 \uC218\uC5D0 \uB9DE\uCDB0 \uCF54\uD2B8\uBE44\uAC00 \uC790\uB3D9\uC73C\uB85C \uB4E4\uC5B4\uAC00\uC694. \uD68C\uC6D0\uC740 \uD45C\uC5D0 \uC5C6\uB294 \uD14C\uB2C8\uC2A4\uC7A5\uC77C \uB54C \uADF8 \uBAA8\uC784 \uCF54\uD2B8\uBE44\uB9CC \uC9C1\uC811 \uB123\uC5B4\uC694.")), edit && /*#__PURE__*/React.createElement(CourtFeeSheet, {
-    key: edit.id || edit.name || "new",
+    key: edit.id || edit.req && edit.req.id || edit.name || "new",
     value: edit,
     onClose: () => setEdit(null)
   }));
@@ -16990,13 +16990,7 @@ function MemberList({
   useSeen();
   const data = useClubMembers();
   const [q] = useShared("memQ", "");
-  const [sort] = useShared("memSort", () => {
-    try {
-      return sessionStorage.getItem("sstc-members-sort") || "name";
-    } catch (e) {
-      return "name";
-    }
-  });
+  const [sort] = useShared("memSort", memSortInit);
   const [open, setOpen] = useState(null);
   if (!data) return /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("p", {
     style: {
@@ -20154,7 +20148,7 @@ function GuildLockSheet({
 // ─── 새 버전 안내 ───────────────────────────────────────────────────────────────
 // 빌드할 때 BUILD_ID가 바뀌고 version.json에도 같이 써져요. 앱을 열 때와 다시 화면에 돌아올 때 version.json을 확인해서
 // 지금 열린 버전과 다르면 위쪽에 "새 버전이 있어요" 안내를 띄워요. (홈 화면에 추가한 앱은 새로고침 버튼이 없어서 필요)
-const BUILD_ID = "1b7bf78fed";
+const BUILD_ID = "f2020c4ace";
 function useNewVersion() {
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
@@ -20561,13 +20555,7 @@ function MemberViewHead() {
     }
   });
   const [q, setQ] = useShared("memQ", "");
-  const [sort, setSortRaw] = useShared("memSort", () => {
-    try {
-      return sessionStorage.getItem("sstc-members-sort") || "name";
-    } catch (e) {
-      return "name";
-    }
-  });
+  const [sort, setSortRaw] = useShared("memSort", memSortInit);
   if (view === "board") return /*#__PURE__*/React.createElement(BoardSearchHead, null);
   if (view === "guild") {
     const me = myUid(),
@@ -20665,32 +20653,146 @@ function MemberViewHead() {
     n: "x",
     s: 13,
     c: "#6B7493"
-  }))), /*#__PURE__*/React.createElement("div", {
-    role: "group",
-    "aria-label": "\uD68C\uC6D0 \uC815\uB82C",
+  }))), /*#__PURE__*/React.createElement(SortDropdown, {
+    value: sort,
+    onChange: setSort
+  }));
+}
+// 회원 정렬 (손별은 뺐어요. 예전에 손별로 두었으면 이름순으로)
+const memSortInit = () => {
+  let v = "name";
+  try {
+    v = sessionStorage.getItem("sstc-members-sort") || "name";
+  } catch (e) {}
+  return MEMBER_SORTS.some(x => x[0] === v) ? v : "name";
+};
+const MEMBER_SORTS = [["name", "이름순"], ["career", "구력순"], ["region", "동네별"], ["guild", "길드별"]];
+function SortDropdown({
+  value,
+  onChange
+}) {
+  const [open, setOpen] = useState(false);
+  const btn = useRef(null);
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    if (!open) return;
+    const r = btn.current.getBoundingClientRect();
+    setPos({
+      top: r.bottom + 4,
+      right: window.innerWidth - r.right
+    });
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, {
+      passive: true
+    });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  const cur = (MEMBER_SORTS.find(x => x[0] === value) || MEMBER_SORTS[0])[1];
+  return /*#__PURE__*/React.createElement("div", {
     style: {
+      position: "relative",
       display: "flex",
-      gap: 6,
-      overflowX: "auto"
+      justifyContent: "flex-end",
+      zIndex: 30
     }
-  }, [["name", "이름순"], ["career", "구력순"], ["region", "동네별"], ["hand", "손별"], ["guild", "길드별"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
+  }, /*#__PURE__*/React.createElement("button", {
+    ref: btn,
     type: "button",
-    "aria-pressed": sort === k,
-    onClick: () => setSort(k),
+    "aria-haspopup": "listbox",
+    "aria-expanded": open,
+    onClick: () => setOpen(o => !o),
     style: {
-      flexShrink: 0,
-      padding: "7px 13px",
-      borderRadius: 10,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 4px 6px 10px",
       border: "none",
-      background: sort === k ? BALL : "rgba(255,255,255,0.12)",
-      color: sort === k ? INK : "#fff",
+      background: "transparent",
+      color: "rgba(255,255,255,0.75)",
       fontSize: 13,
-      fontWeight: 700,
+      fontWeight: 600,
       cursor: "pointer",
       fontFamily: FONT
     }
-  }, l))));
+  }, "\uC815\uB82C \uAE30\uC900: ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "#fff",
+      fontWeight: 800
+    }
+  }, cur), /*#__PURE__*/React.createElement("svg", {
+    "aria-hidden": "true",
+    width: "14",
+    height: "14",
+    viewBox: "0 0 24 24",
+    style: {
+      transform: open ? "rotate(180deg)" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6 6-6",
+    fill: "none",
+    stroke: "#fff",
+    strokeWidth: "2.6",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }))), open && pos && ReactDOM.createPortal( /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setOpen(false),
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 80
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    role: "listbox",
+    "aria-label": "\uD68C\uC6D0 \uC815\uB82C",
+    style: {
+      position: "fixed",
+      top: pos.top,
+      right: pos.right,
+      zIndex: 81,
+      minWidth: 150,
+      padding: 6,
+      borderRadius: 14,
+      background: "#fff",
+      boxShadow: "0 10px 28px rgba(11,30,91,0.22)"
+    }
+  }, MEMBER_SORTS.map(([k, l]) => {
+    const on = value === k;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      type: "button",
+      role: "option",
+      "aria-selected": on,
+      onClick: () => {
+        onChange(k);
+        setOpen(false);
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        width: "100%",
+        padding: "10px 12px",
+        border: "none",
+        borderRadius: 10,
+        background: on ? BLUE_LIGHT : "transparent",
+        color: on ? BLUE : INK,
+        fontSize: 15,
+        fontWeight: on ? 800 : 600,
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: FONT
+      }
+    }, l, on && /*#__PURE__*/React.createElement(Ic, {
+      n: "check",
+      s: 15,
+      c: BLUE
+    }));
+  }))), document.body));
 }
 function StatsHead() {
   const mine = myHeld();
