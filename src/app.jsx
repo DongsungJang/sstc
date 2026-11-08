@@ -4740,7 +4740,7 @@ function MemberList({onOpenMeeting}){
   useSeen();
   const data=useClubMembers();
   const [q]=useShared("memQ","");
-  const [sort]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
+  const [sort]=useShared("memSort",memSortInit);
   const [open,setOpen]=useState(null);
   if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const ym=todayYmd().slice(0,7);
@@ -5482,7 +5482,7 @@ function MemberSearchHead({newCounts={}}){
 function MemberViewHead(){
   const [view]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
   const [q,setQ]=useShared("memQ","");
-  const [sort,setSortRaw]=useShared("memSort",()=>{try{return sessionStorage.getItem("sstc-members-sort")||"name";}catch(e){return "name";}});
+  const [sort,setSortRaw]=useShared("memSort",memSortInit);
   if(view==="board") return <BoardSearchHead/>;
   if(view==="guild"){ const me=myUid(), mine=guildsOf(me), inv=guildList().filter(g=>g.invites&&g.invites[me]&&!inGuild(g,me)).length;
     return <div style={{position:"relative",marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
@@ -5497,11 +5497,29 @@ function MemberViewHead(){
         <input value={q} onChange={e=>setQ(e.target.value)} aria-label="회원 검색" placeholder="닉네임, 본명, 동네, 코트로 찾기" style={{flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",fontSize:16,color:INK,fontFamily:FONT}}/>
         {q&&<button type="button" aria-label="검색어 지우기" onClick={()=>setQ("")} style={{border:"none",background:"#EDF0F6",borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Ic n="x" s={13} c="#6B7493"/></button>}
       </label>
-      <div role="group" aria-label="회원 정렬" style={{display:"flex",gap:6,overflowX:"auto"}}>
-        {[["name","이름순"],["career","구력순"],["region","동네별"],["hand","손별"],["guild","길드별"]].map(([k,l])=>(
-          <button key={k} type="button" aria-pressed={sort===k} onClick={()=>setSort(k)} style={{flexShrink:0,padding:"7px 13px",borderRadius:10,border:"none",background:sort===k?BALL:"rgba(255,255,255,0.12)",color:sort===k?INK:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>
-        ))}
-      </div>
+      <SortDropdown value={sort} onChange={setSort}/>
+        </div>);
+}
+// 회원 정렬 (손별은 뺐어요. 예전에 손별로 두었으면 이름순으로)
+const memSortInit=()=>{ let v="name"; try{ v=sessionStorage.getItem("sstc-members-sort")||"name"; }catch(e){} return MEMBER_SORTS.some(x=>x[0]===v)?v:"name"; };
+const MEMBER_SORTS=[["name","이름순"],["career","구력순"],["region","동네별"],["guild","길드별"]];
+function SortDropdown({value,onChange}){
+  const [open,setOpen]=useState(false);
+  const btn=useRef(null); const [pos,setPos]=useState(null);
+  useEffect(()=>{ if(!open) return; const r=btn.current.getBoundingClientRect(); setPos({top:r.bottom+4,right:window.innerWidth-r.right});
+    const close=()=>setOpen(false); window.addEventListener("scroll",close,{passive:true}); window.addEventListener("resize",close);
+    return ()=>{ window.removeEventListener("scroll",close); window.removeEventListener("resize",close); }; },[open]);
+  const cur=(MEMBER_SORTS.find(x=>x[0]===value)||MEMBER_SORTS[0])[1];
+  return(
+    <div style={{position:"relative",display:"flex",justifyContent:"flex-end",zIndex:30}}>
+      <button ref={btn} type="button" aria-haspopup="listbox" aria-expanded={open} onClick={()=>setOpen(o=>!o)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 4px 6px 10px",border:"none",background:"transparent",color:"rgba(255,255,255,0.75)",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>
+        정렬 기준: <b style={{color:"#fff",fontWeight:800}}>{cur}</b>
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" style={{transform:open?"rotate(180deg)":"none"}}><path d="M6 9l6 6 6-6" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </button>
+      {open&&pos&&ReactDOM.createPortal(<><div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:80}}/><div role="listbox" aria-label="회원 정렬" style={{position:"fixed",top:pos.top,right:pos.right,zIndex:81,minWidth:150,padding:6,borderRadius:14,background:"#fff",boxShadow:"0 10px 28px rgba(11,30,91,0.22)"}}>
+        {MEMBER_SORTS.map(([k,l])=>{ const on=value===k; return(
+          <button key={k} type="button" role="option" aria-selected={on} onClick={()=>{onChange(k);setOpen(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,width:"100%",padding:"10px 12px",border:"none",borderRadius:10,background:on?BLUE_LIGHT:"transparent",color:on?BLUE:INK,fontSize:15,fontWeight:on?800:600,textAlign:"left",cursor:"pointer",fontFamily:FONT}}>{l}{on&&<Ic n="check" s={15} c={BLUE}/>}</button>); })}
+      </div></>,document.body)}
     </div>);
 }
 function StatsHead(){
