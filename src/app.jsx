@@ -3931,7 +3931,7 @@ function StatsTab() {
     </div>
   );
 }
-// 월별 참석 횟수: 나(파랑)와 참석 회원 평균(남색) 막대를 나란히, 막대마다 숫자 (예전엔 평균 막대가 연한 색이라 잘 안 보였어요)
+// 월별 참석 횟수: 나(파랑)와 참석 회원 평균(연한 파랑) 막대를 나란히, 숫자는 막대 안 위쪽에
 function MonthlyChart({rows,maxVal}){
   const cur=rows[rows.length-1], diff=Math.round((cur.me-cur.avg)*10)/10;
   const H=96;
@@ -3948,11 +3948,12 @@ function MonthlyChart({rows,maxVal}){
     <div style={{display:"flex",alignItems:"flex-end",gap:6,padding:"0 4px"}}>
       {rows.map(r=>(
         <div key={r.key} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-          <div style={{width:"100%",display:"flex",gap:3,alignItems:"flex-end",height:H+16}}>
-            {[{v:r.me,bg:BLUE,c:BLUE},{v:r.avg,bg:INK,c:INK}].map((x,k)=>(
-              <div key={k} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:2,height:"100%"}}>
-                <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{x.v}</span>
-                <div style={{width:"100%",background:x.bg,borderRadius:"6px 6px 0 0",height:Math.max(4,(x.v/maxVal)*H)}}/>
+          <div style={{width:"100%",display:"flex",gap:3,alignItems:"flex-end",height:H}}>
+            {[{v:r.me,bg:BLUE,c:"#fff"},{v:r.avg,bg:"#CBD6F5",c:"#4A5A8A"}].map((x,k)=>(
+              <div key={k} style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",height:"100%"}}>
+                <div style={{width:"100%",background:x.bg,borderRadius:"6px 6px 0 0",height:Math.max(20,(x.v/maxVal)*H),display:"flex",justifyContent:"center",paddingTop:4,boxSizing:"border-box"}}>
+                  <span style={{fontSize:10,lineHeight:"12px",color:x.c,fontWeight:800,fontVariantNumeric:"tabular-nums",letterSpacing:"-0.03em"}}>{x.v}</span>
+                </div>
               </div>))}
           </div>
           <span style={{fontSize:11,color:"#8A93B2"}}>{r.label}</span>
@@ -3960,7 +3961,7 @@ function MonthlyChart({rows,maxVal}){
       ))}
     </div>
     <div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
-      {[{bg:BLUE,label:"나"},{bg:INK,label:"참석 회원 평균"}].map(l=>(
+      {[{bg:BLUE,label:"나"},{bg:"#CBD6F5",label:"참석 회원 평균"}].map(l=>(
         <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
           <div style={{width:10,height:10,background:l.bg,borderRadius:2}}/>
           <span style={{fontSize:12,color:"#6B7493"}}>{l.label}</span>
