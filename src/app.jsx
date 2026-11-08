@@ -201,7 +201,7 @@ const isEnded=info=>{ const n=kstNow(), d=n.slice(0,10); return info.date<d||(in
 function toMeeting(id,rec,series){
   const info=rec.info, capacity=+info.capacity||0, guestCap=+info.guestCap||0;
   return { id, rec, info, date:fmtDate(info.date), iso:info.date, time:`${info.start} ~ ${info.end}`,
-    place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:"")+(info.surface?` · ${info.surface}`:""), surface:info.surface||"", placeName:info.place, courtNo:info.courtNo||"", address:info.address||"", lat:info.lat!=null&&Number.isFinite(+info.lat)?+info.lat:null, lng:info.lng!=null&&Number.isFinite(+info.lng)?+info.lng:null,
+    place:info.place+(info.courtNo?` · ${courtLabel(info.courtNo)}`:"")+(info.indoor?" · 실내":"")+(info.surface?` · ${info.surface}`:""), surface:info.surface||"", placeName:info.place, courtNo:info.courtNo||"", address:info.address||"", lat:info.lat!=null&&Number.isFinite(+info.lat)?+info.lat:null, lng:info.lng!=null&&Number.isFinite(+info.lng)?+info.lng:null,
     kind:kindOf(info), flashType:info.kind==="flash"?(info.flashType||"game"):"", courtFee:+info.courtFee||0, capacity, guestCap, total:capacity+guestCap, seriesId:info.seriesId||null, series:series||null,
     desc:info.desc||"", openAt:info.openAt||"", openDate:fmtOpen(info.openAt),
     status:isEnded(info)?"past":"upcoming", guildId:meetGuildIds(info)[0]||"", guildIds:meetGuildIds(info), guildOpen:!!(info.guildOpen&&meetGuildIds(info).length), createdBy:info.createdBy||"", createdByUid:info.createdByUid||"",
@@ -4101,9 +4101,12 @@ const courtCount=v=>{ const s=String(v||"").trim(); if(!s) return 1; let n=0;
 const hmMin=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||""); return m?(+m[1])*60+(+m[2]):0; };
 const hrsText=min=>{ const h=min/60; return Number.isInteger(h)?`${h}시간`:`${(Math.round(h*10)/10)}시간`; };
 // 요일(토·일은 주말)·시간(야간 시작 시각으로 나눔)·코트 수로 계산
-function calcCourtFee(c,date,start,end,courtNo){
+// 실내·실외 요금이 다른 곳(inout): wd·we는 실외, indoor.wd·indoor.we는 실내
+const hasInOut=c=>!!(c&&c.inout&&c.indoor);
+function calcCourtFee(c,date,start,end,courtNo,indoor){
   if(!c||!date||!start||!end||end<=start) return null;
-  const we=[0,6].includes(dowOf(date)), row=we?c.we:c.wd; if(!row) return null;
+  const set=hasInOut(c)&&indoor?c.indoor:c;
+  const we=[0,6].includes(dowOf(date)), row=we?set.we:set.wd; if(!row) return null;
   const nf=hmMin(c.nightFrom||"18:00"), s=hmMin(start), e=hmMin(end);
   const dayMin=Math.max(0,Math.min(e,nf)-s), nightMin=Math.max(0,e-Math.max(s,nf));
   const dayRate=+row.day||0, nightRate=row.same?dayRate:(+row.night||0), n=courtCount(courtNo), per=feePer(c);
@@ -4111,7 +4114,7 @@ function calcCourtFee(c,date,start,end,courtNo){
     :[{label:"주간",min:dayMin,rate:dayRate},{label:"야간",min:nightMin,rate:nightRate}].filter(p=>p.min>0);
   parts.forEach(p=>{ p.amt=Math.round(p.min/60/per*p.rate*n); });
   const total=parts.reduce((a,p)=>a+p.amt,0);
-  return {we,n,per,parts,total};
+  return {we,n,per,parts,total,inout:hasInOut(c),indoor:hasInOut(c)&&!!indoor};
 }
 const feeDigits=v=>String(v==null?"":v).replace(/[^\d]/g,"").slice(0,7);
 function MoneyInput({value,onChange,label,placeholder,style}){
@@ -4123,9 +4126,13 @@ function MoneyInput({value,onChange,label,placeholder,style}){
 }
 
 // 새 모임 화면의 코트비 칸. manual: 직접 넣은 금액(문자열) 또는 null(자동)
-function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,manual,onManual,isAdmin}){
+function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,indoor,onIndoor,manual,onManual,isAdmin}){
   const [sheet,setSheet]=useState(false);
-  const c=findCourtFee(fees,place), r=calcCourtFee(c,date,start,end,courtNo);
+  const c=findCourtFee(fees,place), r=calcCourtFee(c,date,start,end,courtNo,indoor);
+  // 실내·실외 요금이 다른 테니스장이면 어느 쪽인지 골라요
+  const inoutPick=hasInOut(c)&&<div role="radiogroup" aria-label="실내·실외" style={{display:"flex",background:"#F4F6FB",borderRadius:11,padding:3,gap:3,marginBottom:10}}>
+    {[[false,"실외 코트"],[true,"실내 코트"]].map(([v,l])=>{ const on=!!indoor===v; return <button key={l} type="button" role="radio" aria-checked={on} onClick={()=>onIndoor(v)} style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",background:on?BLUE:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>; })}
+  </div>;
   const box={background:"#fff",borderRadius:16,border:"1.5px solid #E2E6F0",padding:"14px 15px"};
   const link=(label,onClick,color)=><button type="button" onClick={onClick} style={{padding:0,border:"none",background:"none",fontSize:12,fontWeight:700,color:color||BLUE,cursor:"pointer",fontFamily:FONT,textDecoration:"underline",textUnderlineOffset:3}}>{label}</button>;
   const sheetEl=sheet&&<CourtFeeSheet value={c||{name:place,address:address||"",lat,lng}} onClose={()=>setSheet(false)}/>;
@@ -4140,6 +4147,7 @@ function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,manual,o
     {sheetEl}
   </div>;
   if(!c||manual!=null) return <div style={box}>
+    {inoutPick}
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:"#FFF1DB",color:"#9A5B00"}}>직접 입력</span>
       <span style={{fontSize:12,color:"#6B7493"}}>{c?"이번 모임만 금액을 바꿔요":"등록된 코트비가 없는 테니스장이에요"}</span>
@@ -4152,9 +4160,10 @@ function CourtFeeBox({fees,place,address,lat,lng,date,start,end,courtNo,manual,o
     {sheetEl}
   </div>;
   return <div style={{...box,borderColor:BLUE,boxShadow:"0 4px 14px rgba(33,82,230,0.08)"}}>
+    {inoutPick}
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:11,fontWeight:800,padding:"3px 8px",borderRadius:8,background:BALL,color:INK}}>자동</span>
-      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:"시간을 넣으면 계산돼요"}</span>
+      <span style={{fontSize:12,color:"#6B7493"}}>{r?`${r.inout?(r.indoor?"실내 · ":"실외 · "):""}${r.we?"주말":"평일"} · ${r.n}면 · ${start}~${end}`:"시간을 넣으면 계산돼요"}</span>
     </div>
     {r&&<>
       <p style={{margin:"8px 0 0",fontSize:26,fontWeight:900,color:INK,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums"}}>{won(r.total)}</p>
@@ -4210,14 +4219,24 @@ function CourtFeeSettings({jump}){
             <Icon name="pin" size={15} color={BLUE} stroke={2.2}/>
             <span style={{flex:1,minWidth:0,fontSize:15.5,fontWeight:800,color:INK,letterSpacing:"-0.02em"}}>{c.name}</span>
             {perTag(c)}
+            {hasInOut(c)&&<span style={{fontSize:11,fontWeight:700,color:"#067647",background:"#E6F6EC",padding:"2px 7px",borderRadius:8,flexShrink:0}}>실내·실외</span>}
             {!(c.wd&&c.wd.same&&c.we&&c.we.same)&&<span style={{fontSize:11,fontWeight:700,color:"#5B3FD6",background:"#EFEBFF",padding:"2px 7px",borderRadius:8,flexShrink:0}}>야간 {c.nightFrom||"18:00"}~</span>}
             <Icon name="chevR" size={16} color="#A3AAC2"/>
           </div>
           {c.address&&<p style={{margin:"2px 0 0 21px",fontSize:11.5,color:"#8A93B0"}}>{c.address}</p>}
           {feeWho(c)&&<p style={{margin:"7px 0 0 21px",fontSize:11.5,fontWeight:600,color:"#4A5578",display:"flex",alignItems:"center",gap:4}}><Icon name="users" size={12} color={BLUE}/>{feeWho(c)}</p>}
           <div style={{margin:"7px 0 0 21px",display:"grid",gridTemplateColumns:"38px 1fr",rowGap:3,fontSize:12.5,color:"#4A5578",fontVariantNumeric:"tabular-nums"}}>
-            <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
-            <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
+            {hasInOut(c)?<>
+              <span style={{color:"#A3AAC2",fontWeight:600,gridColumn:"1 / -1",marginTop:2}}>실외</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600,gridColumn:"1 / -1",marginTop:4}}>실내</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.indoor.wd)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.indoor.we)}</span>
+            </>:<>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>평일</span><span>{rate(c.wd)}</span>
+              <span style={{color:"#A3AAC2",fontWeight:600}}>주말</span><span>{rate(c.we)}</span>
+            </>}
           </div>
         </button>)}
       </div>
@@ -4229,7 +4248,8 @@ function CourtFeeSettings({jump}){
 // 코트비 등록·수정 (관리자만)
 function CourtFeeSheet({value,onClose}){
   const row0=r=>({same:!!(r&&r.same),day:r&&r.day?String(r.day):"",night:r&&r.night?String(r.night):""});
-  const [f,setF]=useState(()=>({...value,per:feePer(value),nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""}}));
+  const [f,setF]=useState(()=>({...value,per:feePer(value),nightFrom:value.nightFrom||"18:00",wd:value.wd?row0(value.wd):{same:false,day:"",night:""},we:value.we?row0(value.we):{same:true,day:"",night:""},
+    inout:hasInOut(value),iwd:value.indoor&&value.indoor.wd?row0(value.indoor.wd):{same:false,day:"",night:""},iwe:value.indoor&&value.indoor.we?row0(value.indoor.we):{same:true,day:"",night:""}}));
   const [err,setErr]=useState(""), [busy,setBusy]=useState(false);
   const editing=!!value.id;
   const block=(k,title,sub)=>{ const row=f[k]; const put=o=>setF(p=>({...p,[k]:{...p[k],...o}}));
@@ -4245,12 +4265,12 @@ function CourtFeeSheet({value,onClose}){
     const name=String(f.name||"").trim();
     if(!name) return setErr("테니스장 이름을 넣어 주세요");
     const bad=r=>!(+r.day>0)||(!r.same&&!(+r.night>0));
-    if(bad(f.wd)||bad(f.we)) return setErr("평일·주말 요금을 모두 넣어 주세요");
+    if(bad(f.wd)||bad(f.we)||(f.inout&&(bad(f.iwd)||bad(f.iwe)))) return setErr(f.inout?"실외·실내 평일·주말 요금을 모두 넣어 주세요":"평일·주말 요금을 모두 넣어 주세요");
     const other=findCourtFee(COURT_FEES,name); if(other&&other.id!==value.id) return setErr("이미 등록된 테니스장이에요. 목록에서 눌러 고쳐 주세요");
     const row=r=>({same:!!r.same,day:+r.day,night:r.same?null:+r.night});
     const now=Date.now(), uid=myUid();
     const data={name,address:(f.address||"").trim()||null,lat:Number.isFinite(+f.lat)&&f.lat!=null?+f.lat:null,lng:Number.isFinite(+f.lng)&&f.lng!=null?+f.lng:null,
-      per:f.per===2?2:1,nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),
+      per:f.per===2?2:1,nightFrom:f.nightFrom||"18:00",wd:row(f.wd),we:row(f.we),inout:f.inout?true:null,indoor:f.inout?{wd:row(f.iwd),we:row(f.iwe)}:null,
       createdBy:editing?(value.createdBy||null):ME,createdByUid:editing?(value.createdByUid||null):uid,createdAt:editing?(value.createdAt||null):now,
       ...(editing?{updatedBy:ME,updatedByUid:uid,updatedAt:now}:{})};
     const id=value.id||("c"+now);
@@ -4290,8 +4310,18 @@ function CourtFeeSheet({value,onClose}){
       <span style={{fontSize:14,fontWeight:500,color:INK}}>요금 <span style={{color:"#ef4444"}}>*</span></span>
       <span style={{fontSize:11.5,fontWeight:700,color:INK,background:BALL,padding:"3px 9px",borderRadius:8}}>{perText(f)}</span>
     </div>
-    {block("wd","평일","월~금")}
-    {block("we","주말","토·일")}
+    <div role="radiogroup" aria-label="실내·실외 요금" style={{display:"flex",background:"#fff",border:"1.5px solid #E2E6F0",borderRadius:13,padding:3,gap:3}}>
+      {[[false,"요금 한 가지"],[true,"실내·실외 요금이 달라요"]].map(([v,l])=>{ const on=!!f.inout===v; return <button key={l} type="button" role="radio" aria-checked={on} onClick={()=>setF(p=>({...p,inout:v}))} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",background:on?INK:"transparent",color:on?"#fff":"#6B7493",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>; })}
+    </div>
+    {f.inout&&<p style={{margin:"-4px 0 0",fontSize:15,fontWeight:900,color:INK}}>실외 코트</p>}
+    {block("wd",f.inout?"실외 평일":"평일","월~금")}
+    {block("we",f.inout?"실외 주말":"주말","토·일")}
+    {f.inout&&<>
+      <p style={{margin:"4px 0 0",fontSize:15,fontWeight:900,color:INK}}>실내 코트</p>
+      {block("iwd","실내 평일","월~금")}
+      {block("iwe","실내 주말","토·일")}
+      <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>새 모임에서 이 테니스장을 고르면 실외/실내 중에 고르게 돼요. 야간 시작 시각과 요금 기준은 둘이 같아요.</p>
+    </>}
     <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>{editing?"고치면 앞으로 만드는 모임부터 바뀐 금액이 들어가요. 이미 만든 모임 코트비는 그대로예요.":"등록하면 다음부터 이 테니스장으로 번개 모임을 만들 때 자동으로 들어가요."}</p>
     {err&&<p style={{margin:0,fontSize:12.5,color:"#ef4444"}}>{err}</p>}
     <div style={{display:"flex",gap:8,marginTop:4}}>
@@ -4531,8 +4561,8 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(!f.place.trim()) e.place="테니스장 이름을 입력해 주세요";
     if(!String(f.courtNo||"").trim()) e.courtNo="코트 번호를 입력해 주세요";
     const cap=parseInt(f.capacity,10); if(!(cap>=2&&cap<=99)) e.capacity="정원은 2~99명이에요";
-    const feeRow=findCourtFee(fees,f.place), feeAuto=calcCourtFee(feeRow,f.date,f.start,f.end,f.courtNo);
-    const sameSlot=editing&&["place","date","start","end","courtNo"].every(k=>String(f[k]||"")===String(initial.info[k]||""));
+    const feeRow=findCourtFee(fees,f.place), feeAuto=calcCourtFee(feeRow,f.date,f.start,f.end,f.courtNo,!!f.indoor);
+    const sameSlot=editing&&["place","date","start","end","courtNo"].every(k=>String(f[k]||"")===String(initial.info[k]||""))&&!!f.indoor===!!initial.info.indoor;
     // 자동: 수정할 때 장소·날짜·시간·코트를 안 바꿨으면 저장된 금액 그대로 (그사이 코트비 표가 바뀌어도)
     const fee=feeManual!=null?(+feeDigits(feeManual)||0):sameSlot&&initial.info.courtFeeAuto?(+initial.info.courtFee||0):feeRow&&feeAuto?feeAuto.total:0;
     const feeIsAuto=feeManual==null&&!!feeRow;
@@ -4543,7 +4573,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
     if(f.kind==="flash"&&f.guildMode&&!gids.length) e.guild="길드를 하나 이상 선택해 주세요";
     setErrors(e); if(Object.keys(e).length) return;
     const uid=(FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
-    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:fee||0,courtFeeAuto:feeIsAuto&&fee>0?true:null,courtFeeManual:feeManual!=null&&fee>0?true:null}:{flashType:null,courtFee:null,courtFeeAuto:null,courtFeeManual:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
+    const base={kind:f.kind,...(f.kind==="flash"?{flashType:f.flashType||"game",courtFee:fee||0,courtFeeAuto:feeIsAuto&&fee>0?true:null,courtFeeManual:feeManual!=null&&fee>0?true:null}:{flashType:null,courtFee:null,courtFeeAuto:null,courtFeeManual:null}),start:f.start,end:f.end,place:f.place.trim(),courtNo:String(f.courtNo||"").trim(),surface:f.surface||"",indoor:f.indoor&&hasInOut(findCourtFee(fees,f.place))?true:(f.indoor&&editing&&initial.info.indoor?true:null),address:(f.address||"").trim(),lat:f.lat!=null&&f.lat!==""&&Number.isFinite(+f.lat)?+f.lat:null,lng:f.lng!=null&&f.lng!==""&&Number.isFinite(+f.lng)?+f.lng:null,capacity:cap,guestCap:gcap,desc:(f.desc||"").trim(),guildId:gids[0]||null,guildIds:gids.length?gids:null,guildOpen:gids.length?!!f.guildOpen:null};
     setSaving(true); setErr("");
     let job;
     if(repeating){
@@ -4665,7 +4695,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
             {hint("선택이에요. 고르면 장소 옆에 함께 보여요. 다시 누르면 선택이 풀려요.")}
           </FieldWrap>
           {f.kind==="flash"&&<FieldWrap label="코트비">
-            <CourtFeeBox fees={fees} place={f.place} address={f.address} lat={f.lat} lng={f.lng} date={f.date} start={f.start} end={f.end} courtNo={f.courtNo} manual={feeManual} onManual={setFeeManual} isAdmin={ME_ADMIN}/>
+            <CourtFeeBox fees={fees} place={f.place} address={f.address} lat={f.lat} lng={f.lng} date={f.date} start={f.start} end={f.end} courtNo={f.courtNo} indoor={!!f.indoor} onIndoor={v=>set("indoor",v)} manual={feeManual} onManual={setFeeManual} isAdmin={ME_ADMIN}/>
           </FieldWrap>}
           <div style={row}>
             <div style={{flex:1}}><FieldWrap label="정원 (회원)" required error={errors.capacity}>
