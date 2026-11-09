@@ -1461,8 +1461,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const voteOf=m=>m&&m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
   const mine=(going.find(g=>!g.gone)||{}).m;
   const next=mine||upcoming.find(m=>!m.cancelled&&!(voteOf(m)&&voteOf(m).status==="absent"))||upcoming[0];
-  // 내 모임보다 먼저 열리는데 아직 투표 안 한 모임 (큰 카드 아래 한 줄로 알려 줘요)
-  const earlier=mine?upcoming.slice(0,upcoming.indexOf(mine)).filter(m=>!m.cancelled&&isOpen(m)&&canJoinMeeting(m.info,m.rec)&&!voteOf(m)):[];
   const monthRank=rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
@@ -1476,8 +1474,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       {!next?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
       <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"16px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
         <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:12}}>
-          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>
-            {mine?<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:BLUE}}>내 다음 모임</span>:<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:"#6B7493"}}>가장 가까운 모임</span>}</p>
+          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span></p>
           <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
           <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
         </div>
@@ -1500,12 +1497,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           :<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
         ):<p style={{margin:0,fontSize:12,color:"#6B7493",textAlign:"center"}}><Ic n="calendar" s={13}/> 예약은 {next.openDate}에 열려요</p>}
         </>}
-        {earlier.length>0&&<div role="button" tabIndex={0} onClick={()=>onOpenMeeting(earlier[0].id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(earlier[0].id,"info");}}
-          style={{marginTop:12,padding:"10px 12px",borderRadius:12,background:"#FFF7EB",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
-          <Ic n="calendar" s={14} c="#C2610C"/>
-          <span style={{flex:1,minWidth:0,fontSize:13,lineHeight:1.45,color:"#7A4A12",wordBreak:"keep-all"}}>그 전에 <b>{earlier[0].iso.slice(5,7)}.{earlier[0].iso.slice(8,10)}({DOW_KO[new Date(earlier[0].iso+"T00:00:00").getDay()]}) {earlier[0].placeName||earlier[0].place}</b>{earlier.length>1?` 외 ${earlier.length-1}개`:""} 모임도 있어요</span>
-          <span style={{fontSize:12,fontWeight:800,color:"#C2610C",whiteSpace:"nowrap"}}>투표하기</span><Icon name="chevR" size={14} color="#C2610C"/>
-        </div>}
       </div>)}
       {/* 그다음 모임들: 가로로 넘겨 보는 카드 */}
       {upcoming.length>1&&(
