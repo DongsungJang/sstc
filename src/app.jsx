@@ -1472,8 +1472,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       {/* 다음 모임: 파란 윗부분에 걸친 흰 카드 */}
       {!next?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
-      <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"16px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
-        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:12}}>
+      <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"14px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
+        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:10}}>
           <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>{/* 큰 카드 이름: 내가 참석하는 모임이면 참석 예정 모임, 아니면 가장 가까운 모임 */}<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:mine?BLUE:"#6B7493"}}>{mine?"참석 예정 모임":"가장 가까운 모임"}</span></p>
           <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
           <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
@@ -1483,7 +1483,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <Ic n="x" s={14}/> {goneLabel(next)}{next.cancelled.memo&&<span style={{display:"block",marginTop:3,fontSize:12,fontWeight:500,color:"#6B7280"}}>{next.cancelled.memo}</span>}
           </p>
         ):<>
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:10}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
             <span style={{fontSize:13,color:"#6B7493"}}>{isFull(next)?"마감":"참석 확정"}{waitN(next)>0&&<span style={{color:"#C2610C"}}> · 대기 {waitN(next)}명</span>}</span>
             <span style={{fontSize:14,fontWeight:800,color:isFull(next)?FULL.c:INK,fontVariantNumeric:"tabular-nums"}}>{next.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}> / {next.total}명</span></span>
@@ -1505,8 +1505,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         <HScrollArrows>
           {upcoming.filter(m=>m!==next).slice(0,6).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
-              style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"12px 14px 11px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:10}}>
+              style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"11px 14px 10px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:6}}>
                 <KindBadge m={{...m,guildId:""}}/>
                 <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
               </div>
