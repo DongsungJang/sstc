@@ -1504,11 +1504,12 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
               style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"12px 14px 11px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:10}}>
-                <KindBadge m={m}/>
+                <KindBadge m={{...m,guildId:""}}/>
                 <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
               </div>
               <p style={{margin:"0 0 3px",color:INK,whiteSpace:"nowrap"}}><span style={{fontSize:24,fontWeight:900,letterSpacing:"-0.04em",fontVariantNumeric:"tabular-nums"}}>{m.iso.slice(5,7)}.{m.iso.slice(8,10)}</span><span style={{fontSize:14,fontWeight:700,marginLeft:4,color:"#4A5578"}}>{DOW_KO[new Date(m.iso+"T00:00:00").getDay()]}</span></p>
               <p style={{margin:0,fontSize:13,color:"#5E6A8E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</p>
+              {m.guildId&&<div style={{marginTop:6}}><GuildMeetTag m={m}/></div>}{/* 길드 표시는 맨 아래에 둬서 날짜·코트명 줄이 옆 카드와 맞게 */}
               {waitN(m)>0&&<p style={{margin:"4px 0 0",fontSize:12,fontWeight:700,color:"#C2610C"}}>대기 {waitN(m)}명</p>}
             </div>
           ))}
