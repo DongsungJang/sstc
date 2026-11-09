@@ -1449,7 +1449,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   useEffect(()=>{ if(focusId){ setExp(focusId); setTimeout(()=>{ try{ noticeRef.current&&noticeRef.current.scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){} },50); } },[focusNotice]);
   const delNotice=n=>{ if(window.confirm(`"${n.title}" 공지를 지울까요?`)) FB.club.child("notices/"+n.id).remove().catch(e=>alert(authMsg(e))); };
   const upcoming=MEETINGS.filter(m=>m.status==="upcoming");
-  const next=upcoming[0], nextNext=upcoming[1];
   // 내가 참석 누른 다가오는 모임 (가까운 날짜·시간 순)
   const going=upcoming.map(m=>{
     const v=m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
@@ -1458,6 +1457,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     if(m.cancelled) return {m,ok:false,gone:true,label:goneLabel(m)};
     return {m,ok:ci>=0||wi<0,label:ci>=0||wi<0?"참석 확정":`대기 ${wi+1}번`};
   }).filter(Boolean);
+  // 맨 위 큰 카드: 내가 참석하는 가장 가까운 모임 → 없으면 불참 누르지 않은 가장 가까운 모임 → 그것도 없으면 가장 가까운 모임
+  const voteOf=m=>m&&m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
+  const mine=(going.find(g=>!g.gone)||{}).m;
+  const next=mine||upcoming.find(m=>!m.cancelled&&!(voteOf(m)&&voteOf(m).status==="absent"))||upcoming[0];
   const monthRank=rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
@@ -1469,9 +1472,9 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       {/* 다음 모임: 파란 윗부분에 걸친 흰 카드 */}
       {!next?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
-      <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"16px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
-        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:12}}>
-          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span></p>
+      <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"14px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
+        <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:10}}>
+          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>{/* 큰 카드 이름: 내가 참석하는 모임이면 참석 예정 모임, 아니면 가장 가까운 모임 */}<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:mine?BLUE:"#6B7493"}}>{mine?"참석 예정 모임":"가장 가까운 모임"}</span></p>
           <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
           <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
         </div>
@@ -1480,7 +1483,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
             <Ic n="x" s={14}/> {goneLabel(next)}{next.cancelled.memo&&<span style={{display:"block",marginTop:3,fontSize:12,fontWeight:500,color:"#6B7280"}}>{next.cancelled.memo}</span>}
           </p>
         ):<>
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:10}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
             <span style={{fontSize:13,color:"#6B7493"}}>{isFull(next)?"마감":"참석 확정"}{waitN(next)>0&&<span style={{color:"#C2610C"}}> · 대기 {waitN(next)}명</span>}</span>
             <span style={{fontSize:14,fontWeight:800,color:isFull(next)?FULL.c:INK,fontVariantNumeric:"tabular-nums"}}>{next.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}> / {next.total}명</span></span>
@@ -1500,10 +1503,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       <div>
         <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
         <HScrollArrows>
-          {upcoming.slice(1,7).map(m=>(
+          {upcoming.filter(m=>m!==next).slice(0,6).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
-              style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"12px 14px 11px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:10}}>
+              style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"11px 14px 10px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:6}}>
                 <KindBadge m={{...m,guildId:""}}/>
                 <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
               </div>
