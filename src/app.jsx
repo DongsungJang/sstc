@@ -1516,7 +1516,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
       <GoingSlider going={going} onOpenMeeting={onOpenMeeting} onGoBooking={onGoBooking}/>
-      <OpenSpots onOpenMeeting={onOpenMeeting}/>
       <Card>
         <SectionTitle>이달의 참여 랭킹</SectionTitle>
         {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
@@ -1600,12 +1599,13 @@ function GoingSlider({going,onOpenMeeting,onGoBooking}){
 const seatsLeft=m=>Math.max(0,(m.total||0)-(m.attendees||[]).length);
 const openSpotMeetings=()=>MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled&&isOpen(m)&&canJoinMeeting(m.info,m.rec)&&m.total>0&&!isFull(m)
   &&!(m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()]&&m.rec.votes[myVoteKey()].status==="attend"));
-function OpenSpots({onOpenMeeting}){
+// 예약 탭 '다가오는 번개/정기 모임' 아래, 고른 종류만
+function OpenSpots({onOpenMeeting,kind,label="모임"}){
   const [n,setN]=useState(MORE_STEP);
-  const list=openSpotMeetings();
+  const list=openSpotMeetings().filter(m=>!kind||m.kind===kind);
   if(!list.length) return null;
   return <Card>
-    <SectionTitle>자리 남은 모임<span style={{fontSize:12,fontWeight:600,color:"#12B76A",marginLeft:6}}>{list.length}</span></SectionTitle>
+    <SectionTitle>자리 남은 {label}<span style={{fontSize:12,fontWeight:600,color:"#12B76A",marginLeft:6}}>{list.length}</span></SectionTitle>
     <p style={{margin:"-6px 0 6px",fontSize:12,color:"#8A93B2"}}>지금 바로 참석할 수 있어요</p>
     <div style={{display:"flex",flexDirection:"column"}}>
       {list.slice(0,n).map((m,i,arr)=>{ const left=seatsLeft(m), few=left<=2; return(
@@ -3845,6 +3845,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
           <MoreButton shown={upN} total={upcoming.length} onChange={setUpN}/>
         </div>
       </div>
+      <OpenSpots key={kind} kind={kind} label={label} onOpenMeeting={id=>setSelId(id)}/>
       {past.length>0&&(
         <div>
           <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
