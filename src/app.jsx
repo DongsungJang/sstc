@@ -1499,7 +1499,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       {upcoming.length>1&&(
       <div>
         <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
-        <div className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollPadding:"0 16px",scrollSnapType:"x mandatory"}}>
+        <HScrollArrows>
           {upcoming.slice(1,7).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
               style={{flex:"0 0 auto",width:"calc((100% - 10px) / 2)",minWidth:150,boxSizing:"border-box",background:m.cancelled?GONE.bg:"#fff",borderRadius:18,padding:"12px 14px 11px",cursor:"pointer",scrollSnapAlign:"start",border:isFull(m)?`1.5px solid ${FULL.line}`:"1.5px solid transparent"}}>
@@ -1512,7 +1512,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
               {waitN(m)>0&&<p style={{margin:"4px 0 0",fontSize:12,fontWeight:700,color:"#C2610C"}}>대기 {waitN(m)}명</p>}
             </div>
           ))}
-        </div>
+        </HScrollArrows>
       </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
       <GoingSlider going={going} onOpenMeeting={onOpenMeeting} onGoBooking={onGoBooking}/>
@@ -1557,6 +1557,44 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       </Card>
     </div>
   );
+}
+// < > 화살표 버튼 (홈 '내가 참석할 모임', 예약 탭 목록 공용)
+function PageArrow({dir,off,onClick,label}){
+  return <button type="button" aria-label={label} disabled={off} onClick={onClick} style={{width:30,height:30,borderRadius:10,border:"none",background:off?"#E8ECF5":BLUE_LIGHT,color:off?"#C5CBDD":BLUE,display:"flex",alignItems:"center",justifyContent:"center",cursor:off?"default":"pointer",padding:0}}><Icon name={dir<0?"chevL":"chevR"} size={17} stroke={2.4}/></button>;
+}
+// 목록을 per개씩 한 장으로 묶어 오른쪽 위 "1 / n  < >"로 넘겨요 (손가락으로 밀어도 넘어가요)
+function SlidePages({items,per=3,title,render}){
+  const ref=useRef(null), [idx,setIdx]=useState(0);
+  const pages=[]; for(let k=0;k<items.length;k+=per) pages.push(items.slice(k,k+per));
+  const n=pages.length;
+  useEffect(()=>{ if(idx>n-1) setIdx(Math.max(0,n-1)); },[n]);
+  const go=i=>{ const el=ref.current; if(!el) return; const j=Math.max(0,Math.min(n-1,i)); el.scrollTo({left:j*el.clientWidth,behavior:"smooth"}); setIdx(j); };
+  const onScroll=()=>{ const el=ref.current; if(el&&el.clientWidth) setIdx(Math.round(el.scrollLeft/el.clientWidth)); };
+  return <>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:30,marginBottom:2}}>
+      {title}
+      {n>1&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#8A93B2",fontVariantNumeric:"tabular-nums",marginRight:2}}>{idx+1} / {n}</span>
+        <PageArrow dir={-1} off={idx<=0} onClick={()=>go(idx-1)} label="이전"/><PageArrow dir={1} off={idx>=n-1} onClick={()=>go(idx+1)} label="다음"/>
+      </div>}
+    </div>
+    {n>0&&<div ref={ref} onScroll={onScroll} className="sstc-hscroll" style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory"}}>
+      {pages.map((pg,pi)=><div key={pi} style={{flex:"0 0 100%",minWidth:0,scrollSnapAlign:"start",display:"flex",flexDirection:"column"}}>{pg.map((it,i)=>render(it,i===pg.length-1))}</div>)}
+    </div>}
+  </>;
+}
+// 홈 '다가오는 모임' 가로 카드: 양옆 둥근 < > 버튼 (PC에선 손가락으로 밀 수 없어서)
+function HScrollArrows({children}){
+  const ref=useRef(null), [can,setCan]=useState([false,false]);
+  const check=()=>{ const el=ref.current; if(!el) return; setCan([el.scrollLeft>4,el.scrollLeft+el.clientWidth<el.scrollWidth-4]); };
+  useEffect(()=>{ check(); window.addEventListener("resize",check); return ()=>window.removeEventListener("resize",check); },[]);
+  const move=d=>{ const el=ref.current; if(!el) return; const step=(el.clientWidth-32-10)/2+10; el.scrollBy({left:d*step,behavior:"smooth"}); };
+  const btn=(d,show)=>show&&<button type="button" aria-label={d<0?"이전 모임":"다음 모임"} onClick={()=>move(d)} style={{position:"absolute",top:"50%",[d<0?"left":"right"]:-14,transform:"translateY(-50%)",zIndex:2,width:34,height:34,borderRadius:"50%",border:"none",background:"#fff",color:INK,boxShadow:"0 4px 14px rgba(11,30,91,0.22)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={d<0?"chevL":"chevR"} size={18} stroke={2.4}/></button>;
+  return <div style={{position:"relative"}}>
+    {btn(-1,can[0])}
+    <div ref={ref} onScroll={check} className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollPadding:"0 16px",scrollSnapType:"x mandatory"}}>{children}</div>
+    {btn(1,can[1])}
+  </div>;
 }
 // 홈 "내가 참석할 모임": 3개씩 한 장으로 묶어 < > 로 넘겨 봐요 (손가락으로 밀어도 넘어가요)
 function GoingSlider({going,onOpenMeeting,onGoBooking}){
@@ -3813,8 +3851,7 @@ function MeetRow({m,past,last,onClick}){
 function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCreate,view,onView}) {
   useSeen();
   const [kind,setKind]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-kind")||"flash";}catch(e){return "flash";}});
-  const [upN,setUpN]=useState(MORE_STEP), [pastN,setPastN]=useState(MORE_STEP);
-  const pickKind=k=>{setKind(k);setUpN(MORE_STEP);setPastN(MORE_STEP);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
+  const pickKind=k=>{setKind(k);try{sessionStorage.setItem("sstc-booking-kind",k);}catch(e){}};
   const setSelId=id=>onOpen(id,"info");
   const sel=open&&MEETINGS.find(m=>m.id===open.id);
   if(sel) return <MeetingDetail key={sel.id+open.view} meeting={sel} initialView={open.view} canManage={canManage(sel)} isAdmin={isAdmin} onEdit={()=>onEdit(sel)} onDeleted={onDeleted}/>;
@@ -3837,23 +3874,15 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
           </button>);})}
       </div>
       <div>
-        <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:"#6B7493"}}>다가오는 {label}</p>
+        <SlidePages key={"up"+kind} items={upcoming} title={<p style={{margin:0,fontSize:13,fontWeight:700,color:"#6B7493"}}>다가오는 {label}</p>}
+          render={(m,last)=><MeetRow key={m.id} m={m} last={last} onClick={()=>setSelId(m.id)}/>}/>
         {upcoming.length===0&&<div style={{marginTop:8}}><Empty action={`+ ${label} 만들기`} onAction={()=>onCreate(kind)}>{ready?`아직 잡힌 ${label}이 없어요.`:"모임을 불러오는 중이에요…"}</Empty></div>}
-        <div style={{display:"flex",flexDirection:"column"}}>
-          {upcoming.slice(0,upN).map((m,i,arr)=><MeetRow key={m.id} m={m} last={i===arr.length-1} onClick={()=>setSelId(m.id)}/>)}
-          {upcoming.length>MORE_STEP&&<div style={{height:8}}/>}
-          <MoreButton shown={upN} total={upcoming.length} onChange={setUpN}/>
-        </div>
       </div>
       <OpenSpots key={kind} kind={kind} label={label} onOpenMeeting={id=>setSelId(id)}/>
       {past.length>0&&(
         <div>
-          <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>
-          <div style={{display:"flex",flexDirection:"column"}}>
-            {past.slice(0,pastN).map((m,i,arr)=><MeetRow key={m.id} m={m} past last={i===arr.length-1} onClick={()=>setSelId(m.id)}/>)}
-            {past.length>MORE_STEP&&<div style={{height:8}}/>}
-            <MoreButton shown={pastN} total={past.length} onChange={setPastN}/>
-          </div>
+          <SlidePages key={"past"+kind} items={past} title={<p style={{margin:0,fontSize:13,fontWeight:700,color:"#A3AAC2"}}>지난 모임</p>}
+            render={(m,last)=><MeetRow key={m.id} m={m} past last={last} onClick={()=>setSelId(m.id)}/>}/>
         </div>
       )}
     </div>
