@@ -1477,7 +1477,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"16px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
         <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:12}}>
           <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>
-            {mine?<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:BLUE}}>내 다음 모임</span>:!next.cancelled&&!myStatus&&<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:"#C2610C"}}>아직 투표 전</span>}</p>
+            {mine?<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:BLUE}}>내 다음 모임</span>:<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:"#6B7493"}}>가장 가까운 모임</span>}</p>
           <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
           <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
         </div>
@@ -1510,7 +1510,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       {/* 그다음 모임들: 가로로 넘겨 보는 카드 */}
       {upcoming.length>1&&(
       <div>
-        <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
+        <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 다음 모임</SectionTitle></div>
         <HScrollArrows>
           {upcoming.filter(m=>m!==next).slice(0,6).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
