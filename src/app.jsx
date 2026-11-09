@@ -1501,7 +1501,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       {/* 그다음 모임들: 가로로 넘겨 보는 카드 */}
       {upcoming.length>1&&(
       <div>
-        <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 다음 모임</SectionTitle></div>
+        <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
         <HScrollArrows>
           {upcoming.filter(m=>m!==next).slice(0,6).map(m=>(
             <div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}}
