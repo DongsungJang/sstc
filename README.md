@@ -128,6 +128,10 @@
           ".write": "auth != null && auth.uid === $uid"
         }
       },
+      "helpOrder": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
+      },
       "ads": {
         ".read": "auth != null",
         ".write": "auth != null && root.child('club/admins/' + auth.uid).exists()"
@@ -233,6 +237,7 @@
 - 자기 프로필은 본인과 관리자만, 승인은 관리자만, 모임 기록(투표·대진·점수)은 승인된 회원과 관리자만 써요.
 - 관리자 목록은 앱에서 아무도 못 바꿔요(콘솔에서만).
 - 알림(`feed`)은 로그인한 사람이 새로 쓰기만 하고 고치거나 지울 수 없어요. 개인 알림(`inbox`)과 공지(`notices`)는 관리자만 써요.
+- 사용 안내 순서(`helpOrder`, 기능 id 목록)는 관리자만 쓰고 로그인한 사람이 읽어요. 규칙을 안 붙여넣었으면 기본 순서로 보여요.
 - 접속 팝업(`popups/<id>`)은 관리자만 쓰고 로그인한 사람이 읽어요. 본 기록(`popupSeen/<uid>`)은 본인만 읽고 쓰고, 관리자는 몇 명이 봤는지 세려고 읽어요.
 - 광고 배너(`ads/<id>`)는 관리자만 쓰고, 로그인한 사람이 읽어요. 관리 탭에서 광고1·광고2… 로 여러 개 넣을 수 있고, 켜져 있고(`enabled: true`) 기간(`start`~`end`, 비우면 무제한) 안인 것만 홈에 보여요.
 - 광고 노출·클릭(`adStats/<광고>/<날짜>/views|clicks/<uid>`)은 회원이 자기 칸에 `true`만 써요. 같은 회원·같은 날은 한 번으로 세요. 읽기와 지우기는 관리자만 해요.

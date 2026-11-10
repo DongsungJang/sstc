@@ -2413,7 +2413,7 @@ function AdminTab({jump}){
       )}
     </div>
   );
-  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["fees","coin","코트비 관리",`코트 ${feeList(COURT_FEES).length}곳${feeReqs.length?` · 등록 필요 ${feeReqs.length}곳`:""}`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["fees","coin","코트비 관리",`코트 ${feeList(COURT_FEES).length}곳${feeReqs.length?` · 등록 필요 ${feeReqs.length}곳`:""}`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"],["help","help","사용 안내 순서","물음표 안내 목록 순서 바꾸기"]];
   const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
   if(sec) return (
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
@@ -2445,6 +2445,7 @@ function AdminTab({jump}){
       {sec==="banner"&&<AdSettings/>}
       {sec==="guilds"&&<AdminGuilds/>}
       {sec==="fees"&&<CourtFeeSettings jump={jump}/>}
+      {sec==="help"&&<HelpOrderSettings/>}
     </div>
   );
   return (
@@ -5868,6 +5869,49 @@ const HELP=[
 ];
 /*HELP_DATA_END*/
 const helpImg=n=>`help/${n}.jpg?v=${HELP_VER}`;
+// 공유 링크: #help (목록) 또는 #help-<기능> 으로 열면 로그인 후 그 안내를 바로 열어요
+const HELP_LINK={id:null};
+const readHelpHash=()=>{ try{ const mm=/^#help(?:-([a-z]+))?$/.exec(location.hash); if(!mm) return false; HELP_LINK.id=mm[1]||""; history.replaceState(null,"",location.pathname+location.search); return true; }catch(e){ return false; } };
+readHelpHash();
+const helpUrl=id=>location.origin+location.pathname+"#help"+(id?"-"+id:"");
+function shareHelp(h){ shareText(`[SSTC 사용 안내] ${h.title}\n${h.sub}\n${helpUrl(h.id)}`,"SSTC 사용 안내 · "+h.title,"안내 링크"); }
+// 보여 주는 순서: 관리 탭에서 정한 순서(club/helpOrder = [기능 id…]) 먼저, 나머지는 기본 순서
+let HELP_ORDER=[];
+const helpSorted=()=>{ const ids=(HELP_ORDER||[]).filter(id=>HELP.some(h=>h.id===id));
+  return [...ids.map(id=>HELP.find(h=>h.id===id)),...HELP.filter(h=>!ids.includes(h.id))]; };
+function useHelpOrder(enabled){
+  const [order,setOrder]=useState([]);
+  useEffect(()=>{ if(!enabled||!FB) return; const r=FB.club.child("helpOrder"), h=s=>{ const v=s.val(); HELP_ORDER=Array.isArray(v)?v:v?Object.values(v):[]; setOrder(HELP_ORDER); };
+    r.on("value",h,()=>{}); return ()=>r.off("value",h); },[enabled]);
+  return order;
+}
+// 관리 탭 → 사용 안내 순서
+function HelpOrderSettings(){
+  const [list,setList]=useState(()=>helpSorted().map(h=>h.id));
+  const [msg,setMsg]=useState("");
+  const save=next=>{ setList(next); setMsg("저장하는 중…");
+    FB.club.child("helpOrder").set(next).then(()=>setMsg("저장했어요")).catch(()=>setMsg("저장하지 못했어요. README의 데이터베이스 규칙(helpOrder)을 다시 붙여넣어 주세요.")); };
+  const move=(i,d)=>{ const j=i+d; if(j<0||j>=list.length) return; const next=[...list]; [next[i],next[j]]=[next[j],next[i]]; save(next); };
+  const arrow=(dis,on,label,path)=><button type="button" aria-label={label} disabled={dis} onClick={on} style={{width:36,height:36,borderRadius:10,border:"none",background:dis?"#F4F6FB":BLUE_LIGHT,color:dis?"#C9D0E3":BLUE,cursor:dis?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d={path} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg></button>;
+  return <Card>
+    <SectionTitle>사용 안내 순서</SectionTitle>
+    <p style={{margin:"-6px 0 10px",fontSize:12.5,color:"#6B7493",lineHeight:1.5}}>오른쪽 위 물음표를 누르면 나오는 목록의 순서예요. 바꾸면 바로 저장돼요.</p>
+    <div style={{display:"flex",flexDirection:"column"}}>
+      {list.map((id,i)=>{ const h=HELP.find(x=>x.id===id); if(!h) return null; return(
+        <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<list.length-1?"1px solid #EEF1FA":"none"}}>
+          <span style={{width:22,fontSize:13,fontWeight:800,color:"#A3AAC2",textAlign:"center"}}>{i+1}</span>
+          <span style={{width:34,height:34,borderRadius:10,background:h.admin?"#FFF4E5":BLUE_LIGHT,color:h.admin?"#C2610C":BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={h.icon} size={17} stroke={2}/></span>
+          <span style={{flex:1,minWidth:0,fontSize:15,fontWeight:700,color:INK}}>{h.title}{h.admin&&<span style={{marginLeft:6,fontSize:10.5,fontWeight:800,padding:"2px 7px",borderRadius:8,background:"#FFF4E5",color:"#C2610C"}}>관리자만</span>}</span>
+          {arrow(i===0,()=>move(i,-1),`${h.title} 위로`,"M6 15l6-6 6 6")}
+          {arrow(i===list.length-1,()=>move(i,1),`${h.title} 아래로`,"M6 9l6 6 6-6")}
+        </div>); })}
+    </div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:10}}>
+      <span style={{fontSize:12,color:msg.startsWith("저장하지")?"#ef4444":"#6B7493"}}>{msg}</span>
+      <button type="button" onClick={()=>save(HELP.map(h=>h.id))} style={{padding:"8px 12px",borderRadius:10,border:"1px solid #E1E6F2",background:"#fff",color:"#4A5578",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT,flexShrink:0}}>기본 순서로</button>
+    </div>
+  </Card>;
+}
 function HelpShot({b}){
   return(
     <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:"1px solid #E1E6F2",aspectRatio:`${b.w} / ${b.h}`,background:"#F4F6FB"}}>
@@ -5879,11 +5923,11 @@ function HelpShot({b}){
     </div>);
 }
 const HelpNum=({n})=><span style={{width:24,height:24,flexShrink:0,borderRadius:"50%",background:INK,color:BALL,fontSize:12.5,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{n}</span>;
-function HelpPage({onClose,isAdmin,onGo}){
-  const [q,setQ]=useState(""), [open,setOpen]=useState(null);
+function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
+  const [q,setQ]=useState(""), [open,setOpen]=useState(initialOpen||null);
   const scroller=useRef(null);
   useEffect(()=>{ if(scroller.current) scroller.current.scrollTop=0; },[open]);
-  const visible=HELP.filter(h=>!h.admin||isAdmin);
+  const visible=helpSorted().filter(h=>!h.admin||isAdmin);
   const qq=q.trim();
   const textOf=h=>[h.title,h.sub,h.tip,...h.blocks.flatMap(b=>b.caps)].join(" ");
   const list=visible.filter(h=>!qq||textOf(h).includes(qq));
@@ -5910,7 +5954,10 @@ function HelpPage({onClose,isAdmin,onGo}){
             </div>
           </div>))}
         {cur.tip&&<div style={{display:"flex",gap:8,alignItems:"center",background:"#F7FBDF",borderRadius:18,padding:"13px 15px",fontSize:13.5,fontWeight:600,color:"#3A4566",lineHeight:1.5}}><span style={{flexShrink:0,display:"flex"}}><Icon name="star" size={16} stroke={2.2}/></span>{cur.tip}</div>}
-        {cur.go&&<button type="button" onClick={()=>onGo&&onGo(cur.go)} style={{height:50,borderRadius:16,border:"none",background:BLUE,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{cur.title} 바로 가기</button>}
+        <div style={{display:"flex",gap:8}}>
+          {cur.go&&<button type="button" onClick={()=>onGo&&onGo(cur.go)} style={{flex:1,height:50,borderRadius:16,border:"none",background:BLUE,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{cur.title} 바로 가기</button>}
+          <button type="button" onClick={()=>shareHelp(cur)} style={{flex:cur.go?"0 0 auto":1,height:50,padding:"0 16px",borderRadius:16,border:"none",background:"#fff",color:BLUE,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}><Icon name="share" size={17} stroke={2.2}/>{cur.go?"공유":"이 안내 공유하기"}</button>
+        </div>
         <div style={{display:"flex",gap:8}}>
           {[prev&&["‹ 이전",prev],next&&["다음 ›",next]].map((x,n)=>x?<button key={n} type="button" onClick={()=>setOpen(x[1].id)} style={{flex:1,padding:"10px 12px",borderRadius:14,border:"none",background:"#fff",cursor:"pointer",textAlign:n?"right":"left",fontFamily:FONT}}><span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{x[0]}</span><span style={{display:"block",fontSize:13.5,fontWeight:800,color:INK}}>{x[1].title}</span></button>:<span key={n} style={{flex:1}}/>)}
         </div></>)}
@@ -6235,7 +6282,7 @@ export default function App() {
   const [splash,setSplash]=useState(true);
   const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
-  const [help,setHelp]=useState(false);       // 사용 안내 (물음표)
+  const [help,setHelp]=useState(false);       // 사용 안내 (물음표): true = 목록, "<기능 id>" = 그 안내
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
   const [memberView,setMemberView]=useState(()=>lsGet(LS.view)==="member"); // 관리자가 회원 화면으로 보기
   const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
@@ -6343,6 +6390,11 @@ export default function App() {
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
   const loginPopup=useLoginPopups(myId,inMain);   // 관리자가 써 둔 접속 팝업 (관리 탭 → 접속 팝업)
+  const helpOrder=useHelpOrder(inMain);   // 사용 안내 순서 (관리 탭 → 사용 안내 순서)
+  // 사용 안내 공유 링크(#help-<기능>): 로그인해서 들어오면 그 안내를 바로 열어요. 앱이 열려 있을 때 주소가 바뀌어도요.
+  const [,setHelpLinkN]=useState(0);
+  useEffect(()=>{ const f=()=>{ if(readHelpHash()) setHelpLinkN(n=>n+1); }; window.addEventListener("hashchange",f); return ()=>window.removeEventListener("hashchange",f); },[]);
+  useEffect(()=>{ if(inMain&&HELP_LINK.id!==null){ const id=HELP_LINK.id; HELP_LINK.id=null; setHelp(id&&HELP.some(h=>h.id===id)?id:true); } });
   // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
   const clubSeen=useRef(null);
   if(clubData&&clubSeen.current!==clubData){ clubSeen.current=clubData; setMemberInfo(clubData.members); buildMeetings(RAW_MEETINGS); }
@@ -6571,7 +6623,7 @@ export default function App() {
         else if(n.type==="courtFee"&&adminOn){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setAdminJump(j=>({sec:"fees",place:n.place,n:(j&&j.n||0)+1})); setTab("admin"); }
         else if(n.type==="guild"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(n.guildId&&guildById(n.guildId)?n.guildId:null); }
       }}/>}
-      {help&&<HelpPage isAdmin={adminOn} onClose={()=>setHelp(false)} onGo={k=>{ setHelp(false); if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}
+      {help&&<HelpPage key={String(help)} isAdmin={adminOn} order={helpOrder} initialOpen={typeof help==="string"?help:null} onClose={()=>setHelp(false)} onGo={k=>{ setHelp(false); if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}
         if(k==="guild"){ GUILD_GO(null); return; } if(k==="stats"){ setTab("members"); setMemView("stats"); try{sessionStorage.setItem("sstc-members-view","stats");}catch(e){} return; }
         if(k==="members"){ setMemView("list"); try{sessionStorage.setItem("sstc-members-view","list");}catch(e){} }
         if(k==="admin"&&!adminOn) return; setTab(k); try{window.scrollTo(0,0);}catch(e){} }}/>}
