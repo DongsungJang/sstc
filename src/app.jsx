@@ -5769,6 +5769,29 @@ function AdminGuilds(){
     </>);
 }
 
+// 잠긴 길드 모임 팝업의 가입 신청 버튼. wide: 길드가 하나일 때 넓은 버튼 / 아니면 줄 안의 작은 버튼
+const btnGhostLock={...btnPrimary,background:"#EDF0F6",color:"#5E6A8E",boxShadow:"none"};
+function GuildLockApply({g,wide}){
+  const me=myUid(); if(!g||!me) return null;
+  const sent=!!(g.requests&&g.requests[me]), invited=!!(g.invites&&g.invites[me]), member=inGuild(g,me);
+  const small={fontSize:12,fontWeight:800,padding:"6px 11px",borderRadius:999,border:"none",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"};
+  if(member) return wide?<p style={{margin:"16px 0 0",fontSize:13,fontWeight:800,color:BLUE}}>이미 길드원이에요. 화면을 새로 열어 주세요</p>:<span style={{...small,cursor:"default",background:BLUE_LIGHT,color:BLUE}}>길드원</span>;
+  if(invited) return <button type="button" onClick={()=>openGuildPeek(g.id)} style={wide?{...btnPrimary,marginTop:18,background:BALL,color:INK}:{...small,background:BALL,color:INK}}>{wide?"초대 받았어요 · 확인하기":"초대 받음 · 확인"}</button>;
+  if(sent) return wide?<div style={{marginTop:18,display:"flex",alignItems:"center",gap:8}}>
+      <span style={{flex:1,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,padding:"13px 0",borderRadius:14,background:BLUE_LIGHT,color:BLUE,fontSize:14,fontWeight:800}}><Icon name="check" size={15} stroke={2.6}/>가입 신청됨 · 길드장 확인 중</span>
+      <button type="button" onClick={()=>guildCancelApply(g)} style={{...btnSmall,background:"#EDF0F6",color:"#5E6A8E",fontWeight:700,padding:"13px 12px"}}>취소</button></div>
+    :<button type="button" onClick={()=>guildCancelApply(g)} style={{...small,background:"#fff",color:"#6B7493",boxShadow:"inset 0 0 0 1.5px #E2E6F0"}}>신청됨 · 취소</button>;
+  return <button type="button" onClick={()=>guildApply(g)} style={wide?{...btnPrimary,marginTop:18,display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%"}:{...small,background:BLUE,color:"#fff"}}>{wide&&<Icon name="userPlus" size={17} stroke={2.2}/>}{wide?`${g.name} 길드 가입 신청하기`:"가입 신청하기"}</button>;
+}
+// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때. 누르면 길드 화면으로
+function InviteTip({guilds,onGo}){
+  const n=guilds.length, label=n===1?`${guilds[0].name} 길드 초대`:`길드 초대 ${n}건`;
+  return <button type="button" onClick={onGo} aria-label={`${label} 확인하기`} style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",zIndex:1,border:"none",padding:0,background:"none",cursor:"pointer",fontFamily:FONT,animation:"sstc-tip 1.6s ease-in-out infinite"}}>
+    <style>{"@keyframes sstc-tip{0%,100%{translate:0 0}50%{translate:0 -3px}}"}</style>
+    <span style={{display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",background:BALL,color:INK,fontSize:12.5,fontWeight:800,padding:"7px 11px",borderRadius:12,boxShadow:"0 6px 18px rgba(11,30,91,0.28)"}}><Icon name="userPlus" size={14} stroke={2.4}/>{label}</span>
+    <span aria-hidden="true" style={{position:"absolute",left:"50%",bottom:-5,width:11,height:11,background:BALL,transform:"translateX(-50%) rotate(45deg)",borderRadius:2}}/>
+  </button>;
+}
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 function GuildLockSheet({meeting,onClose}){
   const gs=meetGuilds(meeting&&meeting.info), g=gs[0], names=gs.map(x=>x.name).join("·");
@@ -5778,8 +5801,12 @@ function GuildLockSheet({meeting,onClose}){
         <span style={{width:60,height:60,borderRadius:18,background:BALL,display:"inline-flex",alignItems:"center",justifyContent:"center"}}><Icon name="lock" size={28} color={INK} stroke={2.2}/></span>
         <p style={{margin:"14px 0 0",fontSize:19,fontWeight:900,color:INK}}>길드 모임이라 볼 수 없어요</p>
         {gs.length>0&&<div style={{marginTop:12,display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>{gs.map(x=><GuildTag key={x.id} g={x} size={30} font={16}/>)}</div>}
-        <p style={{margin:"12px 0 0",fontSize:13.5,color:"#5E6A8E",lineHeight:1.65,wordBreak:"keep-all"}}>이 모임은 <b style={{color:INK}}>{g?names:"어느"}</b> 길드원만 볼 수 있어요.{g&&<><br/>참석하고 싶으면 {gs.length>1?"길드장에게":<>길드장 <b style={{color:INK}}>{nickOf(g.leader)}</b> 님에게</>} 문의해 주세요.</>}</p>
-        <button type="button" onClick={onClose} style={{...btnPrimary,marginTop:18}}>확인</button>
+        <p style={{margin:"12px 0 0",fontSize:13.5,color:"#5E6A8E",lineHeight:1.65,wordBreak:"keep-all"}}>이 모임은 <b style={{color:INK}}>{g?names:"어느"}</b> 길드원만 볼 수 있어요.{g&&<><br/>길드에 가입 신청하면 {gs.length>1?"길드장이":<>길드장 <b style={{color:INK}}>{nickOf(g.leader)}</b> 님이</>} 확인해요.</>}</p>
+        {gs.length===1&&<GuildLockApply g={g} wide/>}
+        {gs.length>1&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:6,textAlign:"left"}}>{gs.map(x=>
+          <div key={x.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F4F6FB",borderRadius:12,padding:"8px 9px"}}>
+            <span style={{flex:1,minWidth:0}}><GuildTag g={x} size={22} font={13.5}/></span><GuildLockApply g={x}/></div>)}</div>}
+        <button type="button" onClick={onClose} style={{...(g?btnGhostLock:btnPrimary),marginTop:g?8:18}}>{g?"닫기":"확인"}</button>
       </div>
     </div>);
 }
@@ -6218,6 +6245,8 @@ export default function App() {
   const guildSeen=useRef(null);
   if(guildData&&guildSeen.current!==guildData){ guildSeen.current=guildData; GUILDS=guildData.guilds||{}; VIP=guildData.vip||{}; buildMeetings(RAW_MEETINGS); }
   const [locked,setLocked]=useState(null);   // 길드 밖 회원이 연 길드 모임 링크
+  // 받은 길드 초대: 회원 탭 위에 작은 말풍선 (길드 화면을 보고 있을 땐 숨김, 수락·거절하면 사라짐)
+  const myInvites=guildData&&myId?guildList().filter(g=>g.invites&&g.invites[myId]&&!inGuild(g,myId)):[];
   const boardPosts=useBoard(inMain);
   // 홈 화면 배너: 켜져 있고 기간 안인 것만 (관리 탭에서 관리). 모임 배너는 모임 정보로 채우고, 마감·종료·무산이면 빼요
   const adData=useAds(inMain);
@@ -6233,6 +6262,7 @@ export default function App() {
   const guildInv=myId?guildList().filter(g=>g.invites&&g.invites[myId]&&!inGuild(g,myId)).length:0;
   const membersNew={list:newMembers.filter(isNew).length,board:newPosts.filter(isNew).length,guild:guildInv};
   const [memView,setMemView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const inviteTip=myInvites.length&&!(tab==="members"&&memView==="guild")?myInvites:null;
   const [,setBoardWrite]=useShared("boardWrite",0);
   const [,setGuildOpen]=useShared("guildOpen",null);
   GUILD_GO=gid=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
@@ -6442,13 +6472,16 @@ export default function App() {
       {/* 남색 하단 탭바: 지금 탭은 공 색 알약 */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:INK,display:"flex",padding:"0 6px",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
-          <button key={t.key} type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
+          <div key={t.key} style={{flex:1,position:"relative",display:"flex"}}>
+          {t.key==="members"&&inviteTip&&<InviteTip guilds={inviteTip} onGo={()=>GUILD_GO(inviteTip.length===1?inviteTip[0].id:null)}/>}
+          <button type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
             <span style={{position:"relative",display:"inline-flex"}}>
               <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:48,height:32,borderRadius:16,background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.55)"}}><Icon name={t.icon} size={21} stroke={on?2.2:1.8}/></span>
               {nb>0&&<span aria-label={`새 항목 ${nb}개`} style={{position:"absolute",top:-5,left:30,minWidth:20,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"14px",textAlign:"center",border:`2px solid ${INK}`,whiteSpace:"nowrap"}}>+{nb>99?99:nb}</span>}
             </span>
             <span style={{fontSize:11,fontWeight:on?700:500,color:on?"#fff":"rgba(255,255,255,0.55)"}}>{t.label}</span>
           </button>
+          </div>
         );})}
       </div>
     </div>
