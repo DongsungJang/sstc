@@ -25,6 +25,7 @@ const ICON_PATHS = {
   back:["M15 5l-7 7 7 7"],
   calendar:["M4 6h16v14H4z","M4 10h16","M8 3v4","M16 3v4"],
   chart:["M4 20V10","M10 20V4","M16 20v-7","M22 20H2"],
+  help:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3","M12 17h.01"],
   bell:["M6 16V11a6 6 0 0 1 12 0v5l2 2H4z","M10 20a2 2 0 0 0 4 0"],
   user:["M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M4 21a8 8 0 0 1 16 0"],
   clock:["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z","M12 6v6l4 2"],
@@ -2412,7 +2413,7 @@ function AdminTab({jump}){
       )}
     </div>
   );
-  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["fees","coin","코트비 관리",`코트 ${feeList(COURT_FEES).length}곳${feeReqs.length?` · 등록 필요 ${feeReqs.length}곳`:""}`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"]];
+  const MENU=[["popup","message","접속 팝업","앱을 열면 뜨는 안내 창"],["active","users","정회원 관리",`정회원 ${active.length}명`],["gone","leave","탈퇴 회원",`${gone.length}명`],["guilds","shield","길드 관리",`길드 ${guildList().length}개 · 우수회원 ${Object.keys(VIP).filter(u=>VIP[u]).length}명`],["fees","coin","코트비 관리",`코트 ${feeList(COURT_FEES).length}곳${feeReqs.length?` · 등록 필요 ${feeReqs.length}곳`:""}`],["banner","megaphone","홈 화면 배너","배너 추가·기간·순서"],["help","help","사용 안내 순서","물음표 안내 목록 순서 바꾸기"]];
   const back=<button type="button" onClick={()=>setSec(null)} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>관리</button>;
   if(sec) return (
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
@@ -2444,6 +2445,7 @@ function AdminTab({jump}){
       {sec==="banner"&&<AdSettings/>}
       {sec==="guilds"&&<AdminGuilds/>}
       {sec==="fees"&&<CourtFeeSettings jump={jump}/>}
+      {sec==="help"&&<HelpOrderSettings/>}
     </div>
   );
   return (
@@ -5847,6 +5849,151 @@ function UpdateBanner(){
     </div>);
 }
 
+// ─── 사용 안내 (우측 상단 물음표) ─────────────────────────────────────────────
+// 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
+// marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
+/*HELP_DATA_START*/
+const HELP_VER="d60a87f0";
+const HELP=[
+  {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"인사말 옆 연필을 누르면 내 정보를 고칠 수 있어요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 갈 가장 가까운 모임","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":194,"marks":[[0.2,23.7,99.5,71.6],[79.4,5.7,16.4,13.9]],"caps":["옆으로 밀어서 다음 모임 보기","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":205,"marks":[[3.2,0.5,93.5,99]],"caps":["이번 달 참석 순위와 내 순위 (끝난 모임만 세요)"]}]},
+  {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기와 새 모임 만들기","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":401,"marks":[[4.2,3.2,91.5,11.5],[83.3,32.8,13.5,7.7],[68.8,64.8,28,14.5]],"caps":["번개 / 정기 바꾸기","꽉 차면 '대기 n'","+ 새 모임 만들기"]}]},
+  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","누르면 참석, 한 번 더 누르면 취소"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,93.5,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]}]},
+  {"id":"bracket","title":"대진표 · 스코어","icon":"ball","sub":"게임 편성과 점수 기록","tip":"6점 선승 · 5:5 무승부 · 참가자만 만들 수 있어요","blocks":[{"img":"bracket-1","w":402,"h":438,"marks":[[4.2,16.2,91.5,9.4],[7.7,63.7,84.6,24.2],[7.7,89.3,84.6,8.7]],"caps":["자동 편성 / 직접 작성","게임당 시간 고르기","코트 수 → 아래 '대진표 만들기'"]}]},
+  {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 · 아래에 랭킹, 코트별 통계"]}]},
+  {"id":"guild","title":"길드","icon":"shield","sub":"마음 맞는 회원끼리 작은 모임","go":"guild","tip":"길드는 우수회원이 만들 수 있어요. 여러 길드에 들어가도 돼요","blocks":[{"img":"guild-1","w":402,"h":555,"marks":[[8,38.9,84.1,20.1],[16.9,66.9,75.9,17.2],[3.2,88.1,93.5,10.3]],"caps":["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},{"img":"guild-2","w":402,"h":194,"marks":[[54.2,74.2,24.5,14.4]],"caps":["길드 모임은 그 길드원만 보고 참석해요"]}]},
+  {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요"]}]},
+  {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
+  {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임","tip":"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":340,"marks":[[28.1,67.9,64.2,16.8],[77.9,85.9,14.4,10.9]],"caps":["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
+  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"화면은 손가락으로 확대할 수 있어요","blocks":[{"caps":["아이폰: 사파리 공유 버튼 → '홈 화면에 추가'","안드로이드: 크롬 ⋮ → '홈 화면에 추가'","'새 버전이 있어요'가 뜨면 업데이트 누르기","그래도 그대로면 앱을 완전히 껐다 켜기"]}]},
+  {"id":"admin","title":"관리자 기능","icon":"gear","sub":"관리자에게만 보여요","go":"admin","admin":true,"tip":"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요","blocks":[{"img":"admin-1","w":402,"h":722,"marks":[[4.2,10.2,91.5,12],[7.7,57.2,84.6,11.1],[7.7,67.5,84.6,11.1],[7.7,88,84.6,11.1]],"caps":["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]}
+];
+/*HELP_DATA_END*/
+const helpImg=n=>`help/${n}.jpg?v=${HELP_VER}`;
+// 공유 링크: #help (목록) 또는 #help-<기능> 으로 열면 로그인 후 그 안내를 바로 열어요
+const HELP_LINK={id:null};
+const readHelpHash=()=>{ try{ const mm=/^#help(?:-([a-z]+))?$/.exec(location.hash); if(!mm) return false; HELP_LINK.id=mm[1]||""; history.replaceState(null,"",location.pathname+location.search); return true; }catch(e){ return false; } };
+readHelpHash();
+const helpUrl=id=>location.origin+location.pathname+"#help"+(id?"-"+id:"");
+function shareHelp(h){ shareText(`[SSTC 사용 안내] ${h.title}\n${h.sub}\n${helpUrl(h.id)}`,"SSTC 사용 안내 · "+h.title,"안내 링크"); }
+// 보여 주는 순서: 관리 탭에서 정한 순서(club/helpOrder = [기능 id…]) 먼저, 나머지는 기본 순서
+let HELP_ORDER=[];
+const helpSorted=()=>{ const ids=(HELP_ORDER||[]).filter(id=>HELP.some(h=>h.id===id));
+  return [...ids.map(id=>HELP.find(h=>h.id===id)),...HELP.filter(h=>!ids.includes(h.id))]; };
+function useHelpOrder(enabled){
+  const [order,setOrder]=useState([]);
+  useEffect(()=>{ if(!enabled||!FB) return; const r=FB.club.child("helpOrder"), h=s=>{ const v=s.val(); HELP_ORDER=Array.isArray(v)?v:v?Object.values(v):[]; setOrder(HELP_ORDER); };
+    r.on("value",h,()=>{}); return ()=>r.off("value",h); },[enabled]);
+  return order;
+}
+// 관리 탭 → 사용 안내 순서
+function HelpOrderSettings(){
+  const [list,setList]=useState(()=>helpSorted().map(h=>h.id));
+  const [msg,setMsg]=useState("");
+  const save=next=>{ setList(next); setMsg("저장하는 중…");
+    FB.club.child("helpOrder").set(next).then(()=>setMsg("저장했어요")).catch(()=>setMsg("저장하지 못했어요. README의 데이터베이스 규칙(helpOrder)을 다시 붙여넣어 주세요.")); };
+  const move=(i,d)=>{ const j=i+d; if(j<0||j>=list.length) return; const next=[...list]; [next[i],next[j]]=[next[j],next[i]]; save(next); };
+  const arrow=(dis,on,label,path)=><button type="button" aria-label={label} disabled={dis} onClick={on} style={{width:36,height:36,borderRadius:10,border:"none",background:dis?"#F4F6FB":BLUE_LIGHT,color:dis?"#C9D0E3":BLUE,cursor:dis?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d={path} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg></button>;
+  return <Card>
+    <SectionTitle>사용 안내 순서</SectionTitle>
+    <p style={{margin:"-6px 0 10px",fontSize:12.5,color:"#6B7493",lineHeight:1.5}}>오른쪽 위 물음표를 누르면 나오는 목록의 순서예요. 바꾸면 바로 저장돼요.</p>
+    <div style={{display:"flex",flexDirection:"column"}}>
+      {list.map((id,i)=>{ const h=HELP.find(x=>x.id===id); if(!h) return null; return(
+        <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<list.length-1?"1px solid #EEF1FA":"none"}}>
+          <span style={{width:22,fontSize:13,fontWeight:800,color:"#A3AAC2",textAlign:"center"}}>{i+1}</span>
+          <span style={{width:34,height:34,borderRadius:10,background:h.admin?"#FFF4E5":BLUE_LIGHT,color:h.admin?"#C2610C":BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={h.icon} size={17} stroke={2}/></span>
+          <span style={{flex:1,minWidth:0,fontSize:15,fontWeight:700,color:INK}}>{h.title}{h.admin&&<span style={{marginLeft:6,fontSize:10.5,fontWeight:800,padding:"2px 7px",borderRadius:8,background:"#FFF4E5",color:"#C2610C"}}>관리자만</span>}</span>
+          {arrow(i===0,()=>move(i,-1),`${h.title} 위로`,"M6 15l6-6 6 6")}
+          {arrow(i===list.length-1,()=>move(i,1),`${h.title} 아래로`,"M6 9l6 6 6-6")}
+        </div>); })}
+    </div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:10}}>
+      <span style={{fontSize:12,color:msg.startsWith("저장하지")?"#ef4444":"#6B7493"}}>{msg}</span>
+      <button type="button" onClick={()=>save(HELP.map(h=>h.id))} style={{padding:"8px 12px",borderRadius:10,border:"1px solid #E1E6F2",background:"#fff",color:"#4A5578",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:FONT,flexShrink:0}}>기본 순서로</button>
+    </div>
+  </Card>;
+}
+function HelpShot({b}){
+  return(
+    <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:"1px solid #E1E6F2",aspectRatio:`${b.w} / ${b.h}`,background:"#F4F6FB"}}>
+      <img src={helpImg(b.img)} alt="" loading="lazy" style={{position:"absolute",inset:0,width:"100%",height:"100%",display:"block"}}/>
+      {(b.marks||[]).map(([x,y,w,h],i)=>(<React.Fragment key={i}>
+        <div style={{position:"absolute",left:`${x}%`,top:`${y}%`,width:`${w}%`,height:`${h}%`,border:`3px solid ${BALL}`,borderRadius:12,boxShadow:`0 0 0 1.5px ${INK}, inset 0 0 0 1px ${INK}`,boxSizing:"border-box"}}/>
+        <div style={{position:"absolute",left:`max(13px, ${x}%)`,top:`max(13px, ${y}%)`,width:26,height:26,margin:"-13px 0 0 -13px",borderRadius:"50%",background:BALL,color:INK,fontWeight:900,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",border:`2.5px solid ${INK}`,boxShadow:"0 3px 8px rgba(11,30,91,0.35)",boxSizing:"border-box"}}>{i+1}</div>
+      </React.Fragment>))}
+    </div>);
+}
+const HelpNum=({n})=><span style={{width:24,height:24,flexShrink:0,borderRadius:"50%",background:INK,color:BALL,fontSize:12.5,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{n}</span>;
+function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
+  const [q,setQ]=useState(""), [open,setOpen]=useState(initialOpen||null);
+  const scroller=useRef(null);
+  useEffect(()=>{ if(scroller.current) scroller.current.scrollTop=0; },[open]);
+  const visible=helpSorted().filter(h=>!h.admin||isAdmin);
+  const qq=q.trim();
+  const textOf=h=>[h.title,h.sub,h.tip,...h.blocks.flatMap(b=>b.caps)].join(" ");
+  const list=visible.filter(h=>!qq||textOf(h).includes(qq));
+  const cur=open&&visible.find(h=>h.id===open);
+  const head=(backLabel,onBack,children)=>(
+    <div style={{background:GRAD,color:"#fff",padding:"max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px 46px",position:"relative",overflow:"hidden"}}>
+      <CourtLines/>
+      <div style={{position:"relative"}}><button type="button" onClick={onBack} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}}><Icon name="back" size={20} stroke={2.4}/>{backLabel}</button></div>
+      <div style={{position:"relative"}}>{children}</div>
+    </div>);
+  const sheet=children=><div style={{marginTop:-24,borderRadius:"26px 26px 0 0",background:PAGE_BG,position:"relative",padding:"18px 16px calc(36px + env(safe-area-inset-bottom,0px))",display:"flex",flexDirection:"column",gap:12}}>{children}</div>;
+  let body;
+  if(cur){ const i=visible.indexOf(cur), prev=visible[i-1], next=visible[i+1];
+    body=<>
+      {head("사용 안내",()=>setOpen(null),<div style={{marginTop:18,display:"flex",alignItems:"center",gap:12}}>
+        <span style={{width:48,height:48,borderRadius:14,background:BALL,color:INK,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={cur.icon} size={24} stroke={2.2}/></span>
+        <div><p style={{margin:0,fontSize:24,fontWeight:900,letterSpacing:"-0.03em"}}>{cur.title}</p><p style={{margin:"2px 0 0",fontSize:13,opacity:0.8}}>{cur.sub}</p></div></div>)}
+      {sheet(<>
+        {cur.blocks.map((b,bi)=>(
+          <div key={bi} style={{background:"#fff",borderRadius:22,padding:14,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}>
+            {b.img&&<HelpShot b={b}/>}
+            <div style={{margin:b.img?"12px 2px 0":"2px",display:"flex",flexDirection:"column",gap:8}}>
+              {b.caps.map((c,k)=><div key={k} style={{display:"flex",alignItems:"center",gap:10,fontSize:15,fontWeight:700,color:INK,lineHeight:1.4}}><HelpNum n={k+1}/>{c}</div>)}
+            </div>
+          </div>))}
+        {cur.tip&&<div style={{display:"flex",gap:8,alignItems:"center",background:"#F7FBDF",borderRadius:18,padding:"13px 15px",fontSize:13.5,fontWeight:600,color:"#3A4566",lineHeight:1.5}}><span style={{flexShrink:0,display:"flex"}}><Icon name="star" size={16} stroke={2.2}/></span>{cur.tip}</div>}
+        <div style={{display:"flex",gap:8}}>
+          {cur.go&&<button type="button" onClick={()=>onGo&&onGo(cur.go)} style={{flex:1,height:50,borderRadius:16,border:"none",background:BLUE,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{cur.title} 바로 가기</button>}
+          <button type="button" onClick={()=>shareHelp(cur)} style={{flex:cur.go?"0 0 auto":1,height:50,padding:"0 16px",borderRadius:16,border:"none",background:"#fff",color:BLUE,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}><Icon name="share" size={17} stroke={2.2}/>{cur.go?"공유":"이 안내 공유하기"}</button>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {[prev&&["‹ 이전",prev],next&&["다음 ›",next]].map((x,n)=>x?<button key={n} type="button" onClick={()=>setOpen(x[1].id)} style={{flex:1,padding:"10px 12px",borderRadius:14,border:"none",background:"#fff",cursor:"pointer",textAlign:n?"right":"left",fontFamily:FONT}}><span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{x[0]}</span><span style={{display:"block",fontSize:13.5,fontWeight:800,color:INK}}>{x[1].title}</span></button>:<span key={n} style={{flex:1}}/>)}
+        </div></>)}
+    </>;
+  } else {
+    body=<>
+      {head("돌아가기",onClose,<>
+        <p style={{margin:"18px 0 0",fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>사용 안내</p>
+        <p style={{margin:"4px 0 0",fontSize:13,opacity:0.75}}>기능을 누르면 화면으로 설명해 줘요</p>
+        <label style={{marginTop:14,display:"flex",alignItems:"center",gap:8,height:48,padding:"0 14px",borderRadius:14,background:"#fff"}}>
+          <Ic n="search" s={18} c={BLUE}/>
+          <input value={q} onChange={e=>setQ(e.target.value)} aria-label="안내 찾기" placeholder="예: 대기, 무산, 익명, 길드" style={{flex:1,minWidth:0,border:"none",outline:"none",background:"transparent",fontSize:16,color:INK,fontFamily:FONT,boxShadow:"none"}}/>
+          {q&&<button type="button" aria-label="검색어 지우기" onClick={()=>setQ("")} style={{border:"none",background:"#EDF0F6",borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Ic n="x" s={13} c="#6B7493"/></button>}
+        </label></>)}
+      {sheet(<>
+        {!list.length&&<Card><p style={{margin:0,fontSize:14,color:"#6B7493",textAlign:"center"}}>'{qq}' 에 맞는 안내가 없어요.</p></Card>}
+        {list.map(h=>{ const th=h.blocks.find(b=>b.img); return(
+          <button key={h.id} type="button" onClick={()=>setOpen(h.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:12,border:"none",borderRadius:20,background:"#fff",boxShadow:"0 1px 2px rgba(11,30,91,0.05)",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
+            {th?<span style={{width:84,height:64,flexShrink:0,borderRadius:12,border:"1px solid #E1E6F2",overflow:"hidden",background:"#F4F6FB"}}><img src={helpImg(th.img)} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"50% 0",display:"block"}}/></span>
+              :<span style={{width:84,height:64,flexShrink:0,borderRadius:12,background:h.admin?"#FFF4E5":BLUE_LIGHT,color:h.admin?"#C2610C":BLUE,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name={h.icon} size={26} stroke={2}/></span>}
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:16,fontWeight:800,color:INK}}><span style={{color:h.admin?"#C2610C":BLUE,display:"inline-flex"}}><Icon name={h.icon} size={16} stroke={2.2}/></span>{h.title}{h.admin&&<span style={{fontSize:10.5,fontWeight:800,padding:"2px 7px",borderRadius:8,background:"#FFF4E5",color:"#C2610C"}}>관리자</span>}</span>
+              <span style={{display:"block",marginTop:3,fontSize:12.5,color:"#6B7493"}}>{h.sub}</span>
+            </span>
+            <span style={{fontSize:20,color:"#A3AAC2"}}>›</span>
+          </button>); })}
+        <p style={{margin:"8px 0 0",fontSize:12,color:"#A3AAC2",textAlign:"center",lineHeight:1.6}}>더 궁금한 건 {BOARD_NAME}에 물어보거나 관리자에게 알려 주세요.</p></>)}
+    </>;
+  }
+  const el=(
+    <div role="dialog" aria-label="사용 안내" style={{position:"fixed",inset:0,zIndex:70,display:"flex",justifyContent:"center",background:"rgba(16,24,64,0.45)"}}>
+      <div ref={scroller} style={{width:"100%",maxWidth:440,height:"100%",overflowY:"auto",background:PAGE_BG,fontFamily:FONT}}>{body}</div>
+    </div>);
+  return typeof ReactDOM!=="undefined"&&ReactDOM.createPortal?ReactDOM.createPortal(el,document.body):el;
+}
+
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
 // 소곤소곤은 하단 탭으로 바로, 통계는 회원 탭 안 (회원 목록 / 길드 / 통계)
 const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"board",label:BOARD_NAME,icon:"message"}];
@@ -6135,6 +6282,7 @@ export default function App() {
   const [splash,setSplash]=useState(true);
   const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
   const list=useMeetingList();               // 모든 모임 (실시간)
+  const [help,setHelp]=useState(false);       // 사용 안내 (물음표): true = 목록, "<기능 id>" = 그 안내
   const [menu,setMenu]=useState(false);       // 우측 상단 내 메뉴
   const [memberView,setMemberView]=useState(()=>lsGet(LS.view)==="member"); // 관리자가 회원 화면으로 보기
   const [myInfo,setMyInfo]=useState(false);   // 내 정보 창 (false | true | "edit")
@@ -6242,6 +6390,11 @@ export default function App() {
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
   const loginPopup=useLoginPopups(myId,inMain);   // 관리자가 써 둔 접속 팝업 (관리 탭 → 접속 팝업)
+  const helpOrder=useHelpOrder(inMain);   // 사용 안내 순서 (관리 탭 → 사용 안내 순서)
+  // 사용 안내 공유 링크(#help-<기능>): 로그인해서 들어오면 그 안내를 바로 열어요. 앱이 열려 있을 때 주소가 바뀌어도요.
+  const [,setHelpLinkN]=useState(0);
+  useEffect(()=>{ const f=()=>{ if(readHelpHash()) setHelpLinkN(n=>n+1); }; window.addEventListener("hashchange",f); return ()=>window.removeEventListener("hashchange",f); },[]);
+  useEffect(()=>{ if(inMain&&HELP_LINK.id!==null){ const id=HELP_LINK.id; HELP_LINK.id=null; setHelp(id&&HELP.some(h=>h.id===id)?id:true); } });
   // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
   const clubSeen=useRef(null);
   if(clubData&&clubSeen.current!==clubData){ clubSeen.current=clubData; setMemberInfo(clubData.members); buildMeetings(RAW_MEETINGS); }
@@ -6358,6 +6511,7 @@ export default function App() {
             ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
             :<span style={{fontSize:19,fontWeight:800,letterSpacing:"0.02em",display:"inline-flex",alignItems:"center",gap:8}}><BallMark size={22}/>SSTC</span>}
           <div style={{display:"flex",gap:8}}>
+            <button type="button" onClick={()=>setHelp(true)} style={iconBtn} title="사용 안내" aria-label="사용 안내"><Icon name="help" size={19}/></button>
             <button type="button" onClick={()=>{setNoti(club.items);club.markSeen();}} style={{...iconBtn,position:"relative"}} title="알림" aria-label={`알림${club.unread?` ${club.unread}개 안 읽음`:""}`}>
               <Icon name="bell" size={19}/>
               {club.unread>0&&<span style={{position:"absolute",top:-3,right:-3,minWidth:18,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",textAlign:"center",border:"2px solid #2152E6"}}>{club.unread>9?"9+":club.unread}</span>}
@@ -6469,6 +6623,10 @@ export default function App() {
         else if(n.type==="courtFee"&&adminOn){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setAdminJump(j=>({sec:"fees",place:n.place,n:(j&&j.n||0)+1})); setTab("admin"); }
         else if(n.type==="guild"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(n.guildId&&guildById(n.guildId)?n.guildId:null); }
       }}/>}
+      {help&&<HelpPage key={String(help)} isAdmin={adminOn} order={helpOrder} initialOpen={typeof help==="string"?help:null} onClose={()=>setHelp(false)} onGo={k=>{ setHelp(false); if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}
+        if(k==="guild"){ GUILD_GO(null); return; } if(k==="stats"){ setTab("members"); setMemView("stats"); try{sessionStorage.setItem("sstc-members-view","stats");}catch(e){} return; }
+        if(k==="members"){ setMemView("list"); try{sessionStorage.setItem("sstc-members-view","list");}catch(e){} }
+        if(k==="admin"&&!adminOn) return; setTab(k); try{window.scrollTo(0,0);}catch(e){} }}/>}
       {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
       {locked&&<GuildLockSheet meeting={locked} onClose={()=>setLocked(null)}/>}
