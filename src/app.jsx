@@ -5819,10 +5819,10 @@ function TabTip({icon,label,aria,onGo,side,lift=0}){
     <span aria-hidden="true" style={{position:"absolute",...(right?{right:38}:{left:"50%"}),bottom:-5,width:11,height:11,background:BALL,transform:right?"rotate(45deg)":"translateX(-50%) rotate(45deg)",borderRadius:2}}/>
   </button>;
 }
-// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때. 누르면 길드 화면으로
+// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때 '새 길드 초대' (짧게: 옆 탭 말풍선과 안 겹치게). 누르면 길드 화면으로
 function InviteTip({guilds,onGo,lift}){
-  const n=guilds.length, label=n===1?`${guilds[0].name} 길드 초대`:`길드 초대 ${n}건`;
-  return <TabTip icon="userPlus" label={label} aria={`${label} 확인하기`} onGo={onGo} lift={lift}/>;
+  const n=guilds.length, names=guilds.map(g=>g.name).join(", ");
+  return <TabTip icon="userPlus" label="새 길드 초대" aria={`${names} 길드 초대${n>1?` ${n}건`:""} 확인하기`} onGo={onGo} lift={lift}/>;
 }
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 function GuildLockSheet({meeting,onClose}){
@@ -6671,7 +6671,7 @@ export default function App() {
         {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
           <div key={t.key} style={{flex:1,position:"relative",display:"flex"}}>
           {t.key==="members"&&inviteTip&&<InviteTip guilds={inviteTip} onGo={()=>GUILD_GO(inviteTip.length===1?inviteTip[0].id:null)}/>}
-          {t.key==="board"&&boardTip>0&&<TabTip icon="message" side={adminOn?null:"right"} label={`새 댓글 ${boardTip}`} aria={`소곤소곤 새 댓글 ${boardTip}개 보기`} lift={inviteTip?40:0} onGo={()=>goTab("board")}/>}
+          {t.key==="board"&&boardTip>0&&<TabTip icon="message" side={adminOn?null:"right"} label={`새 댓글 ${boardTip}`} aria={`소곤소곤 새 댓글 ${boardTip}개 보기`} lift={adminOn&&inviteTip?40:0} onGo={()=>goTab("board")}/>}
           <button type="button" onClick={()=>goTab(t.key)} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
             <span style={{position:"relative",display:"inline-flex"}}>
               <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:48,height:32,borderRadius:16,background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.55)"}}><Icon name={t.icon} size={21} stroke={on?2.2:1.8}/></span>
