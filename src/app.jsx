@@ -383,7 +383,9 @@ const seenSave=()=>{ const cut=Date.now()-NEW_DAYS*864e5; Object.keys(SEEN.d.i).
 function seenLoad(uid){
   if(SEEN.d&&SEEN.uid===uid) return;
   SEEN.uid=uid; let d=null; try{ d=JSON.parse(lsGet("sstc-seen-"+(uid||"local"))||"null"); }catch(e){}
-  SEEN.d=d&&d.base?{base:d.base,t:d.t||{},i:d.i||{}}:{base:Date.now(),t:{},i:{}}; seenSave();
+  SEEN.d=d&&d.base?{base:d.base,t:d.t||{},i:d.i||{}}:{base:Date.now(),t:{},i:{}};
+  if(!SEEN.d.t.board&&SEEN.d.t.members) SEEN.d.t.board=SEEN.d.t.members;   // 소곤소곤이 회원 탭에 있던 때 마지막으로 본 시각부터
+  seenSave();
 }
 const isNewItem=(id,at,byUid)=>{ const d=SEEN.d; if(!d||!at) return false;
   return at>d.base&&at>Date.now()-NEW_DAYS*864e5&&!(byUid&&byUid===SEEN.uid)&&!d.i[id]; };
@@ -4980,7 +4982,7 @@ const hgMatch=(q,values)=>{
   return best;
 };
 const HAND_ORDER=["오른손 (양손 백핸드)","오른손 (한손 백핸드)","왼손 (양손 백핸드)","왼손 (한손 백핸드)"];
-// ─── 소곤소곤 (회원 탭 게시판) ─────────────────────────────────────────────────
+// ─── 소곤소곤 (하단 탭 게시판) ─────────────────────────────────────────────────
 // club/board/<pid> = {uid,name,text,at,editedAt,anon,mentions:{uid:true},likes:{uid:true},comments:{<cid>:{uid,name,text,at,editedAt,anon,mentions}}}
 // 정회원·관리자만 읽고 써요. 내 글·댓글은 수정·삭제, 관리자는 삭제만.
 // 익명(anon:true)이면 name은 "익명"으로 저장하고 화면에도 닉네임을 안 보여 줘요. uid는 본인 수정·삭제와 규칙 확인용으로만 남아요.
@@ -5143,12 +5145,11 @@ function FreeBoard({canWrite,isAdmin,focus}){
   </>);
 }
 
-function MembersTab({onOpenMeeting,onCreateMeeting,canWrite,isAdmin,boardFocus,newCounts={}}){
-  const [view,setView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
-  useEffect(()=>{ if(boardFocus) setView("board"); },[boardFocus]);
+function MembersTab({onOpenMeeting,onCreateMeeting}){
+  const [view]=useShared("memView",memViewInit);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      {view==="board"?<FreeBoard canWrite={canWrite} isAdmin={isAdmin} focus={boardFocus}/>:view==="guild"?<GuildView onOpenMeeting={onOpenMeeting} onCreateMeeting={onCreateMeeting}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
+      {view==="stats"?<StatsTab/>:view==="guild"?<GuildView onOpenMeeting={onOpenMeeting} onCreateMeeting={onCreateMeeting}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
     </div>);
 }
 function MemberList({onOpenMeeting}){
@@ -5847,7 +5848,8 @@ function UpdateBanner(){
 }
 
 // ─── 메인 앱 ──────────────────────────────────────────────────────────────────
-const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"stats",label:"통계",icon:"chart"}];
+// 소곤소곤은 하단 탭으로 바로, 통계는 회원 탭 안 (회원 목록 / 길드 / 통계)
+const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"board",label:BOARD_NAME,icon:"message"}];
 
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
 const GLOBAL_CSS = `
@@ -5908,13 +5910,13 @@ function BoardSearchHead(){
       </div>
     </div>);
 }
-// 회원 탭 윗단: 회원 목록 / 길드 / 소곤소곤 알약 버튼 + 보기마다 검색·정렬
+// 회원 탭 윗단: 회원 목록 / 길드 / 통계 알약 버튼 + 보기마다 검색·정렬
 function MemberSearchHead({newCounts={}}){
-  const [view,setView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const [view,setView]=useShared("memView",memViewInit);
   const pick=k=>{setView(k);try{sessionStorage.setItem("sstc-members-view",k);}catch(e){}};
   return(<>
     <div role="tablist" aria-label="회원 탭 보기" style={{position:"relative",marginTop:14,display:"flex",gap:4,padding:4,borderRadius:14,background:"rgba(255,255,255,0.12)"}}>
-      {[["list","회원 목록"],["guild","길드"],["board",BOARD_NAME]].map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
+      {MEM_VIEWS.map(([k,l])=>{ const n=newCounts[k]||0, on=view===k; return(
         <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pick(k)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.8)",fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontFamily:FONT,letterSpacing:"-0.02em"}}>{l}{n>0&&<span aria-label={`새 항목 ${n}개`} style={{minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"18px",padding:"0 5px",boxSizing:"border-box"}}>{n}</span>}</button>
       );})}
     </div>
@@ -5922,10 +5924,10 @@ function MemberSearchHead({newCounts={}}){
   </>);
 }
 function MemberViewHead(){
-  const [view]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const [view]=useShared("memView",memViewInit);
   const [q,setQ]=useShared("memQ","");
   const [sort,setSortRaw]=useShared("memSort",memSortInit);
-  if(view==="board") return <BoardSearchHead/>;
+  if(view==="stats") return <StatsHead/>;
   if(view==="guild"){ const me=myUid(), mine=guildsOf(me), inv=guildList().filter(g=>g.invites&&g.invites[me]&&!inGuild(g,me)).length;
     return <div style={{position:"relative",marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
       <span style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>내가 속한 길드 <b style={{color:BALL}}>{mine.length}</b>개 · 여러 길드에 들어갈 수 있어요</span>
@@ -5942,6 +5944,9 @@ function MemberViewHead(){
       <SortDropdown value={sort} onChange={setSort}/>
         </div>);
 }
+// 회원 탭 보기: 회원 목록 / 길드 / 통계 (예전에 소곤소곤을 보던 기기는 회원 목록으로)
+const MEM_VIEWS=[["list","회원 목록"],["guild","길드"],["stats","통계"]];
+const memViewInit=()=>{ let v="list"; try{ v=sessionStorage.getItem("sstc-members-view")||"list"; }catch(e){} return MEM_VIEWS.some(x=>x[0]===v)?v:"list"; };
 // 회원 정렬 (손별은 뺐어요. 예전에 손별로 두었으면 이름순으로)
 const memSortInit=()=>{ let v="name"; try{ v=sessionStorage.getItem("sstc-members-sort")||"name"; }catch(e){} return MEMBER_SORTS.some(x=>x[0]===v)?v:"name"; };
 const MEMBER_SORTS=[["name","이름순"],["career","구력순"],["region","동네별"],["guild","길드별"]];
@@ -6230,7 +6235,7 @@ export default function App() {
   // 공유 링크(#meeting-<id>)로 들어오면 로그인 후 그 모임을 바로 열어요
   useEffect(()=>{ if(screen==="main"&&list.ready&&DEEP_LINK.id&&(!FB||guildSeen.current)){ const id=DEEP_LINK.id; if(MEETINGS.some(m=>m.id===id)){ const v=DEEP_LINK.view; DEEP_LINK.id=0; openM(id,v,"home"); }
     else{ const hid=ALL_MEETINGS.find(m=>m.id===id); if(hid){ DEEP_LINK.id=0; setLocked(hid); } } } });
-  // ── 새 항목 배지: 예약(새 모임), 회원(새 정회원 + 소곤소곤 새 글), 관리(새 가입 신청, 관리자만) ──
+  // ── 새 항목 배지: 예약(새 모임), 회원(새 정회원), 소곤소곤(새 글), 관리(새 가입 신청, 관리자만) ──
   useSeen();
   const myId=account&&account.user?account.user.uid:"";
   const inMain=screen==="main"&&(!FB||!!(account&&account.user&&(account.admin||account.approved)));
@@ -6258,10 +6263,10 @@ export default function App() {
   const newPosts=(boardPosts||[]).map(postNewItem);
   const newPending=clubData?Object.entries(clubData.members).map(([uid,m])=>({uid,...m}))
     .filter(m=>m&&!m.withdrawn&&!clubData.approved[m.uid]&&!clubData.admins[m.uid]).map(pendingNewItem):[];
-  const tabBadge={booking:tabNewCount("booking",newMeetings),members:tabNewCount("members",[...newMembers,...newPosts]),admin:tabNewCount("admin",newPending)};
+  const tabBadge={booking:tabNewCount("booking",newMeetings),members:tabNewCount("members",newMembers),board:tabNewCount("board",newPosts),admin:tabNewCount("admin",newPending)};
   const guildInv=myId?guildList().filter(g=>g.invites&&g.invites[myId]&&!inGuild(g,myId)).length:0;
-  const membersNew={list:newMembers.filter(isNew).length,board:newPosts.filter(isNew).length,guild:guildInv};
-  const [memView,setMemView]=useShared("memView",()=>{try{return sessionStorage.getItem("sstc-members-view")||"list";}catch(e){return "list";}});
+  const membersNew={list:newMembers.filter(isNew).length,guild:guildInv};
+  const [memView,setMemView]=useShared("memView",memViewInit);
   const inviteTip=myInvites.length&&!(tab==="members"&&memView==="guild")?myInvites:null;
   const [,setBoardWrite]=useShared("boardWrite",0);
   const [,setGuildOpen]=useShared("guildOpen",null);
@@ -6324,7 +6329,7 @@ export default function App() {
   }
 
   // ── 메인 앱 화면 ──
-  const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",stats:"통계",admin:"관리"};
+  const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",board:BOARD_NAME,admin:"관리"};
   // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
   const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
   const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
@@ -6392,13 +6397,13 @@ export default function App() {
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:18}}>
                 <p style={{margin:0,fontSize:26,fontWeight:900,letterSpacing:"-0.03em"}}>{tabTitles[tab]}{tab==="members"&&clubData&&<span style={{marginLeft:8,opacity:0.55,fontWeight:600}}>{activeMembers(clubData).length}</span>}</p>
                 {tab==="booking"&&<ViewToggle view={bookView} onView={setBookView} dark/>}
-                {tab==="members"&&memView==="board"&&(!FB||!!(account&&(account.admin||account.approved)))&&<button type="button" aria-label="새 글 쓰기" title="새 글 쓰기" onClick={()=>setBoardWrite(n=>n+1)} style={{...iconBtn,width:46,height:46,borderRadius:14,background:BALL,color:INK}}><Icon name="pencil" size={20} stroke={2.2}/></button>}
-                {tab==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
+                {tab==="board"&&(!FB||!!(account&&(account.admin||account.approved)))&&<button type="button" aria-label="새 글 쓰기" title="새 글 쓰기" onClick={()=>setBoardWrite(n=>n+1)} style={{...iconBtn,width:46,height:46,borderRadius:14,background:BALL,color:INK}}><Icon name="pencil" size={20} stroke={2.2}/></button>}
+                {tab==="members"&&memView==="stats"&&<span style={{...headChip,fontSize:13,padding:"7px 12px"}}>{todayYmd().slice(0,4)} 시즌</span>}
                 {tab==="admin"&&realAdmin&&<button type="button" onClick={toggleView} style={{...headChip,fontSize:13,padding:"8px 12px",border:"none",cursor:"pointer",fontFamily:FONT}}><Icon name="swap" size={14} stroke={2.2}/>회원 모드로</button>}
               </div>
               {tab==="booking"&&bookView!=="map"&&<MiniCalendar part="grid" onOpen={id=>openM(id,"info","booking")}/>}
               {tab==="members"&&<MemberSearchHead newCounts={membersNew}/>}
-              {tab==="stats"&&<StatsHead/>}
+              {tab==="board"&&<BoardSearchHead/>}
               {tab==="admin"&&adminOn&&<AdminHead pending={newPending.length} members={clubData?activeMembers(clubData).length:0} banners={ads.length}/>}
             </div>
           )
@@ -6416,9 +6421,8 @@ export default function App() {
           notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice} ads={ads} adSecs={adData.sec}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view,from)=>openM(id,view,from||"booking")} ready={list.ready} view={bookView} onView={setBookView}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
-        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} onCreateMeeting={openGuildCreate} isAdmin={adminOn} boardFocus={boardFocus} newCounts={membersNew}
-          canWrite={!FB||!!(account&&(account.admin||account.approved))}/>}
-        {tab==="stats"&&<StatsTab/>}
+        {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} onCreateMeeting={openGuildCreate}/>}
+        {tab==="board"&&<div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}><FreeBoard canWrite={!FB||!!(account&&(account.admin||account.approved))} isAdmin={adminOn} focus={boardFocus}/></div>}
         {tab==="admin"&&FB&&adminOn&&<AdminTab jump={adminJump}/>}
       </div>
       {/* 새 모임 버튼 (+ 새 모임): 예약 탭 목록에서만 탭바 바로 위 오른쪽에 (다른 탭·모임 상세에서는 숨겨서 댓글·글 쓸 때 안 가리게) */}
@@ -6457,7 +6461,7 @@ export default function App() {
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
-        if(n.postId){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setBoardFocus(n.postId+"#"+Date.now()); }
+        if(n.postId){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("board"); setBoardFocus(n.postId+"#"+Date.now()); }
         else if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
