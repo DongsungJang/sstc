@@ -406,10 +406,10 @@ const isNew=x=>isNewItem(x.id,x.at,x.by);
 const lastOtherCmt=p=>toList(p.comments).reduce((m,c)=>c&&c.text&&c.uid!==SEEN.uid?Math.max(m,+c.at||0):m,0);
 const hasNewCmt=p=>{ const d=SEEN.d, at=lastOtherCmt(p); return !!d&&at>d.base&&at>Date.now()-NEW_DAYS*864e5&&at>(d.i["k"+p.id]||0); };
 const markCmtSeen=p=>{ const at=lastOtherCmt(p); if(!SEEN.d||!at||(SEEN.d.i["k"+p.id]||0)>=at) return; SEEN.d.i["k"+p.id]=at; seenSave(); };
-// 오늘(자정 전) 남이 새로 만든 다가오는 모임: 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
+// 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
 const sameDay=(a,b)=>{ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); };
 const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=+(m.info&&m.info.createdAt)||0;
-  return m.status==="upcoming"&&!m.cancelled&&at&&sameDay(at,Date.now())&&!(m.createdByUid&&m.createdByUid===SEEN.uid); })
+  return m.status==="upcoming"&&!m.cancelled&&at&&sameDay(at,Date.now()); })
   .sort((a,b)=>(+b.info.createdAt||0)-(+a.info.createdAt||0));
 function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
