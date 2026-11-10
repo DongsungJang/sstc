@@ -402,6 +402,15 @@ const postNewItem=p=>({id:"p"+p.id,at:+p.at||0,by:p.uid});
 const memberNewItem=m=>({id:"u"+m.uid,at:m.uid===SEEN.uid?0:(+m.approvedAt||+m.createdAt||0),by:m.approvedByUid||""});
 const pendingNewItem=m=>({id:"a"+m.uid,at:+m.createdAt||0,by:m.uid});
 const isNew=x=>isNewItem(x.id,x.at,x.by);
+// 글의 새 댓글: 남이 단 마지막 댓글 시각이 그 글을 마지막으로 연 뒤면 '새 댓글' (항목 id k<글 id> = 연 때 본 마지막 댓글 시각)
+const lastOtherCmt=p=>toList(p.comments).reduce((m,c)=>c&&c.text&&c.uid!==SEEN.uid?Math.max(m,+c.at||0):m,0);
+const hasNewCmt=p=>{ const d=SEEN.d, at=lastOtherCmt(p); return !!d&&at>d.base&&at>Date.now()-NEW_DAYS*864e5&&at>(d.i["k"+p.id]||0); };
+const markCmtSeen=p=>{ const at=lastOtherCmt(p); if(!SEEN.d||!at||(SEEN.d.i["k"+p.id]||0)>=at) return; SEEN.d.i["k"+p.id]=at; seenSave(); };
+// 오늘(자정 전) 남이 새로 만든 다가오는 모임: 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
+const sameDay=(a,b)=>{ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); };
+const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=+(m.info&&m.info.createdAt)||0;
+  return m.status==="upcoming"&&!m.cancelled&&at&&sameDay(at,Date.now())&&!(m.createdByUid&&m.createdByUid===SEEN.uid); })
+  .sort((a,b)=>(+b.info.createdAt||0)-(+a.info.createdAt||0));
 function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
 function LoginScreen({notice,onSignup,onForgot,onLogin}) {
@@ -3875,6 +3884,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
       <MiniCalendar onOpen={setSelId} part="picked"/>
+      <TodayNew onOpen={setSelId}/>
       <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["flash","번개 모임","zap"],["regular","정기 모임","calendar"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>m.kind===k).length,fresh=upAll.some(m=>m.kind===k&&!m.cancelled&&isNew(meetingNewItem(m)));return(
           <button key={k} type="button" role="tab" aria-selected={on} onClick={()=>pickKind(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",background:on?INK:"transparent",color:on?"#fff":"#6B7493",boxShadow:on?SHADOW_BTN:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
@@ -3895,6 +3905,20 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
       )}
     </div>
   );
+}
+
+// 예약 탭 '다가오는 모임' 위: 오늘 새로 올라온 모임 (번개·정기 다). 날이 바뀌면 사라져요
+function TodayNew({onOpen}){
+  const list=todayNewMeetings();
+  if(!list.length) return null;
+  return(
+    <div style={{background:"#fff",borderRadius:18,padding:"12px 14px 2px",boxShadow:`inset 0 0 0 2px ${BALL}`}}>
+      <p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}>
+        <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:BALL}}><Icon name="calendar" size={13} stroke={2.4}/></span>
+        새로 올라온 모임<span style={{fontSize:12,fontWeight:800,color:BLUE}}>{list.length}</span>
+        <span style={{marginLeft:"auto",fontSize:11,fontWeight:500,color:"#A3AAC2"}}>오늘 올라온 것만 · 내일 사라져요</span></p>
+      {list.map((m,i)=><MeetRow key={m.id} m={m} last={i===list.length-1} onClick={()=>onOpen(m.id)}/>)}
+    </div>);
 }
 
 // ─── 통계 탭 ──────────────────────────────────────────────────────────────────
@@ -5067,7 +5091,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
   const uid=myUid()||myVoteKey();
   const go=id=>{ setOpenId(id); try{window.scrollTo(0,0);}catch(e){} };
   // 글을 열면 NEW가 사라져요 (알림으로 열어도 같음)
-  useEffect(()=>{ if(openId&&posts){ const p=posts.find(x=>x.id===openId); if(p) markItemSeen("p"+p.id,p.at); } },[openId,posts]);
+  useEffect(()=>{ if(openId&&posts){ const p=posts.find(x=>x.id===openId); if(p){ markItemSeen("p"+p.id,p.at); markCmtSeen(p); } } },[openId,posts]);
   useEffect(()=>{ if(focus) go(focus.split("#")[0]); },[focus]);
   if(!canWrite) return(
     <Card style={{textAlign:"center",padding:"28px 20px"}}>
@@ -5133,7 +5157,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
               {title&&<p style={{margin:"10px 0 0",fontSize:16,fontWeight:900,color:INK,letterSpacing:"-0.02em",lineHeight:1.4,wordBreak:"keep-all"}}><CommentText text={title} names={names}/></p>}
               {rest&&<p style={{margin:title?"4px 0 0":"10px 0 0",fontSize:14,color:"#5E6A8E",lineHeight:1.55,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",whiteSpace:"pre-wrap"}}><CommentText text={rest} names={names}/></p>}
               <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10,fontSize:12,color:"#6B7493",fontWeight:500}}>
-                <span>댓글 {nC}</span>
+                <span>댓글 {nC}{hasNewCmt(p)&&<span style={{marginLeft:6,fontSize:11,fontWeight:800,color:"#ef4444"}}>새 댓글</span>}</span>
                 <button type="button" aria-pressed={on} aria-label={on?"좋아요 취소":"좋아요"} onClick={e=>{e.stopPropagation();like(p);}} style={{...small,fontSize:12,fontWeight:on?700:500,color:on?"#ef4444":"#6B7493"}}>좋아요 {lk}</button>
               </div>
             </Card>
@@ -5786,14 +5810,19 @@ function GuildLockApply({g,wide}){
     :<button type="button" onClick={()=>guildCancelApply(g)} style={{...small,background:"#fff",color:"#6B7493",boxShadow:"inset 0 0 0 1.5px #E2E6F0"}}>신청됨 · 취소</button>;
   return <button type="button" onClick={()=>guildApply(g)} style={wide?{...btnPrimary,marginTop:18,display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%"}:{...small,background:BLUE,color:"#fff"}}>{wide&&<Icon name="userPlus" size={17} stroke={2.2}/>}{wide?`${g.name} 길드 가입 신청하기`:"가입 신청하기"}</button>;
 }
-// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때. 누르면 길드 화면으로
-function InviteTip({guilds,onGo}){
-  const n=guilds.length, label=n===1?`${guilds[0].name} 길드 초대`:`길드 초대 ${n}건`;
-  return <button type="button" onClick={onGo} aria-label={`${label} 확인하기`} style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",zIndex:1,border:"none",padding:0,background:"none",cursor:"pointer",fontFamily:FONT,animation:"sstc-tip 1.6s ease-in-out infinite"}}>
+// 하단 탭 위 말풍선 (공 색, 살짝 위아래로). side: 가운데(기본) / 오른쪽 끝 탭은 "right"로 화면 밖으로 안 나가게
+function TabTip({icon,label,aria,onGo,side,lift=0}){
+  const right=side==="right";
+  return <button type="button" onClick={onGo} aria-label={aria||label} style={{position:"absolute",bottom:`calc(100% + ${8+lift}px)`,...(right?{right:4}:{left:"50%",transform:"translateX(-50%)"}),zIndex:1,border:"none",padding:0,background:"none",cursor:"pointer",fontFamily:FONT,animation:"sstc-tip 1.6s ease-in-out infinite"}}>
     <style>{"@keyframes sstc-tip{0%,100%{translate:0 0}50%{translate:0 -3px}}"}</style>
-    <span style={{display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",background:BALL,color:INK,fontSize:12.5,fontWeight:800,padding:"7px 11px",borderRadius:12,boxShadow:"0 6px 18px rgba(11,30,91,0.28)"}}><Icon name="userPlus" size={14} stroke={2.4}/>{label}</span>
-    <span aria-hidden="true" style={{position:"absolute",left:"50%",bottom:-5,width:11,height:11,background:BALL,transform:"translateX(-50%) rotate(45deg)",borderRadius:2}}/>
+    <span style={{display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap",background:BALL,color:INK,fontSize:12.5,fontWeight:800,padding:"7px 11px",borderRadius:12,boxShadow:"0 6px 18px rgba(11,30,91,0.28)"}}><Icon name={icon} size={14} stroke={2.4}/>{label}</span>
+    <span aria-hidden="true" style={{position:"absolute",...(right?{right:38}:{left:"50%"}),bottom:-5,width:11,height:11,background:BALL,transform:right?"rotate(45deg)":"translateX(-50%) rotate(45deg)",borderRadius:2}}/>
   </button>;
+}
+// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때 '길드 초대' (짧게: 옆 탭 말풍선과 안 겹치게). 누르면 길드 화면으로
+function InviteTip({guilds,onGo,lift}){
+  const n=guilds.length, names=guilds.map(g=>g.name).join(", ");
+  return <TabTip icon="userPlus" label="길드 초대" aria={`${names} 길드 초대${n>1?` ${n}건`:""} 확인하기`} onGo={onGo} lift={lift}/>;
 }
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 function GuildLockSheet({meeting,onClose}){
@@ -6421,9 +6450,15 @@ export default function App() {
   const membersNew={list:newMembers.filter(isNew).length,guild:guildInv};
   const [memView,setMemView]=useShared("memView",memViewInit);
   const inviteTip=myInvites.length&&!(tab==="members"&&memView==="guild")?myInvites:null;
+  // 소곤소곤 탭 위 말풍선: 탭을 마지막으로 연 뒤 남이 단 새 댓글 (새 글은 빨간 +n 배지로만)
+  // 예약 탭 목록에선 '+ 새 모임' 버튼과 겹쳐서 숨겨요
+  const boardSeenAt=(SEEN.d&&SEEN.d.t.board)||0, boardBase=(SEEN.d&&SEEN.d.base)||Date.now();
+  const newComments=(boardPosts||[]).reduce((n,p)=>n+toList(p.comments).filter(c=>c&&c.text&&+c.at>boardSeenAt&&+c.at>boardBase&&c.uid!==myId).length,0);
+  const boardTip=tab==="board"||(tab==="booking"&&!openMeeting&&bookView!=="map")?0:newComments;
   const [,setBoardWrite]=useShared("boardWrite",0);
   const [,setGuildOpen]=useShared("guildOpen",null);
   GUILD_GO=gid=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
+  const goTab=k=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab(k); };
   if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
@@ -6636,7 +6671,8 @@ export default function App() {
         {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
           <div key={t.key} style={{flex:1,position:"relative",display:"flex"}}>
           {t.key==="members"&&inviteTip&&<InviteTip guilds={inviteTip} onGo={()=>GUILD_GO(inviteTip.length===1?inviteTip[0].id:null)}/>}
-          <button type="button" onClick={()=>{if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}setTab(t.key);}} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
+          {t.key==="board"&&boardTip>0&&<TabTip icon="message" side={adminOn?null:"right"} label={`새 댓글 ${boardTip}`} aria={`소곤소곤 새 댓글 ${boardTip}개 보기`} lift={adminOn&&inviteTip?40:0} onGo={()=>goTab("board")}/>}
+          <button type="button" onClick={()=>goTab(t.key)} style={{flex:1,padding:"9px 0 10px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:"#fff"}}>
             <span style={{position:"relative",display:"inline-flex"}}>
               <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:48,height:32,borderRadius:16,background:on?BALL:"transparent",color:on?INK:"rgba(255,255,255,0.55)"}}><Icon name={t.icon} size={21} stroke={on?2.2:1.8}/></span>
               {nb>0&&<span aria-label={`새 항목 ${nb}개`} style={{position:"absolute",top:-5,left:30,minWidth:20,height:18,padding:"0 5px",boxSizing:"border-box",borderRadius:12,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:700,lineHeight:"14px",textAlign:"center",border:`2px solid ${INK}`,whiteSpace:"nowrap"}}>+{nb>99?99:nb}</span>}
