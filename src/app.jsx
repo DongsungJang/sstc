@@ -5819,10 +5819,10 @@ function TabTip({icon,label,aria,onGo,side,lift=0}){
     <span aria-hidden="true" style={{position:"absolute",...(right?{right:38}:{left:"50%"}),bottom:-5,width:11,height:11,background:BALL,transform:right?"rotate(45deg)":"translateX(-50%) rotate(45deg)",borderRadius:2}}/>
   </button>;
 }
-// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때 '새 길드 초대' (짧게: 옆 탭 말풍선과 안 겹치게). 누르면 길드 화면으로
+// 하단 회원 탭 위 말풍선: 길드 초대를 받았을 때 '길드 초대' (짧게: 옆 탭 말풍선과 안 겹치게). 누르면 길드 화면으로
 function InviteTip({guilds,onGo,lift}){
   const n=guilds.length, names=guilds.map(g=>g.name).join(", ");
-  return <TabTip icon="userPlus" label="새 길드 초대" aria={`${names} 길드 초대${n>1?` ${n}건`:""} 확인하기`} onGo={onGo} lift={lift}/>;
+  return <TabTip icon="userPlus" label="길드 초대" aria={`${names} 길드 초대${n>1?` ${n}건`:""} 확인하기`} onGo={onGo} lift={lift}/>;
 }
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 function GuildLockSheet({meeting,onClose}){
