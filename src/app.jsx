@@ -418,8 +418,10 @@ const markCmtSeen=p=>{ const at=lastOtherCmt(p); if(!SEEN.d||!at||(SEEN.d.i["k"+
 // 모임 글의 새 댓글: 볼 수 있는 모임(MEETINGS: 비공개 번개는 초대받은 회원, 잠긴 길드 모임은 길드원)만, 무산 제외, 내 댓글 제외.
 // 항목 id kmc<모임 id> = 모임을 열었을 때 본 마지막 댓글 시각 (소곤소곤 글 새 댓글과 같은 방식)
 const meetCmtKey=m=>({id:"mc"+m.id,comments:m.rec&&m.rec.comments});
-const hasNewMeetCmt=m=>!m.cancelled&&hasNewCmt(meetCmtKey(m));
-const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
+// 끝난 지 3일 지난 모임은 빼요 (오랜만에 들어와도 너무 많이 쌓이지 않게)
+const cmtOld=m=>(m.endIso||m.iso||"")<addDays(todayYmd(),-3);
+const hasNewMeetCmt=m=>!m.cancelled&&!cmtOld(m)&&hasNewCmt(meetCmtKey(m));
+const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled||cmtOld(m)) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
   return toList(m.rec&&m.rec.comments).filter(c=>c&&c.text&&c.uid!==SEEN.uid&&+c.at>t).length; };
 const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a)));
 // 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
@@ -1604,13 +1606,13 @@ function SlidePages({items,per=3,title,render}){
   const go=i=>{ const el=ref.current; if(!el) return; const j=Math.max(0,Math.min(n-1,i)); el.scrollTo({left:j*el.clientWidth,behavior:"smooth"}); setIdx(j); };
   const onScroll=()=>{ const el=ref.current; if(el&&el.clientWidth) setIdx(Math.round(el.scrollLeft/el.clientWidth)); };
   return <>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:30,marginBottom:2}}>
+    {(title||n>1)&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",minHeight:30,marginBottom:2}}>
       {title}
-      {n>1&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+      {n>1&&<div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
         <span style={{fontSize:12,fontWeight:700,color:"#8A93B2",fontVariantNumeric:"tabular-nums",marginRight:2}}>{idx+1} / {n}</span>
         <PageArrow dir={-1} off={idx<=0} onClick={()=>go(idx-1)} label="이전"/><PageArrow dir={1} off={idx>=n-1} onClick={()=>go(idx+1)} label="다음"/>
       </div>}
-    </div>
+    </div>}
     {n>0&&<div ref={ref} onScroll={onScroll} className="sstc-hscroll" style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory"}}>
       {pages.map((pg,pi)=><div key={pi} style={{flex:"0 0 100%",minWidth:0,scrollSnapAlign:"start",display:"flex",flexDirection:"column"}}>{pg.map((it,i)=>render(it,i===pg.length-1))}</div>)}
     </div>}
@@ -4033,10 +4035,22 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
 function NewCmtRows({onOpen}){
   useSeen();
   const list=newCmtMeetings();
+  const [ask,setAsk]=useState(false);
   if(!list.length) return null;
+  const readAll=()=>{ list.forEach(m=>markCmtSeen(meetCmtKey(m))); setAsk(false); };
+  const pop=(t,onClick,primary)=><button type="button" onClick={onClick} style={{flex:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?"#E5484D":"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
   return(
     <div style={{background:"#fff",borderRadius:18,padding:"8px 14px 6px",boxShadow:"inset 0 0 0 2px #FBC8C8"}}>
-      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span></p>}
+      {ask&&<div onClick={()=>setAsk(false)} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+        <div role="dialog" aria-modal="true" aria-label="모두 읽음 처리" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:320,background:"#fff",borderRadius:22,padding:"24px 20px 18px",textAlign:"center",fontFamily:FONT,boxShadow:"0 18px 50px rgba(11,30,91,0.3)"}}>
+          <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:44,height:44,borderRadius:14,background:"#FDECEC",color:"#E5484D"}}><Icon name="check" size={22} stroke={2.6}/></span>
+          <p style={{margin:"12px 0 6px",fontSize:17,fontWeight:800,color:INK}}>모두 읽음 처리를 하시겠습니까?</p>
+          <p style={{margin:"0 0 18px",fontSize:13,color:"#6B7493",lineHeight:1.5}}>새 댓글 달린 모임 {list.length}개의 '새 댓글' 표시가 사라져요.</p>
+          <div style={{display:"flex",gap:8}}>{pop("아니요",()=>setAsk(false))}{pop("예",readAll,true)}</div>
+        </div></div>}
+      <p style={{margin:"2px 0 0",display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span>
+          <button type="button" onClick={()=>setAsk(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:4,padding:"5px 11px",borderRadius:20,border:"1.5px solid #F7B4B4",background:"#fff",color:"#D12D33",fontSize:12,fontWeight:800,fontFamily:FONT,cursor:"pointer",whiteSpace:"nowrap",boxShadow:"0 1px 3px rgba(229,72,77,0.18)"}}><Icon name="check" size={13} stroke={2.8}/>모두 읽음 처리</button></p>
+      <SlidePages items={list} title={null}
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
