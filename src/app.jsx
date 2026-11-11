@@ -4038,8 +4038,7 @@ function NewCmtRows({onOpen}){
   if(!list.length) return null;
   return(
     <div style={{background:"#fff",borderRadius:18,padding:"8px 14px 6px",boxShadow:"inset 0 0 0 2px #FBC8C8"}}>
-      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span>
-          <button type="button" onClick={()=>list.forEach(m=>markCmtSeen(meetCmtKey(m)))} style={{marginLeft:4,padding:"3px 9px",borderRadius:10,border:"none",background:"#F1F4FA",color:"#6B7493",fontSize:11.5,fontWeight:700,fontFamily:FONT,cursor:"pointer",whiteSpace:"nowrap"}}>모두 읽음</button></p>}
+      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span></p>}
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
@@ -4047,6 +4046,7 @@ function NewCmtRows({onOpen}){
             <span style={{fontSize:12,fontWeight:800,color:"#E5484D",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="message" size={12} stroke={2.4}/>{n}</span>
             <Icon name="chevR" size={14} stroke={2.2} color="#A3AAC2"/>
           </button>); }}/>
+      <button type="button" onClick={()=>list.forEach(m=>markCmtSeen(meetCmtKey(m)))} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,width:"100%",marginTop:4,padding:"9px 0 5px",border:"none",borderTop:"1px solid #F3E1E1",background:"none",color:"#E5484D",fontSize:13,fontWeight:700,fontFamily:FONT,cursor:"pointer"}}><Icon name="check" size={15} stroke={2.6}/>모두 읽음 처리</button>
     </div>);
 }
 // 예약 탭 '다가오는 모임' 위: 오늘 새로 올라온 모임 (번개·정기 다). 날이 바뀌면 사라져요
