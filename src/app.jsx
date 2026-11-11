@@ -415,11 +415,19 @@ const isNew=x=>isNewItem(x.id,x.at,x.by);
 const lastOtherCmt=p=>toList(p.comments).reduce((m,c)=>c&&c.text&&c.uid!==SEEN.uid?Math.max(m,+c.at||0):m,0);
 const hasNewCmt=p=>{ const d=SEEN.d, at=lastOtherCmt(p); return !!d&&at>d.base&&at>Date.now()-NEW_DAYS*864e5&&at>(d.i["k"+p.id]||0); };
 const markCmtSeen=p=>{ const at=lastOtherCmt(p); if(!SEEN.d||!at||(SEEN.d.i["k"+p.id]||0)>=at) return; SEEN.d.i["k"+p.id]=at; seenSave(); };
+// 모임 글의 새 댓글: 볼 수 있는 모임(MEETINGS: 비공개 번개는 초대받은 회원, 잠긴 길드 모임은 길드원)만, 무산 제외, 내 댓글 제외.
+// 항목 id kmc<모임 id> = 모임을 열었을 때 본 마지막 댓글 시각 (소곤소곤 글 새 댓글과 같은 방식)
+const meetCmtKey=m=>({id:"mc"+m.id,comments:m.rec&&m.rec.comments});
+const hasNewMeetCmt=m=>!m.cancelled&&hasNewCmt(meetCmtKey(m));
+const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
+  return toList(m.rec&&m.rec.comments).filter(c=>c&&c.text&&c.uid!==SEEN.uid&&+c.at>t).length; };
+const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a)));
 // 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
 const sameDay=(a,b)=>{ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); };
 const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=+(m.info&&m.info.createdAt)||0;
   return m.status==="upcoming"&&!m.cancelled&&at&&sameDay(at,Date.now()); })
   .sort((a,b)=>(+b.info.createdAt||0)-(+a.info.createdAt||0));
+function CmtTag({n}){ return <span aria-label={`새 댓글 ${n}개`} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10.5,fontWeight:800,lineHeight:"16px",padding:"0 6px 0 5px",borderRadius:12,background:"#FDECEC",color:"#E5484D",whiteSpace:"nowrap",flex:"0 0 auto"}}><Icon name="message" size={11} stroke={2.6}/>새 댓글{n>1?` ${n}`:""}</span>; }
 function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
 function LoginScreen({notice,onSignup,onForgot,onLogin}) {
@@ -3138,7 +3146,7 @@ function useMentions(){
 const clip=(t,n=40)=>t.length>n?t.slice(0,n)+"…":t;
 // allowAnon: 익명으로 쓰기 선택 (소곤소곤), nameOf(c): 화면에 보일 이름 (익명 번호 등)
 // anonNotify: 알림에 쓴 사람·댓글 내용을 아예 안 남겨요 (소곤소곤: 실명으로 썼다 지우고 익명으로 다시 써도 누군지 모르게)
-function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,title="댓글",allowAnon=false,anonNotify=false,nameOf}){
+function CommentBox({comments,save,where,link,isAdmin,canWrite=true,newSince=0,onAdded,title="댓글",allowAnon=false,anonNotify=false,nameOf}){
   const {members,names,mentionsOf}=useMentions();
   const [text,setText]=useState(""), [busy,setBusy]=useState(false);
   const [edit,setEdit]=useState(null);   // {id,text}
@@ -3172,6 +3180,7 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
                 <span style={{fontSize:13,fontWeight:700,color:c.anon?"#6B7493":INK}}>{shown(c)}</span>
                 {c.anon&&mine&&<span style={{fontSize:10,color:"#A3AAC2"}}>(내 댓글)</span>}
                 <span style={{fontSize:11,color:"#A3AAC2"}}>{ago(c.at)}{c.editedAt?" · 수정됨":""}</span>
+                {newSince>0&&!mine&&+c.at>newSince&&<span style={{fontSize:10,fontWeight:800,color:"#E5484D"}}>새 댓글</span>}
               </div>
               {editing?(<div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
                 <MentionInput value={edit.text} onChange={v=>setEdit({...edit,text:v})} members={members} autoFocus onSubmit={()=>saveEdit(c)}/>
@@ -3199,7 +3208,11 @@ function CommentBox({comments,save,where,link,isAdmin,canWrite=true,onAdded,titl
   );
 }
 function MeetingComments({meeting,isAdmin}){
-  return <CommentBox comments={meeting.rec&&meeting.rec.comments} isAdmin={isAdmin}
+  // 열기 전에 본 마지막 댓글 시각: 그 뒤 남이 단 댓글 옆에 '새 댓글'. 열면 본 걸로 (예약 탭 '새 댓글 달린 모임'에서 빠져요)
+  const [since]=useState(()=>Math.max((SEEN.d&&SEEN.d.i["kmc"+meeting.id])||0,(SEEN.d&&SEEN.d.base)||0,Date.now()-NEW_DAYS*864e5));
+  const cm=meeting.rec&&meeting.rec.comments;
+  useEffect(()=>{ markCmtSeen(meetCmtKey(meeting)); },[cm]);
+  return <CommentBox comments={cm} isAdmin={isAdmin} newSince={since}
     save={(cid,v)=>saveMeetingPath(`m${meeting.id}/comments/${cid}`,v)}
     where={`${meeting.date} ${meeting.placeName||meeting.place} 모임 댓글`} link={{meetingId:meeting.id}}/>;
 }
@@ -3962,7 +3975,7 @@ function MeetRow({m,past,last,onClick}){
       </span>
       <div style={{flex:1,minWidth:0}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:dim?"#6B7493":INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
-          <span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{m.placeName||m.place}</span>{!dim&&isNew(meetingNewItem(m))&&<NewTag/>}</p>
+          <span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{m.placeName||m.place}</span>{!dim&&isNew(meetingNewItem(m))&&<NewTag/>}{hasNewMeetCmt(m)&&<CmtTag n={newMeetCmtCount(m)}/>}</p>
         <p style={{margin:"4px 0 0",fontSize:12,color:"#6B7493",fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
           <span style={{flex:"0 0 auto",opacity:dim?0.6:1}}><KindBadge m={m}/></span><span>{m.time}</span>{isAtt&&!gone&&<span style={{color:BLUE,fontWeight:700}}>· {past?"참석했어요":"참석 예정"}</span>}</p>
       </div>
@@ -3992,6 +4005,7 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20,paddingBottom:24}}>
       <MiniCalendar onOpen={setSelId} part="picked"/>
+      <NewCmtRows onOpen={setSelId}/>
       <TodayNew onOpen={setSelId}/>
       <div role="tablist" aria-label="모임 종류" style={{display:"flex",background:"#E4E9F7",borderRadius:12,padding:4}}>
         {[["flash","번개","zap"],["regular","정기","calendar"],["mt","엠티","flame"]].map(([k,l,ic])=>{const on=kind===k,n=upAll.filter(m=>bk(m)===k).length,fresh=upAll.some(m=>bk(m)===k&&!m.cancelled&&isNew(meetingNewItem(m)));return(
@@ -4015,6 +4029,23 @@ function BookingTab({open,onOpen,ready,canManage,isAdmin,onEdit,onDeleted,onCrea
   );
 }
 
+// 예약 탭 '새로 올라온 모임' 위: 새 댓글 달린 모임 한 줄 목록 (날짜 · 장소 · 새 댓글 수). 3개씩, 많으면 1 / n < >로 넘겨요
+function NewCmtRows({onOpen}){
+  useSeen();
+  const list=newCmtMeetings();
+  if(!list.length) return null;
+  return(
+    <div style={{background:"#fff",borderRadius:16,padding:"6px 14px 6px",boxShadow:"inset 0 0 0 1.5px #FBC8C8"}}>
+      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:5,fontSize:12.5,fontWeight:800,color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/>새 댓글 달린 모임 {list.length}</p>}
+        render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
+          <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
+            <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
+            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:m.status==="past"?"#6B7493":INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</span>
+            <span style={{fontSize:12,fontWeight:800,color:"#E5484D",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="message" size={12} stroke={2.4}/>{n}</span>
+            <Icon name="chevR" size={14} stroke={2.2} color="#A3AAC2"/>
+          </button>); }}/>
+    </div>);
+}
 // 예약 탭 '다가오는 모임' 위: 오늘 새로 올라온 모임 (번개·정기 다). 날이 바뀌면 사라져요
 function TodayNew({onOpen}){
   const list=todayNewMeetings();
