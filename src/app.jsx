@@ -3675,11 +3675,12 @@ function MiniCalendar({onOpen,part}){
   const [y,mo]=ym.split("-").map(Number);
   const shift=d=>{ const t=new Date(y,mo-1+d,1); setYm(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); setPick(null); };
   const byDay={};
-  MEETINGS.forEach(m=>{ if(m.iso&&m.iso.slice(0,7)===ym) (byDay[m.iso]=byDay[m.iso]||[]).push(m); });
+  // 엠티처럼 여러 날 걸친 모임은 시작~끝 모든 날짜에 점을 찍어요
+  MEETINGS.forEach(m=>{ if(!m.iso) return; (m.endIso&&m.endIso>m.iso?mtDays(m.info):[m.iso]).forEach(d=>{ if(d.slice(0,7)===ym) (byDay[d]=byDay[d]||[]).push(m); }); });
   Object.values(byDay).forEach(a=>a.sort((p,q)=>(p.info&&p.info.start||"")<(q.info&&q.info.start||"")?-1:1));
   const first=new Date(y,mo-1,1).getDay(), days=new Date(y,mo,0).getDate();
   const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
-  const count=Object.values(byDay).reduce((a,l)=>a+l.length,0);
+  const count=new Set(Object.values(byDay).flat()).size;
   const picked=pick&&byDay[pick];
   const navBtn=(d,ic,label)=><button type="button" aria-label={label} onClick={()=>shift(d)} style={{width:32,height:32,borderRadius:10,border:dark?"none":"1px solid #E4E9F7",background:dark?"rgba(255,255,255,0.12)":"#fff",color:dark?"#fff":"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
   const gridPart=(<>
