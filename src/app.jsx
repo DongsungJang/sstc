@@ -423,7 +423,9 @@ const cmtOld=m=>(m.endIso||m.iso||"")<addDays(todayYmd(),-3);
 const hasNewMeetCmt=m=>!m.cancelled&&!cmtOld(m)&&hasNewCmt(meetCmtKey(m));
 const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled||cmtOld(m)) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
   return toList(m.rec&&m.rec.comments).filter(c=>c&&c.text&&c.uid!==SEEN.uid&&+c.at>t).length; };
-const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a)));
+// 내가 참석(대기 포함)하는 모임이 먼저, 그 안에선 최근 댓글 순
+const imInMeet=m=>(m.attendees||[]).some(a=>a.isMe)||(m.waitlist||[]).some(a=>a.isMe);
+const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>(imInMeet(b)-imInMeet(a))||(lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a))));
 // 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
 const sameDay=(a,b)=>{ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); };
 const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=+(m.info&&m.info.createdAt)||0;
@@ -4054,7 +4056,7 @@ function NewCmtRows({onOpen}){
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
-            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:m.status==="past"?"#6B7493":INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</span>
+            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:imInMeet(m)?INK:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</span>
             <span style={{fontSize:12,fontWeight:800,color:"#E5484D",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="message" size={12} stroke={2.4}/>{n}</span>
             <Icon name="chevR" size={14} stroke={2.2} color="#A3AAC2"/>
           </button>); }}/>
