@@ -4046,7 +4046,7 @@ function NewCmtRows({onOpen}){
             <span style={{fontSize:12,fontWeight:800,color:"#E5484D",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="message" size={12} stroke={2.4}/>{n}</span>
             <Icon name="chevR" size={14} stroke={2.2} color="#A3AAC2"/>
           </button>); }}/>
-      <button type="button" onClick={()=>list.forEach(m=>markCmtSeen(meetCmtKey(m)))} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,width:"100%",marginTop:4,padding:"9px 0 5px",border:"none",borderTop:"1px solid #F3E1E1",background:"none",color:"#E5484D",fontSize:13,fontWeight:700,fontFamily:FONT,cursor:"pointer"}}><Icon name="check" size={15} stroke={2.6}/>모두 읽음 처리</button>
+      <button type="button" onClick={()=>list.forEach(m=>markCmtSeen(meetCmtKey(m)))} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",margin:"8px 0 8px",padding:"11px 0",borderRadius:12,border:"1.5px solid #F7B4B4",background:"#FDECEC",color:"#D12D33",fontSize:14,fontWeight:800,fontFamily:FONT,cursor:"pointer",boxShadow:"0 2px 0 #F3C6C6"}}><Icon name="check" size={16} stroke={2.8}/>모두 읽음 처리</button>
     </div>);
 }
 // 예약 탭 '다가오는 모임' 위: 오늘 새로 올라온 모임 (번개·정기 다). 날이 바뀌면 사라져요
