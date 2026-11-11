@@ -4056,7 +4056,7 @@ function NewCmtRows({onOpen}){
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
-            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:imInMeet(m)?INK:"#8A93B2",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</span>
+            <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:700,color:INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}{imInMeet(m)&&<span style={{marginLeft:6,fontSize:10.5,fontWeight:800,padding:"1px 6px",borderRadius:7,background:BLUE_LIGHT,color:BLUE,verticalAlign:"2px"}}>참석</span>}</span>
             <span style={{fontSize:12,fontWeight:800,color:"#E5484D",display:"inline-flex",alignItems:"center",gap:3}}><Icon name="message" size={12} stroke={2.4}/>{n}</span>
             <Icon name="chevR" size={14} stroke={2.2} color="#A3AAC2"/>
           </button>); }}/>
