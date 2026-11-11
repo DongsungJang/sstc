@@ -4035,8 +4035,8 @@ function NewCmtRows({onOpen}){
   const list=newCmtMeetings();
   if(!list.length) return null;
   return(
-    <div style={{background:"#fff",borderRadius:16,padding:"6px 14px 6px",boxShadow:"inset 0 0 0 1.5px #FBC8C8"}}>
-      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:5,fontSize:12.5,fontWeight:800,color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/>새 댓글 달린 모임 {list.length}</p>}
+    <div style={{background:"#fff",borderRadius:18,padding:"8px 14px 6px",boxShadow:"inset 0 0 0 2px #FBC8C8"}}>
+      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span></p>}
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
