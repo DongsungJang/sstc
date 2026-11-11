@@ -418,8 +418,10 @@ const markCmtSeen=p=>{ const at=lastOtherCmt(p); if(!SEEN.d||!at||(SEEN.d.i["k"+
 // 모임 글의 새 댓글: 볼 수 있는 모임(MEETINGS: 비공개 번개는 초대받은 회원, 잠긴 길드 모임은 길드원)만, 무산 제외, 내 댓글 제외.
 // 항목 id kmc<모임 id> = 모임을 열었을 때 본 마지막 댓글 시각 (소곤소곤 글 새 댓글과 같은 방식)
 const meetCmtKey=m=>({id:"mc"+m.id,comments:m.rec&&m.rec.comments});
-const hasNewMeetCmt=m=>!m.cancelled&&hasNewCmt(meetCmtKey(m));
-const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
+// 끝난 지 3일 지난 모임은 빼요 (오랜만에 들어와도 너무 많이 쌓이지 않게)
+const cmtOld=m=>(m.endIso||m.iso||"")<addDays(todayYmd(),-3);
+const hasNewMeetCmt=m=>!m.cancelled&&!cmtOld(m)&&hasNewCmt(meetCmtKey(m));
+const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled||cmtOld(m)) return 0; const t=Math.max(d.i["kmc"+m.id]||0,d.base,Date.now()-NEW_DAYS*864e5);
   return toList(m.rec&&m.rec.comments).filter(c=>c&&c.text&&c.uid!==SEEN.uid&&+c.at>t).length; };
 const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a)));
 // 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
@@ -4036,7 +4038,8 @@ function NewCmtRows({onOpen}){
   if(!list.length) return null;
   return(
     <div style={{background:"#fff",borderRadius:18,padding:"8px 14px 6px",boxShadow:"inset 0 0 0 2px #FBC8C8"}}>
-      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span></p>}
+      <SlidePages items={list} title={<p style={{margin:0,display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:INK}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:8,background:"#FDECEC",color:"#E5484D"}}><Icon name="message" size={13} stroke={2.4}/></span>새 댓글 달린 모임<span style={{fontSize:12,fontWeight:800,color:"#E5484D"}}>{list.length}</span>
+          <button type="button" onClick={()=>list.forEach(m=>markCmtSeen(meetCmtKey(m)))} style={{marginLeft:4,padding:"3px 9px",borderRadius:10,border:"none",background:"#F1F4FA",color:"#6B7493",fontSize:11.5,fontWeight:700,fontFamily:FONT,cursor:"pointer",whiteSpace:"nowrap"}}>모두 읽음</button></p>}
         render={m=>{ const d=new Date(m.iso+"T00:00:00"), n=newMeetCmtCount(m); return(
           <button key={m.id} type="button" onClick={()=>onOpen(m.id)} aria-label={`${m.placeName||m.place} 새 댓글 ${n}개 보기`} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"6px 0",border:"none",background:"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
             <span style={{fontSize:12.5,fontWeight:700,color:"#6B7493",fontVariantNumeric:"tabular-nums",minWidth:52,whiteSpace:"nowrap"}}>{d.getMonth()+1}.{d.getDate()}({WEEK[d.getDay()]})</span>
