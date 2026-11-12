@@ -914,6 +914,15 @@ const adLogoOk=v=>typeof v==="string"&&/^data:image\/(webp|png|jpeg);base64,[A-Z
 const AD_SEC_DEF=5, AD_SECS=[3,5,7,10];
 const adSec=v=>{ const n=Math.round(+v); return Number.isFinite(n)&&n>=2&&n<=30?n:AD_SEC_DEF; };
 // 링크는 http(s)만. "essentskin.co.kr"처럼 쓰면 https://를 붙여요
+// 공지 내용 안 링크를 누를 수 있게. 우리 앱 사용 안내 링크(#help-<기능>)는 앱 안에서 바로 열어요
+let HELP_OPEN=null;
+function LinkText({text}){
+  const parts=String(text||"").split(/(https?:\/\/[^\s<>"']+)/g);
+  return parts.map((t,i)=>{ if(i%2===0) return t;
+    const url=t.replace(/[.,!?)\]]+$/,""), rest=t.slice(url.length);
+    const hm=/^#help(?:-([a-z]+))?$/.exec((()=>{ try{ const u=new URL(url), k=x=>x.protocol+"//"+x.host+x.pathname.replace(/index\.html$/,""); return k(u)===k(location)?u.hash:""; }catch(e){ return ""; } })());
+    return <React.Fragment key={i}><a href={url} target={hm?undefined:"_blank"} rel="noopener noreferrer" onClick={e=>{ e.stopPropagation(); if(hm&&HELP_OPEN){ e.preventDefault(); HELP_OPEN(hm[1]||""); } }} style={{color:BLUE,fontWeight:700,textDecoration:"underline",wordBreak:"break-all"}}>{url}</a>{rest}</React.Fragment>; });
+}
 const adUrl=u=>{ u=String(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u="https://"+u; return /^https?:\/\/[^\s/]+\.[^\s]+/i.test(u)?u:""; };
 const adToday=()=>kstNow().slice(0,10);
 // 기간 상태: "live" 노출 중 / "before" 시작 전 / "after" 끝남 (날짜는 한국 시간 기준, 시작일·종료일 당일 포함)
@@ -1626,7 +1635,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
                 <span style={{fontSize:11,color:"#A3AAC2",marginLeft:4}}>{exp===n.id?"▲":"▼"}</span>
               </div>
               {exp===n.id&&<div style={{padding:"10px 12px",fontSize:13,color:"#4A5578",lineHeight:1.65,background:BLUE_LIGHT,borderRadius:14,marginBottom:6,whiteSpace:"pre-wrap"}}>
-                {n.content}
+                <LinkText text={n.content}/>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
                   <span style={{fontSize:11,color:"#A3AAC2"}}>{n.by?`${n.by} · `:""}{ago(n.at)}</span>
                   {isAdmin&&<button type="button" onClick={()=>delNotice(n)} style={{background:"none",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",padding:0}}>삭제</button>}
@@ -6779,6 +6788,7 @@ export default function App() {
     window.addEventListener("popstate",onPop);
     return ()=>{ window.removeEventListener("popstate",onPop); clearTimeout(timer); };
   },[]);
+  HELP_OPEN=id=>setHelp(id&&HELP.some(h=>h.id===id)?id:true);
   GUILD_GO=gid=>{ if(openMeeting){setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
   const goTab=k=>{ if(openMeeting){setOpenMeeting(null);} setTab(k); };
   if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
