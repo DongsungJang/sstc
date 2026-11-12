@@ -1342,6 +1342,33 @@ function useLoginPopups(uid,on){
 }
 // ─── 앱처럼 쓰기 권하기: 브라우저로 연 사람에게만 (홈 화면 앱으로 열면 안 떠요) ─────────────
 // 홈 화면 앱으로 쓰기 전까지 열 때마다 떠요(나중에 = 이번만 닫기, 이미 추가했어요 = 이 기기에선 다시 안 뜸). 관리자 접속 팝업이 뜨는 때엔 겹치지 않게 쉬어요
+// ─── 뒤로 가기 기록 (history.state = {nav:지금 화면, prev:바로 앞 화면, d:깊이, guard:종료 확인 칸}) ───
+const NAV_REPLACE={on:false};   // 다음 화면 이동은 기록을 새로 쌓지 않고 바꿔치기 (사용 안내 이전/다음)
+const navSame=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const navUrl=n=>location.pathname+location.search+(n&&n.mt?"#meeting-"+n.mt.id:"");
+const IOS_STANDALONE=()=>{ try{ return navigator.standalone===true; }catch(e){ return false; } };
+const NAV_GUARD=()=>{ try{ return /Android/i.test(navigator.userAgent)&&isStandalone(); }catch(e){ return false; } };
+// 앱 안 '뒤로' 버튼: 바로 앞 기록이 가려는 화면이면 진짜 뒤로 가기(기록이 꼬이지 않게), 아니면 false
+const navBack=ok=>{ try{ const hs=history.state; if(hs&&hs.prev&&hs.d>0&&ok(hs.prev)){ history.back(); return true; } }catch(e){} return false; };
+// 아이폰 홈 화면 앱: 왼쪽 끝에서 오른쪽으로 밀면 뒤로 (사파리처럼 기본 제스처가 없어서 직접 만들어요)
+function EdgeSwipeBack(){
+  const [g,setG]=useState(null);   // {y,dx}
+  useEffect(()=>{
+    let st=null;
+    const can=()=>{ const hs=history.state; return !!(hs&&hs.d>0&&!document.querySelector('[role="dialog"]:not([aria-label="사용 안내"])')); };
+    const down=e=>{ const t=e.touches[0]; st=(e.touches.length===1&&t.clientX<=24&&can())?{x:t.clientX,y:t.clientY,on:false,dx:0}:null; };
+    const move=e=>{ if(!st) return; const t=e.touches[0], dx=t.clientX-st.x, dy=t.clientY-st.y;
+      if(!st.on){ if(Math.abs(dy)>12&&Math.abs(dy)>dx){ st=null; return; } if(dx<=8) return; st.on=true; }
+      if(e.cancelable) e.preventDefault(); st.dx=Math.max(0,dx); setG({y:st.y,dx:st.dx}); };
+    const up=()=>{ if(st&&st.on&&st.dx>70) history.back(); st=null; setG(null); };
+    window.addEventListener("touchstart",down,{passive:true}); window.addEventListener("touchmove",move,{passive:false});
+    window.addEventListener("touchend",up); window.addEventListener("touchcancel",up);
+    return ()=>{ window.removeEventListener("touchstart",down); window.removeEventListener("touchmove",move); window.removeEventListener("touchend",up); window.removeEventListener("touchcancel",up); };
+  },[]);
+  if(!g) return null;
+  const ready=g.dx>70, x=Math.min(g.dx,110)*0.6-44;
+  return <div aria-hidden="true" style={{position:"fixed",left:0,top:g.y-22,zIndex:120,width:44,height:44,borderRadius:"50%",transform:`translateX(${x}px)`,background:ready?BLUE:"rgba(255,255,255,0.95)",color:ready?"#fff":BLUE,boxShadow:"0 4px 14px rgba(11,30,91,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,lineHeight:1,pointerEvents:"none",transition:"background .12s, color .12s"}}>‹</div>;
+}
 const isStandalone=()=>{ try{ return window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true; }catch(e){ return false; } };
 const INSTALL_LS="sstc-install-tip";
 const installTipDue=()=>!isStandalone()&&lsGet(INSTALL_LS)!=="never";
@@ -6142,14 +6169,14 @@ const HELP=[
   {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요"]}]},
   {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
   {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임","tip":"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":340,"marks":[[28.1,67.9,64.2,16.8],[77.9,85.9,14.4,10.9]],"caps":["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
-  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92.0,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17.0]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92.0,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"caps":["오른쪽 위 ⋮ 누르기","'홈 화면에 추가' 누르기","'설치' 또는 '추가' 누르면 끝"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷","blocks":[{"caps":["아래 ☰ 메뉴 누르기","'현재 페이지 추가' → '홈 화면' 누르기","'추가' 누르면 끝"]}]}],"blocks":[]},
+  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92.0,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17.0]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92.0,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"img":"app-and-chrome-1","w":600,"h":358,"marks":[[88.3,1.8,8.1,16.4]],"caps":["오른쪽 위 ⋮ 누르기"]},{"img":"app-and-chrome-2","w":600,"h":585,"marks":[[30.9,39.4,63.9,10.6]],"caps":["'설치 및 바로가기 만들기' 누르기"]},{"img":"app-and-chrome-3","w":600,"h":338,"marks":[[6.0,30.4,88.1,29.6]],"caps":["'설치' 누르기"]},{"img":"app-and-chrome-4","w":600,"h":377,"marks":[[75.8,74.1,14.1,14.7]],"caps":["앱 설치 창에서 '설치' 누르기"]},{"img":"app-and-chrome-5","w":600,"h":292,"marks":[[34.1,22.7,31.4,24.4]],"caps":["'SSTC 설치 중…'이 뜨면 끝, 홈 화면에 아이콘이 생겨요"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷(기본)","blocks":[{"img":"app-and-samsung-1","w":600,"h":377,"marks":[[79.1,3.4,7.6,12.4]],"caps":["주소창 오른쪽 ↓ 버튼 누르기"]},{"img":"app-and-samsung-2","w":600,"h":253,"marks":[[50.9,60.3,40.1,28.2]],"caps":["'추가' 누르기"]},{"img":"app-and-samsung-3","w":600,"h":221,"marks":[[16.3,42.6,67.7,35.3]],"caps":["'앱스에 추가했어요'가 뜨면 끝"]}]}],"blocks":[]},
   {"id":"admin","title":"관리자 기능","icon":"gear","sub":"관리자에게만 보여요","go":"admin","admin":true,"tip":"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요","blocks":[{"img":"admin-1","w":402,"h":722,"marks":[[4.2,10.2,91.5,12],[7.7,57.2,84.6,11.1],[7.7,67.5,84.6,11.1],[7.7,88,84.6,11.1]],"caps":["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]}
 ];
 /*HELP_DATA_END*/
 const helpImg=n=>`help/${n}.jpg?v=${HELP_VER}`;
 // 공유 링크: #help (목록) 또는 #help-<기능> 으로 열면 로그인 후 그 안내를 바로 열어요
 const HELP_LINK={id:null};
-const readHelpHash=()=>{ try{ const mm=/^#help(?:-([a-z]+))?$/.exec(location.hash); if(!mm) return false; HELP_LINK.id=mm[1]||""; history.replaceState(null,"",location.pathname+location.search); return true; }catch(e){ return false; } };
+const readHelpHash=()=>{ try{ const mm=/^#help(?:-([a-z]+))?$/.exec(location.hash); if(!mm) return false; HELP_LINK.id=mm[1]||""; history.replaceState(history.state,"",location.pathname+location.search); return true; }catch(e){ return false; } };
 readHelpHash();
 const helpUrl=id=>location.origin+location.pathname+"#help"+(id?"-"+id:"");
 function shareHelp(h){ shareText(`[SSTC 사용 안내] ${h.title}\n${h.sub}\n${helpUrl(h.id)}`,"SSTC 사용 안내 · "+h.title,"안내 링크"); }
@@ -6219,8 +6246,8 @@ function HelpTabs({tabs,value,onChange}){
   </div>;
 }
 const HelpNum=({n})=><span style={{width:24,height:24,flexShrink:0,borderRadius:"50%",background:INK,color:BALL,fontSize:12.5,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{n}</span>;
-function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
-  const [q,setQ]=useState(""), [open,setOpen]=useState(initialOpen||null), [tabKey,setTabKey]=useState(helpDeviceTab);
+function HelpPage({onClose,isAdmin,onGo,open,setOpen,order}){
+  const [q,setQ]=useState(""), [tabKey,setTabKey]=useState(helpDeviceTab);
   const scroller=useRef(null);
   useEffect(()=>{ if(scroller.current) scroller.current.scrollTop=0; },[open]);
   const visible=helpSorted().filter(h=>!h.admin||isAdmin);
@@ -6264,7 +6291,7 @@ function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
           <button type="button" onClick={()=>shareHelp(cur)} style={{flex:cur.go?"0 0 auto":1,height:50,padding:"0 16px",borderRadius:16,border:"none",background:"#fff",color:BLUE,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}><Icon name="share" size={17} stroke={2.2}/>{cur.go?"공유":"이 안내 공유하기"}</button>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {[prev&&["‹ 이전",prev],next&&["다음 ›",next]].map((x,n)=>x?<button key={n} type="button" onClick={()=>setOpen(x[1].id)} style={{flex:1,padding:"10px 12px",borderRadius:14,border:"none",background:"#fff",cursor:"pointer",textAlign:n?"right":"left",fontFamily:FONT}}><span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{x[0]}</span><span style={{display:"block",fontSize:13.5,fontWeight:800,color:INK}}>{x[1].title}</span></button>:<span key={n} style={{flex:1}}/>)}
+          {[prev&&["‹ 이전",prev],next&&["다음 ›",next]].map((x,n)=>x?<button key={n} type="button" onClick={()=>setOpen(x[1].id,true)} style={{flex:1,padding:"10px 12px",borderRadius:14,border:"none",background:"#fff",cursor:"pointer",textAlign:n?"right":"left",fontFamily:FONT}}><span style={{display:"block",fontSize:11,color:"#A3AAC2"}}>{x[0]}</span><span style={{display:"block",fontSize:13.5,fontWeight:800,color:INK}}>{x[1].title}</span></button>:<span key={n} style={{flex:1}}/>)}
         </div></>)}
     </>;
   } else {
@@ -6601,25 +6628,14 @@ export default function App() {
   // 예약 탭 목록/지도 (모임 상세에서 돌아와도 보던 쪽 그대로)
   const [bookView,setBookViewRaw]=useState(()=>{try{return sessionStorage.getItem("sstc-booking-view")==="map"?"map":"list";}catch(e){return "list";}});
   const setBookView=v=>{setBookViewRaw(v);try{sessionStorage.setItem("sstc-booking-view",v);}catch(e){}};
-  // 모임을 열면 주소에 #meeting-<id>를 붙여서 폰·브라우저 뒤로가기로도 닫히게 함
+  // 모임을 열면 주소에 #meeting-<id>가 붙어요 (화면 이동 기록은 아래 뒤로 가기 부분에서)
   const openM=(id,view,from)=>{
     setOpenMeeting({id,view,from});setTab("booking");
     { const m=MEETINGS.find(x=>x.id===id); if(m){ const x=meetingNewItem(m); markItemSeen(x.id,x.at); } }   // 열어 본 모임은 NEW 끄기
     try{ window.scrollTo(0,0); }catch(e){}
-    try{ if(location.hash!=="#meeting-"+id) location.hash="meeting-"+id; }catch(e){}
   };
   const afterClose=m=>{ setOpenMeeting(null); if(m&&(m.from==="home"||m.from==="members")) setTab(m.from); };
-  const closeM=()=>{
-    let viaHistory=false;
-    try{ if(location.hash.indexOf("#meeting-")===0){ viaHistory=true; history.back(); } }catch(e){}
-    if(!viaHistory) afterClose(openMeeting);
-  };
-  const openRef=useRef(openMeeting); openRef.current=openMeeting;
-  useEffect(()=>{
-    const onHash=()=>{ if(openRef.current&&location.hash.indexOf("#meeting-")!==0) afterClose(openRef.current); };
-    window.addEventListener("hashchange",onHash);
-    return ()=>window.removeEventListener("hashchange",onHash);
-  },[]);
+  const closeM=()=>{ if(!navBack(p=>!p.mt)) afterClose(openMeeting); };
   const IS_ADMIN=!FB; // 데모(파이어베이스 없음)에서만 필수 입력 건너뛰기 허용
 
   // ── 회원 계정 ──
@@ -6735,9 +6751,36 @@ export default function App() {
   const newComments=(boardPosts||[]).reduce((n,p)=>n+toList(p.comments).filter(c=>c&&c.text&&+c.at>boardSeenAt&&+c.at>boardBase&&c.uid!==myId).length,0);
   const boardTip=tab==="board"||(tab==="booking"&&!openMeeting&&bookView!=="map")?0:newComments;
   const [,setBoardWrite]=useShared("boardWrite",0);
-  const [,setGuildOpen]=useShared("guildOpen",null);
-  GUILD_GO=gid=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
-  const goTab=k=>{ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab(k); };
+  const [guildOpen,setGuildOpen]=useShared("guildOpen",null);
+  // ── 뒤로 가기: 탭·모임·사용 안내·회원 보기·길드를 옮길 때마다 기록을 남겨서
+  //    안드로이드 뒤로 버튼·아이폰 밀기·브라우저 뒤로로 한 단계씩 돌아가요
+  const navSnap={tab,mt:openMeeting||null,help:help||false,mv:memView,g:guildOpen||null};
+  const navRef=useRef(null); navRef.current={inMain,set:n=>{ setOpenMeeting(n.mt||null); setTab(n.tab||"home"); setHelp(n.help||false); setMemView(n.mv||"list"); try{sessionStorage.setItem("sstc-members-view",n.mv||"list");}catch(e){} setGuildOpen(n.g||null); }};
+  const [exitTip,setExitTip]=useState(false);
+  useEffect(()=>{
+    if(!inMain) return;
+    const hs=history.state, url=navUrl(navSnap);
+    if(!hs||!hs.nav){   // 처음 들어왔을 때: 안드로이드 홈 화면 앱은 맨 앞에 '종료 확인' 칸을 하나 더 둬요
+      try{ if(NAV_GUARD()){ history.replaceState({nav:navSnap,d:0,guard:1},"",url); history.pushState({nav:navSnap,prev:navSnap,d:1},"",url); } else history.replaceState({nav:navSnap,d:0},"",url); }catch(e){}
+      return;
+    }
+    if(navSame(hs.nav,navSnap)) return;
+    try{ if(NAV_REPLACE.on) history.replaceState({...hs,nav:navSnap},"",url); else history.pushState({nav:navSnap,prev:hs.nav,d:(hs.d||0)+1},"",url); }catch(e){}
+    NAV_REPLACE.on=false;
+  },[inMain,JSON.stringify(navSnap)]);
+  useEffect(()=>{
+    let timer=0;
+    const onPop=e=>{
+      const st=e.state, r=navRef.current; if(!r.inMain||!st||!st.nav) return;
+      r.set(st.nav);
+      if(st.guard){ setExitTip(true); clearTimeout(timer); timer=setTimeout(()=>{ setExitTip(false); try{ if(history.state&&history.state.guard) history.pushState({nav:history.state.nav,prev:history.state.nav,d:1},"",location.href); }catch(e){} },2000); }
+      else{ setExitTip(false); clearTimeout(timer); }
+    };
+    window.addEventListener("popstate",onPop);
+    return ()=>{ window.removeEventListener("popstate",onPop); clearTimeout(timer); };
+  },[]);
+  GUILD_GO=gid=>{ if(openMeeting){setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(gid&&guildById(gid)?gid:null); try{window.scrollTo(0,0);}catch(e){} };
+  const goTab=k=>{ if(openMeeting){setOpenMeeting(null);} setTab(k); };
   if(splash) return <><SplashScreen onStart={()=>setSplash(false)}/><UpdateBanner/></>;
 
   // ── 로그인/회원가입 화면 (승인 대기·로딩도 같은 틀) ──
@@ -6817,6 +6860,8 @@ export default function App() {
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/><GuildPeek/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
+      {inMain&&(IOS_STANDALONE()||window.__SWIPE)&&<EdgeSwipeBack/>}
+      {exitTip&&<div role="status" style={{position:"fixed",left:"50%",bottom:"calc(96px + env(safe-area-inset-bottom))",transform:"translateX(-50%)",zIndex:120,padding:"10px 18px",borderRadius:999,background:"rgba(11,30,91,0.88)",color:"#fff",fontSize:13.5,fontWeight:700,fontFamily:FONT,whiteSpace:"nowrap",boxShadow:"0 6px 18px rgba(11,30,91,0.3)",pointerEvents:"none"}}>한 번 더 누르면 종료돼요</div>}
       {installTip&&!loginPopup.popup&&!help&&<InstallPopup onClose={()=>setInstallTip(false)} onGo={()=>{ setInstallTip(false); setHelp("app"); }}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
@@ -6931,15 +6976,15 @@ export default function App() {
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
-        if(n.postId){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("board"); setBoardFocus(n.postId+"#"+Date.now()); }
+        if(n.postId){ if(openMeeting){setOpenMeeting(null);} setTab("board"); setBoardFocus(n.postId+"#"+Date.now()); }
         else if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
-        else if(n.type==="notice"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
+        else if(n.type==="notice"){ if(openMeeting){setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
         else if(n.type==="member"&&adminOn){ setOpenMeeting(null); setTab("admin"); }
-        else if(n.type==="courtFee"&&adminOn){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setAdminJump(j=>({sec:"fees",place:n.place,n:(j&&j.n||0)+1})); setTab("admin"); }
-        else if(n.type==="guild"){ if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(n.guildId&&guildById(n.guildId)?n.guildId:null); }
+        else if(n.type==="courtFee"&&adminOn){ if(openMeeting){setOpenMeeting(null);} setAdminJump(j=>({sec:"fees",place:n.place,n:(j&&j.n||0)+1})); setTab("admin"); }
+        else if(n.type==="guild"){ if(openMeeting){setOpenMeeting(null);} setTab("members"); setMemView("guild"); try{sessionStorage.setItem("sstc-members-view","guild");}catch(e){} setGuildOpen(n.guildId&&guildById(n.guildId)?n.guildId:null); }
       }}/>}
-      {help&&<HelpPage key={String(help)} isAdmin={adminOn} order={helpOrder} initialOpen={typeof help==="string"?help:null} onClose={()=>setHelp(false)} onGo={k=>{ setHelp(false); if(openMeeting){try{if(location.hash)history.replaceState(null,"",location.pathname+location.search);}catch(e){}setOpenMeeting(null);}
+      {help&&<HelpPage isAdmin={adminOn} order={helpOrder} open={typeof help==="string"?help:null} setOpen={(id,swap)=>{ if(!id){ if(navBack(p=>p.help===true)) return; } else if(swap) NAV_REPLACE.on=true; setHelp(id||true); }} onClose={()=>{ if(!navBack(p=>!p.help)) setHelp(false); }} onGo={k=>{ setHelp(false); if(openMeeting){setOpenMeeting(null);}
         if(k==="guild"){ GUILD_GO(null); return; } if(k==="stats"){ setTab("members"); setMemView("stats"); try{sessionStorage.setItem("sstc-members-view","stats");}catch(e){} return; }
         if(k==="members"){ setMemView("list"); try{sessionStorage.setItem("sstc-members-view","list");}catch(e){} }
         if(k==="admin"&&!adminOn) return; setTab(k); try{window.scrollTo(0,0);}catch(e){} }}/>}
