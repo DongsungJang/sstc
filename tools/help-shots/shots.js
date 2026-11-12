@@ -67,8 +67,9 @@ const HELP=[
  {id:"me",title:"내 정보",icon:"user",sub:"사진, NTRP, 구력, 닉네임",tip:"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요",blocks:[
    {img:"me-1",prep:steps(async p=>{await p.keyboard.press('Escape');await p.goto(p.url());await p.waitForTimeout(1500);const b=p.getByText('시작하기');if(await b.count())await b.first().click();await p.waitForTimeout(1200);await p.getByRole('button',{name:'내 정보 메뉴'}).click();await p.waitForTimeout(600);}),crop:[[0],["로그아웃",0,0,"button"]],cropPad:[0,14],marks:[["내 정보 수정",0,1,"button"],["로그아웃",0,0,"button"]],
     caps:["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
- {id:"app",title:"앱처럼 쓰기",icon:"phone",sub:"홈 화면에 추가와 업데이트",tip:"화면은 손가락으로 확대할 수 있어요",blocks:[
-   {caps:["아이폰: 사파리 공유 버튼 → '홈 화면에 추가'","안드로이드: 크롬 ⋮ → '홈 화면에 추가'","'새 버전이 있어요'가 뜨면 업데이트 누르기","그래도 그대로면 앱을 완전히 껐다 켜기"]}]},
+ {id:"app",title:"앱처럼 쓰기",icon:"phone",sub:"홈 화면에 추가와 업데이트",tip:"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요",blocks:[],
+  // 휴대폰·브라우저별 단계 (그림은 실제 휴대폰 캡처를 잘라 help/app-*.jpg로 둠, 찍지 않고 그대로 씀)
+  tabs:[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92.0,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17.0]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92.0,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"caps":["오른쪽 위 ⋮ 누르기","'홈 화면에 추가' 누르기","'설치' 또는 '추가' 누르면 끝"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷","blocks":[{"caps":["아래 ☰ 메뉴 누르기","'현재 페이지 추가' → '홈 화면' 누르기","'추가' 누르면 끝"]}]}]},
  {id:"admin",title:"관리자 기능",icon:"gear",sub:"관리자에게만 보여요",go:"admin",admin:true,tip:"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요",blocks:[
    {img:"admin-1",prep:tab("관리"),crop:[[60],["길드 관리",2]],cropPad:[0,10],marks:[["승인 대기",2],["접속 팝업",2],["정회원 관리",2],["길드 관리",2]],
     caps:["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]},
@@ -121,7 +122,7 @@ const HELP=[
   }
   await b.close();
   const data=HELP.map(h=>({id:h.id,title:h.title,icon:h.icon,sub:h.sub,...(h.go?{go:h.go}:{}),...(h.admin?{admin:true}:{}),tip:h.tip,
-    blocks:h.blocks.map(bl=>bl.img?{img:bl.img,w:bl.w,h:bl.h,marks:(bl.m||[]).filter(Boolean),caps:bl.caps}:{caps:bl.caps})}));
+    blocks:h.blocks.map(bl=>bl.img?{img:bl.img,w:bl.w,h:bl.h,marks:(bl.m||[]).filter(Boolean),caps:bl.caps}:{caps:bl.caps}),...(h.tabs?{tabs:h.tabs}:{})}));
   const ver=hash.digest('hex').slice(0,8);
   const appPath=path.join(ROOT,'src','app.jsx'); let src=fs.readFileSync(appPath,'utf8');
   src=src.replace(/\/\*HELP_DATA_START\*\/[\s\S]*?\/\*HELP_DATA_END\*\//,

@@ -6125,7 +6125,7 @@ const HELP=[
   {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요"]}]},
   {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
   {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임","tip":"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":340,"marks":[[28.1,67.9,64.2,16.8],[77.9,85.9,14.4,10.9]],"caps":["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
-  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"화면은 손가락으로 확대할 수 있어요","blocks":[{"caps":["아이폰: 사파리 공유 버튼 → '홈 화면에 추가'","안드로이드: 크롬 ⋮ → '홈 화면에 추가'","'새 버전이 있어요'가 뜨면 업데이트 누르기","그래도 그대로면 앱을 완전히 껐다 켜기"]}]},
+  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92.0,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17.0]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92.0,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"caps":["오른쪽 위 ⋮ 누르기","'홈 화면에 추가' 누르기","'설치' 또는 '추가' 누르면 끝"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷","blocks":[{"caps":["아래 ☰ 메뉴 누르기","'현재 페이지 추가' → '홈 화면' 누르기","'추가' 누르면 끝"]}]}],"blocks":[]},
   {"id":"admin","title":"관리자 기능","icon":"gear","sub":"관리자에게만 보여요","go":"admin","admin":true,"tip":"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요","blocks":[{"img":"admin-1","w":402,"h":722,"marks":[[4.2,10.2,91.5,12],[7.7,57.2,84.6,11.1],[7.7,67.5,84.6,11.1],[7.7,88,84.6,11.1]],"caps":["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]}
 ];
 /*HELP_DATA_END*/
@@ -6173,24 +6173,43 @@ function HelpOrderSettings(){
     </div>
   </Card>;
 }
-function HelpShot({b}){
+function HelpShot({b,num}){
   return(
     <div style={{position:"relative",borderRadius:16,overflow:"hidden",border:"1px solid #E1E6F2",aspectRatio:`${b.w} / ${b.h}`,background:"#F4F6FB"}}>
       <img src={helpImg(b.img)} alt="" loading="lazy" style={{position:"absolute",inset:0,width:"100%",height:"100%",display:"block"}}/>
       {(b.marks||[]).map(([x,y,w,h],i)=>(<React.Fragment key={i}>
         <div style={{position:"absolute",left:`${x}%`,top:`${y}%`,width:`${w}%`,height:`${h}%`,border:`3px solid ${BALL}`,borderRadius:12,boxShadow:`0 0 0 1.5px ${INK}, inset 0 0 0 1px ${INK}`,boxSizing:"border-box"}}/>
-        <div style={{position:"absolute",left:`max(13px, ${x}%)`,top:`max(13px, ${y}%)`,width:26,height:26,margin:"-13px 0 0 -13px",borderRadius:"50%",background:BALL,color:INK,fontWeight:900,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",border:`2.5px solid ${INK}`,boxShadow:"0 3px 8px rgba(11,30,91,0.35)",boxSizing:"border-box"}}>{i+1}</div>
+        <div style={{position:"absolute",left:`max(13px, ${x}%)`,top:`max(13px, ${y}%)`,width:26,height:26,margin:"-13px 0 0 -13px",borderRadius:"50%",background:BALL,color:INK,fontWeight:900,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",border:`2.5px solid ${INK}`,boxShadow:"0 3px 8px rgba(11,30,91,0.35)",boxSizing:"border-box"}}>{num||i+1}</div>
       </React.Fragment>))}
     </div>);
 }
+// 앱처럼 쓰기: 지금 쓰는 브라우저 탭을 먼저 (아이폰 크롬 CriOS / 아이폰 사파리 / 안드로이드)
+const helpDeviceTab=()=>{ const ua=(typeof navigator!=="undefined"&&navigator.userAgent)||""; return /Android/i.test(ua)?(/SamsungBrowser/i.test(ua)?"and-samsung":"and-chrome"):/CriOS/.test(ua)?"ios-chrome":"ios-safari"; };
+function HelpTabs({tabs,value,onChange}){
+  const mine=helpDeviceTab(), cur=tabs.find(t=>t.key===value)||tabs[0];
+  const OS=[["ios","아이폰"],["android","안드로이드"]].filter(([o])=>tabs.some(t=>t.os===o));
+  const pill=(on,label,sub,onClick,k)=><button key={k} type="button" role="tab" aria-selected={on} onClick={onClick} style={{flex:1,padding:"9px 0 8px",borderRadius:11,border:"none",background:on?INK:"transparent",color:on?"#fff":"#5E6A8E",fontSize:14,fontWeight:800,fontFamily:FONT,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,lineHeight:1.2}}>{label}{sub&&<span style={{fontSize:10,fontWeight:800,color:on?BALL:BLUE}}>{sub}</span>}</button>;
+  return <div style={{display:"flex",flexDirection:"column",gap:8}}>
+    <div role="tablist" aria-label="휴대폰" style={{display:"flex",background:"#E4E9F7",borderRadius:14,padding:4,gap:2}}>
+      {OS.map(([o,l])=>pill(cur.os===o,l,tabs.some(t=>t.os===o&&t.key===mine)?"내 휴대폰":"",()=>{ if(cur.os!==o){ const m=tabs.find(t=>t.os===o&&t.key===mine); onChange((m||tabs.find(t=>t.os===o)).key); } },o))}
+    </div>
+    <div role="tablist" aria-label="브라우저" style={{display:"flex",gap:8}}>
+      {tabs.filter(t=>t.os===cur.os).map(t=>{ const on=t.key===cur.key; return(
+        <button key={t.key} type="button" role="tab" aria-selected={on} onClick={()=>onChange(t.key)} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1.5px solid ${on?BLUE:"#E1E6F2"}`,background:on?BLUE_LIGHT:"#fff",color:on?BLUE:"#5E6A8E",fontSize:13.5,fontWeight:800,fontFamily:FONT,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          {t.label}{t.key===mine&&<span style={{fontSize:10,fontWeight:800,padding:"1px 6px",borderRadius:7,background:BALL,color:INK}}>지금 쓰는 중</span>}
+        </button>); })}
+    </div>
+  </div>;
+}
 const HelpNum=({n})=><span style={{width:24,height:24,flexShrink:0,borderRadius:"50%",background:INK,color:BALL,fontSize:12.5,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{n}</span>;
 function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
-  const [q,setQ]=useState(""), [open,setOpen]=useState(initialOpen||null);
+  const [q,setQ]=useState(""), [open,setOpen]=useState(initialOpen||null), [tabKey,setTabKey]=useState(helpDeviceTab);
   const scroller=useRef(null);
   useEffect(()=>{ if(scroller.current) scroller.current.scrollTop=0; },[open]);
   const visible=helpSorted().filter(h=>!h.admin||isAdmin);
   const qq=q.trim();
-  const textOf=h=>[h.title,h.sub,h.tip,...h.blocks.flatMap(b=>b.caps)].join(" ");
+  const allBlocks=h=>[...h.blocks,...(h.tabs||[]).flatMap(t=>t.blocks)];
+  const textOf=h=>[h.title,h.sub,h.tip,...allBlocks(h).flatMap(b=>b.caps)].join(" ");
   const list=visible.filter(h=>!qq||textOf(h).includes(qq));
   const cur=open&&visible.find(h=>h.id===open);
   const head=(backLabel,onBack,children)=>(
@@ -6207,6 +6226,14 @@ function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
         <span style={{width:48,height:48,borderRadius:14,background:BALL,color:INK,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={cur.icon} size={24} stroke={2.2}/></span>
         <div><p style={{margin:0,fontSize:24,fontWeight:900,letterSpacing:"-0.03em"}}>{cur.title}</p><p style={{margin:"2px 0 0",fontSize:13,opacity:0.8}}>{cur.sub}</p></div></div>)}
       {sheet(<>
+        {cur.tabs&&<HelpTabs tabs={cur.tabs} value={tabKey} onChange={setTabKey}/>}
+        {cur.tabs&&(cur.tabs.find(t=>t.key===tabKey)||cur.tabs[0]).blocks.map((b,bi)=>(
+          <div key={tabKey+bi} style={{background:"#fff",borderRadius:22,padding:14,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}>
+            {b.img&&<HelpShot b={b} num={bi+1}/>}
+            <div style={{margin:b.img?"12px 2px 0":"2px",display:"flex",flexDirection:"column",gap:8}}>
+              {b.caps.map((c,k)=><div key={k} style={{display:"flex",alignItems:"center",gap:10,fontSize:15,fontWeight:700,color:INK,lineHeight:1.4}}><HelpNum n={b.img?bi+1:k+1}/>{c}</div>)}
+            </div>
+          </div>))}
         {cur.blocks.map((b,bi)=>(
           <div key={bi} style={{background:"#fff",borderRadius:22,padding:14,boxShadow:"0 1px 2px rgba(11,30,91,0.05)"}}>
             {b.img&&<HelpShot b={b}/>}
@@ -6235,7 +6262,7 @@ function HelpPage({onClose,isAdmin,onGo,initialOpen,order}){
         </label></>)}
       {sheet(<>
         {!list.length&&<Card><p style={{margin:0,fontSize:14,color:"#6B7493",textAlign:"center"}}>'{qq}' 에 맞는 안내가 없어요.</p></Card>}
-        {list.map(h=>{ const th=h.blocks.find(b=>b.img); return(
+        {list.map(h=>{ const th=allBlocks(h).find(b=>b.img); return(
           <button key={h.id} type="button" onClick={()=>setOpen(h.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:12,border:"none",borderRadius:20,background:"#fff",boxShadow:"0 1px 2px rgba(11,30,91,0.05)",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
             {th?<span style={{width:84,height:64,flexShrink:0,borderRadius:12,border:"1px solid #E1E6F2",overflow:"hidden",background:"#F4F6FB"}}><img src={helpImg(th.img)} alt="" loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"50% 0",display:"block"}}/></span>
               :<span style={{width:84,height:64,flexShrink:0,borderRadius:12,background:h.admin?"#FFF4E5":BLUE_LIGHT,color:h.admin?"#C2610C":BLUE,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name={h.icon} size={26} stroke={2}/></span>}
