@@ -1341,18 +1341,20 @@ function useLoginPopups(uid,on){
   return {popup:due[0]||null,left:due.length,close,ready:!FB||!on||!uid||queue!==null};
 }
 // ─── 앱처럼 쓰기 권하기: 브라우저로 연 사람에게만 (홈 화면 앱으로 열면 안 떠요) ─────────────
-// 홈 화면 앱으로 쓰기 전까지 열 때마다 떠요(나중에 = 이번만 닫기). 관리자 접속 팝업이 뜨는 때엔 겹치지 않게 쉬어요
+// 홈 화면 앱으로 쓰기 전까지 열 때마다 떠요(나중에 = 이번만 닫기, 이미 추가했어요 = 이 기기에선 다시 안 뜸). 관리자 접속 팝업이 뜨는 때엔 겹치지 않게 쉬어요
 const isStandalone=()=>{ try{ return window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true; }catch(e){ return false; } };
-const installTipDue=()=>!isStandalone();
+const INSTALL_LS="sstc-install-tip";
+const installTipDue=()=>!isStandalone()&&lsGet(INSTALL_LS)!=="never";
 function InstallPopup({onClose,onGo}){
   const later=()=>onClose();
   const btn=(t,f,primary)=><button type="button" onClick={f} style={{flex:primary?1.4:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?BLUE:"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
   return <div onClick={later} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-    <div role="dialog" aria-modal="true" aria-label="앱처럼 쓰기" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:330,background:"#fff",borderRadius:24,padding:"24px 20px 20px",textAlign:"center",fontFamily:FONT,boxShadow:"0 20px 50px rgba(11,30,91,0.3)"}}>
+    <div role="dialog" aria-modal="true" aria-label="앱처럼 쓰기" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:330,background:"#fff",borderRadius:24,padding:"24px 20px 14px",textAlign:"center",fontFamily:FONT,boxShadow:"0 20px 50px rgba(11,30,91,0.3)"}}>
       <img src="icons/icon-192.png" alt="" style={{width:64,height:64,borderRadius:16,boxShadow:"0 6px 16px rgba(33,82,230,0.25)"}}/>
       <p style={{margin:"14px 0 6px",fontSize:18,fontWeight:900,color:INK}}>SSTC를 앱처럼 써 보세요</p>
       <p style={{margin:"0 0 18px",fontSize:13.5,color:"#5E6A8E",lineHeight:1.6,wordBreak:"keep-all"}}>홈 화면에 추가하면 주소창 없이 꽉 찬 화면으로<br/>아이콘 한 번에 바로 열려요.</p>
       <div style={{display:"flex",gap:8}}>{btn("나중에",later)}{btn("방법 보기",onGo,true)}</div>
+      <button type="button" onClick={()=>{ lsSet(INSTALL_LS,"never"); onClose(); }} style={{marginTop:8,padding:"6px 10px",border:"none",background:"none",color:"#A3AAC2",fontSize:12.5,fontFamily:FONT,cursor:"pointer"}}>이미 추가했어요</button>
     </div></div>;
 }
 function LoginPopup({popup,left=1,onClose,preview}){
