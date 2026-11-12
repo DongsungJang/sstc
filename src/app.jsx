@@ -1338,7 +1338,24 @@ function useLoginPopups(uid,on){
     setSeen(s=>{ const n={...(s||{}),[p.id]:rec}; lsSetJSON(POPUP_LS(uid),n); return n; });
     FB.club.child("popupSeen/"+uid+"/"+p.id).set(rec).catch(()=>{});
   };
-  return {popup:due[0]||null,left:due.length,close};
+  return {popup:due[0]||null,left:due.length,close,ready:!FB||!on||!uid||queue!==null};
+}
+// ─── 앱처럼 쓰기 권하기: 브라우저로 연 사람에게만 (홈 화면 앱으로 열면 안 떠요) ─────────────
+// 홈 화면 앱으로 쓰기 전까지 열 때마다 떠요(나중에 = 이번만 닫기, 이미 추가했어요 = 이 기기에선 다시 안 뜸). 관리자 접속 팝업이 뜨는 때엔 겹치지 않게 쉬어요
+const isStandalone=()=>{ try{ return window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true; }catch(e){ return false; } };
+const INSTALL_LS="sstc-install-tip";
+const installTipDue=()=>!isStandalone()&&lsGet(INSTALL_LS)!=="never";
+function InstallPopup({onClose,onGo}){
+  const later=()=>onClose();
+  const btn=(t,f,primary)=><button type="button" onClick={f} style={{flex:primary?1.4:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?BLUE:"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
+  return <div onClick={later} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div role="dialog" aria-modal="true" aria-label="앱처럼 쓰기" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:330,background:"#fff",borderRadius:24,padding:"24px 20px 14px",textAlign:"center",fontFamily:FONT,boxShadow:"0 20px 50px rgba(11,30,91,0.3)"}}>
+      <img src="icons/icon-192.png" alt="" style={{width:64,height:64,borderRadius:16,boxShadow:"0 6px 16px rgba(33,82,230,0.25)"}}/>
+      <p style={{margin:"14px 0 6px",fontSize:18,fontWeight:900,color:INK}}>SSTC를 앱처럼 써 보세요</p>
+      <p style={{margin:"0 0 18px",fontSize:13.5,color:"#5E6A8E",lineHeight:1.6,wordBreak:"keep-all"}}>홈 화면에 추가하면 주소창 없이 꽉 찬 화면으로<br/>아이콘 한 번에 바로 열려요.</p>
+      <div style={{display:"flex",gap:8}}>{btn("나중에",later)}{btn("방법 보기",onGo,true)}</div>
+      <button type="button" onClick={()=>{ lsSet(INSTALL_LS,"never"); onClose(); }} style={{marginTop:8,padding:"6px 10px",border:"none",background:"none",color:"#A3AAC2",fontSize:12.5,fontFamily:FONT,cursor:"pointer"}}>이미 추가했어요</button>
+    </div></div>;
 }
 function LoginPopup({popup,left=1,onClose,preview}){
   const [quiet,setQuiet]=useState(false);
@@ -6678,6 +6695,9 @@ export default function App() {
   useEffect(()=>{ if(inMain) seenLoad(myId); },[inMain,myId]);
   const clubData=useClubMembers(inMain);
   const loginPopup=useLoginPopups(myId,inMain);   // 관리자가 써 둔 접속 팝업 (관리 탭 → 접속 팝업)
+  // 앱처럼 쓰기 권하기: 접속 팝업을 다 불러온 뒤 한 번만 정해요 (접속 팝업이 있으면 이번엔 안 띄움)
+  const [installTip,setInstallTip]=useState(null);
+  useEffect(()=>{ if(installTip===null&&inMain&&loginPopup.ready) setInstallTip(!loginPopup.popup&&installTipDue()); },[inMain,loginPopup.ready]);
   const helpOrder=useHelpOrder(inMain);   // 사용 안내 순서 (관리 탭 → 사용 안내 순서)
   // 사용 안내 공유 링크(#help-<기능>): 로그인해서 들어오면 그 안내를 바로 열어요. 앱이 열려 있을 때 주소가 바뀌어도요.
   const [,setHelpLinkN]=useState(0);
@@ -6797,6 +6817,7 @@ export default function App() {
     <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
       <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/><GuildPeek/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
+      {installTip&&!loginPopup.popup&&!help&&<InstallPopup onClose={()=>setInstallTip(false)} onGo={()=>{ setInstallTip(false); setHelp("app"); }}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
         {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
