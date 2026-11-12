@@ -60,9 +60,6 @@ const ICON_PATHS = {
   image:["M3 5h18v14H3z","M8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z","M21 15l-5-5L5 19"],
   leave:["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
 };
-// 랭킹 순위: "1위"처럼 위를 붙여 횟수와 헷갈리지 않게. 1~3위는 파란 알약, 그 밖은 글자만
-const RankNo=({r})=><span style={{minWidth:34,height:22,padding:"0 7px",boxSizing:"border-box",borderRadius:11,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0,whiteSpace:"nowrap",
-  background:r.top?(r.rank===1?BLUE:BLUE_LIGHT):"transparent",color:r.top?(r.rank===1?"#fff":BLUE):"#A3AAC2"}}>{r.rank}위</span>;
 // 글자 사이에 넣는 작은 선 아이콘
 const Ic=({n,s=14,c="currentColor",w=1.9,style})=><span style={{display:"inline-flex",verticalAlign:"-0.15em",flexShrink:0,...style}}><Icon name={n} size={s} color={c} stroke={w}/></span>;
 function Icon({name,size=22,color="currentColor",stroke=2}) {
@@ -1538,7 +1535,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const voteOf=m=>m&&m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
   const mine=(going.find(g=>!g.gone)||{}).m;
   const next=mine||upcoming.find(m=>!m.cancelled&&!(voteOf(m)&&voteOf(m).status==="absent"))||upcoming[0];
-  const monthRank=rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
   const myStatus=myVote&&myVote.status;
@@ -1597,22 +1593,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
       </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
       <GoingSlider going={going} onOpenMeeting={onOpenMeeting} onGoBooking={onGoBooking}/>
-      <Card>
-        <SectionTitle>이달의 참여 랭킹</SectionTitle>
-        {monthRank.length===0?<Empty>이번 달 참석 기록이 아직 없어요.</Empty>:(
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {monthRank.slice(0,3).map(r=>(
-            <div key={r.name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:r.isMe?BLUE_LIGHT:"#F1F4FA",border:r.isMe?`1.5px solid ${BLUE}`:"1px solid transparent"}}>
-              <RankNo r={r}/>
-              <span style={{flex:1,fontSize:14,fontWeight:r.isMe?700:500,color:r.isMe?BLUE:INK}}>{r.name}{r.isMe&&<span style={{fontSize:11,background:BLUE,color:"#fff",padding:"1px 6px",borderRadius:10,marginLeft:6}}>나</span>}</span>
-              <span style={{fontSize:11,color:"#A3AAC2",marginRight:4}}>NTRP {r.ntrp}</span>
-              <span style={{fontSize:13,fontWeight:700,color:BLUE}}>{r.count}회</span>
-            </div>
-          ))}
-          {(()=>{ const me=monthRank.find(r=>r.isMe); if(monthRank.slice(0,3).includes(me)) return null;
-            return <p style={{margin:"4px 2px 0",fontSize:13,color:"#6B7493",display:"flex",justifyContent:"space-between"}}><span>내 순위</span><span style={{fontWeight:800,color:me?BLUE:"#A3AAC2"}}>{me?`${me.rank}위 · ${me.count}회`:"이번 달 참석 전이에요"}</span></p>; })()}
-        </div>)}
-      </Card>
       <Card>
         <SectionTitle action={isAdmin?"+ 공지 쓰기":null} onAction={onWriteNotice}>공지사항</SectionTitle>
         {notices.length===0?<Empty>등록된 공지사항이 없어요.</Empty>:(
@@ -4174,7 +4154,8 @@ function StatsTab() {
     return {...mo,me:me?me.count:0,avg:Math.round(avg*10)/10};
   });
   const maxVal=Math.max(1,...rows.map(r=>Math.max(r.me,r.avg)));
-  const rank=rankingOf(held);
+  const [rankAll,setRankAll]=useState(false);   // 참여 랭킹: 이번 달(기본) / 전체
+  const rank=rankingOf(rankAll?held:held.filter(m=>m.iso.slice(0,7)===todayYmd().slice(0,7)));
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16,paddingBottom:24}}>
       <div style={{display:"flex",gap:10}}>
@@ -4187,8 +4168,13 @@ function StatsTab() {
       </div>
       <MonthlyChart rows={rows} maxVal={maxVal}/>
       <Card>
-        <SectionTitle>참여 랭킹</SectionTitle>
-        {rank.length===0?<Empty>아직 참석 기록이 없어요.</Empty>:<Podium rank={rank} limit={5}/>}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>참여 랭킹</span>
+          <div style={{display:"flex",gap:2,padding:3,borderRadius:999,background:"#EDF0F6"}}>
+            {[[false,"이번 달"],[true,"전체"]].map(([v,t])=><button key={t} type="button" onClick={()=>setRankAll(v)} style={{padding:"5px 12px",border:"none",borderRadius:999,background:rankAll===v?"#fff":"transparent",color:rankAll===v?BLUE:"#6B7493",fontSize:12.5,fontWeight:800,fontFamily:FONT,cursor:"pointer",boxShadow:rankAll===v?"0 1px 4px rgba(11,30,91,0.12)":"none"}}>{t}</button>)}
+          </div>
+        </div>
+        {rank.length===0?<Empty>{rankAll?"아직 참석 기록이 없어요.":"이번 달 참석 기록이 아직 없어요."}</Empty>:<Podium key={String(rankAll)} rank={rank} limit={5}/>}
       </Card>
       <CourtStats held={held}/>
     </div>
