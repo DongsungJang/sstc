@@ -1519,7 +1519,7 @@ function PopupSettings(){
     </Card>);
 }
 
-function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,focusNotice,ads=[],adSecs}) {
+function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteNotice,onEditNotice,focusNotice,ads=[],adSecs}) {
   const focusId=focusNotice?focusNotice.split("#")[0]:null;
   const [exp,setExp]=useState(focusId);
   const noticeRef=useRef(null);
@@ -1628,8 +1628,11 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
               {exp===n.id&&<div style={{padding:"10px 12px",fontSize:13,color:"#4A5578",lineHeight:1.65,background:BLUE_LIGHT,borderRadius:14,marginBottom:6,whiteSpace:"pre-wrap"}}>
                 {n.content}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
-                  <span style={{fontSize:11,color:"#A3AAC2"}}>{n.by?`${n.by} · `:""}{ago(n.at)}</span>
-                  {isAdmin&&<button type="button" onClick={()=>delNotice(n)} style={{background:"none",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",padding:0}}>삭제</button>}
+                  <span style={{fontSize:11,color:"#A3AAC2"}}>{n.by?`${n.by} · `:""}{ago(n.at)}{n.editedAt?" · 수정됨":""}</span>
+                  {isAdmin&&<span style={{display:"flex",gap:14}}>
+                    <button type="button" onClick={()=>onEditNotice&&onEditNotice(n)} style={{background:"none",border:"none",color:BLUE,fontSize:12,fontWeight:700,cursor:"pointer",padding:0}}>수정</button>
+                    <button type="button" onClick={()=>delNotice(n)} style={{background:"none",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",padding:0}}>삭제</button>
+                  </span>}
                 </div>
               </div>}
             </div>
@@ -4393,11 +4396,17 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
 }
 
 // ─── 공지 쓰기 (관리자) ────────────────────────────────────────────────────────
-function NoticeForm({onClose}) {
-  const [f,setF]=useState({title:"",content:"",important:false});
+function NoticeForm({onClose,edit}) {   // edit = 고칠 공지 (없으면 새로 쓰기)
+  const [f,setF]=useState(edit?{title:edit.title||"",content:edit.content||"",important:!!edit.important}:{title:"",content:"",important:false});
   const [err,setErr]=useState(""), [saving,setSaving]=useState(false);
   const submit=()=>{
     if(!f.title.trim()){ setErr("제목을 입력해 주세요"); return; }
+    if(edit){   // 고치기는 알림을 다시 보내지 않아요
+      setSaving(true); setErr("");
+      FB.club.child("notices/"+edit.id).update({title:f.title.trim(),content:f.content.trim(),important:f.important,editedAt:Date.now()})
+        .then(onClose).catch(e=>{setSaving(false);setErr(authMsg(e));});
+      return;
+    }
     const id=newId(), n={title:f.title.trim(),content:f.content.trim(),important:f.important,at:Date.now(),by:ME,byUid:myUid()};
     setSaving(true); setErr("");
     FB.club.child("notices/"+id).set(n)
@@ -4405,14 +4414,14 @@ function NoticeForm({onClose}) {
       .then(onClose).catch(e=>{setSaving(false);setErr(authMsg(e));});
   };
   return(
-    <Sheet title="공지 쓰기" onClose={onClose}>
+    <Sheet title={edit?"공지 수정":"공지 쓰기"} onClose={onClose}>
       <FieldWrap label="제목" required><input type="text" value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="예: 11월 정모 장소 변경" style={inputStyle}/></FieldWrap>
       <FieldWrap label="내용"><textarea value={f.content} onChange={e=>setF({...f,content:e.target.value})} rows={5} style={{...inputStyle,borderRadius:18,resize:"none"}}/></FieldWrap>
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#4A5578",cursor:"pointer"}}>
         <input type="checkbox" checked={f.important} onChange={e=>setF({...f,important:e.target.checked})} style={{width:18,height:18,accentColor:BLUE,margin:0}}/>중요 공지로 표시
       </label>
       {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
-      <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?"올리는 중…":"공지 올리기"}</button>
+      <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?(edit?"저장하는 중…":"올리는 중…"):(edit?"수정 완료":"공지 올리기")}</button>
     </Sheet>
   );
 }
@@ -6933,7 +6942,7 @@ export default function App() {
         )}
         {list.error&&<Card style={{marginBottom:12}}><p style={{margin:0,fontSize:13,color:"#ef4444"}}>모임을 불러오지 못했어요. {list.error}</p></Card>}
         {tab==="home"&&<HomeTab onGoBooking={()=>{setOpenMeeting(null);setTab("booking");}} onOpenMeeting={(id,view)=>openM(id,view,"home")} onCreate={openCreate}
-          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} focusNotice={focusNotice} ads={ads} adSecs={adData.sec}/>}
+          notices={club.notices} isAdmin={adminOn} onWriteNotice={()=>setNoticeForm(true)} onEditNotice={n=>setNoticeForm(n)} focusNotice={focusNotice} ads={ads} adSecs={adData.sec}/>}
         {tab==="booking"&&<BookingTab open={openMeeting} onOpen={(id,view,from)=>openM(id,view,from||"booking")} ready={list.ready} view={bookView} onView={setBookView}
           canManage={canManage} isAdmin={adminOn} onEdit={m=>setForm2({initial:m})} onDeleted={()=>closeM()} onCreate={openCreate}/>}
         {tab==="members"&&<MembersTab onOpenMeeting={id=>openM(id,"info","members")} onCreateMeeting={openGuildCreate}/>}
@@ -6988,7 +6997,7 @@ export default function App() {
         if(k==="guild"){ GUILD_GO(null); return; } if(k==="stats"){ setTab("members"); setMemView("stats"); try{sessionStorage.setItem("sstc-members-view","stats");}catch(e){} return; }
         if(k==="members"){ setMemView("list"); try{sessionStorage.setItem("sstc-members-view","list");}catch(e){} }
         if(k==="admin"&&!adminOn) return; setTab(k); try{window.scrollTo(0,0);}catch(e){} }}/>}
-      {noticeForm&&<NoticeForm onClose={()=>setNoticeForm(false)}/>}
+      {noticeForm&&<NoticeForm edit={noticeForm===true?null:noticeForm} onClose={()=>setNoticeForm(false)}/>}
       {myInfo&&<MyInfoSheet startEdit={myInfo==="edit"} account={account} onProfileSaved={p=>{setMe(p);setAccount(a=>({...a,profile:p}));}} onClose={()=>setMyInfo(false)} onLogout={()=>{setMyInfo(false);logout();}}/>}
       {locked&&(isPrivate(locked.info)?<PrivateLockSheet meeting={locked} onClose={()=>setLocked(null)}/>:<GuildLockSheet meeting={locked} onClose={()=>setLocked(null)}/>)}
       {mForm&&<MeetingForm initial={mForm.initial} defaultKind={mForm.kind} defaultGuild={mForm.guild} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
