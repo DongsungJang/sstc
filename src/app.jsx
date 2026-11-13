@@ -1531,6 +1531,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     if(m.cancelled) return {m,ok:false,gone:true,label:goneLabel(m)};
     return {m,ok:ci>=0||wi<0,label:ci>=0||wi<0?"참석 확정":`대기 ${wi+1}번`};
   }).filter(Boolean);
+  // 다가오는 모임 카드 '참석 가능': 아직 참석·불참 안 눌렀고, 예약이 열렸고, 들어갈 수 있고, 자리가 남은 모임
+  const canGo=m=>!m.cancelled&&!(m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()])&&isOpen(m)&&canJoinMeeting(m.info,m.rec)&&!isFull(m);
   // 맨 위 큰 카드: 내가 참석 예정인 가장 가까운 모임만 (없으면 빈 카드 + 예약 탭으로)
   const next=(going.find(g=>!g.gone)||{}).m;
   // 홈에서 바로 참석·불참 투표
@@ -1588,9 +1590,12 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
                 <span style={{fontSize:13,fontWeight:800,color:m.cancelled?GONE.c:isFull(m)?FULL.c:INK,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{m.cancelled?"무산":<>{m.attendees.length}<span style={{color:"#A3AAC2",fontWeight:600}}>/{m.total}</span></>}</span>
               </div>
               <p style={{margin:"0 0 3px",color:INK,whiteSpace:"nowrap"}}><span style={{fontSize:24,fontWeight:900,letterSpacing:"-0.04em",fontVariantNumeric:"tabular-nums"}}>{m.iso.slice(5,7)}.{m.iso.slice(8,10)}{m.endIso!==m.iso&&<span style={{fontSize:16}}>~{m.endIso.slice(5,7)===m.iso.slice(5,7)?"":m.endIso.slice(5,7)+"."}{m.endIso.slice(8,10)}</span>}</span>{m.endIso===m.iso&&<span style={{fontSize:14,fontWeight:700,marginLeft:4,color:"#4A5578"}}>{DOW_KO[new Date(m.iso+"T00:00:00").getDay()]}</span>}</p>
-              <p style={{margin:0,fontSize:13,color:"#5E6A8E",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</p>
+              {(g=>{ g=g&&!g.gone?g:null; return <p style={{margin:0,fontSize:13,color:"#5E6A8E",display:"flex",alignItems:"center",gap:6}}><span style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.placeName||m.place}</span>
+                {/* 내가 참석·대기 중인 모임: 코트명 오른쪽에 작은 표시 (카드 높이는 그대로) */}
+                {g?<span style={{flexShrink:0,display:"inline-flex",alignItems:"center",gap:2,fontSize:11,fontWeight:800,padding:"2px 7px",borderRadius:9,background:g.ok?BLUE_LIGHT:"#FFF1DE",color:g.ok?BLUE:"#C2610C"}}><Ic n={g.ok?"check":"clock"} s={10}/>{g.ok?"참석 예정":`대기 ${g.label.replace(/[^0-9]/g,"")}번`}</span>
+                  :canGo(m)&&<span style={{flexShrink:0,fontSize:11,fontWeight:800,padding:"2px 7px",borderRadius:9,background:"#E3F8EE",color:"#0E9F5E"}}>참석 가능</span>}</p>; })(going.find(x=>x.m.id===m.id))}
               {m.privateMeet&&<div style={{marginTop:6}}><PrivateTag/></div>}{m.guildId&&<div style={{marginTop:6}}><GuildMeetTag m={m}/></div>}{/* 길드 표시는 맨 아래에 둬서 날짜·코트명 줄이 옆 카드와 맞게 */}
-              {waitN(m)>0&&<p style={{margin:"4px 0 0",fontSize:12,fontWeight:700,color:"#C2610C"}}>대기 {waitN(m)}명</p>}
+              {waitN(m)>0&&!going.some(x=>x.m.id===m.id&&!x.ok)&&<p style={{margin:"4px 0 0",fontSize:12,fontWeight:700,color:"#C2610C"}}>대기 {waitN(m)}명</p>}{/* 내가 대기 중이면 '대기 n번' 표시와 겹쳐서 뺌 */}
             </div>
           ))}
         </HScrollArrows>
