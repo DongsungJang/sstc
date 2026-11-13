@@ -1693,7 +1693,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           {notices.map((n,i)=>(
             <div key={n.id} ref={exp===n.id?noticeRef:null}>
               <div onClick={()=>setExp(exp===n.id?null:n.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"11px 0",borderBottom:i<notices.length-1?"1px solid #EEF1FA":"none",cursor:"pointer"}}>
-                {n.important&&<span style={{fontSize:10,background:"#fef2f2",color:"#ef4444",padding:"2px 6px",borderRadius:6,fontWeight:600,whiteSpace:"nowrap"}}>중요</span>}
+                {n.important&&<span style={{fontSize:10,background:"#fef2f2",color:"#ef4444",padding:"2px 6px",borderRadius:6,fontWeight:700,whiteSpace:"nowrap"}}>📌 중요</span>}
                 <span style={{flex:1,fontSize:14,color:INK,fontWeight:n.important?600:400}}>{n.title}</span>
                 <span style={{fontSize:11,color:"#A3AAC2",whiteSpace:"nowrap"}}>{fmtDate(ymd(new Date(n.at))).slice(2,10)}</span>
                 <span style={{fontSize:11,color:"#A3AAC2",marginLeft:4}}>{exp===n.id?"▲":"▼"}</span>
@@ -2365,7 +2365,8 @@ function useClubFeed(uid){
   },[uid]);
   const items=[...toList(st.feed),...toList(st.inbox,{mine:true})].filter(n=>n&&n.at&&(!n.to||n.to===uid)&&(n.type!=="courtFee"||ME_ADMIN)).sort((a,b)=>b.at-a.at).slice(0,50)
     .map(n=>({...n,unread:n.at>(+st.seen||0)&&n.byUid!==uid}));
-  const notices=toList(st.notices).filter(n=>n.title).sort((a,b)=>b.at-a.at);
+  // 중요 공지는 항상 맨 위에 (그 안에서는 최신 순)
+  const notices=toList(st.notices).filter(n=>n.title).sort((a,b)=>(b.important?1:0)-(a.important?1:0)||b.at-a.at);
   const markSeen=()=>FB&&uid&&FB.club.child("members/"+uid+"/notiSeenAt").set(Date.now()).catch(()=>{});
   return {items,unread:items.filter(n=>n.unread).length,notices,markSeen};
 }
@@ -4481,7 +4482,7 @@ function NoticeForm({onClose,edit}) {   // edit = 고칠 공지 (없으면 새�
       <FieldWrap label="제목" required><input type="text" value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="예: 11월 정모 장소 변경" style={inputStyle}/></FieldWrap>
       <FieldWrap label="내용"><textarea value={f.content} onChange={e=>setF({...f,content:e.target.value})} rows={5} style={{...inputStyle,borderRadius:18,resize:"none"}}/></FieldWrap>
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#4A5578",cursor:"pointer"}}>
-        <input type="checkbox" checked={f.important} onChange={e=>setF({...f,important:e.target.checked})} style={{width:18,height:18,accentColor:BLUE,margin:0}}/>중요 공지로 표시
+        <input type="checkbox" checked={f.important} onChange={e=>setF({...f,important:e.target.checked})} style={{width:18,height:18,accentColor:BLUE,margin:0}}/>중요 공지로 표시 <span style={{fontSize:12,color:"#A3AAC2"}}>(공지 맨 위에 고정)</span>
       </label>
       {err&&<p style={{margin:0,fontSize:13,color:"#ef4444"}}>{err}</p>}
       <button type="button" disabled={saving} onClick={submit} style={{...btnPrimary,opacity:saving?0.6:1}}>{saving?(edit?"저장하는 중…":"올리는 중…"):(edit?"수정 완료":"공지 올리기")}</button>
