@@ -1531,10 +1531,8 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     if(m.cancelled) return {m,ok:false,gone:true,label:goneLabel(m)};
     return {m,ok:ci>=0||wi<0,label:ci>=0||wi<0?"참석 확정":`대기 ${wi+1}번`};
   }).filter(Boolean);
-  // 맨 위 큰 카드: 내가 참석하는 가장 가까운 모임 → 없으면 불참 누르지 않은 가장 가까운 모임 → 그것도 없으면 가장 가까운 모임
-  const voteOf=m=>m&&m.rec&&m.rec.votes&&m.rec.votes[myVoteKey()];
-  const mine=(going.find(g=>!g.gone)||{}).m;
-  const next=mine||upcoming.find(m=>!m.cancelled&&!(voteOf(m)&&voteOf(m).status==="absent"))||upcoming[0];
+  // 맨 위 큰 카드: 내가 참석 예정인 가장 가까운 모임만 (없으면 빈 카드 + 예약 탭으로)
+  const next=(going.find(g=>!g.gone)||{}).m;
   // 홈에서 바로 참석·불참 투표
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
   const myStatus=myVote&&myVote.status;
@@ -1544,10 +1542,16 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
       {/* 다음 모임: 파란 윗부분에 걸친 흰 카드 */}
-      {!next?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
+      {!next?(upcoming.length===0?<Card style={{boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}><Empty action="+ 모임 만들기" onAction={onCreate}>아직 잡힌 모임이 없어요.</Empty></Card>:(
+      // 참석 예정 모임이 없을 때: 문구 + 예약 탭으로 가는 버튼
+      <div style={{background:"#fff",borderRadius:22,padding:"18px 18px 16px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)",textAlign:"center"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginBottom:4}}><BallMark size={22}/><span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>참석 예정인 모임이 없어요</span></div>
+        <p style={{margin:"0 0 12px",fontSize:13,color:"#6B7493"}}>얼른 신청해 보세요!</p>
+        <button type="button" onClick={onGoBooking} style={{padding:"10px 22px",background:GRAD,color:"#fff",border:"none",borderRadius:14,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:SHADOW_BTN}}>모임 둘러보기</button>
+      </div>)):(
       <div style={{background:next.cancelled?GONE.bg:"#fff",border:next.cancelled?`1.5px solid ${GONE.line}`:isFull(next)?`1.5px solid ${FULL.line}`:"1.5px solid transparent",borderRadius:22,padding:"14px 18px",boxShadow:"0 12px 32px rgba(11,30,91,0.14)"}}>
         <div role="button" tabIndex={0} onClick={()=>onOpenMeeting(next.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(next.id,"info");}} style={{cursor:"pointer",marginBottom:10}}>
-          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>{/* 큰 카드 이름: 내가 참석하는 모임이면 참석 예정 모임, 아니면 가장 가까운 모임 */}<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:mine?BLUE:"#6B7493"}}>{mine?"참석 예정 모임":"가장 가까운 모임"}</span></p>
+          <p style={{margin:"0 0 8px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><KindBadge m={next}/><span style={{background:INK,color:BALL,fontSize:12,fontWeight:800,padding:"3px 8px",borderRadius:7}}>{dDay(next.iso)}</span>{/* 큰 카드 이름: 확정이면 파란 참석 예정 모임, 대기 중이면 주황 대기 중인 모임 */}<span style={{marginLeft:"auto",fontSize:12,fontWeight:800,color:myGoing&&!myGoing.ok?"#C2610C":BLUE}}>{myGoing&&!myGoing.ok?"대기 중인 모임":"참석 예정 모임"}</span></p>
           <p style={{margin:"0 0 4px",fontWeight:900,fontSize:22,color:INK,letterSpacing:"-0.035em"}}>{longDate(next.iso)}</p>
           <p style={{margin:0,fontSize:14,color:"#5E6A8E",wordBreak:"keep-all"}}>{next.time} · {next.placeName||next.place}</p>
         </div>
@@ -1564,7 +1568,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           <div style={{height:6,background:isFull(next)?FULL.line:"#E4E9F4",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>
         {isOpen(next)&&!canJoinMeeting(next.info,next.rec)?<GuildJoinNotice m={next}/>:isOpen(next)?(
-        <><AttendButtons status={myStatus} onVote={vote}/>
+        <><AttendButtons status={myStatus} onVote={vote} wait={myGoing&&!myGoing.ok} full={isFull(next)} prio={next.kind!=="flash"}/>
         {myGoing?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
           :myStatus==="absent"?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
           :<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
@@ -1572,7 +1576,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </>}
       </div>)}
       {/* 그다음 모임들: 가로로 넘겨 보는 카드 */}
-      {upcoming.length>1&&(
+      {upcoming.some(m=>m!==next)&&(
       <div>
         <div style={{padding:"0 4px"}}><SectionTitle action="전체보기" onAction={onGoBooking}>다가오는 모임</SectionTitle></div>
         <HScrollArrows>
@@ -1592,7 +1596,6 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
         </HScrollArrows>
       </div>)}
       {ads.length>0&&<AdCarousel ads={ads} sec={adSecs}/>}
-      <GoingSlider going={going} onOpenMeeting={onOpenMeeting} onGoBooking={onGoBooking}/>
       <Card>
         <SectionTitle action={isAdmin?"+ 공지 쓰기":null} onAction={onWriteNotice}>공지사항</SectionTitle>
         {notices.length===0?<Empty>등록된 공지사항이 없어요.</Empty>:(
@@ -1622,7 +1625,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
     </div>
   );
 }
-// < > 화살표 버튼 (홈 '내가 참석할 모임', 예약 탭 목록 공용)
+// < > 화살표 버튼 (예약 탭 목록)
 function PageArrow({dir,off,onClick,label}){
   return <button type="button" aria-label={label} disabled={off} onClick={onClick} style={{width:30,height:30,borderRadius:10,border:"none",background:off?"#E8ECF5":BLUE_LIGHT,color:off?"#C5CBDD":BLUE,display:"flex",alignItems:"center",justifyContent:"center",cursor:off?"default":"pointer",padding:0}}><Icon name={dir<0?"chevL":"chevR"} size={17} stroke={2.4}/></button>;
 }
@@ -1659,43 +1662,6 @@ function HScrollArrows({children}){
     <div ref={ref} onScroll={check} className="sstc-hscroll" style={{display:"flex",gap:10,overflowX:"auto",margin:"0 -16px",padding:"0 16px 2px",scrollPadding:"0 16px",scrollSnapType:"x mandatory"}}>{children}</div>
     {btn(1,can[1])}
   </div>;
-}
-// 홈 "내가 참석할 모임": 3개씩 한 장으로 묶어 < > 로 넘겨 봐요 (손가락으로 밀어도 넘어가요)
-function GoingSlider({going,onOpenMeeting,onGoBooking}){
-  const ref=useRef(null), [idx,setIdx]=useState(0), total=going.length;
-  const pages=[]; for(let k=0;k<total;k+=3) pages.push(going.slice(k,k+3));   // 한 장에 3개씩
-  const n=pages.length;
-  useEffect(()=>{ if(idx>n-1) setIdx(Math.max(0,n-1)); },[n]);
-  const go=i=>{ const el=ref.current; if(!el) return; const j=Math.max(0,Math.min(n-1,i)); el.scrollTo({left:j*el.clientWidth,behavior:"smooth"}); setIdx(j); };
-  const onScroll=()=>{ const el=ref.current; if(el&&el.clientWidth) setIdx(Math.round(el.scrollLeft/el.clientWidth)); };
-  const arrow=(d,ic,label)=>{ const off=d<0?idx<=0:idx>=n-1; return <button type="button" aria-label={label} disabled={off} onClick={()=>go(idx+d)} style={{width:30,height:30,borderRadius:10,border:"none",background:off?"#F1F4FA":BLUE_LIGHT,color:off?"#C5CBDD":BLUE,display:"flex",alignItems:"center",justifyContent:"center",cursor:off?"default":"pointer",padding:0}}><Icon name={ic} size={17} stroke={2.4}/></button>; };
-  return <Card>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-      <span style={{fontSize:17,fontWeight:900,color:INK,letterSpacing:"-0.03em"}}>내가 참석할 모임{total>0&&<span style={{fontSize:12,fontWeight:600,color:BLUE,marginLeft:6}}>{total}</span>}</span>
-      {n>1&&<div style={{display:"flex",alignItems:"center",gap:6}}>
-        <span style={{fontSize:12,fontWeight:700,color:"#8A93B2",fontVariantNumeric:"tabular-nums",marginRight:2}}>{idx+1} / {n}</span>
-        {arrow(-1,"chevL","이전 모임")}{arrow(1,"chevR","다음 모임")}
-      </div>}
-    </div>
-    {total===0?<Empty action="모임 둘러보기" onAction={onGoBooking}>참석하기로 한 모임이 아직 없어요.</Empty>:(
-    <div ref={ref} onScroll={onScroll} className="sstc-hscroll" style={{display:"flex",overflowX:"auto",scrollSnapType:"x mandatory"}}>
-      {pages.map((pg,pi)=>(
-        <div key={pi} style={{flex:"0 0 100%",boxSizing:"border-box",scrollSnapAlign:"start",display:"flex",flexDirection:"column",gap:8}}>
-        {pg.map(({m,ok,gone,label})=><div key={m.id} role="button" tabIndex={0} onClick={()=>onOpenMeeting(m.id,"info")} onKeyDown={e=>{if(e.key==="Enter")onOpenMeeting(m.id,"info");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:BLUE_LIGHT,borderRadius:14,cursor:"pointer"}}>
-          <span style={{minWidth:46,textAlign:"center",background:"#fff",color:BLUE,fontSize:12,fontWeight:700,padding:"6px 4px",borderRadius:10}}>{dDay(m.iso)}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:INK,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{m.date}<KindBadge m={m}/></p>
-            <p style={{margin:"0 0 1px",fontSize:12,color:"#4A5578"}}><Ic n="clock" s={12}/> {m.time}</p>
-            <p style={{margin:0,fontSize:12,color:"#4A5578",wordBreak:"keep-all"}}><Ic n="pin" s={12}/> {m.placeName||m.place}</p>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-            <span style={{fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:12,whiteSpace:"nowrap",background:gone?GONE.c:ok?"#fff":"#FFF4E5",color:gone?"#fff":ok?BLUE:"#C2610C"}}>{label}</span>
-            {ok&&!gone&&<WaitTag m={m}/>}
-          </div>
-        </div>)}</div>
-      ))}
-    </div>)}
-  </Card>;
 }
 // 자리 남은 모임: 지금 참석 누를 수 있고 아직 정원이 안 찬 다가오는 모임 (내가 이미 참석한 모임은 빼요)
 const seatsLeft=m=>Math.max(0,(m.total||0)-(m.attendees||[]).length);
@@ -2138,15 +2104,36 @@ const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
       .catch(()=>{ try{ return localDb(); }catch(e){ return null; } });
 // 참석·불참 버튼 (홈·모임 상세 공용). 고른 쪽만 꽉 찬 색 + 체크, 안 고른 쪽은 테두리만.
 // 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
-function AttendButtons({status,onVote}) {
-  const going=status==="attend", out=status==="absent";
+// 예/아니요 확인 팝업 (가운데 카드). tone: 주황(wait) · 빨강(absent)
+function AskPop({icon,tone,title,sub,no="아니요",yes="예",onNo,onYes}){
+  const c=tone==="wait"?{bg:"#FFF1DE",fg:"#E07A0B",btn:"linear-gradient(135deg,#F59E0B,#E07A0B)"}:{bg:"#FDECEC",fg:"#E5484D",btn:"#E5484D"};
+  const b=(t,on,primary)=><button type="button" onClick={on} style={{flex:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?c.btn:"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
+  return <div onClick={onNo} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div role="dialog" aria-modal="true" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:320,background:"#fff",borderRadius:22,padding:"24px 20px 18px",textAlign:"center",fontFamily:FONT,boxShadow:"0 18px 50px rgba(11,30,91,0.3)"}}>
+      <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:44,height:44,borderRadius:14,background:c.bg,color:c.fg}}><Icon name={icon} size={22} stroke={2.4}/></span>
+      <p style={{margin:"12px 0 6px",fontSize:17,fontWeight:800,color:INK,whiteSpace:"pre-line",lineHeight:1.4}}>{title}</p>
+      {sub&&<p style={{margin:"0 0 18px",fontSize:13,color:"#6B7493",lineHeight:1.5,wordBreak:"keep-all"}}>{sub}</p>}
+      <div style={{display:"flex",gap:8}}>{b(no,onNo)}{b(yes,onYes,true)}</div>
+    </div></div>;
+}
+// 참석 · 불참 버튼. full: 정원이 다 찬 모임이면 참석을 누를 때 '대기 신청' 확인, prio: 정기 모임(이달 덜 온 회원 먼저)
+// 참석·대기 중에 불참을 누르면 '불참하시겠습니까?' 확인 뒤에 바뀌어요
+function AttendButtons({status,onVote,wait,full,prio}) {
+  const going=status==="attend", out=status==="absent", waiting=going&&wait;   // 참석 눌렀지만 대기 중이면 주황 '대기 중'
+  const WAIT_BG="linear-gradient(135deg,#F59E0B,#E07A0B)";
+  const [ask,setAsk]=useState(null);   // "wait" | "absent"
   const base={flex:1,padding:"13px 0",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
+  const pressAttend=()=>{ if(!going&&full){ setAsk("wait"); return; } onVote("attend"); };
+  const pressAbsent=()=>{ if(going){ setAsk("absent"); return; } onVote("absent"); };
+  const done=v=>{ setAsk(null); onVote(v); };
   return (
     <div style={{display:"flex",gap:8}}>
-      <button type="button" aria-pressed={going} onClick={()=>onVote("attend")} style={{...base,
-        background:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:going?SHADOW_BTN:"none"}}>
-        {going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
-      <button type="button" aria-pressed={out} onClick={()=>onVote("absent")} style={{...base,
+      {ask==="wait"&&<AskPop icon="clock" tone="wait" title={"인원이 다 찼어요\n대기 신청을 하시겠습니까?"} sub={prio?"이달 참석이 적은 회원이 먼저라 바로 참석으로 바뀔 수도 있어요. 대기 중에 자리가 나면 순서대로 참석으로 바뀌어요.":"자리가 나면 대기 순서대로 참석으로 바뀌어요."} onNo={()=>setAsk(null)} onYes={()=>done("attend")}/>}
+      {ask==="absent"&&<AskPop icon="x" tone="absent" title="불참하시겠습니까?" sub={waiting?"대기가 취소되고 불참으로 바뀌어요.":"참석이 취소되고 불참으로 바뀌어요."} no="취소" yes="확인" onNo={()=>setAsk(null)} onYes={()=>done("absent")}/>}
+      <button type="button" aria-pressed={going} onClick={pressAttend} style={{...base,
+        background:waiting?WAIT_BG:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:waiting?"0 6px 16px rgba(224,122,11,0.28)":going?SHADOW_BTN:"none"}}>
+        {waiting?<><Ic n="clock" s={15} w={2.4}/>대기 중</>:going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
+      <button type="button" aria-pressed={out} onClick={pressAbsent} style={{...base,
         background:out?"#E5484D":"#EDF0F6",color:out?"#fff":"#5E6A8E",border:`1.5px solid ${out?"#E5484D":"transparent"}`}}>
         {out?<><Ic n="check" s={15} w={2.6}/>불참</>:"불참"}</button>
     </div>);
@@ -3598,7 +3585,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         {!gone&&!isPast&&open&&!canJoinMeeting(meeting.info,meeting.rec)&&<GuildJoinNotice m={meeting}/>}
         {!gone&&!isPast&&open&&canJoinMeeting(meeting.info,meeting.rec)&&(
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
-            <AttendButtons status={myStatus} onVote={setMyStatus}/>
+            <AttendButtons status={myStatus} onVote={setMyStatus} wait={myStatus==="attend"&&myConfirmIdx<0} full={isFull(meeting)} prio={prio}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {imOut&&<p style={{margin:0,fontSize:11.5,color:"#6B7493",background:"#F4F6FB",borderRadius:10,padding:"8px 10px",lineHeight:1.5}}>{inviter?`${inviter} 님 초대로 참석하는 길드 모임이에요.`:"초대받아 참석하는 길드 모임이에요."} 불참으로 바꿔도 다시 참석할 수 있어요.</p>}
             {myStatus==="attend"&&!isMT(meeting)&&(
