@@ -1568,7 +1568,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           <div style={{height:6,background:isFull(next)?FULL.line:"#E4E9F4",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>
         {isOpen(next)&&!canJoinMeeting(next.info,next.rec)?<GuildJoinNotice m={next}/>:isOpen(next)?(
-        <><AttendButtons status={myStatus} onVote={vote} wait={myGoing&&!myGoing.ok}/>
+        <><AttendButtons status={myStatus} onVote={vote} wait={myGoing&&!myGoing.ok} full={isFull(next)} prio={next.kind!=="flash"}/>
         {myGoing?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
           :myStatus==="absent"?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
           :<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
@@ -2104,16 +2104,36 @@ const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
       .catch(()=>{ try{ return localDb(); }catch(e){ return null; } });
 // 참석·불참 버튼 (홈·모임 상세 공용). 고른 쪽만 꽉 찬 색 + 체크, 안 고른 쪽은 테두리만.
 // 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
-function AttendButtons({status,onVote,wait}) {
+// 예/아니요 확인 팝업 (가운데 카드). tone: 주황(wait) · 빨강(absent)
+function AskPop({icon,tone,title,sub,no="아니요",yes="예",onNo,onYes}){
+  const c=tone==="wait"?{bg:"#FFF1DE",fg:"#E07A0B",btn:"linear-gradient(135deg,#F59E0B,#E07A0B)"}:{bg:"#FDECEC",fg:"#E5484D",btn:"#E5484D"};
+  const b=(t,on,primary)=><button type="button" onClick={on} style={{flex:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?c.btn:"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
+  return <div onClick={onNo} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div role="dialog" aria-modal="true" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:320,background:"#fff",borderRadius:22,padding:"24px 20px 18px",textAlign:"center",fontFamily:FONT,boxShadow:"0 18px 50px rgba(11,30,91,0.3)"}}>
+      <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:44,height:44,borderRadius:14,background:c.bg,color:c.fg}}><Icon name={icon} size={22} stroke={2.4}/></span>
+      <p style={{margin:"12px 0 6px",fontSize:17,fontWeight:800,color:INK,whiteSpace:"pre-line",lineHeight:1.4}}>{title}</p>
+      {sub&&<p style={{margin:"0 0 18px",fontSize:13,color:"#6B7493",lineHeight:1.5,wordBreak:"keep-all"}}>{sub}</p>}
+      <div style={{display:"flex",gap:8}}>{b(no,onNo)}{b(yes,onYes,true)}</div>
+    </div></div>;
+}
+// 참석 · 불참 버튼. full: 정원이 다 찬 모임이면 참석을 누를 때 '대기 신청' 확인, prio: 정기 모임(이달 덜 온 회원 먼저)
+// 참석·대기 중에 불참을 누르면 '불참하시겠습니까?' 확인 뒤에 바뀌어요
+function AttendButtons({status,onVote,wait,full,prio}) {
   const going=status==="attend", out=status==="absent", waiting=going&&wait;   // 참석 눌렀지만 대기 중이면 주황 '대기 중'
   const WAIT_BG="linear-gradient(135deg,#F59E0B,#E07A0B)";
+  const [ask,setAsk]=useState(null);   // "wait" | "absent"
   const base={flex:1,padding:"13px 0",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
+  const pressAttend=()=>{ if(!going&&full){ setAsk("wait"); return; } onVote("attend"); };
+  const pressAbsent=()=>{ if(going){ setAsk("absent"); return; } onVote("absent"); };
+  const done=v=>{ setAsk(null); onVote(v); };
   return (
     <div style={{display:"flex",gap:8}}>
-      <button type="button" aria-pressed={going} onClick={()=>onVote("attend")} style={{...base,
+      {ask==="wait"&&<AskPop icon="clock" tone="wait" title={"인원이 다 찼어요\n대기 신청을 하시겠습니까?"} sub={prio?"이달 참석이 적은 회원이 먼저라 바로 참석으로 바뀔 수도 있어요. 대기 중에 자리가 나면 순서대로 참석으로 바뀌어요.":"자리가 나면 대기 순서대로 참석으로 바뀌어요."} onNo={()=>setAsk(null)} onYes={()=>done("attend")}/>}
+      {ask==="absent"&&<AskPop icon="x" tone="absent" title="불참하시겠습니까?" sub={waiting?"대기가 취소되고 불참으로 바뀌어요.":"참석이 취소되고 불참으로 바뀌어요."} no="취소" yes="확인" onNo={()=>setAsk(null)} onYes={()=>done("absent")}/>}
+      <button type="button" aria-pressed={going} onClick={pressAttend} style={{...base,
         background:waiting?WAIT_BG:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:waiting?"0 6px 16px rgba(224,122,11,0.28)":going?SHADOW_BTN:"none"}}>
         {waiting?<><Ic n="clock" s={15} w={2.4}/>대기 중</>:going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
-      <button type="button" aria-pressed={out} onClick={()=>onVote("absent")} style={{...base,
+      <button type="button" aria-pressed={out} onClick={pressAbsent} style={{...base,
         background:out?"#E5484D":"#EDF0F6",color:out?"#fff":"#5E6A8E",border:`1.5px solid ${out?"#E5484D":"transparent"}`}}>
         {out?<><Ic n="check" s={15} w={2.6}/>불참</>:"불참"}</button>
     </div>);
@@ -3565,7 +3585,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         {!gone&&!isPast&&open&&!canJoinMeeting(meeting.info,meeting.rec)&&<GuildJoinNotice m={meeting}/>}
         {!gone&&!isPast&&open&&canJoinMeeting(meeting.info,meeting.rec)&&(
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
-            <AttendButtons status={myStatus} onVote={setMyStatus} wait={myStatus==="attend"&&myConfirmIdx<0}/>
+            <AttendButtons status={myStatus} onVote={setMyStatus} wait={myStatus==="attend"&&myConfirmIdx<0} full={isFull(meeting)} prio={prio}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {imOut&&<p style={{margin:0,fontSize:11.5,color:"#6B7493",background:"#F4F6FB",borderRadius:10,padding:"8px 10px",lineHeight:1.5}}>{inviter?`${inviter} 님 초대로 참석하는 길드 모임이에요.`:"초대받아 참석하는 길드 모임이에요."} 불참으로 바꿔도 다시 참석할 수 있어요.</p>}
             {myStatus==="attend"&&!isMT(meeting)&&(
