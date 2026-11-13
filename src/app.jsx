@@ -12,6 +12,91 @@ const SHADOW = "none";
 const SHADOW_BTN = "none";
 const FONT = "'Inter Tight','Noto Sans KR',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
 
+// ─── 다크 모드 ──────────────────────────────────────────────────────────────
+// 화면 모드: 자동(폰 설정 따라) / 라이트 / 다크. 이 기기에만 저장(localStorage sstc-theme).
+// 앱 곳곳의 style={{...}}은 빌드할 때 __dk(...)로 감싸져요(tools/build.js). 다크일 때 __dk가 색을 아래 표대로 바꿔요.
+//  - 표: [배경, 글자, 테두리]. 표에 없는 색은 밝기를 뒤집어 자동으로 맞춰요.
+//  - 공 색(#D7F24A) 바탕 위 글자는 다크에서도 남색 그대로 (CSS 변수 --dkb로 자식까지)
+//  - style 안에 $dk:{...}를 주면 다크일 때 그 값으로 덮어쓰고, $keep:true면 색을 안 바꿔요(배너·길드 엠블럼처럼 직접 고른 색)
+let DK=false;
+const DK_PAGE="#0B1022";
+const DK_P={
+ "#ffffff":["#171D35","#ffffff","#2A3254"], "#edf0f6":["#252D4D","#E8ECFA","#2A3254"], "#e9edfa":["#0B1022",null,null],
+ "#f1f4fa":["#1E2542",null,"#2A3254"], "#f4f6fb":["#1E2542",null,"#2A3254"], "#eef1fa":["#1E2542",null,"#2A3254"],
+ "#f1f2f5":["#1E2542",null,"#2A3254"], "#eef1f7":["#1E2542",null,"#2A3254"], "#f1f4fb":["#1E2542",null,null], "#e8ecf5":["#1E2542",null,null],
+ "#e4e9f7":["#262E50",null,"#2A3254"], "#e2e6f0":["#262E50",null,"#2A3254"], "#d6def7":["#2A3458","#3A4670","#323C63"],
+ "#e4e9f4":["#262E50",null,"#2A3254"], "#e8ecf4":["#262E50",null,"#2A3254"], "#e1e6f2":["#262E50",null,"#2A3254"], "#e4e7f0":["#262E50",null,"#2A3254"],
+ "#c8cfe2":["#3A4366","#4E5779","#3A4366"], "#cbd6f5":["#3A4E8C",null,null],
+ "#0b1e5b":["#34418A","#E8ECFA","#3A4670"], "#1b2559":[null,"#E8ECFA",null],
+ "#4a5578":[null,"#BCC4DE",null], "#5e6a8e":[null,"#A8B1CD",null], "#6b7493":[null,"#97A0BE",null],
+ "#8a93b2":[null,"#7E88A8",null], "#8a93b0":[null,"#7E88A8",null], "#a3aac2":[null,"#6C7594","#3A4366"], "#c5cbdd":[null,"#4E5779",null],
+ "#2152e6":["#2A55E0","#7EA0FF","#5B80F5"], "#1a43c9":["#2249C8","#7EA0FF",null], "#e8eeff":["#1C2A5E","#9DB6FF","#2E3F7A"],
+ "#eef4ff":["#1C2A5E",null,null], "#dcebff":["#1C2A5E",null,null],
+ "#d7f24a":["#D7F24A","#D7F24A","#D7F24A"], "#eaf7c2":["#33401A","#D7F24A",null],
+ "#ef4444":["#E5484D","#FF7275",null], "#e5484d":["#E5484D","#FF7275",null], "#b91c1c":[null,"#FF8A8C",null],
+ "#fdecec":["#3B1D26",null,null], "#fef2f2":["#3B1D26",null,null], "#fbd5d5":["#4A2330",null,"#5A2A38"], "#fff1f1":["#3B1D26",null,null], "#fff5f5":["#3B1D26",null,null],
+ "#c2610c":["#C2610C","#FFAA5E",null], "#e07a0b":["#E07A0B","#FFAA5E",null], "#8a5a12":[null,"#F2C27A",null], "#9a4a07":[null,"#FFAA5E",null], "#9a6b22":[null,"#F2C27A",null],
+ "#fff4e5":["#3A2914",null,"#4D3618"], "#fff8ec":["#3A2914",null,null], "#fde2b8":["#4D3618",null,"#5A4020"], "#fff1de":["#3A2914",null,null], "#fff0bf":["#3A3214",null,null],
+ "#067647":["#0E8A55","#4FDDA0",null], "#12b76a":["#12B76A","#3FD68C",null], "#e5f7ee":["#123526",null,null], "#d6f2e4":["#174532",null,null], "#3f6212":[null,"#B5E36A",null],
+ "#fef9c3":["#3A3514",null,null], "#fde047":[null,null,"#8A7A20"], "#a16207":[null,"#F5CF5A",null],
+ "#6d28d9":[null,"#B79BFF",null], "#5b3fd6":[null,"#A994FF",null], "#7c3aed":[null,"#B79BFF",null], "#f1eafe":["#2A2050",null,null],
+ "#6b7280":[null,"#9AA0B4",null], "#374151":[null,"#C8CCD8",null],
+};
+const dkHex=(r,g,b)=>"#"+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,"0")).join("");
+function dkHsl(r,g,b){r/=255;g/=255;b/=255;const M=Math.max(r,g,b),m=Math.min(r,g,b);let h=0,s=0,l=(M+m)/2;if(M!==m){const d=M-m;s=l>.5?d/(2-M-m):d/(M+m);h=M===r?(g-b)/d+(g<b?6:0):M===g?(b-r)/d+2:(r-g)/d+4;h/=6;}return[h,s,l];}
+function dkRgb(h,s,l){if(!s)return[l*255,l*255,l*255];const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;const f=t=>{t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;};return[f(h+1/3)*255,f(h)*255,f(h-1/3)*255];}
+function dkAuto(r,g,b,cat){ let [h,s,l]=dkHsl(r,g,b);
+  if(cat===0){ if(l>.78){ l=.10+(1-l)*.55; s=Math.min(s,.45); } }
+  else if(cat===1){ if(l<.5) l=Math.min(.92,1-l*.75); }
+  else if(l>.72){ l=.24; s=Math.min(s,.35); }
+  return dkHex(...dkRgb(h,s,l)); }
+// 색 하나 바꾸기. cat: 0 배경, 1 글자, 2 테두리, 3 그림자 → [새 색, 글자(공 바탕이면 남색으로 바뀔 수 있음)인지]
+function dkOne(r,g,b,a,cat){ const k=dkHex(r,g,b);
+  if(a<1){ if(k==="#ffffff"||k==="#000000") return null; if(cat===3||(cat===0&&dkHsl(r,g,b)[2]<.3)) return ["#000000",false]; const o=(DK_P[k]&&DK_P[k][1])||dkAuto(r,g,b,1); return [o,false]; }
+  if(cat===3) cat=2;
+  const o=(DK_P[k]&&DK_P[k][cat])||dkAuto(r,g,b,cat);
+  return [o,cat===1&&k!=="#d7f24a"]; }
+const DK_RE=/#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b|rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/g;
+const DK_CACHE=new Map();
+function dkStr(v,cat){ const ck=cat+"|"+v; let o=DK_CACHE.get(ck); if(o!==undefined) return o;
+  o=v.replace(DK_RE,(m,hx,r,g,b,a)=>{ let A=1;
+    if(hx){ if(hx.length===3) hx=[...hx].map(c=>c+c).join(""); r=parseInt(hx.slice(0,2),16); g=parseInt(hx.slice(2,4),16); b=parseInt(hx.slice(4,6),16); if(hx.length===8) A=parseInt(hx.slice(6,8),16)/255; }
+    else { r=+r; g=+g; b=+b; A=a===undefined?1:+a; }
+    const x=dkOne(r,g,b,A,cat); if(!x) return m;
+    const n=parseInt(x[0].slice(1),16), c=A<1?`rgba(${n>>16},${(n>>8)&255},${n&255},${Math.round(A*1000)/1000})`:x[0];
+    return x[1]?`var(--dkb,${c})`:c; });
+  if(DK_CACHE.size>5000) DK_CACHE.clear(); DK_CACHE.set(ck,o); return o; }
+const dkCat=k=>k==="boxShadow"||k==="textShadow"?3:/^background/.test(k)?0:(k==="color"||k==="fill"||k==="stroke"||k==="caretColor"||k==="WebkitTextFillColor")?1:/^(border|outline)/.test(k)?2:-1;
+const dkIsBall=v=>typeof v==="string"&&/^#d7f24a$/i.test(v.trim());
+function __dk(s){
+  if(!s||typeof s!=="object") return s;
+  if(!DK){ if(!("$dk" in s)&&!("$keep" in s)) return s; const {$dk,$keep,...r}=s; return r; }
+  const {$dk,$keep,...r}=s; if($keep) return r;
+  const o={}, bg=r.background!==undefined?r.background:r.backgroundColor, ball=dkIsBall(bg);
+  for(const k in r){ const v=r[k], c=dkCat(k); o[k]=(typeof v==="string"&&c>=0)?(ball&&c===1&&!dkIsBall(v)?INK:dkStr(v,c)):v; }
+  if(ball){ o["--dkb"]=INK; if(r.color===undefined) o.color=INK; }
+  else if(typeof bg==="string"&&bg&&!/^(none|transparent|inherit)$/.test(bg)&&!/rgba\(|gradient|#[0-9a-f]{8}\b/i.test(bg)) o["--dkb"]="initial";
+  return $dk?{...o,...$dk}:o; }
+// 아이콘처럼 style 밖에서 쓰는 글자 색
+const dkC=c=>{ if(!DK||typeof c!=="string"||c==="currentColor") return c; const v=dkStr(c,1), m=/^var\(--dkb,(.*)\)$/.exec(v); return m?m[1]:v; };
+const THEME_LS="sstc-theme";
+let setThemeMode=()=>{};
+function useThemeMode(){
+  const mq=typeof window!=="undefined"&&window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):null;
+  const [mode,setMode]=useState(()=>{ const v=lsGet(THEME_LS); return v==="light"||v==="dark"?v:"auto"; });
+  const [sys,setSys]=useState(()=>!!(mq&&mq.matches));
+  useEffect(()=>{ if(!mq) return; const f=e=>setSys(!!e.matches); mq.addEventListener?mq.addEventListener("change",f):mq.addListener(f); return()=>{ mq.removeEventListener?mq.removeEventListener("change",f):mq.removeListener(f); }; },[]);
+  const dark=mode==="dark"||(mode==="auto"&&sys);
+  DK=dark;   // 이번 그리기부터 바로 적용 (자식들이 같은 값을 봐요)
+  setThemeMode=v=>{ lsSet(THEME_LS,v==="auto"?null:v); setMode(v); };
+  useEffect(()=>{ try{
+    let m=document.querySelector('meta[name="color-scheme"]'); if(!m){ m=document.createElement("meta"); m.name="color-scheme"; document.head.appendChild(m); }
+    m.content=dark?"dark":"only light";
+    document.body.style.background=dark?DK_PAGE:""; document.body.style.color=dark?"#E8ECFA":"";
+  }catch(e){} },[dark]);
+  return mode;
+}
+
 // ─── 아이콘 (선 아이콘) ─────────────────────────────────────────────────────
 const ICON_PATHS = {
   heart:["M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"],
@@ -64,7 +149,7 @@ const ICON_PATHS = {
 const Ic=({n,s=14,c="currentColor",w=1.9,style})=><span style={{display:"inline-flex",verticalAlign:"-0.15em",flexShrink:0,...style}}><Icon name={n} size={s} color={c} stroke={w}/></span>;
 function Icon({name,size=22,color="currentColor",stroke=2}) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={dkC(color)} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {ICON_PATHS[name].map((d,i)=><path key={i} d={d}/>)}
     </svg>
   );
@@ -981,26 +1066,26 @@ function AdBanner({ad,onOpen}){
   if(!ad||!ad.title) return null;
   const url=adUrl(ad.url), th=adTheme(ad.bg), go=!url&&ad.onGo, popup=!url&&!go&&String(ad.popup||"").trim();
   const body=(
-    <div style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
-      {adLogoOk(ad.logoImg)?<div style={{width:54,height:54,borderRadius:16,background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,0.06)",flexShrink:0,overflow:"hidden"}}>
-        <img src={ad.logoImg} alt={ad.logo||"로고"} draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-      </div>:ad.logo&&<div style={{width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:"0 4px",boxSizing:"border-box"}}>
-        <span style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:th.logo,fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
+    <div style={{$keep:true,display:"flex",alignItems:"center",gap:14,padding:"14px 16px",height:"100%",boxSizing:"border-box"}}>
+      {adLogoOk(ad.logoImg)?<div style={{$keep:true,width:54,height:54,borderRadius:16,background:"#fff",boxShadow:"0 0 0 1px rgba(0,0,0,0.06)",flexShrink:0,overflow:"hidden"}}>
+        <img src={ad.logoImg} alt={ad.logo||"로고"} draggable={false} style={{$keep:true,width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+      </div>:ad.logo&&<div style={{$keep:true,width:54,height:54,borderRadius:16,background:"#fff",border:"1px solid #EADFD2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden",padding:"0 4px",boxSizing:"border-box"}}>
+        <span style={{$keep:true,fontFamily:"Georgia,'Times New Roman',serif",fontSize:ad.logo.length>6?9:ad.logo.length>4?10.5:13,letterSpacing:"0.08em",color:th.logo,fontWeight:600,textAlign:"center",wordBreak:"keep-all",lineHeight:1.2}}>{ad.logo}</span>
       </div>}
-      <div style={{flex:1,minWidth:0,paddingRight:ad.top?0:28}}>
-        {ad.top&&<p style={{margin:"0 34px 3px 0",fontSize:11,color:th.top,fontWeight:600,wordBreak:"keep-all"}}>{ad.top}</p>}
-        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:th.title,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
-        {ad.sub&&<p style={{margin:0,fontSize:12,color:th.sub,wordBreak:"keep-all"}}>{ad.sub}</p>}
+      <div style={{$keep:true,flex:1,minWidth:0,paddingRight:ad.top?0:28}}>
+        {ad.top&&<p style={{$keep:true,margin:"0 34px 3px 0",fontSize:11,color:th.top,fontWeight:600,wordBreak:"keep-all"}}>{ad.top}</p>}
+        <p style={{$keep:true,margin:"0 0 2px",fontSize:14,fontWeight:700,color:th.title,wordBreak:"keep-all",lineHeight:1.4}}>{ad.title}</p>
+        {ad.sub&&<p style={{$keep:true,margin:0,fontSize:12,color:th.sub,wordBreak:"keep-all"}}>{ad.sub}</p>}
       </div>
-      {(url||popup||go)&&<span aria-hidden="true" style={{fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
+      {(url||popup||go)&&<span aria-hidden="true" style={{$keep:true,fontSize:20,color:th.arrow,flexShrink:0}}>›</span>}
     </div>);
-  const box={display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
-  const tag=<AdTag tag={ad.tag} style={{position:"absolute",top:8,right:10}}/>;
+  const box={$keep:true,display:"block",height:"100%",boxSizing:"border-box",textDecoration:"none",position:"relative",borderRadius:20,overflow:"hidden",background:th.bg,border:`1px solid ${th.line}`,boxShadow:"0 4px 14px rgba(33,82,230,0.06)",WebkitUserDrag:"none"};
+  const tag=<AdTag tag={ad.tag} style={{$keep:true,position:"absolute",top:8,right:10}}/>;
   const label=`${adTagOf(ad.tag)[0]}: ${ad.title}`;
   if(url) return <a href={url} target="_blank" rel="noopener noreferrer" draggable={false} onClick={onOpen} aria-label={label} style={box}>{body}{tag}</a>;
-  if(go) return <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ onOpen&&onOpen(); go(); }} onKeyDown={e=>{ if(e.key==="Enter"){ onOpen&&onOpen(); go(); } }} style={{...box,cursor:"pointer"}}>{body}{tag}</div>;
+  if(go) return <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ onOpen&&onOpen(); go(); }} onKeyDown={e=>{ if(e.key==="Enter"){ onOpen&&onOpen(); go(); } }} style={{$keep:true,...box,cursor:"pointer"}}>{body}{tag}</div>;
   if(popup) return <>
-    <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ setPop(true); onOpen&&onOpen(); }} onKeyDown={e=>{ if(e.key==="Enter"){ setPop(true); onOpen&&onOpen(); } }} style={{...box,cursor:"pointer"}}>{body}{tag}</div>
+    <div role="button" tabIndex={0} aria-label={label} onClick={()=>{ setPop(true); onOpen&&onOpen(); }} onKeyDown={e=>{ if(e.key==="Enter"){ setPop(true); onOpen&&onOpen(); } }} style={{$keep:true,...box,cursor:"pointer"}}>{body}{tag}</div>
     {pop&&<AdPopup ad={ad} onClose={()=>setPop(false)}/>}
   </>;
   return <div style={box}>{body}{tag}</div>;
@@ -5504,7 +5589,7 @@ function GuildEmblem({g,size=20,style,peek=true}){
   const box={width:size,height:size,borderRadius:Math.round(size*0.28),flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",overflow:"hidden",verticalAlign:"middle",boxShadow:"inset 0 0 0 1px rgba(11,30,91,0.1)",boxSizing:"border-box",...style};
   if(photoOk(g.photo)) return <span role="img" aria-label={`${g.name} 길드`} title={g.name} style={{...box,background:"#E4E9F4"}}><img src={g.photo} alt="" draggable={false} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></span>;
   const ab=String(g.abbr||g.name||"?").slice(0,GUILD_ABBR_MAX);
-  return <span role="img" aria-label={`${g.name} 길드`} title={g.name} style={{...box,background:g.bg||INK,color:g.fg||BALL,fontSize:Math.round(size*(ab.length===1?0.52:0.4)*10)/10,fontWeight:900,letterSpacing:"-0.06em",lineHeight:1,fontFamily:FONT}}>{ab}</span>;
+  return <span role="img" aria-label={`${g.name} 길드`} title={g.name} style={{...box,$keep:true,background:g.bg||INK,color:g.fg||BALL,fontSize:Math.round(size*(ab.length===1?0.52:0.4)*10)/10,fontWeight:900,letterSpacing:"-0.06em",lineHeight:1,fontFamily:FONT}}>{ab}</span>;
 }
 // 엠블럼 + 길드명 (자리가 넉넉한 곳)
 function GuildTag({g,size=18,font,color=INK,peek=true}){
@@ -5621,7 +5706,7 @@ function GuildPeek(){
       <button type="button" aria-label="닫기" onClick={()=>setGid(null)} style={{position:"absolute",top:"calc(14px + env(safe-area-inset-top,0px))",right:16,...iconBtn}}><Icon name="x" size={20}/></button>
       <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
         {photoOk(g.photo)?<img src={g.photo} alt={`${g.name} 엠블럼`} style={{width:big,height:big,objectFit:"cover",borderRadius:44,boxShadow:"0 20px 60px rgba(0,0,0,0.35)",background:"#fff"}}/>
-          :<span role="img" aria-label={`${g.name} 엠블럼`} style={{width:big,height:big,borderRadius:44,background:g.bg||INK,color:g.fg||BALL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:`calc(${big} * ${String(g.abbr||g.name).length===1?0.5:0.38})`,fontWeight:900,letterSpacing:"-0.06em",boxShadow:"0 20px 60px rgba(0,0,0,0.35)"}}>{String(g.abbr||g.name||"?").slice(0,GUILD_ABBR_MAX)}</span>}
+          :<span role="img" aria-label={`${g.name} 엠블럼`} style={{width:big,height:big,borderRadius:44,$keep:true,background:g.bg||INK,color:g.fg||BALL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:`calc(${big} * ${String(g.abbr||g.name).length===1?0.5:0.38})`,fontWeight:900,letterSpacing:"-0.06em",boxShadow:"0 20px 60px rgba(0,0,0,0.35)"}}>{String(g.abbr||g.name||"?").slice(0,GUILD_ABBR_MAX)}</span>}
         <p style={{margin:"18px 0 0",color:"#fff",fontSize:24,fontWeight:900,letterSpacing:"-0.03em"}}>{g.name}</p>
         <p style={{margin:"4px 0 0",color:"rgba(255,255,255,0.7)",fontSize:13}}>길드장 {nickOf(g.leader)} · 길드원 {guildCount(g)}명{member?" · 내 길드":""}</p>
       </div>
@@ -6145,18 +6230,20 @@ function UpdateBanner(){
 // 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
 // marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
 /*HELP_DATA_START*/
-const HELP_VER="d60a87f0";
+const HELP_VER="6a6d5406";
 const HELP=[
-  {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"인사말 옆 연필을 누르면 내 정보를 고칠 수 있어요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 갈 가장 가까운 모임","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":194,"marks":[[0.2,23.7,99.5,71.6],[79.4,5.7,16.4,13.9]],"caps":["옆으로 밀어서 다음 모임 보기","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":205,"marks":[[3.2,0.5,93.5,99]],"caps":["이번 달 참석 순위와 내 순위 (끝난 모임만 세요)"]}]},
-  {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기와 새 모임 만들기","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":401,"marks":[[4.2,3.2,91.5,11.5],[83.3,32.8,13.5,7.7],[68.8,64.8,28,14.5]],"caps":["번개 / 정기 바꾸기","꽉 차면 '대기 n'","+ 새 모임 만들기"]}]},
-  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","누르면 참석, 한 번 더 누르면 취소"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,93.5,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]}]},
+  {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"참석 예정 모임이 없으면 '모임 둘러보기'를 눌러 예약 탭으로 가요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 참석할 가장 가까운 모임 (대기 중이면 주황)","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":197,"marks":[[3.2,23.4,46.3,70.1],[77.8,60.4,15.3,13.2],[79.4,5.6,16.4,13.7]],"caps":["옆으로 밀어서 다음 모임 보기","내 상태: ✓ 참석 예정 · 대기 n번 · 참석 가능","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":150,"marks":[[7.7,32,84.6,32.7]],"caps":["운영진 공지 · 누르면 펼쳐 보기 (중요 공지는 맨 위)"]}]},
+  {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기, 새 모임, 새 댓글","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록 · 엠티 보라","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":259,"marks":[[6.7,18.5,86.6,27],[64,7.3,29.3,13.5],[3.2,53.3,93.5,43.2]],"caps":["새 댓글 달린 모임 · 누르면 그 모임으로","새 댓글 표시 한꺼번에 지우기","오늘 새로 올라온 모임 (자정에 사라져요)"]},{"img":"booking-3","w":402,"h":323,"marks":[[4.2,4,91.5,14.2],[42.1,0.3,10.6,-14.1],[17.7,66.9,37,9]],"caps":["번개 / 정기 / 엠티 바꾸기 (꽉 차면 '대기 n')","새로 올라온 모임은 NEW","비공개 번개: 초대받은 회원만 보여요 (+ 새 모임은 아래 '모임 만들기')"]}]},
+  {"id":"newmeet","title":"모임 만들기","icon":"plus","sub":"정기 · 번개 · 엠티, 공개 범위","go":"booking","tip":"코트비는 관리자가 등록한 코트면 날짜·시간에 맞춰 자동으로 채워져요","blocks":[{"img":"newmeet-1","w":402,"h":466,"marks":[[3.7,4.5,92,95.3],[3.7,27.8,92.5,10.3],[3.7,67.4,92.5,15.9]],"caps":["정기 · 번개 · 엠티 고르기","번개는 게임 / 훈련","초대한 회원만 → 비공개 번개 (고른 회원만 보고 참석)"]}]},
+  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,93.5,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]}]},
+  {"id":"mt","title":"엠티 · 카풀","icon":"users","sub":"1박 이상 모임과 같이 타고 가기","tip":"엠티는 참석 횟수·랭킹에 세지 않아요","blocks":[{"img":"mt-1","w":402,"h":509,"marks":[[4.2,3.7,26,6.1],[10.9,75,78.1,8.6],[7.7,86.2,84.6,13.6]],"caps":["엠티 · 몇 박인지","시작 ~ 끝 날짜와 시간","인원은 게스트 포함 한 칸"]},{"img":"mt-2","w":402,"h":275,"marks":[[68.2,7.6,24,8.4],[7.7,227.2,84.6,-127.6],[7.7,72.4,84.6,27.3]],"caps":["차 몇 대 · 남은 자리","운전하는 차 (출발 위치·시간) · 누르면 타기 / 내리기","차가 필요하면 '태워 주세요'"]}]},
   {"id":"bracket","title":"대진표 · 스코어","icon":"ball","sub":"게임 편성과 점수 기록","tip":"6점 선승 · 5:5 무승부 · 참가자만 만들 수 있어요","blocks":[{"img":"bracket-1","w":402,"h":438,"marks":[[4.2,16.2,91.5,9.4],[7.7,63.7,84.6,24.2],[7.7,89.3,84.6,8.7]],"caps":["자동 편성 / 직접 작성","게임당 시간 고르기","코트 수 → 아래 '대진표 만들기'"]}]},
-  {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 · 아래에 랭킹, 코트별 통계"]}]},
-  {"id":"guild","title":"길드","icon":"shield","sub":"마음 맞는 회원끼리 작은 모임","go":"guild","tip":"길드는 우수회원이 만들 수 있어요. 여러 길드에 들어가도 돼요","blocks":[{"img":"guild-1","w":402,"h":555,"marks":[[8,38.9,84.1,20.1],[16.9,66.9,75.9,17.2],[3.2,88.1,93.5,10.3]],"caps":["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},{"img":"guild-2","w":402,"h":194,"marks":[[54.2,74.2,24.5,14.4]],"caps":["길드 모임은 그 길드원만 보고 참석해요"]}]},
-  {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요"]}]},
+  {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 (이번 달 나 · 회원 평균)"]},{"img":"members-3","w":402,"h":501,"marks":[[62.7,2.2,28.8,7],[7.7,73.3,84.6,9],[7.7,83.4,84.6,11.2]],"caps":["참여 랭킹: 이번 달 / 전체 (끝난 모임만 세요)","5위 아래는 더보기","내 순위 · 아래엔 코트별 통계"]}]},
+  {"id":"guild","title":"길드","icon":"shield","sub":"마음 맞는 회원끼리 작은 모임","go":"guild","tip":"길드는 우수회원이 만들 수 있어요. 여러 길드에 들어가도 돼요","blocks":[{"img":"guild-1","w":402,"h":554,"marks":[[8,39,84.1,20.1],[16.9,67.1,26.5,16.6],[3.2,88.1,93.5,10.3]],"caps":["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},{"img":"guild-2","w":402,"h":75,"marks":[[39.1,47.3,24.5,37.3]],"caps":["길드 모임은 그 길드원만 보고 참석해요"]}]},
+  {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5],[7.2,60.6,17.8,4.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요","내 글에 새 댓글 (아래 탭 위 말풍선에도 떠요)"]}]},
   {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
-  {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임","tip":"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":340,"marks":[[28.1,67.9,64.2,16.8],[77.9,85.9,14.4,10.9]],"caps":["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
-  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92.0,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17.0]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92.0,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80.0,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"img":"app-and-chrome-1","w":600,"h":358,"marks":[[88.3,1.8,8.1,16.4]],"caps":["오른쪽 위 ⋮ 누르기"]},{"img":"app-and-chrome-2","w":600,"h":585,"marks":[[30.9,39.4,63.9,10.6]],"caps":["'설치 및 바로가기 만들기' 누르기"]},{"img":"app-and-chrome-3","w":600,"h":338,"marks":[[6.0,30.4,88.1,29.6]],"caps":["'설치' 누르기"]},{"img":"app-and-chrome-4","w":600,"h":377,"marks":[[75.8,74.1,14.1,14.7]],"caps":["앱 설치 창에서 '설치' 누르기"]},{"img":"app-and-chrome-5","w":600,"h":292,"marks":[[34.1,22.7,31.4,24.4]],"caps":["'SSTC 설치 중…'이 뜨면 끝, 홈 화면에 아이콘이 생겨요"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷(기본)","blocks":[{"img":"app-and-samsung-1","w":600,"h":377,"marks":[[79.1,3.4,7.6,12.4]],"caps":["주소창 오른쪽 ↓ 버튼 누르기"]},{"img":"app-and-samsung-2","w":600,"h":253,"marks":[[50.9,60.3,40.1,28.2]],"caps":["'추가' 누르기"]},{"img":"app-and-samsung-3","w":600,"h":221,"marks":[[16.3,42.6,67.7,35.3]],"caps":["'앱스에 추가했어요'가 뜨면 끝"]}]}],"blocks":[]},
+  {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임, 화면 모드","tip":"화면 모드는 이 폰에만 저장돼요. 닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":440,"marks":[[0.2,0.2,99.5,99.5],[28.1,75.2,64.2,13],[77.9,89.1,14.4,8.4]],"caps":["화면 모드: 자동(폰 설정) · 라이트 · 다크","사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
+  {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","blocks":[],"tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"img":"app-and-chrome-1","w":600,"h":358,"marks":[[88.3,1.8,8.1,16.4]],"caps":["오른쪽 위 ⋮ 누르기"]},{"img":"app-and-chrome-2","w":600,"h":585,"marks":[[30.9,39.4,63.9,10.6]],"caps":["'설치 및 바로가기 만들기' 누르기"]},{"img":"app-and-chrome-3","w":600,"h":338,"marks":[[6,30.4,88.1,29.6]],"caps":["'설치' 누르기"]},{"img":"app-and-chrome-4","w":600,"h":377,"marks":[[75.8,74.1,14.1,14.7]],"caps":["앱 설치 창에서 '설치' 누르기"]},{"img":"app-and-chrome-5","w":600,"h":292,"marks":[[34.1,22.7,31.4,24.4]],"caps":["'SSTC 설치 중…'이 뜨면 끝, 홈 화면에 아이콘이 생겨요"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷(기본)","blocks":[{"img":"app-and-samsung-1","w":600,"h":377,"marks":[[79.1,3.4,7.6,12.4]],"caps":["주소창 오른쪽 ↓ 버튼 누르기"]},{"img":"app-and-samsung-2","w":600,"h":253,"marks":[[50.9,60.3,40.1,28.2]],"caps":["'추가' 누르기"]},{"img":"app-and-samsung-3","w":600,"h":221,"marks":[[16.3,42.6,67.7,35.3]],"caps":["'앱스에 추가했어요'가 뜨면 끝"]}]}]},
   {"id":"admin","title":"관리자 기능","icon":"gear","sub":"관리자에게만 보여요","go":"admin","admin":true,"tip":"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요","blocks":[{"img":"admin-1","w":402,"h":722,"marks":[[4.2,10.2,91.5,12],[7.7,57.2,84.6,11.1],[7.7,67.5,84.6,11.1],[7.7,88,84.6,11.1]],"caps":["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]}
 ];
 /*HELP_DATA_END*/
@@ -6249,7 +6336,7 @@ function HelpPage({onClose,isAdmin,onGo,open,setOpen,order}){
       <div style={{position:"relative"}}><button type="button" onClick={onBack} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}}><Icon name="back" size={20} stroke={2.4}/>{backLabel}</button></div>
       <div style={{position:"relative"}}>{children}</div>
     </div>);
-  const sheet=children=><div style={{marginTop:-24,borderRadius:"26px 26px 0 0",background:PAGE_BG,position:"relative",padding:"18px 16px calc(36px + env(safe-area-inset-bottom,0px))",display:"flex",flexDirection:"column",gap:12}}>{children}</div>;
+  const sheet=children=><div style={{marginTop:-24,borderRadius:"26px 26px 0 0",background:PAGE_BG,$dk:{background:DK_PAGE},position:"relative",padding:"18px 16px calc(36px + env(safe-area-inset-bottom,0px))",display:"flex",flexDirection:"column",gap:12}}>{children}</div>;
   let body;
   if(cur){ const i=visible.indexOf(cur), prev=visible[i-1], next=visible[i+1];
     body=<>
@@ -6308,7 +6395,7 @@ function HelpPage({onClose,isAdmin,onGo,open,setOpen,order}){
   }
   const el=(
     <div role="dialog" aria-label="사용 안내" style={{position:"fixed",inset:0,zIndex:70,display:"flex",justifyContent:"center",background:"rgba(16,24,64,0.45)"}}>
-      <div ref={scroller} style={{width:"100%",maxWidth:440,height:"100%",overflowY:"auto",background:PAGE_BG,fontFamily:FONT}}>{body}</div>
+      <div ref={scroller} style={{width:"100%",maxWidth:440,height:"100%",overflowY:"auto",background:PAGE_BG,$dk:{background:DK_PAGE},fontFamily:FONT}}>{body}</div>
     </div>);
   return typeof ReactDOM!=="undefined"&&ReactDOM.createPortal?ReactDOM.createPortal(el,document.body):el;
 }
@@ -6318,6 +6405,7 @@ function HelpPage({onClose,isAdmin,onGo,open,setOpen,order}){
 const TABS=[{key:"home",label:"홈",icon:"home"},{key:"booking",label:"예약",icon:"calendar"},{key:"members",label:"회원",icon:"users"},{key:"board",label:BOARD_NAME,icon:"message"}];
 
 // 폰트·포커스 링 등 인라인 스타일로 못 쓰는 전역 스타일
+const globalCss=()=>DK?GLOBAL_CSS.replace(":root{color-scheme:only light}",":root{color-scheme:dark}").replace(`background:${PAGE_BG}`,`background:${DK_PAGE}`).replace(`color:${INK};`,"color:#E8ECFA;").replace("::placeholder{color:#A3AAC2}","::placeholder{color:#6C7594}"):GLOBAL_CSS;
 const GLOBAL_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Inter+Tight:wght@400;500;600;700;800&display=swap');
 :root{color-scheme:only light}
@@ -6597,6 +6685,7 @@ function SplashScreen({onStart}) {
 }
 
 export default function App() {
+  const themeMode=useThemeMode();            // 화면 모드 (자동/라이트/다크)
   // screen: "login" | "forgot" | "signup" | "main"
   const [splash,setSplash]=useState(true);
   const [loginNote,setLoginNote]=useState(null);   // 탈퇴 계정 안내 등 로그인 화면 메시지   // 앱을 열 때마다 스플래시부터
@@ -6776,8 +6865,8 @@ export default function App() {
   if(screen!=="main"||pending||loading) {
     const titles={login:"로그인",forgot:"비밀번호 찾기",signup:"회원가입"};
     return(
-      <div style={{minHeight:"100vh",background:"#fff",maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
-        <style>{GLOBAL_CSS}</style><UpdateBanner/>
+      <div style={{minHeight:"100vh",background:"#fff",$dk:{background:DK_PAGE},maxWidth:440,margin:"0 auto",fontFamily:FONT}}>
+        <style>{globalCss()}</style><UpdateBanner/>
         {/* 파란 히어로 (하드코트: 단색 파랑 + 가로 풀코트 라인) */}
         <div style={{background:GRAD,padding:`${screen==="login"?60:36}px 24px ${screen==="login"?72:60}px`,color:"#fff",textAlign:"center",position:"relative",overflow:"hidden"}}>
           <CourtLines opacity={0.1}/>
@@ -6844,8 +6933,8 @@ export default function App() {
   const openGuildCreate=gid=>setForm2({initial:null,kind:"flash",guild:gid});   // 길드 화면에서 "길드 번개 만들기"
   const myCount=myHeld(), yearCount=myCount.filter(m=>m.iso.slice(0,4)===todayYmd().slice(0,4)).length;
   return(
-    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",display:"flex",flexDirection:"column",fontFamily:FONT}}>
-      <style>{GLOBAL_CSS}</style><UpdateBanner/><PhotoViewer/><GuildPeek/>
+    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100vh",background:"#EDF0F6",$dk:{background:DK_PAGE},display:"flex",flexDirection:"column",fontFamily:FONT}}>
+      <style>{globalCss()}</style><UpdateBanner/><PhotoViewer/><GuildPeek/>
       {loginPopup.popup&&<LoginPopup popup={loginPopup.popup} left={loginPopup.left} onClose={q=>loginPopup.close(loginPopup.popup,q)}/>}
       {inMain&&(IOS_STANDALONE()||window.__SWIPE)&&<EdgeSwipeBack/>}
       {exitTip&&<div role="status" style={{position:"fixed",left:"50%",bottom:"calc(96px + env(safe-area-inset-bottom))",transform:"translateX(-50%)",zIndex:120,padding:"10px 18px",borderRadius:999,background:"rgba(11,30,91,0.88)",color:"#fff",fontSize:13.5,fontWeight:700,fontFamily:FONT,whiteSpace:"nowrap",boxShadow:"0 6px 18px rgba(11,30,91,0.3)",pointerEvents:"none"}}>한 번 더 누르면 종료돼요</div>}
@@ -6911,7 +7000,7 @@ export default function App() {
           )
         )}
       </div>
-      <div style={{flex:1,padding:"20px 16px 110px",marginTop:isHome?-96:-26,borderRadius:isHome?0:"26px 26px 0 0",background:isHome?`linear-gradient(transparent 96px,${PAGE_BG} 96px)`:PAGE_BG,position:"relative",zIndex:2}}>
+      <div style={{flex:1,padding:"20px 16px 110px",marginTop:isHome?-96:-26,borderRadius:isHome?0:"26px 26px 0 0",background:isHome?`linear-gradient(transparent 96px,${PAGE_BG} 96px)`:PAGE_BG,position:"relative",zIndex:2,$dk:{background:isHome?`linear-gradient(transparent 96px,${DK_PAGE} 96px)`:DK_PAGE}}}>
         {FB&&account&&account.profile&&!account.profile.realName&&(
           <Card style={{marginBottom:12,display:"flex",alignItems:"center",gap:10,background:"#FFF8EC",border:"1px solid #FDE2B8"}}>
             <span style={{flex:1,fontSize:13,color:"#8A5A12",lineHeight:1.5}}>본명이 아직 없어요. 회원 확인을 위해 본명을 넣어 주세요.</span>
@@ -6954,6 +7043,14 @@ export default function App() {
                       <div key={k} style={{flex:fl,minWidth:0,background:"#EDF0F6",borderRadius:12,padding:"9px 10px"}}><p style={{margin:0,fontSize:11,lineHeight:"14px",height:14,color:"#6B7493"}}>{k}</p><p style={{margin:"4px 0 0",fontSize:15,lineHeight:"20px",height:20,fontWeight:800,color:INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontVariantNumeric:"tabular-nums"}}>{v}</p></div>
                     ))}
                   </div>
+                  <div role="group" aria-label="화면 모드" style={{marginTop:14}}>
+                    <p style={{margin:"0 0 6px",fontSize:12,fontWeight:700,color:"#4A5578"}}>화면 모드</p>
+                    <div style={{display:"flex",gap:3,padding:3,borderRadius:12,background:"#EDF0F6"}}>
+                      {[["auto","자동"],["light","라이트"],["dark","다크"]].map(([k,t])=>{ const on=themeMode===k; return(
+                        <button key={k} type="button" aria-pressed={on} onClick={()=>setThemeMode(k)} style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,fontSize:13,fontWeight:on?800:600,fontFamily:FONT,cursor:"pointer",color:on?INK:"#6B7493",background:on?"#fff":"transparent",boxShadow:on?"0 1px 3px rgba(11,30,91,0.15)":"none"}}>{t}</button>); })}
+                    </div>
+                    <p style={{margin:"6px 0 0",fontSize:11,color:"#8A93B2"}}>자동은 폰 설정(다크 모드)을 따라가요</p>
+                  </div>
                   <button type="button" role="menuitem" onClick={()=>go("edit")} style={{...btnPrimary,marginTop:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={16} stroke={2.2}/>내 정보 수정</button>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
                     <button type="button" role="menuitem" onClick={()=>go(true)} style={{background:"none",border:"none",padding:"6px 2px",fontSize:13,fontWeight:600,color:"#5E6A8E",cursor:"pointer",fontFamily:FONT}}>내 정보 보기</button>
@@ -6980,7 +7077,7 @@ export default function App() {
       {locked&&(isPrivate(locked.info)?<PrivateLockSheet meeting={locked} onClose={()=>setLocked(null)}/>:<GuildLockSheet meeting={locked} onClose={()=>setLocked(null)}/>)}
       {mForm&&<MeetingForm initial={mForm.initial} defaultKind={mForm.kind} defaultGuild={mForm.guild} onClose={()=>setForm2(null)} onSaved={id=>{const editing=!!mForm.initial;setForm2(null);if(!editing)openM(id,"info","booking");}}/>}
       {/* 남색 하단 탭바: 지금 탭은 공 색 알약 */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:INK,display:"flex",padding:"0 6px",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,background:INK,$dk:{background:"#10162E",borderTop:"1px solid #1E2542"},display:"flex",padding:"0 6px",zIndex:20,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {tabs.map(t=>{const on=tab===t.key, nb=on?0:(tabBadge[t.key]||0);return(
           <div key={t.key} style={{flex:1,position:"relative",display:"flex"}}>
           {t.key==="members"&&inviteTip&&<InviteTip guilds={inviteTip} onGo={()=>GUILD_GO(inviteTip.length===1?inviteTip[0].id:null)}/>}

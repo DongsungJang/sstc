@@ -13,7 +13,12 @@ src=src.replace('import { useState, useRef, useEffect } from "react";','const { 
        .replace('export default function App()','function App()');
 src+='\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));\n';
 const splashCss=fs.readFileSync(path.join(ROOT,'src/splash.css'),'utf8');
-const out=Babel.transform(src,{compact:true,presets:[['react',{runtime:'classic'}]]}).code;
+// 다크 모드: 모든 style={...}을 __dk(...)로 감싸서, 다크일 때 색을 바꿔요 (src/app.jsx의 __dk)
+const dkPlugin=({types:t})=>({visitor:{JSXAttribute(p){ const v=p.node.value;
+  if(p.node.name.name!=='style'||!v||v.type!=='JSXExpressionContainer') return;
+  const e=v.expression; if(t.isCallExpression(e)&&t.isIdentifier(e.callee,{name:'__dk'})) return;
+  v.expression=t.callExpression(t.identifier('__dk'),[e]); }}});
+const out=Babel.transform(src,{compact:true,plugins:[dkPlugin],presets:[['react',{runtime:'classic'}]]}).code;
 const page=(scripts)=>`<!DOCTYPE html>
 <html lang="ko">
 <head>
