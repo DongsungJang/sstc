@@ -64,7 +64,7 @@ const HELP=[
  {id:"noti",title:"알림",icon:"bell",sub:"종 버튼에 모이는 소식",tip:"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요",blocks:[
    {img:"noti-1",prep:steps(tab("홈"),async p=>{await p.getByRole('button',{name:/^알림/}).first().click();await p.waitForTimeout(800);}),crop:[["알림",0,0,"p"],["모임을 만들었어요",2]],cropPad:[20,14],marks:[["참석했어요",2],["새 댓글",2],["불렀어요",2]],
     caps:["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
- {id:"me",title:"내 정보",icon:"user",sub:"사진, NTRP, 구력, 닉네임",tip:"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요",blocks:[
+ {id:"me",title:"내 정보",icon:"user",sub:"사진, NTRP, 구력, 닉네임, 화면 모드",tip:"닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요",blocks:[
    {img:"me-1",prep:steps(async p=>{await p.keyboard.press('Escape');await p.goto(p.url());await p.waitForTimeout(1500);const b=p.getByText('시작하기');if(await b.count())await b.first().click();await p.waitForTimeout(1200);await p.getByRole('button',{name:'내 정보 메뉴'}).click();await p.waitForTimeout(600);}),crop:[[0],["로그아웃",0,0,"button"]],cropPad:[0,14],marks:[["내 정보 수정",0,1,"button"],["로그아웃",0,0,"button"]],
     caps:["사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
  {id:"app",title:"앱처럼 쓰기",icon:"phone",sub:"홈 화면에 추가와 업데이트",tip:"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요",blocks:[],
@@ -88,7 +88,7 @@ const HELP=[
     await p.route('**/react.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react.production.min.js')}));
     await p.route('**/react-dom.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react-dom.production.min.js')}));
   }
-  await p.addInitScript(()=>{ try{ localStorage.setItem('sstc-admin-view','member'); }catch(e){} });
+  await p.addInitScript(()=>{ try{ localStorage.setItem('sstc-admin-view','member'); localStorage.setItem('sstc-install-tip','never'); }catch(e){} });
   await p.goto('file://'+path.join(ROOT,'index.html')); await p.waitForTimeout(2000);
   const st=p.getByText('시작하기'); if(await st.count()) await st.first().click(); await p.waitForTimeout(1500);
   const outDir=path.join(ROOT,'help'); fs.mkdirSync(outDir,{recursive:true});
