@@ -1568,7 +1568,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
           <div style={{height:6,background:isFull(next)?FULL.line:"#E4E9F4",borderRadius:10}}><div style={{height:"100%",width:`${fill}%`,background:isFull(next)?FULL.bar:BLUE,borderRadius:10}}/></div>
         </div>
         {isOpen(next)&&!canJoinMeeting(next.info,next.rec)?<GuildJoinNotice m={next}/>:isOpen(next)?(
-        <><AttendButtons status={myStatus} onVote={vote}/>
+        <><AttendButtons status={myStatus} onVote={vote} wait={myGoing&&!myGoing.ok}/>
         {myGoing?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:myGoing.ok?BLUE:"#C2610C"}}>{myGoing.label}이에요</p>
           :myStatus==="absent"?<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#6B7493"}}>불참으로 표시했어요</p>
           :<p style={{margin:"6px 0 0",fontSize:12,textAlign:"center",color:"#A3AAC2"}}>아직 참석 여부를 정하지 않았어요</p>}</>
@@ -2104,14 +2104,15 @@ const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
       .catch(()=>{ try{ return localDb(); }catch(e){ return null; } });
 // 참석·불참 버튼 (홈·모임 상세 공용). 고른 쪽만 꽉 찬 색 + 체크, 안 고른 쪽은 테두리만.
 // 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
-function AttendButtons({status,onVote}) {
-  const going=status==="attend", out=status==="absent";
+function AttendButtons({status,onVote,wait}) {
+  const going=status==="attend", out=status==="absent", waiting=going&&wait;   // 참석 눌렀지만 대기 중이면 주황 '대기 중'
+  const WAIT_BG="linear-gradient(135deg,#F59E0B,#E07A0B)";
   const base={flex:1,padding:"13px 0",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5};
   return (
     <div style={{display:"flex",gap:8}}>
       <button type="button" aria-pressed={going} onClick={()=>onVote("attend")} style={{...base,
-        background:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:going?SHADOW_BTN:"none"}}>
-        {going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
+        background:waiting?WAIT_BG:going?GRAD:"#fff",color:going?"#fff":BLUE,border:going?"1.5px solid transparent":`1.5px solid ${BLUE}`,boxShadow:waiting?"0 6px 16px rgba(224,122,11,0.28)":going?SHADOW_BTN:"none"}}>
+        {waiting?<><Ic n="clock" s={15} w={2.4}/>대기 중</>:going?<><Ic n="check" s={15} w={2.6}/>참석 중</>:"참석하기"}</button>
       <button type="button" aria-pressed={out} onClick={()=>onVote("absent")} style={{...base,
         background:out?"#E5484D":"#EDF0F6",color:out?"#fff":"#5E6A8E",border:`1.5px solid ${out?"#E5484D":"transparent"}`}}>
         {out?<><Ic n="check" s={15} w={2.6}/>불참</>:"불참"}</button>
@@ -3564,7 +3565,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         {!gone&&!isPast&&open&&!canJoinMeeting(meeting.info,meeting.rec)&&<GuildJoinNotice m={meeting}/>}
         {!gone&&!isPast&&open&&canJoinMeeting(meeting.info,meeting.rec)&&(
           <div data-attend="" style={{display:"flex",flexDirection:"column",gap:10,scrollMarginTop:90}}>
-            <AttendButtons status={myStatus} onVote={setMyStatus}/>
+            <AttendButtons status={myStatus} onVote={setMyStatus} wait={myStatus==="attend"&&myConfirmIdx<0}/>
             <p style={{margin:0,fontSize:12,textAlign:"center",color:!myStatus?"#A3AAC2":myStatus==="attend"&&myConfirmIdx<0?"#C2610C":"#6B7493"}}>{myMsg}</p>
             {imOut&&<p style={{margin:0,fontSize:11.5,color:"#6B7493",background:"#F4F6FB",borderRadius:10,padding:"8px 10px",lineHeight:1.5}}>{inviter?`${inviter} 님 초대로 참석하는 길드 모임이에요.`:"초대받아 참석하는 길드 모임이에요."} 불참으로 바꿔도 다시 참석할 수 있어요.</p>}
             {myStatus==="attend"&&!isMT(meeting)&&(
