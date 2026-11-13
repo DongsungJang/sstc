@@ -34,8 +34,17 @@ Object.values(meetings).forEach(m=>{ const v={}; Object.entries(m.votes||{}).for
 meetings.m103.info.createdByUid="u1";
 Object.assign(meetings.m101.info,{createdBy:"동토리",createdByUid:"u1"});
 meetings.m105={info:{kind:"flash",flashType:"game",date:"2026-11-12",start:"20:00",end:"22:00",place:"마곡 레포츠센터",courtNo:"4",capacity:4,guestCap:0,guildIds:["g1"],guildId:"g1",createdBy:"하늘",createdByUid:"u2",createdAt:now-6*H},votes:{u2:{name:"하늘",status:"attend",at:"2026-11-10T09:00:00"}}};
+// 오늘 새로 올라온 번개 · 비공개 번개 · 엠티(카풀) · 새 댓글
+const vt=(u,ago)=>({name:M[u][0],status:"attend",at:fa(now-ago*H)});
+meetings.m106={info:{kind:"flash",flashType:"game",date:"2026-11-18",start:"19:00",end:"21:00",place:"당산 테니스장",courtNo:"2",capacity:4,guestCap:0,createdBy:"민수",createdByUid:"u3",createdAt:now-1*H},votes:{u3:vt("u3",1)}};
+meetings.m107={info:{kind:"flash",flashType:"game",date:"2026-11-17",start:"20:00",end:"22:00",place:"목동 테니스장",courtNo:"6",capacity:4,guestCap:0,invite:{u1:true,u3:true,u4:true},createdBy:"하늘",createdByUid:"u2",createdAt:now-30*H},votes:{u2:vt("u2",30),u4:vt("u4",20)}};
+meetings.m108={info:{kind:"flash",flashType:"mt",date:"2026-11-21",toDate:"2026-11-22",start:"14:00",end:"12:00",place:"가평 테니스 펜션",courtNo:"1, 2",capacity:10,guestCap:0,desc:"1박 2일 테니스 엠티! 저녁은 바비큐",createdBy:"지수",createdByUid:"u4",createdAt:now-40*H},
+  votes:{u4:vt("u4",40),u2:vt("u2",39),u1:vt("u1",38),u5:vt("u5",30)},
+  carpool:{cars:{u2:{from:"마곡역",time:"12:30",seats:3,riders:{u1:true},at:now-30*H}},need:{u5:{from:"당산역",at:now-20*H}}}};
+meetings.m103.comments={c1:{uid:"u4",name:"지수",text:"이번 주 정기 모임 공 제가 챙길게요",at:now-1*H}};
 const board={}; Object.entries(base.board).forEach(([k,p])=>board[k]=p);
 module.exports={club:{members,approved,admins:{u1:true},nicknames,meetings,board,
+ notices:{n1:{title:"SSTC를 앱처럼 쓰는 방법",content:"홈 화면에 추가하면 앱처럼 쓸 수 있어요.\n오른쪽 위 ? 버튼 → 앱처럼 쓰기",important:true,at:now-20*H,by:"동토리",byUid:"u1"},n2:{title:"11월 정기 모임 안내",content:"11월은 매주 토요일 아침 7시 장충이에요.",at:now-60*H,by:"동토리",byUid:"u1"}},
  vip:{u2:true,u1:true},
  guilds:{g1:{name:"새벽조",abbr:"새벽",bg:"#0B1E5B",fg:"#D7F24A",intro:"주말 아침 6시에 치는 사람들",leader:"u2",members:{u2:now-30*864e5,u1:now-20*864e5,u3:now-10*864e5,u4:now-9*864e5},createdAt:now-30*864e5,requests:{u5:{at:now-2*H,name:"유나"}}},
          g2:{name:"불꽃",abbr:"불",bg:"#F97316",fg:"#ffffff",intro:"평일 저녁 랠리 좋아하는 모임",leader:"u4",members:{u4:now,u6:now,u7:now},createdAt:now-15*864e5,invites:{u1:{at:now-1*H,by:"지수"}}}},
