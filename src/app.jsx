@@ -479,16 +479,19 @@ function seenLoad(uid){
   if(!SEEN.d.t.board&&SEEN.d.t.members) SEEN.d.t.board=SEEN.d.t.members;   // 소곤소곤이 회원 탭에 있던 때 마지막으로 본 시각부터
   seenSave();
 }
-const isNewItem=(id,at,byUid)=>{ const d=SEEN.d; if(!d||!at) return false;
+const isNewItem=(id,at,byUid)=>{ const d=SEEN.d; if(!d||!at||at>Date.now()) return false;   // 아직 안 된 시각(예약 오픈 전 정기모임)은 아니에요
   return at>d.base&&at>Date.now()-NEW_DAYS*864e5&&!(byUid&&byUid===SEEN.uid)&&!d.i[id]; };
-const markItemSeen=(id,at)=>{ if(!SEEN.d||SEEN.d.i[id]) return; SEEN.d.i[id]=at||Date.now(); seenSave(); };
+const markItemSeen=(id,at)=>{ if(!SEEN.d||SEEN.d.i[id]||at>Date.now()) return; SEEN.d.i[id]=at||Date.now(); seenSave(); };
 const markTabSeen=k=>{ if(!SEEN.d) return; SEEN.d.t[k]=Date.now(); seenSave(); };
 // 탭 배지 개수: NEW인 것 중 그 탭을 마지막으로 연 뒤에 올라온 것
 const tabNewCount=(k,items)=>{ const d=SEEN.d; if(!d) return 0; const t=d.t[k]||0; return items.filter(x=>x.at>t&&isNewItem(x.id,x.at,x.by)).length; };
 function useSeen(){ const [,setN]=useState(0);
   useEffect(()=>{ const f=()=>setN(n=>n+1); SEEN.subs.add(f); return ()=>{ SEEN.subs.delete(f); }; },[]); }
 // 목록에서 쓰는 항목 모양 {id, at, by}
-const meetingNewItem=m=>({id:"m"+m.id,at:(m.info&&+m.info.createdAt)||0,by:m.createdByUid});
+// 모임이 '올라온' 시각: 정기모임은 예약 오픈 시각(그때부터 투표할 수 있으니까), 오픈 시각이 없거나 만들 때 이미 열렸으면 만든 시각. 번개·엠티는 만든 시각
+const openMs=s=>{ const x=/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(s||""); return x?new Date(+x[1],+x[2]-1,+x[3],+x[4],+x[5]).getTime():0; };
+const meetPostedAt=m=>{ const c=(m.info&&+m.info.createdAt)||0; if(m.kind!=="regular") return c; const o=openMs(m.openAt); return o>c?o:c; };
+const meetingNewItem=m=>({id:"m"+m.id,at:meetPostedAt(m),by:m.createdByUid});
 const postNewItem=p=>({id:"p"+p.id,at:+p.at||0,by:p.uid});
 const memberNewItem=m=>({id:"u"+m.uid,at:m.uid===SEEN.uid?0:(+m.approvedAt||+m.createdAt||0),by:m.approvedByUid||""});
 const pendingNewItem=m=>({id:"a"+m.uid,at:+m.createdAt||0,by:m.uid});
@@ -508,11 +511,12 @@ const newMeetCmtCount=m=>{ const d=SEEN.d; if(!d||m.cancelled||cmtOld(m)) return
 // 내가 참석(대기 포함)하는 모임이 먼저, 그 안에선 최근 댓글 순
 const imInMeet=m=>(m.attendees||[]).some(a=>a.isMe)||(m.waitlist||[]).some(a=>a.isMe);
 const newCmtMeetings=()=>MEETINGS.filter(hasNewMeetCmt).sort((a,b)=>(imInMeet(b)-imInMeet(a))||(lastOtherCmt(meetCmtKey(b))-lastOtherCmt(meetCmtKey(a))));
-// 오늘(자정 전) 새로 만든 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요
+// 오늘(자정 전) 새로 올라온 다가오는 모임 (내가 만든 것도): 예약 탭 '새로 올라온 모임' 칸. 날이 바뀌면 빠져요.
+// 정기모임은 예약 오픈 날 오픈 시각부터 (meetPostedAt)
 const sameDay=(a,b)=>{ const x=new Date(a),y=new Date(b); return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate(); };
-const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=+(m.info&&m.info.createdAt)||0;
-  return m.status==="upcoming"&&!m.cancelled&&at&&sameDay(at,Date.now()); })
-  .sort((a,b)=>(+b.info.createdAt||0)-(+a.info.createdAt||0));
+const todayNewMeetings=()=>MEETINGS.filter(m=>{ const at=meetPostedAt(m);
+  return m.status==="upcoming"&&!m.cancelled&&at&&at<=Date.now()&&sameDay(at,Date.now()); })
+  .sort((a,b)=>meetPostedAt(b)-meetPostedAt(a));
 function CmtTag({n}){ return <span aria-label={`새 댓글 ${n}개`} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10.5,fontWeight:800,lineHeight:"16px",padding:"0 6px 0 5px",borderRadius:12,background:"#FDECEC",color:"#E5484D",whiteSpace:"nowrap",flex:"0 0 auto"}}><Icon name="message" size={11} stroke={2.6}/>새 댓글{n>1?` ${n}`:""}</span>; }
 function NewTag({style}){ return <span aria-label="새 항목" style={{fontSize:10,fontWeight:800,letterSpacing:"0.04em",lineHeight:"16px",padding:"0 6px",borderRadius:12,background:"#ef4444",color:"#fff",whiteSpace:"nowrap",...style}}>NEW</span>; }
 
@@ -6813,6 +6817,10 @@ export default function App() {
   // 지금 보고 있는 탭은 들어올 때·나갈 때 확인한 걸로 쳐요 (보는 중에 올라온 건 배지로 안 띄움)
   useEffect(()=>{ if(!inMain) return; markTabSeen(tab); return ()=>markTabSeen(tab); },[tab,inMain,myId]);
   const newMeetings=MEETINGS.filter(m=>m.status==="upcoming"&&!m.cancelled).map(meetingNewItem);
+  // 정기모임 예약 오픈 시각이 되면 앱을 켜 둔 채여도 바로 '새로 올라온 모임'·NEW·+n이 뜨게 다시 그려요
+  const nextOpen=newMeetings.reduce((t,x)=>x.at>Date.now()&&(!t||x.at<t)?x.at:t,0);
+  useEffect(()=>{ if(!nextOpen) return; const w=nextOpen-Date.now()+500; if(w>864e5) return;
+    const h=setTimeout(()=>SEEN.subs.forEach(f=>f()),Math.max(w,0)); return ()=>clearTimeout(h); },[nextOpen]);
   const newMembers=clubData?activeMembers(clubData).map(memberNewItem):[];
   const newPosts=(boardPosts||[]).map(postNewItem);
   const newPending=clubData?Object.entries(clubData.members).map(([uid,m])=>({uid,...m}))
