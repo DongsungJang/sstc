@@ -1628,7 +1628,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
   const myStatus=myVote&&myVote.status;
   const myGoing=next&&myStatus==="attend"?(going.find(g=>g.m.id===next.id)||{ok:true,label:"참석 확정"}):null;
-  const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).then(()=>{ if(status==="attend") notifyAttend(next,myStatus); }).catch(e=>alert(authMsg(e)));
+  const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).then(()=>{ if(status==="attend") notifyAttend(next,myStatus); else notifyUnattend(next,myVote); }).catch(e=>alert(authMsg(e)));
   const fill=next?Math.min(100,Math.round((next.attendees.length/Math.max(1,next.total))*100)):0;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
@@ -2332,12 +2332,34 @@ const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 // anon: 소곤소곤 익명 글·댓글에서 보내는 알림은 보낸 사람을 남기지 않아요
 const postFeed = (item,anon) => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:anon?"익명":ME,byUid:anon?"":myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",courtFee:"coin",attend:"check",mention:"message",cancel:"x",boardComment:"message"};
+const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",courtFee:"coin",attend:"check",attendCancel:"x",mention:"message",cancel:"x",boardComment:"message"};
 // 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
-const MEETING_NOTI=["meeting","admin","attend","mention","cancel"];
+const MEETING_NOTI=["meeting","admin","attend","attendCancel","mention","cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
+// 같은 모임에 다시 참석하면 예전 참석 알림은 지우고 새 알림 하나만 남겨요.
+// 참석 취소: 참석한 지 30분 안이면 참석 알림만 조용히 지우고, 30분 이상 지났으면 '참석을 취소했어요' 알림으로 바꿔요.
+// (내가 쓴 feed 알림을 지우려면 README 규칙의 feed 부분이 byUid 본인 수정을 허용해야 해요. 안 되면 화면에서 겹친 걸 합쳐 보여 줘요)
+const ATTEND_UNDO_MS=30*60*1000;
+const isSelfAttendNoti=n=>n&&(n.type==="attendCancel"||n.type==="attendUndo"||(n.type==="attend"&&/참석을 눌렀어요$/.test(n.text||"")));
+const attendNotiKey=n=>n.byUid+"|"+n.meetingId+"|"+n.to;
+const myAttendNotis=m=>{ const me=myUid(); if(!FB||!me) return Promise.resolve([]);
+  return once(FB.club.child("feed")).then(f=>toList(f).filter(n=>isSelfAttendNoti(n)&&n.byUid===me&&n.meetingId===m.id&&n.to===m.createdByUid)).catch(()=>[]); };
+const dropFeed=list=>Promise.all(list.map(n=>FB.club.child("feed/"+n.id).remove().then(()=>true,()=>false)));
 const notifyAttend=(m,prevStatus)=>{ if(!m||prevStatus==="attend"||!m.createdByUid||m.createdByUid===myUid()) return;
-  postFeed({type:"attend",to:m.createdByUid,meetingId:m.id,text:`${ME} 님이 ${m.date} ${m.placeName||m.place} 모임에 참석을 눌렀어요`}); };
+  myAttendNotis(m).then(old=>dropFeed(old)).then(()=>
+    postFeed({type:"attend",to:m.createdByUid,meetingId:m.id,text:`${ME} 님이 ${m.date} ${m.placeName||m.place} 모임에 참석을 눌렀어요`})); };
+// prevVote: 취소하기 전 내 투표 (참석 시각 at이 있어요)
+const notifyUnattend=(m,prevVote)=>{ if(!m||!prevVote||prevVote.status!=="attend"||!m.createdByUid||m.createdByUid===myUid()) return;
+  myAttendNotis(m).then(old=>{
+    const last=old.filter(n=>n.type==="attend").sort((a,b)=>b.at-a.at)[0];
+    const since=(last&&last.at)||prevVote.at||0;
+    const late=since>0&&Date.now()-since>=ATTEND_UNDO_MS;
+    return dropFeed(old).then(ok=>{
+      if(late) return postFeed({type:"attendCancel",to:m.createdByUid,meetingId:m.id,text:`${ME} 님이 ${m.date} ${m.placeName||m.place} 모임 참석을 취소했어요`});
+      // 30분 안: 조용히. 규칙 때문에 못 지웠으면 '숨김 표시'를 남겨 화면에서 참석 알림을 감춰요
+      if(ok.some(x=>!x)) return postFeed({type:"attendUndo",to:m.createdByUid,meetingId:m.id,text:""});
+    });
+  }); };
 const ago = t => { const m=Math.floor((Date.now()-t)/60000); if(m<1) return "방금"; if(m<60) return m+"분 전"; const h=Math.floor(m/60); if(h<24) return h+"시간 전";
   const d=Math.floor(h/24); if(d<7) return d+"일 전"; const x=new Date(t); return `${x.getMonth()+1}/${x.getDate()}`; };
 // 마지막 접속: club/lastSeen/<uid> 에 시각을 남겨요 (관리자만 읽을 수 있음)
@@ -2367,7 +2389,10 @@ function useClubFeed(uid){
     });
     return ()=>subs.forEach(f=>f());
   },[uid]);
-  const items=[...toList(st.feed),...toList(st.inbox,{mine:true})].filter(n=>n&&n.at&&(!n.to||n.to===uid)&&(n.type!=="courtFee"||ME_ADMIN)).sort((a,b)=>b.at-a.at).slice(0,50)
+  // 같은 회원·같은 모임의 참석/취소 알림은 가장 최근 것 하나만 (숨김 표시면 아예 안 보여요)
+  const seenKey=new Set();
+  const items=[...toList(st.feed),...toList(st.inbox,{mine:true})].filter(n=>n&&n.at&&(!n.to||n.to===uid)&&(n.type!=="courtFee"||ME_ADMIN)).sort((a,b)=>b.at-a.at)
+    .filter(n=>{ if(!isSelfAttendNoti(n)) return true; const k=attendNotiKey(n); if(seenKey.has(k)) return false; seenKey.add(k); return n.type!=="attendUndo"; }).slice(0,50)
     .map(n=>({...n,unread:n.at>(+st.seen||0)&&n.byUid!==uid}));
   // 중요 공지는 항상 맨 위에 (그 안에서는 최신 순)
   const notices=toList(st.notices).filter(n=>n.title).sort((a,b)=>(b.important?1:0)-(a.important?1:0)||b.at-a.at);
@@ -3580,7 +3605,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const total=confirmed.length;
   const votes0=(meeting.rec&&meeting.rec.votes)||{};
   const fill=Math.round((total/Math.max(1,meeting.total))*100), prio=meeting.kind!=="flash";
-  const setMyStatus=val=>{ const prev=myStatus; store.saveRsvp(voteValue(val,mine)); if(val==="attend") notifyAttend(meeting,prev); };
+  const setMyStatus=val=>{ const prev=myStatus; store.saveRsvp(voteValue(val,mine)); if(val==="attend") notifyAttend(meeting,prev); else notifyUnattend(meeting,mine); };
   const addGuest=()=>{const n=guestInput.trim();if(!n)return;store.saveRsvp({...voteValue("attend",mine),guests:[...guests,{name:n,at:nowAt()}]});setGuestInput("");setShowGuest(false);};
   const removeGuest=i=>store.saveRsvp({...voteValue("attend",mine),guests:guests.filter((_,idx)=>idx!==i)});
   // 무산 처리: 기록은 남기고 info.cancel 저장, 참석 누른 회원에게 알림
