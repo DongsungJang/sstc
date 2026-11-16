@@ -2337,9 +2337,9 @@ const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"m
 const MEETING_NOTI=["meeting","admin","attend","attendCancel","mention","cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
 // 같은 모임에 다시 참석하면 예전 참석 알림은 지우고 새 알림 하나만 남겨요.
-// 참석 취소: 참석한 지 12시간 안이면 참석 알림만 조용히 지우고, 12시간 이상 지났으면 '참석을 취소했어요' 알림으로 바꿔요.
+// 참석 취소: 참석한 지 30분 안이면 참석 알림만 조용히 지우고, 30분 이상 지났으면 '참석을 취소했어요' 알림으로 바꿔요.
 // (내가 쓴 feed 알림을 지우려면 README 규칙의 feed 부분이 byUid 본인 수정을 허용해야 해요. 안 되면 화면에서 겹친 걸 합쳐 보여 줘요)
-const ATTEND_UNDO_MS=12*60*60*1000;
+const ATTEND_UNDO_MS=30*60*1000;
 const isSelfAttendNoti=n=>n&&(n.type==="attendCancel"||n.type==="attendUndo"||(n.type==="attend"&&/참석을 눌렀어요$/.test(n.text||"")));
 const attendNotiKey=n=>n.byUid+"|"+n.meetingId+"|"+n.to;
 const myAttendNotis=m=>{ const me=myUid(); if(!FB||!me) return Promise.resolve([]);
@@ -2356,7 +2356,7 @@ const notifyUnattend=(m,prevVote)=>{ if(!m||!prevVote||prevVote.status!=="attend
     const late=since>0&&Date.now()-since>=ATTEND_UNDO_MS;
     return dropFeed(old).then(ok=>{
       if(late) return postFeed({type:"attendCancel",to:m.createdByUid,meetingId:m.id,text:`${ME} 님이 ${m.date} ${m.placeName||m.place} 모임 참석을 취소했어요`});
-      // 12시간 안: 조용히. 규칙 때문에 못 지웠으면 '숨김 표시'를 남겨 화면에서 참석 알림을 감춰요
+      // 30분 안: 조용히. 규칙 때문에 못 지웠으면 '숨김 표시'를 남겨 화면에서 참석 알림을 감춰요
       if(ok.some(x=>!x)) return postFeed({type:"attendUndo",to:m.createdByUid,meetingId:m.id,text:""});
     });
   }); };
