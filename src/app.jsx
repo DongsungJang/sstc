@@ -4107,9 +4107,12 @@ function MeetRow({m,past,last,onClick}){
   return(
     <div role="button" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter")onClick();}}
       style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:last?"none":"1px solid #E2E7F2",cursor:"pointer"}}>
-      <span style={{width:46,height:46,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
-        <span style={{fontSize:17,fontWeight:800,color:dim?"#A3AAC2":INK}}>{ok?d.getDate():"-"}</span>
-        <span style={{fontSize:10,fontWeight:500,color:"#6B7493",marginTop:3}}>{ok?WEEK[d.getDay()]:""}</span>
+      <span style={{width:46,height:48,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",boxShadow:`inset 0 0 0 0.35px #C3C9D8`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:1,fontVariantNumeric:"tabular-nums",overflow:"hidden"}}>
+        <span style={{alignSelf:"stretch",textAlign:"center",fontSize:9,fontWeight:700,color:"#fff",background:dim?"#C5CBDB":BLUE,padding:"3px 0 2px"}}>{ok?(d.getMonth()+1)+"월":"\u00a0"}</span>
+        <span style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:16,fontWeight:800,color:dim?"#A3AAC2":INK}}>{ok?d.getDate():"-"}</span>
+          <span style={{fontSize:9.5,fontWeight:500,color:"#6B7493",marginTop:2}}>{ok?WEEK[d.getDay()]:""}</span>
+        </span>
       </span>
       <div style={{flex:1,minWidth:0}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:dim?"#6B7493":INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
