@@ -4107,9 +4107,10 @@ function MeetRow({m,past,last,onClick}){
   return(
     <div role="button" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter")onClick();}}
       style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:last?"none":"1px solid #E2E7F2",cursor:"pointer"}}>
-      <span style={{width:46,height:46,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
+      <span style={{width:46,height:50,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
+        {ok&&<span style={{fontSize:10,fontWeight:700,color:dim?"#A3AAC2":BLUE,marginBottom:3}}>{d.getMonth()+1}월</span>}
         <span style={{fontSize:17,fontWeight:800,color:dim?"#A3AAC2":INK}}>{ok?d.getDate():"-"}</span>
-        <span style={{fontSize:10,fontWeight:500,color:"#6B7493",marginTop:3}}>{ok?WEEK[d.getDay()]:""}</span>
+        <span style={{fontSize:10,fontWeight:500,color:"#6B7493",marginTop:3}}>{ok?WEEK[d.getDay()]+"요일":""}</span>
       </span>
       <div style={{flex:1,minWidth:0}}>
         <p style={{margin:0,fontSize:14,fontWeight:700,color:dim?"#6B7493":INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:6}}>
