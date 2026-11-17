@@ -4107,7 +4107,7 @@ function MeetRow({m,past,last,onClick}){
   return(
     <div role="button" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter")onClick();}}
       style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:last?"none":"1px solid #E2E7F2",cursor:"pointer"}}>
-      <span style={{width:46,height:48,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",boxShadow:`inset 0 0 0 0.5px ${dim?"#C5CBDB":BLUE}`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:1,fontVariantNumeric:"tabular-nums",overflow:"hidden"}}>
+      <span style={{width:46,height:48,flex:"0 0 auto",borderRadius:12,background:dim?"#F4F6FB":"#fff",boxShadow:`inset 0 0 0 0.35px ${dim?"#D3D8E4":"#7C9AF0"}`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:1,fontVariantNumeric:"tabular-nums",overflow:"hidden"}}>
         <span style={{alignSelf:"stretch",textAlign:"center",fontSize:9,fontWeight:700,color:"#fff",background:dim?"#C5CBDB":BLUE,padding:"3px 0 2px"}}>{ok?(d.getMonth()+1)+"월":"\u00a0"}</span>
         <span style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
           <span style={{fontSize:16,fontWeight:800,color:dim?"#A3AAC2":INK}}>{ok?d.getDate():"-"}</span>
