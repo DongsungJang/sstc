@@ -72,7 +72,7 @@ const HELP=[
     caps:["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},
    {img:"guild-2",prep:steps(tab("예약"),role("tab",/번개/),scrollToText("마곡 레포츠센터",200)),crop:[["마곡 레포츠센터",2],["마곡 레포츠센터",2]],cropPad:[14,14],marks:[["길드 모임",1]],
     caps:["길드 모임은 그 길드원만 보고 참석해요"]}]},
- {id:"diary",title:"훈련일기",icon:"book",sub:"잘된 점 · 고칠 점, 자세 사진, 월간 리뷰",go:"diary",tip:"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)",blocks:[
+ {id:"diary",title:"훈련일기",icon:"book",sub:"잘된 점 · 고칠 점, 자세 사진, 누적 리뷰",go:"diary",tip:"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)",blocks:[
    {img:"diary-1",prep:steps(reload,tab("회원"),role("tab","훈련일기")),crop:[[60],["오늘 훈련일기 쓰기",0,0,"button"]],cropPad:[0,12],marks:[["훈련일기",0,0,"button"],[["전체",0,0,"button"],["내 일기",0,0,"button"]],["15",0,0,"button"],["오늘 훈련일기 쓰기",0,0,"button"]],
     caps:["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},
    {img:"diary-2",prep:steps(click("오늘 훈련일기 쓰기"),async p=>{ await p.evaluate(()=>{ document.querySelectorAll("*").forEach(e=>{ if(e.scrollTop>0) e.scrollTop=0; }); }); await p.waitForTimeout(300); }),crop:[["훈련 종류",1],["따라 할 사진",1]],cropPad:[14,40],marks:[["훈련 종류",1],[["잘된 점",1],["고칠 점",1,1]],[["지금 내 자세",1],["참고 자세",1]]],
@@ -83,10 +83,12 @@ const HELP=[
     caps:["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},
    {img:"diary-4c",prep:async p=>{ await p.evaluate(()=>{ const e=[...document.querySelectorAll("span,p")].find(e=>/^코멘트 \d/.test(e.textContent.trim())&&e.offsetParent!==null); if(e) scrollTo(0,e.getBoundingClientRect().top+scrollY-120); }); await p.waitForTimeout(400); },crop:[["코멘트 2",1],["다음 주 새벽조",2]],cropPad:[14,14],marks:[["어깨를 먼저 돌려",2],["다음 주 새벽조",2]],
     caps:["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},
-   {img:"diary-5",prep:steps(reload,tab("회원"),role("tab","훈련일기"),scrollToText("내 고칠 점 모음",40)),crop:[["내 고칠 점 모음",3],["고칠 점 모두 보기",1]],cropPad:[14,14],marks:[["고칠 점 모두 보기",0,0,"button"],[/*리뷰*/"월 리뷰",0,0,"button"]],
-    caps:["쓴 고칠 점을 날짜순으로 모아 보기","월간 리뷰: 자주 나온 문제와 패턴"]},
-   {img:"diary-6",prep:steps(click(/월 리뷰/)),crop:[["지난달 나에게 한마디",1],["반복해서 나온 말",0]],cropPad:[14,150],marks:[["지난달 나에게 한마디",1],["얘기는 이번 달엔 없어요.",1],["반복해서 나온 말",1]],
-    caps:["지난달 나에게 남긴 한마디 (리뷰 맨 아래에서 써요)","이번 달 한 줄 정리 · 늘었는지, 사라졌는지","고칠 점에 많이 나온 말 (아래엔 찾은 패턴)"]},
+   {img:"diary-5",prep:steps(reload,tab("회원"),role("tab","훈련일기"),scrollToText("내 고칠 점 모음",40)),crop:[["내 고칠 점 모음",3],["고칠 점 모두 보기",1]],cropPad:[14,14],marks:[["고칠 점 모두 보기",0,0,"button"],["누적 리뷰",0,0,"button"]],
+    caps:["쓴 고칠 점을 날짜순으로 모아 보기","누적 리뷰: 일기를 쓸 때마다 쌓여요"]},
+   {img:"diary-6",prep:steps(click("누적 리뷰",{exact:true})),crop:[["나에게 한마디",1],["반복해서 나온 말",0]],cropPad:[14,190],marks:[["나에게 한마디",1],["지금까지 고칠 점에",0],["반복해서 나온 말",1]],
+    caps:["나에게 한마디 (리뷰 맨 아래에서 써요)","지금까지 가장 많이 나온 문제 · 마지막 일기에서 더해진 것","많이 나온 말 · 누르면 그 일기만 (+ 이번 · 요즘 없음)"]},
+   {img:"diary-7",prep:scrollToText("고칠 점과 받은 코멘트",40),crop:[["고칠 점과 받은 코멘트",2],["다음 주 새벽조",2]],cropPad:[16,14],marks:[["백핸드 칠 때 공이 계속",1],[["어깨를 먼저 돌려",2],["다음 주 새벽조",2]]],
+    caps:["내가 쓴 고칠 점 (최근 순)","그 일기에 받은 코멘트가 바로 아래 쌓여요"]},
  ]},
  {id:"board",title:"소곤소곤",icon:"message",sub:"익명으로도 쓰는 게시판",go:"board",tip:"내 글은 고치거나 지울 수 있어요",blocks:[
    {img:"board-1",prep:tab("소곤소곤"),crop:[[60],["이번 주말 비 소식",3]],marks:[["새 글 쓰기",0,0,"button"],["글 내용으로 찾기",0,0,"input"],[["전체",0,0,"button"],["익명",0,0,"button"]],["백핸드 슬라이스",3],["새 댓글",0,0,"span"]],
