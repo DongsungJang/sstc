@@ -1706,10 +1706,10 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
                 {n.content}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
                   <span style={{fontSize:11,color:"#A3AAC2"}}>{n.by?`${n.by} · `:""}{ago(n.at)}{n.editedAt?" · 수정됨":""}</span>
-                  {isAdmin&&<span style={{display:"flex",gap:14}}>
+                  <span style={{display:"flex",gap:14,alignItems:"center"}}>{isAdmin&&<>
                     <button type="button" onClick={()=>onEditNotice&&onEditNotice(n)} style={{background:"none",border:"none",color:BLUE,fontSize:12,fontWeight:700,cursor:"pointer",padding:0}}>수정</button>
                     <button type="button" onClick={()=>delNotice(n)} style={{background:"none",border:"none",color:"#ef4444",fontSize:12,cursor:"pointer",padding:0}}>삭제</button>
-                  </span>}
+                  </>}<ShareLinkButton url={shareUrl("notice",n.id)} style={{background:"#fff"}}/></span>
                 </div>
               </div>}
             </div>
@@ -3750,7 +3750,10 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
       </Card>
       {inviteOpen&&<InviteSheet meeting={meeting} onClose={()=>setInviteOpen(false)}/>}
       {isMT(meeting)&&!gone&&<Carpool meeting={meeting} confirmed={confirmed} isPast={isPast}/>}
-      <button type="button" onClick={()=>shareMeeting(meeting)} style={{...btnSecondary,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>카톡으로 공유</button>
+      <div style={{display:"flex",gap:8}}>
+        <button type="button" onClick={()=>shareMeeting(meeting)} style={{...btnSecondary,flex:1,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>카톡으로 공유</button>
+        <ShareLinkButton url={location.origin+location.pathname+"#meeting-"+meeting.id} style={{width:48,height:"auto",borderRadius:14,background:"#fff",boxShadow:"inset 0 0 0 1.5px #E1E6F2"}}/>
+      </div>
       {meeting.desc&&<Card><SectionTitle>모임 설명</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
       <Card>
         <SectionTitle>참석 확정 ({total}/{meeting.total}명)</SectionTitle>
@@ -5469,6 +5472,7 @@ function FreeBoard({canWrite,isAdmin,focus}){
         {mine&&<button type="button" onClick={()=>setForm({initial:p})} style={small}><Ic n="pencil" s={12}/> 수정</button>}
         <button type="button" onClick={()=>del(p)} style={{...small,color:"#ef4444"}}><Ic n="trash" s={12}/> 삭제</button>
       </span>}
+      {inDetail&&<ShareLinkButton url={shareUrl("post",p.id)} style={{marginLeft:(mine||isAdmin)?0:"auto"}}/>}
     </div>); };
   const open=openId&&posts.find(p=>p.id===openId);
   let body;
@@ -5950,7 +5954,7 @@ function GuildBoard({g}){
   const me=myUid(), manage=g.leader===me||ME_ADMIN;
   const posts=useGuildPosts(g.id,true);
   const {names}=useMentions();
-  const [form,setForm]=useState(null), [openId,setOpenId]=useState(null);
+  const [form,setForm]=useState(null), [openId,setOpenId]=useState(()=>{ if(GUILD_POST_LINK.gid!==g.id) return null; const id=GUILD_POST_LINK.pid; GUILD_POST_LINK.gid=GUILD_POST_LINK.pid=null; return id; });
   if(!posts) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>게시판을 불러오는 중이에요…</p></Card>;
   const like=p=>{ const on=!!(p.likes&&p.likes[me]); guildPostRef(g.id,`${p.id}/likes/${me}`).set(on?null:true).catch(guildFail); };
   const del=p=>{ if(window.confirm("이 글을 지울까요? 댓글도 같이 지워져요.")) guildPostRef(g.id,p.id).remove().then(()=>setOpenId(null)).catch(guildFail); };
@@ -5976,6 +5980,7 @@ function GuildBoard({g}){
           {(open.uid===me||manage)&&<span style={{marginLeft:"auto",display:"flex",gap:14}}>
             {open.uid===me&&<button type="button" onClick={()=>setForm({initial:open})} style={small}><Ic n="pencil" s={12}/> 수정</button>}
             <button type="button" onClick={()=>del(open)} style={{...small,color:"#ef4444"}}><Ic n="trash" s={12}/> 삭제</button></span>}
+          <ShareLinkButton url={shareUrl("gpost",g.id+"."+open.id)} style={{marginLeft:(open.uid===me||manage)?0:"auto"}}/>
         </div>
       </Card>
       <CommentBox comments={open.comments} isAdmin={manage} canWrite save={(cid,v)=>guildPostRef(g.id,`${open.id}/comments/${cid}`).set(v)}
@@ -6005,7 +6010,7 @@ function GuildBoard({g}){
 
 function GuildDetail({g,data,onBack,onEdit,onOpenMeeting,onCreateMeeting}){
   const me=myUid(), isLeader=g.leader===me, member=inGuild(g,me), manage=isLeader||ME_ADMIN;
-  const [tab,setTab]=useState("members");
+  const [tab,setTab]=useState(()=>GUILD_POST_LINK.gid===g.id?"board":"members");
   const [inviting,setInviting]=useState(false);
   const [handing,setHanding]=useState(false);
   const uids=Object.keys(g.members||{}).sort((a,b)=>(a===g.leader?-1:b===g.leader?1:nickOf(a).localeCompare(nickOf(b),"ko")));
@@ -6294,6 +6299,37 @@ const helpImg=n=>`help/${n}.jpg?v=${HELP_VER}`;
 const HELP_LINK={id:null};
 const readHelpHash=()=>{ try{ const mm=/^#help(?:-([a-z]+))?$/.exec(location.hash); if(!mm) return false; HELP_LINK.id=mm[1]||""; history.replaceState(history.state,"",location.pathname+location.search); return true; }catch(e){ return false; } };
 readHelpHash();
+// 글 공유 링크: 훈련일기 #diary-<id>, 소곤소곤 #post-<id>, 공지 #notice-<id>, 길드 게시판 #gpost-<길드>.<글> (로그인 후 그 글을 바로 열어요)
+// 링크엔 글 번호만 들어가요 (익명 글도 글쓴이가 드러나지 않아요)
+const GUILD_POST_LINK={gid:null,pid:null};
+const SHARE_LINK={kind:null,id:null};
+const readShareHash=()=>{ try{ const mm=/^#(diary|post|notice|gpost)-([\w.-]+)$/.exec(location.hash); if(!mm) return false; SHARE_LINK.kind=mm[1]; SHARE_LINK.id=mm[2]; history.replaceState(history.state,"",location.pathname+location.search); return true; }catch(e){ return false; } };
+readShareHash();
+const shareUrl=(kind,id)=>location.origin+location.pathname+"#"+kind+"-"+id;
+// 아래쪽에 잠깐 떴다 사라지는 안내 ("링크가 복사되었습니다")
+let TOAST_SET=null;
+const showToast=t=>{ if(TOAST_SET) TOAST_SET({t,k:Date.now()}); };
+function Toast(){
+  const [m,setM]=useState(null);
+  useEffect(()=>{ TOAST_SET=setM; return ()=>{ TOAST_SET=null; }; },[]);
+  useEffect(()=>{ if(!m) return; const h=setTimeout(()=>setM(null),1800); return ()=>clearTimeout(h); },[m]);
+  if(!m) return null;
+  return <div role="status" aria-live="polite" style={{position:"fixed",left:"50%",bottom:"calc(96px + env(safe-area-inset-bottom))",transform:"translateX(-50%)",zIndex:400,background:"rgba(11,30,91,0.92)",color:"#fff",fontSize:14,fontWeight:700,padding:"11px 18px",borderRadius:999,boxShadow:"0 6px 20px rgba(11,30,91,0.25)",display:"flex",alignItems:"center",gap:7,whiteSpace:"nowrap",animation:"sstcToast .18s ease-out",fontFamily:FONT}}>
+    <Icon name="check" size={15} color={BALL} stroke={3}/>{m.t}
+  </div>;
+}
+// 링크 복사 (클립보드가 막혀 있으면 숨은 입력칸으로 복사)
+function copyLink(url){
+  const ok=()=>showToast("링크가 복사되었습니다");
+  const old=()=>{ try{ const ta=document.createElement("textarea"); ta.value=url; ta.setAttribute("readonly",""); ta.style.cssText="position:fixed;top:-100px;opacity:0"; document.body.appendChild(ta); ta.select(); const r=document.execCommand("copy"); ta.remove(); if(r) ok(); else window.prompt("아래 링크를 복사해 주세요",url); }catch(e){ window.prompt("아래 링크를 복사해 주세요",url); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok).catch(old); else old();
+}
+// 글 오른쪽 아래 공유 버튼: 누르면 그 글 링크가 복사돼요
+function ShareLinkButton({url,style}){
+  return <button type="button" aria-label="링크 복사" onClick={e=>{ e.stopPropagation(); copyLink(url); }} style={{width:34,height:34,borderRadius:10,border:"none",background:"#F1F4FA",color:"#4A5578",display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0,flexShrink:0,...style}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-8.5 8.5"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
+  </button>;
+}
 const helpUrl=id=>location.origin+location.pathname+"#help"+(id?"-"+id:"");
 function shareHelp(h){ shareText(`[SSTC 사용 안내] ${h.title}\n${h.sub}\n${helpUrl(h.id)}`,"SSTC 사용 안내 · "+h.title,"안내 링크"); }
 // 보여 주는 순서: 관리 탭에서 정한 순서(club/helpOrder = [기능 id…]) 먼저, 나머지는 기본 순서
@@ -6966,10 +7002,11 @@ function DiaryDetail({d,onBack,onEdit}){
         {d.good&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#12A15E"}}>잘된 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.good}</p></div>}
         {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p></div>}
       </div>
-      {(mine||ME_ADMIN)&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12}}>
+      {(mine||ME_ADMIN||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
         {mine&&d.fix&&<button type="button" onClick={()=>{ setReview(d.uid); onBack(); }} style={{marginRight:"auto",background:"#F2FAD0",border:"none",borderRadius:9,padding:"5px 10px",fontSize:12.5,fontWeight:800,color:INK,cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4}}><Icon name="target" size={12} stroke={2.4}/>누적 리뷰에 더해졌어요 ›</button>}
         {mine&&<button type="button" onClick={onEdit} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}><Ic n="pencil" s={12}/> 수정</button>}
-        <button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>
+        {(mine||ME_ADMIN)&&<button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>}
+        {d.vis!=="me"&&<ShareLinkButton url={shareUrl("diary",d.id)}/>}
       </div>}
     </Card>
     {d.vis==="me"?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 나만 보는 일기예요</p>
@@ -7410,6 +7447,13 @@ export default function App() {
   // 사용 안내 공유 링크(#help-<기능>): 로그인해서 들어오면 그 안내를 바로 열어요. 앱이 열려 있을 때 주소가 바뀌어도요.
   const [,setHelpLinkN]=useState(0);
   useEffect(()=>{ const f=()=>{ if(readHelpHash()) setHelpLinkN(n=>n+1); }; window.addEventListener("hashchange",f); return ()=>window.removeEventListener("hashchange",f); },[]);
+  // 글 공유 링크(#diary-<id>, #post-<id>): 로그인 후 그 글을 열어요
+  useEffect(()=>{ const f=()=>{ if(readShareHash()) setHelpLinkN(n=>n+1); }; window.addEventListener("hashchange",f); return ()=>window.removeEventListener("hashchange",f); },[]);
+  useEffect(()=>{ if(inMain&&SHARE_LINK.id){ const {kind,id}=SHARE_LINK; SHARE_LINK.kind=SHARE_LINK.id=null; if(openMeeting) setOpenMeeting(null);
+    if(kind==="diary"){ setTab("members"); openDiaryFromNoti(id); }
+    else if(kind==="notice"){ setTab("home"); setFocusNotice(id+"#"+Date.now()); }
+    else if(kind==="gpost"){ const [gid,pid]=id.split("."); GUILD_POST_LINK.gid=gid; GUILD_POST_LINK.pid=pid; GUILD_GO&&GUILD_GO(gid); }
+    else { setTab("board"); setBoardFocus(id+"#"+Date.now()); } try{window.scrollTo(0,0);}catch(e){} } });
   useEffect(()=>{ if(inMain&&HELP_LINK.id!==null){ const id=HELP_LINK.id; HELP_LINK.id=null; setHelp(id&&HELP.some(h=>h.id===id)?id:true); } });
   // 회원 정보가 바뀌면(닉네임·NTRP 수정) 모임 목록을 그 최신 값으로 다시 채워요
   const clubSeen=useRef(null);
@@ -7678,6 +7722,7 @@ export default function App() {
                   </div>
                 </div>); })()}
               </>}
+      <Toast/>
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
         if(n.diaryId){ if(openMeeting){setOpenMeeting(null);} setTab("members"); openDiaryFromNoti(n.diaryId); try{window.scrollTo(0,0);}catch(e){} }
