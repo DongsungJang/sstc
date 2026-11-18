@@ -778,7 +778,7 @@ function Step3({data,onChange,onSubmit,onBack,isAdmin,submitLabel="가입 완료
       {/* NTRP 팝업 */}
       {ntrpPopup&&popupItem&&(
         <div onClick={()=>setNtrpPopup(null)} style={{position:"fixed",inset:0,background:"rgba(27,37,89,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,padding:24,maxWidth:340,width:"100%",boxShadow:"0 8px 32px rgba(0,0,0,0.2)",maxHeight:"80vh",overflowY:"auto"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,padding:24,maxWidth:340,width:"100%",boxShadow:"0 8px 32px rgba(0,0,0,0.2)",maxHeight:"80vh",overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div><span style={{fontSize:24,fontWeight:"bold",color:BLUE}}>{popupItem.score}</span><span style={{fontSize:16,fontWeight:600,color:INK,marginLeft:8}}>{popupItem.label}</span></div>
               <button onClick={()=>setNtrpPopup(null)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#A3AAC2"}}>✕</button>
@@ -1052,7 +1052,7 @@ function AdPopup({ad,onClose}){
   useEffect(()=>{ const k=e=>{ if(e.key==="Escape") onClose(); }; window.addEventListener("keydown",k); return ()=>window.removeEventListener("keydown",k); },[]);
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:60,background:"rgba(15,23,60,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-      <div role="dialog" aria-label={ad.title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"80vh",overflowY:"auto",background:"#fff",borderRadius:24,padding:20,boxSizing:"border-box",boxShadow:"0 20px 50px rgba(15,23,60,0.3)",fontFamily:FONT}}>
+      <div role="dialog" aria-label={ad.title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:360,maxHeight:"80vh",overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none",background:"#fff",borderRadius:24,padding:20,boxSizing:"border-box",boxShadow:"0 20px 50px rgba(15,23,60,0.3)",fontFamily:FONT}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
           {adLogoOk(ad.logoImg)&&<img src={ad.logoImg} alt="" style={{width:44,height:44,borderRadius:12,objectFit:"cover",flexShrink:0,boxShadow:"0 0 0 1px rgba(0,0,0,0.06)"}}/>}
           <div style={{flex:1,minWidth:0}}>
@@ -4435,7 +4435,7 @@ function MyInfoSheet({account,onClose,onLogout,onProfileSaved,startEdit}) {
   const Row=({k,v})=>v?<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid #EEF1FA"}}><span style={{width:84,fontSize:13,color:"#A3AAC2"}}>{k}</span><span style={{flex:1,fontSize:13,fontWeight:500,color:INK,wordBreak:"keep-all"}}>{v}</span></div>:null;
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
+      <div role="dialog" aria-label="내 정보" onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 16px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{edit?"정보 수정":"내 정보"}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
@@ -4527,7 +4527,7 @@ function NoticeForm({onClose,edit}) {   // edit = 고칠 공지 (없으면 새�
 function Sheet({title,onClose,children}) {
   const el=(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:16}}>
+      <div role="dialog" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"88vh",overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT,display:"flex",flexDirection:"column",gap:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{title}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>
@@ -5130,7 +5130,7 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
   const hint=t=><p style={{margin:"6px 0 0",fontSize:11,color:"#A3AAC2",lineHeight:1.5}}>{t}</p>;
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(16,24,64,0.45)",zIndex:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
+      <div role="dialog" aria-label={editing?"모임 수정":"모임 만들기"} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",overflowX:"hidden",overscrollBehaviorX:"none",background:"#EDF0F6",borderRadius:"28px 28px 0 0",padding:"20px 18px calc(20px + env(safe-area-inset-bottom,0px))",boxSizing:"border-box",fontFamily:FONT}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <p style={{margin:0,fontSize:19,fontWeight:700,color:INK}}>{editing?"모임 수정":"모임 만들기"}</p>
           <button type="button" onClick={onClose} aria-label="닫기" style={{background:"#E4E9F7",border:"none",borderRadius:"50%",width:34,height:34,fontSize:16,color:"#6B7493",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={16} stroke={2.2}/></button>

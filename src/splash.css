@@ -61,3 +61,10 @@
 input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),
 textarea,
 select{font-size:16px!important}
+
+/* 아이폰 사파리의 날짜·시간 입력칸은 width:100%를 무시하고 화면보다 넓어져서,
+   새 모임 창이 좌우로 밀려 흔들렸어요. 칸 폭을 부모 안으로 묶고, 글자도 다른 칸처럼 왼쪽 정렬해요. */
+input[type=date],input[type=time],input[type=datetime-local],input[type=month]{
+  -webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;box-sizing:border-box;min-height:48px}
+input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value,
+input[type=datetime-local]::-webkit-date-and-time-value{text-align:left;margin:0}
