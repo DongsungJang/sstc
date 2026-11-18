@@ -3,6 +3,7 @@
 // - 빌드된 index.html을 Playwright로 열고, 파이어베이스 대신 가짜 저장소(mockfb.js)에 예시 데이터(seed.js)를 넣어 찍어요.
 // - 화면을 잘라 help/<이름>.jpg로 저장하고, 노란 테두리 위치와 설명을 src/app.jsx의 HELP 자리에 써 넣어요.
 // - React를 cdnjs에서 못 받는 환경이면 REACT_DIR=<react·react-dom UMD 파일이 있는 폴더>를 주세요.
+// - 일부만 다시 찍으려면 ONLY=diary,me 처럼 주세요. 나머지는 src/app.jsx에 있던 그림·표시를 그대로 써요.
 const {chromium}=require('playwright');
 const fs=require('fs'), path=require('path'), crypto=require('crypto');
 const ROOT=path.join(__dirname,'..','..');
@@ -71,6 +72,22 @@ const HELP=[
     caps:["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},
    {img:"guild-2",prep:steps(tab("예약"),role("tab",/번개/),scrollToText("마곡 레포츠센터",200)),crop:[["마곡 레포츠센터",2],["마곡 레포츠센터",2]],cropPad:[14,14],marks:[["길드 모임",1]],
     caps:["길드 모임은 그 길드원만 보고 참석해요"]}]},
+ {id:"diary",title:"훈련일기",icon:"book",sub:"잘된 점 · 고칠 점, 자세 사진, 월간 리뷰",go:"diary",tip:"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)",blocks:[
+   {img:"diary-1",prep:steps(reload,tab("회원"),role("tab","훈련일기")),crop:[[60],["오늘 훈련일기 쓰기",0,0,"button"]],cropPad:[0,12],marks:[["훈련일기",0,0,"button"],[["전체",0,0,"button"],["내 일기",0,0,"button"]],["15",0,0,"button"],["오늘 훈련일기 쓰기",0,0,"button"]],
+    caps:["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},
+   {img:"diary-2",prep:steps(click("오늘 훈련일기 쓰기"),async p=>{ await p.evaluate(()=>{ document.querySelectorAll("*").forEach(e=>{ if(e.scrollTop>0) e.scrollTop=0; }); }); await p.waitForTimeout(300); }),crop:[["훈련 종류",1],["따라 할 사진",1]],cropPad:[14,40],marks:[["훈련 종류",1],[["잘된 점",1],["고칠 점",1,1]],[["지금 내 자세",1],["참고 자세",1]]],
+    caps:["레슨 · 게임 · 랠리 · 혼자 연습","잘된 점 · 고칠 점은 글로 편하게","지금 내 자세와 참고 자세 사진을 나란히"]},
+   {img:"diary-3",prep:async p=>{ await p.evaluate(()=>{ const s=[...document.querySelectorAll("body *")].find(e=>e.textContent.trim()==="전체 공개"&&e.offsetParent!==null); if(s) s.scrollIntoView({block:"center"}); }); await p.waitForTimeout(400); },crop:[["누가 볼 수 있나요?"],["다른 회원 코멘트 받기"]],cropPad:[18,18],marks:[[["전체 공개",1],["나만 보기",1]],["다른 회원 코멘트 받기",1]],
+    caps:["전체 공개 / 나만 보기","코멘트를 받을지 (달리면 알림)"]},
+   {img:"diary-4",prep:steps(reload,tab("회원"),role("tab","훈련일기"),async p=>{ await p.getByText("백핸드 칠 때 공이 계속").last().click(); await p.waitForTimeout(900); },scrollToText("지금 내 자세",120)),crop:[["지금 내 자세",2],["참고: 레슨",0]],cropPad:[14,14],marks:[["지금 내 자세",2],["참고 자세",2]],
+    caps:["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},
+   {img:"diary-4c",prep:async p=>{ await p.evaluate(()=>{ const e=[...document.querySelectorAll("span,p")].find(e=>/^코멘트 \d/.test(e.textContent.trim())&&e.offsetParent!==null); if(e) scrollTo(0,e.getBoundingClientRect().top+scrollY-120); }); await p.waitForTimeout(400); },crop:[["코멘트 2",1],["다음 주 새벽조",2]],cropPad:[14,14],marks:[["어깨를 먼저 돌려",2],["다음 주 새벽조",2]],
+    caps:["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},
+   {img:"diary-5",prep:steps(reload,tab("회원"),role("tab","훈련일기"),scrollToText("내 고칠 점 모음",40)),crop:[["내 고칠 점 모음",3],["고칠 점 모두 보기",1]],cropPad:[14,14],marks:[["고칠 점 모두 보기",0,0,"button"],[/*리뷰*/"월 리뷰",0,0,"button"]],
+    caps:["쓴 고칠 점을 날짜순으로 모아 보기","월간 리뷰: 자주 나온 문제와 패턴"]},
+   {img:"diary-6",prep:steps(click(/월 리뷰/)),crop:[["지난달 나에게 한마디",1],["반복해서 나온 말",0]],cropPad:[14,150],marks:[["지난달 나에게 한마디",1],["얘기는 이번 달엔 없어요.",1],["반복해서 나온 말",1]],
+    caps:["지난달 나에게 남긴 한마디 (리뷰 맨 아래에서 써요)","이번 달 한 줄 정리 · 늘었는지, 사라졌는지","고칠 점에 많이 나온 말 (아래엔 찾은 패턴)"]},
+ ]},
  {id:"board",title:"소곤소곤",icon:"message",sub:"익명으로도 쓰는 게시판",go:"board",tip:"내 글은 고치거나 지울 수 있어요",blocks:[
    {img:"board-1",prep:tab("소곤소곤"),crop:[[60],["이번 주말 비 소식",3]],marks:[["새 글 쓰기",0,0,"button"],["글 내용으로 찾기",0,0,"input"],[["전체",0,0,"button"],["익명",0,0,"button"]],["백핸드 슬라이스",3],["새 댓글",0,0,"span"]],
     caps:["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요","내 글에 새 댓글 (아래 탭 위 말풍선에도 떠요)"]}]},
@@ -106,7 +123,11 @@ const HELP=[
   const st=p.getByText('시작하기'); if(await st.count()) await st.first().click(); await p.waitForTimeout(1500);
   const outDir=path.join(ROOT,'help'); fs.mkdirSync(outDir,{recursive:true});
   const hash=crypto.createHash('sha1');
+  const ONLY=process.env.ONLY?process.env.ONLY.split(','):null;
+  const OLD={}; if(ONLY){ const m=fs.readFileSync(path.join(ROOT,'src','app.jsx'),'utf8').match(/const HELP_VER=("[^"]*");\nconst HELP=\[\n([\s\S]*?)\n\];/);
+    hash.update(JSON.parse(m[1])); m[2].split(',\n').forEach(l=>{ const d=JSON.parse(l.trim()); OLD[d.id]=d; }); }
   for(const h of HELP){
+    if(ONLY&&!ONLY.includes(h.id)){ const o=OLD[h.id]; if(o) h.blocks.forEach((bl,i)=>{ const ob=o.blocks[i]; if(bl.img&&ob&&ob.img===bl.img){ bl.w=ob.w; bl.h=ob.h; bl.m=ob.marks; } }); continue; }
     if(h.admin){ await p.evaluate(()=>localStorage.setItem('sstc-admin-view','admin')); await p.addInitScript(()=>{ try{ localStorage.setItem('sstc-admin-view','admin'); }catch(e){} }); await p.goto(p.url()); await p.waitForTimeout(1500); const s2=p.getByText('시작하기'); if(await s2.count()) await s2.first().click(); await p.waitForTimeout(1500); }
     for(const bl of h.blocks){
       if(!bl.img) continue;
