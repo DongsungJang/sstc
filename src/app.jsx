@@ -2332,7 +2332,7 @@ const newId = () => Date.now()+"_"+Math.random().toString(36).slice(2,7);
 const myUid = () => (FB&&FB.auth.currentUser&&FB.auth.currentUser.uid)||"";
 // anon: 소곤소곤 익명 글·댓글에서 보내는 알림은 보낸 사람을 남기지 않아요
 const postFeed = (item,anon) => FB ? FB.club.child("feed/"+newId()).set({...item,at:Date.now(),by:anon?"익명":ME,byUid:anon?"":myUid()}).catch(()=>{}) : Promise.resolve();
-const NOTI_ICON = {guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",courtFee:"coin",attend:"check",attendCancel:"x",mention:"message",cancel:"x",boardComment:"message"};
+const NOTI_ICON = {diaryComment:"book",guild:"shield",member:"userPlus",meeting:"calendar",notice:"megaphone",approved:"checkCircle",admin:"bell",courtFee:"coin",attend:"check",attendCancel:"x",mention:"message",cancel:"x",boardComment:"message"};
 // 한 사람에게만 가는 알림도 feed에 쓰고 to(받는 사람 uid)로 걸러요 (inbox는 관리자만 쓸 수 있어서). 규칙 변경 없음
 const MEETING_NOTI=["meeting","admin","attend","attendCancel","mention","cancel"];
 // 참석을 누르면 모임 만든 사람에게 알림 (내가 만든 모임이면 안 보냄)
@@ -4835,7 +4835,7 @@ function NotiSheet({items,onClose,onPick,isAdmin}) {
       {items.length===0?<Empty>새 알림이 없어요.</Empty>:(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {items.map(n=>{
-            const go=n.type==="guild"||n.postId||(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action))||(n.type==="courtFee"&&isAdmin);
+            const go=n.type==="guild"||n.diaryId||n.postId||(MEETING_NOTI.includes(n.type)&&n.meetingId)||n.type==="meeting"||n.type==="notice"||(n.type==="member"&&isAdmin)||(n.type==="admin"&&(n.meetingId||n.action))||(n.type==="courtFee"&&isAdmin);
             return(
               <button key={n.id} type="button" onClick={()=>onPick(n)} style={{display:"flex",alignItems:"flex-start",gap:12,textAlign:"left",width:"100%",padding:"12px 14px",background:n.unread?"#fff":"#F8F9FD",border:n.unread?`1.5px solid ${BLUE_LIGHT}`:"1px solid #EEF1FA",borderRadius:18,cursor:"pointer",fontFamily:FONT,boxShadow:n.unread?SHADOW:"none"}}>
                 <span style={{width:34,height:34,borderRadius:"50%",background:BLUE_LIGHT,color:BLUE,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={NOTI_ICON[n.type]||"bell"} size={17} stroke={1.9}/></span>
@@ -5522,7 +5522,7 @@ function MembersTab({onOpenMeeting,onCreateMeeting}){
   const [view]=useShared("memView",memViewInit);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
-      {view==="stats"?<StatsTab/>:view==="guild"?<GuildView onOpenMeeting={onOpenMeeting} onCreateMeeting={onCreateMeeting}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
+      {view==="stats"?<StatsTab/>:view==="diary"?<DiaryView/>:view==="guild"?<GuildView onOpenMeeting={onOpenMeeting} onCreateMeeting={onCreateMeeting}/>:<MemberList onOpenMeeting={onOpenMeeting}/>}
     </div>);
 }
 function MemberList({onOpenMeeting}){
@@ -5531,6 +5531,8 @@ function MemberList({onOpenMeeting}){
   const [q]=useShared("memQ","");
   const [sort]=useShared("memSort",memSortInit);
   const [open,setOpen]=useState(null);
+  const diaries=useDiaries();
+  const [,setMemView]=useShared("memView",memViewInit), [,setDiaryUser]=useShared("diaryUser",null);
   if(!data) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>회원 목록을 불러오는 중이에요…</p></Card>;
   const ym=todayYmd().slice(0,7);
   const monthCount={}; rankingOf(heldMeetings().filter(m=>m.iso.slice(0,7)===ym)).forEach(r=>{monthCount[r.name]=r.count;});
@@ -5588,6 +5590,12 @@ function MemberList({onOpenMeeting}){
               {m.weeklyFreq&&chip("calendar",`주 ${String(m.weeklyFreq).replace(/^주\s*/,"")}`)}
               {m.lessonStatus&&chip("users",m.lessonStatus)}
             </div>}
+            {open===gr.label+m.uid&&(()=>{ const n=(diaries||[]).filter(d=>d.uid===m.uid&&canSeeDiary(d)).length; return(
+              <button type="button" onClick={e=>{e.stopPropagation();setDiaryUser(m.uid);setMemView("diary");try{window.scrollTo(0,0);}catch(x){}}} style={{marginTop:10,width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",border:"none",borderRadius:12,background:"#F2FAD0",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
+                <Icon name="book" size={16} color={INK} stroke={2}/>
+                <span style={{flex:1,fontSize:13.5,fontWeight:800,color:INK}}>훈련일기 <span style={{color:"#5E6A8E",fontWeight:600}}>{n}편 보기</span></span>
+                <Icon name="chevR" size={15} color="#5E6A8E" stroke={2.4}/>
+              </button>); })()}
             {open===gr.label+m.uid&&(()=>{ const up=upcomingOf(m.uid); return(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
                 <p style={{margin:"0 0 6px",fontSize:11,fontWeight:600,color:"#8A93B2"}}>참가 예정 모임</p>
@@ -6477,6 +6485,525 @@ function useShared(key,init){
   return [SHARED[key],v=>{ SHARED[key]=typeof v==="function"?v(SHARED[key]):v; SHARED_SUBS.forEach(g=>g()); }];
 }
 
+// ─── 훈련일기 ─────────────────────────────────────────────────────────────────
+// 회원 탭 > 훈련일기: 달력으로 날짜별 일기, 지금 내 자세 / 참고 자세 사진, 코멘트(@부르기), 고칠 점 모음, 월간 리뷰
+Object.assign(ICON_PATHS,{
+  book:["M4 19.5A2.5 2.5 0 0 1 6.5 17H20","M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z","M9 7h7","M9 11h5"],
+  up:["M12 19V5","M5 12l7-7 7 7"], down:["M12 5v14","M19 12l-7 7-7-7"],
+  target:["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z","M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z","M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"],
+});
+const DIARY_TYPES=[["lesson","레슨"],["game","게임"],["rally","랠리"],["solo","혼자 연습"]];
+const DIARY_TYPE=k=>(DIARY_TYPES.find(x=>x[0]===k)||DIARY_TYPES[1])[1];
+const DIARY_VIS=[["all","전체 공개","users"],["me","나만 보기","lock"]];
+const DIARY_FILTERS=[["all","전체"],["mine","내 일기"]];
+function VisTag({v}){ if(!v||v==="all") return null; const x=DIARY_VIS.find(y=>y[0]===v);
+  return <span style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:11,fontWeight:700,color:v==="me"?"#5E6A8E":"#2152E6",background:v==="me"?"#EEF1FA":BLUE_LIGHT,padding:"2px 7px",borderRadius:6,whiteSpace:"nowrap"}}><Icon name={x[2]} size={10} stroke={2.6}/>{x[1]}</span>; }
+function BackLink({label,onClick}){ return <button type="button" onClick={onClick} style={{alignSelf:"flex-start",display:"inline-flex",alignItems:"center",gap:2,padding:"4px 8px 4px 2px",border:"none",background:"none",color:INK,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:FONT}}><Icon name="back" size={18} stroke={2.4}/>{label}</button>; }
+// 훈련일기 달력: 일기 쓴 날에 점 (내 일기 = 공 색, 다른 회원 = 흰색/파랑). dark = 파란 윗부분용
+function DiaryCalendar({list,ym,setYm,pick,setPick,dark,label="일기"}){
+  const today=todayYmd(), me=myUid();
+  const [y,mo]=ym.split("-").map(Number);
+  const shift=d=>{ const t=new Date(y,mo-1+d,1); setYm(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); setPick(null); };
+  const byDay={}; list.forEach(d=>{ if(d.date.slice(0,7)===ym) (byDay[d.date]=byDay[d.date]||[]).push(d); });
+  const first=new Date(y,mo-1,1).getDay(), days=new Date(y,mo,0).getDate();
+  const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+  const n=Object.values(byDay).flat().length;
+  const navBtn=(d,ic,lb)=><button type="button" aria-label={lb} onClick={()=>shift(d)} style={{width:32,height:32,borderRadius:10,border:dark?"none":"1px solid #E4E9F7",background:dark?"rgba(255,255,255,0.12)":"#fff",color:dark?"#fff":"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
+  const dotOther=dark?"#fff":BLUE;
+  return(<div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+      {navBtn(-1,"chevL","이전 달")}
+      <div style={{textAlign:"center"}}>
+        <p style={{margin:0,fontSize:dark?17:15,fontWeight:700,color:dark?"#fff":INK}}>{y}년 {mo}월</p>
+        <p style={{margin:0,fontSize:11,color:dark?"rgba(255,255,255,0.6)":"#A3AAC2"}}>{n?`${label} ${n}편`:`${label} 없음`}</p>
+      </div>
+      {navBtn(1,"chevR","다음 달")}
+    </div>
+    <div role="grid" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",rowGap:2}}>
+      {WEEK.map((w,i)=><span key={w} style={{textAlign:"center",fontSize:11,fontWeight:600,color:dark?"rgba(255,255,255,0.55)":i===0?"#E5484D":i===6?BLUE:"#A3AAC2",padding:"2px 0 4px"}}>{w}</span>)}
+      {cells.map((d,i)=>{ if(!d) return <span key={"e"+i}/>;
+        const iso=`${ym}-${String(d).padStart(2,"0")}`, l=byDay[iso]||[], on=pick===iso, isToday=iso===today, future=iso>today, dow=i%7;
+        const mineN=l.filter(x=>x.uid===me).length, other=l.length-mineN;
+        return <button key={iso} type="button" aria-pressed={on} onClick={()=>setPick(on||!l.length?null:iso)} style={{border:"none",background:on&&!dark?BLUE_LIGHT:"transparent",borderRadius:10,padding:"2px 0 3px",cursor:l.length?"pointer":"default",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minHeight:30}}>
+          <span style={dark?{width:30,height:30,lineHeight:"30px",borderRadius:10,fontSize:15,fontWeight:l.length||on?700:500,fontVariantNumeric:"tabular-nums",background:on?BALL:"transparent",boxShadow:isToday&&!on?"inset 0 0 0 1.5px rgba(255,255,255,0.55)":"none",color:on?INK:future?"rgba(255,255,255,0.4)":"#fff"}
+            :{width:24,height:24,lineHeight:"24px",borderRadius:8,fontSize:12.5,fontWeight:l.length||on?800:400,fontVariantNumeric:"tabular-nums",background:on?BLUE:isToday?BLUE_LIGHT:"transparent",color:on?"#fff":future?"#C5CBE0":dow===0?"#E5484D":dow===6?BLUE:INK}}>{d}</span>
+          <span style={{display:"flex",gap:2,height:5,alignItems:"center"}}>
+            {mineN>0&&<span style={{width:5,height:5,borderRadius:3,background:BALL,boxShadow:dark?"none":"inset 0 0 0 1px rgba(11,30,91,0.35)"}}/>}
+            {[...Array(Math.min(2,other))].map((_,k)=><span key={k} style={{width:5,height:5,borderRadius:3,background:dotOther}}/>)}
+            {other>2&&<span style={{fontSize:8,lineHeight:"5px",color:dark?"#fff":"#6B7493",fontWeight:700}}>+</span>}
+          </span>
+        </button>; })}
+    </div>
+    <div style={{display:"flex",justifyContent:"center",gap:14,marginTop:6,fontSize:11,color:dark?"rgba(255,255,255,0.7)":"#6B7493"}}>
+      <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:3,background:BALL,boxShadow:dark?"none":"inset 0 0 0 1px rgba(11,30,91,0.35)"}}/>내 일기</span>
+      <span style={{display:"inline-flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:3,background:dotOther}}/>회원 일기</span>
+      <span>날짜를 누르면 그날 일기</span>
+    </div>
+  </div>);
+}
+const dayTitle=iso=>{ const d=new Date(iso+"T00:00:00"); return `${d.getMonth()+1}월 ${d.getDate()}일 ${WEEK[d.getDay()]}요일`; };
+// 월간 리뷰: 그 달 일기 글에서 테니스 낱말을 찾아 세요 (AI 없음). 지난달과 비교, 훈련 종류별로 몰리는지 보고, 한 달 소감은 직접 써요
+const REVIEW_WORDS=[["백핸드",["백핸드"]],["포핸드",["포핸드"]],["서브",["서브"]],["토스",["토스"]],["발리",["발리"]],["스매시",["스매시"]],["타점",["타점","몸 옆에서"]],["스텝",["스텝","첫 발","잔발"]],["어깨",["어깨"]],["손목",["손목"]],["무릎",["무릎"]],["팔로스루",["팔로스루"]],["서두름",["급해","급하","서둘"]],["더블 폴트",["더블"]],["준비 자세",["준비 자세"]],["집중",["집중"]]];
+const wordHits=(t,w)=>(REVIEW_WORDS.find(x=>x[0]===w)||[w,[w]])[1].some(k=>String(t||"").includes(k));
+function wordCount(list){ const c={}; list.forEach(d=>REVIEW_WORDS.forEach(([w])=>{ if(wordHits(d.fix,w)) (c[w]=c[w]||[]).push(d); })); return c; }
+function Marked({text,word}){
+  const keys=(REVIEW_WORDS.find(x=>x[0]===word)||[word,[word]])[1]; const re=new RegExp("("+keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")","g");
+  return <>{String(text).split(re).map((p,i)=>keys.includes(p)?<mark key={i} style={{background:"#F2FAD0",color:INK,fontWeight:800,padding:"0 2px",borderRadius:4}}>{p}</mark>:p)}</>;
+}
+function MonthlyReview({uid,list,onBack,onOpen}){
+  const me=myUid();
+  const [ym,setYm]=useState(()=>todayYmd().slice(0,7));
+  const [y,mo]=ym.split("-").map(Number);
+  const notes=useDiaryNotes(uid===me);
+  const [note,setNote]=useState(null);   // 고치는 중인 글 (null이면 저장된 글 보여 줌)
+  const [saving,setSaving]=useState(false);
+  useEffect(()=>setNote(null),[ym]);
+  const prevYm=(()=>{ const t=new Date(y,mo-2,1); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`; })();
+  const shift=d=>{ const t=new Date(y,mo-1+d,1); setYm(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`); };
+  const cur=list.filter(d=>d.date.slice(0,7)===ym), prev=list.filter(d=>d.date.slice(0,7)===prevYm);
+  const cc=wordCount(cur), pc=wordCount(prev);
+  const rows=Object.keys(cc).map(w=>({w,n:cc[w].length,p:(pc[w]||[]).length,items:cc[w]})).sort((a,b)=>b.n-a.n||b.p-a.p);
+  const gone=Object.keys(pc).filter(w=>!cc[w]).map(w=>({w,p:pc[w].length})).sort((a,b)=>b.p-a.p);
+  const keep=rows.filter(r=>r.p>0);
+  const types=DIARY_TYPES.map(([k,l])=>({k,l,n:cur.filter(d=>d.type===k).length})).filter(t=>t.n);
+  const nCm=cur.reduce((a,d)=>a+toList(d.comments).length,0);
+  // 패턴: 두 번 이상 나온 낱말이 한 가지 훈련 종류에 몰려 있으면
+  const patterns=rows.filter(r=>r.n>=2).map(r=>{ const by={}; r.items.forEach(d=>by[d.type]=(by[d.type]||0)+1); const [k,n]=Object.entries(by).sort((a,b)=>b[1]-a[1])[0]; return n/r.n>=0.75?{w:r.w,t:DIARY_TYPE(k),n,all:n===r.n}:null; }).filter(Boolean);
+  const top=rows[0], max=Math.max(1,...rows.map(r=>r.n));
+  const navBtn=(d,ic)=><button type="button" onClick={()=>shift(d)} style={{width:32,height:32,borderRadius:10,border:"1px solid #E4E9F7",background:"#fff",color:"#4A5578",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name={ic} size={16} stroke={2.2}/></button>;
+  return(<>
+    <BackLink label={uid===me?"내 훈련일기":`${nickOf(uid)} 님 일기`} onClick={onBack}/>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 2px"}}>
+      {navBtn(-1,"chevL")}
+      <div style={{flex:1,textAlign:"center"}}><p style={{margin:0,fontSize:19,fontWeight:900,color:INK}}>{mo}월 리뷰</p><p style={{margin:"2px 0 0",fontSize:12,color:"#8A93B2"}}>{uid===me?"내":`${nickOf(uid)} 님`} 일기 {cur.length}편을 돌아봐요</p></div>
+      {navBtn(1,"chevR")}
+    </div>
+    {uid===me&&notes&&notes[prevYm]&&notes[prevYm].text&&<div style={{background:INK,borderRadius:20,padding:"14px 16px"}}>
+      <p style={{margin:"0 0 6px",fontSize:12,fontWeight:800,color:BALL}}>지난달 나에게 한마디</p>
+      <p style={{margin:0,fontSize:14.5,color:"#fff",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{notes[prevYm].text}</p>
+    </div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+      {[["일기",`${cur.length}편`,prev.length?`지난달 ${prev.length}편`:""],["가장 많이",types.length?types.slice().sort((a,b)=>b.n-a.n)[0].l:"-",types.map(t=>`${t.l} ${t.n}`).join(" · ")],["받은 코멘트",`${nCm}개`,""]].map(([a,b,c])=>
+        <div key={a} style={{background:"#fff",borderRadius:16,padding:"12px 12px"}}><p style={{margin:0,fontSize:11.5,color:"#8A93B2",fontWeight:700}}>{a}</p><p style={{margin:"4px 0 0",fontSize:17,fontWeight:900,color:INK}}>{b}</p>{c&&<p style={{margin:"3px 0 0",fontSize:10.5,color:"#A3AAC2",lineHeight:1.4}}>{c}</p>}</div>)}
+    </div>
+    {top&&<div style={{background:"#F2FAD0",borderRadius:20,padding:"14px 16px",fontSize:14.5,color:INK,lineHeight:1.65}}>
+      {mo}월 고칠 점에 <b style={{color:"#C2610C"}}>‘{top.w}’</b>이 <b>{top.n}번</b>으로 가장 많이 나왔어요{top.p?<>, 지난달보다 <b>{top.n-top.p>=0?`${top.n-top.p}번 늘었어요`:`${top.p-top.n}번 줄었어요`}</b></>:""}.
+      {patterns[0]?<> <b>‘{patterns[0].w}’</b>은 {patterns[0].all?"":"주로 "}<b>{patterns[0].t}</b> 일기에서{patterns[0].all?"만":""} 나왔어요.</>:null}
+      {gone[0]?<> 지난달 많던 <b style={{color:"#12A15E"}}>‘{gone[0].w}’</b> 얘기는 이번 달엔 없어요.</>:null}
+    </div>}
+    <Card>
+      <SectionTitle>반복해서 나온 말</SectionTitle>
+      {rows.length===0&&<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>이 달 고칠 점에서 찾은 테니스 낱말이 없어요.</p>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {rows.slice(0,6).map(r=><div key={r.w} style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{width:64,fontSize:14,fontWeight:800,color:INK}}>{r.w}</span>
+          <span style={{flex:1,height:10,borderRadius:5,background:"#EEF1F7",overflow:"hidden"}}><span style={{display:"block",height:"100%",width:`${r.n/max*100}%`,borderRadius:5,background:r===top?"#F59E0B":"#FBCB7A"}}/></span>
+          <span style={{width:28,textAlign:"right",fontSize:13,fontWeight:800,color:INK}}>{r.n}번</span>
+          <span style={{width:58,textAlign:"right",fontSize:11.5,fontWeight:700,color:r.p===0?"#C2610C":r.n>r.p?"#E5484D":r.n<r.p?"#12A15E":"#8A93B2"}}>{r.p===0?"새로":r.n>r.p?`▲ ${r.n-r.p}`:r.n<r.p?`▼ ${r.p-r.n}`:"그대로"}</span>
+        </div>)}
+      </div>
+      <p style={{margin:"10px 0 0",fontSize:11.5,color:"#A3AAC2"}}>고칠 점 글에서 테니스 낱말을 찾아 몇 편에 나왔는지 셌어요 · 옆은 지난달과 비교</p>
+    </Card>
+    {top&&<Card>
+      <SectionTitle>‘{top.w}’ 나온 일기</SectionTitle>
+      <div style={{display:"flex",flexDirection:"column",gap:0}}>
+        {top.items.map((d,i)=><button key={d.id} type="button" onClick={()=>onOpen(d.id)} style={{display:"flex",gap:10,width:"100%",padding:"9px 0",border:"none",borderTop:i?"1px solid #EEF1F7":"none",background:"none",textAlign:"left",cursor:"pointer",fontFamily:FONT}}>
+          <span style={{width:40,flexShrink:0,fontSize:12,fontWeight:700,color:"#8A93B2",paddingTop:2}}>{shortDay(d.date).replace(/\(.\)/,"")}</span>
+          <span style={{flex:1,fontSize:13.5,color:INK,lineHeight:1.55}}><Marked text={d.fix} word={top.w}/> <span style={{fontSize:11,fontWeight:800,color:BLUE}}>{DIARY_TYPE(d.type)}</span></span>
+        </button>)}
+      </div>
+    </Card>}
+    {(patterns.length>0||keep.length>0||gone.length>0)&&<Card>
+      <SectionTitle>찾은 패턴</SectionTitle>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {patterns.map(p=><div key={p.w} style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{width:26,height:26,borderRadius:8,background:"#FFF4E5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="target" size={15} color="#C2610C" stroke={2.2}/></span><span style={{fontSize:14,color:INK,lineHeight:1.5}}><b>‘{p.w}’</b>은 {p.all?<><b>{p.t}</b> 일기에서만</>:<>주로 <b>{p.t}</b> 일기에서</>} 나와요 ({p.n}번)</span></div>)}
+        {keep.length>0&&<div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{width:26,height:26,borderRadius:8,background:"#FDECEC",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="repeat" size={15} color="#E5484D" stroke={2.2}/></span><span style={{fontSize:14,color:INK,lineHeight:1.5}}>지난달부터 이어지는 문제: {keep.map(r=><b key={r.w}>‘{r.w}’ </b>)}</span></div>}
+        {gone.length>0&&<div style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{width:26,height:26,borderRadius:8,background:"#E3F7EC",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="check" size={15} color="#12A15E" stroke={3}/></span><span style={{fontSize:14,color:INK,lineHeight:1.5}}>이번 달 안 나온 것: {gone.map(g=><b key={g.w}>‘{g.w}’ </b>)}<span style={{color:"#6B7493"}}>(지난달 {gone.map(g=>`${g.w} ${g.p}번`).join(", ")})</span></span></div>}
+      </div>
+    </Card>}
+    {uid===me&&<Card>
+      <SectionTitle>{mo}월 나에게 한마디</SectionTitle>
+      {(()=>{ const saved=(notes&&notes[ym]&&notes[ym].text)||"", val=note===null?saved:note, dirty=note!==null&&note.trim()!==saved;
+        const save=()=>{ if(!FB||saving) return; setSaving(true); const t=val.trim();
+          FB.club.child(`diaryNotes/${me}/${ym}`).set(t?{text:t.slice(0,DIARY_TEXT_MAX),at:Date.now()}:null).then(()=>setNote(null)).catch(e=>alert(authMsg(e))).finally(()=>setSaving(false)); };
+        return <>
+          <textarea value={val} maxLength={DIARY_TEXT_MAX} onChange={e=>setNote(e.target.value)} placeholder={"예) 백핸드는 어깨를 먼저 돌리기. 게임에서 급해지면 한 박자 쉬기.\n다음 달엔 서브 연습을 더 해 보자."} style={{width:"100%",boxSizing:"border-box",minHeight:96,padding:"12px 14px",borderRadius:14,border:"1.5px solid #E2E6F0",fontSize:16,color:INK,fontFamily:FONT,lineHeight:1.5,resize:"none",outline:"none"}}/>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+            <p style={{margin:0,flex:1,fontSize:11.5,color:"#A3AAC2"}}>나만 보여요 · 다음 달 리뷰 맨 위에 다시 보여 줘요</p>
+            {dirty&&<button type="button" disabled={saving} onClick={save} style={{...btnSmall,fontWeight:800}}>{saving?"저장 중…":"저장"}</button>}
+            {!dirty&&saved&&<span style={{fontSize:12,fontWeight:700,color:"#12A15E"}}>저장됨</span>}
+          </div>
+        </>; })()}
+    </Card>}
+  </>);
+}
+// 고칠 점 모아 보기: 태그 없이 쓴 글 그대로 모아요 (글이 모이면 묶는 방법을 정해요)
+function FixNotesCard({list,onMore,onReview,title}){
+  const recent=list.filter(d=>d.fix).slice(0,3);
+  return <Card style={{border:`1.5px solid ${BALL}`}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+      <span style={{width:30,height:30,borderRadius:10,background:INK,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="target" size={17} color={BALL} stroke={2.2}/></span>
+      <p style={{margin:0,flex:1,fontSize:16,fontWeight:800,color:INK}}>{title}</p>
+      <span style={{fontSize:12,color:"#8A93B2"}}>{list.filter(d=>d.fix).length}개</span>
+    </div>
+    {recent.length===0?<p style={{margin:0,fontSize:13,color:"#A3AAC2"}}>일기에 쓴 고칠 점이 여기에 모여요.</p>:
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>{recent.map(d=><div key={d.id} style={{display:"flex",gap:10,alignItems:"baseline"}}>
+      <span style={{width:44,flexShrink:0,fontSize:12,fontWeight:700,color:"#8A93B2"}}>{shortDay(d.date).replace(/\(.\)/,"")}</span>
+      <span style={{flex:1,minWidth:0,fontSize:13.5,color:INK,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{d.fix}</span></div>)}</div>}
+    {recent.length>0&&<div style={{display:"flex",gap:8,marginTop:12}}>
+      {onReview&&<button type="button" onClick={onReview} style={{flex:1,padding:"10px 0",border:"none",borderRadius:12,background:INK,color:BALL,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><Icon name="calendar" size={14} stroke={2.4}/>{+todayYmd().slice(5,7)}월 리뷰</button>}
+      {onMore&&<button type="button" onClick={onMore} style={{flex:1,padding:"10px 0",border:"none",borderRadius:12,background:"#F1F4FA",color:INK,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>고칠 점 모두 보기<Icon name="chevR" size={14} stroke={2.4}/></button>}
+    </div>}
+  </Card>;
+}
+function FixNotesPage({uid,list,onBack,onOpen}){
+  const me=myUid(), items=list.filter(d=>d.fix);
+  const months=[]; items.forEach(d=>{ const k=d.date.slice(0,7); let g=months.find(x=>x.k===k); if(!g){ g={k,items:[]}; months.push(g); } g.items.push(d); });
+  return(<>
+    <BackLink label={uid===me?"내 훈련일기":`${nickOf(uid)} 님 일기`} onClick={onBack}/>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"0 2px"}}>
+      <span style={{width:36,height:36,borderRadius:12,background:INK,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="target" size={20} color={BALL} stroke={2.2}/></span>
+      <div style={{flex:1}}><p style={{margin:0,fontSize:19,fontWeight:900,color:INK}}>{uid===me?"내":`${nickOf(uid)} 님`} 고칠 점 모음</p><p style={{margin:"2px 0 0",fontSize:12,color:"#8A93B2"}}>일기에 쓴 고칠 점을 날짜순으로 한곳에 모았어요</p></div>
+    </div>
+    {months.map(g=><Card key={g.k} style={{padding:"14px 16px"}}>
+      <p style={{margin:"0 0 8px",fontSize:14,fontWeight:900,color:INK}}>{+g.k.slice(0,4)}년 {+g.k.slice(5)}월 <span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{g.items.length}개</span></p>
+      {g.items.map((d,i)=><button key={d.id} type="button" onClick={()=>onOpen(d.id)} style={{display:"flex",gap:10,alignItems:"flex-start",width:"100%",padding:"10px 0",border:"none",borderTop:i?"1px solid #EEF1F7":"none",background:"none",cursor:"pointer",textAlign:"left",fontFamily:FONT}}>
+        <span style={{width:44,flexShrink:0,fontSize:12,fontWeight:700,color:"#8A93B2",paddingTop:2}}>{shortDay(d.date).replace(/\(.\)/,"")}</span>
+        <span style={{flex:1,minWidth:0}}>
+          <span style={{display:"block",fontSize:14,color:INK,lineHeight:1.55}}>{d.fix}</span>
+          <span style={{display:"flex",gap:6,marginTop:4,alignItems:"center"}}><span style={{fontSize:11,fontWeight:800,color:BLUE,background:BLUE_LIGHT,padding:"1px 6px",borderRadius:5}}>{DIARY_TYPE(d.type)}</span>{toList(d.comments).length>0&&<span style={{fontSize:11.5,color:BLUE,fontWeight:700}}>코멘트 {toList(d.comments).length}</span>}{(d.photoNow||d.photoRef)&&<span style={{fontSize:11.5,color:"#8A93B2"}}>사진</span>}</span>
+        </span>
+      </button>)}
+    </Card>)}
+    <p style={{margin:0,fontSize:11.5,color:"#A3AAC2",textAlign:"center",lineHeight:1.6}}>글이 충분히 모이면 자주 나오는 문제를 묶어서 요약해 볼 거예요.{uid===me?" 나만 보기 일기도 내 모음에는 들어가요.":""}</p>
+  </>);
+}
+function UserDiaryCal({list,onOpen}){
+  const [ym,setYm]=useState(()=>todayYmd().slice(0,7)), [pick,setPick]=useState(null);
+  const day=pick?list.filter(x=>x.date===pick):[];
+  return <Card style={{padding:"12px 12px 10px"}}>
+    <DiaryCalendar list={list} ym={ym} setYm={setYm} pick={pick} setPick={setPick}/>
+    {day.length>0&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #EEF1FA",display:"flex",flexDirection:"column",gap:6}}>
+      <p style={{margin:"0 4px",fontSize:14,fontWeight:900,color:INK}}>{dayTitle(pick)}</p>
+      {day.map(x=><button key={x.id} type="button" onClick={()=>onOpen(x.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"9px 10px",border:"none",borderRadius:12,background:"#F4F6FB",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
+        <span style={{fontSize:11,fontWeight:800,color:BLUE,background:BLUE_LIGHT,padding:"2px 7px",borderRadius:6}}>{DIARY_TYPE(x.type)}</span>
+        <span style={{flex:1,minWidth:0,fontSize:13,color:INK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.fix}</span>
+        <Icon name="chevR" size={14} color="#A3AAC2" stroke={2.4}/></button>)}
+    </div>}
+  </Card>;
+}
+// 회원 탭 윗단 (훈련일기 보기): 전체 · 내 일기 + 달력
+function DiaryHead(){
+  const [f,setF]=useShared("diaryF","all");
+  const [user,setUser]=useShared("diaryUser",null), [openId,setOpen]=useShared("diaryOpen",null), [sum,setSum]=useShared("diarySum",null);
+  const [ym,setYm]=useShared("diaryYm",()=>todayYmd().slice(0,7)), [pick,setPick]=useShared("diaryPick",null);
+  const all=useDiaries()||[];
+  const me=myUid(), list=all.filter(canSeeDiary).filter(x=>f==="mine"?x.uid===me:true);
+  const [review]=useShared("diaryReview",null);
+  const home=!user&&!openId&&!sum&&!review;
+  return <div style={{position:"relative",marginTop:14}}>
+    <div role="group" aria-label="일기 보기" style={{display:"flex",gap:6}}>
+      {DIARY_FILTERS.map(([k,l])=><button key={k} type="button" onClick={()=>{setF(k);setUser(null);setOpen(null);setSum(null);SHARED.diaryReview=null;}} style={{flexShrink:0,padding:"7px 13px",borderRadius:10,border:"none",background:f===k?BALL:"rgba(255,255,255,0.12)",color:f===k?INK:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>{l}</button>)}
+      <span style={{marginLeft:"auto",alignSelf:"center",fontSize:12,color:"rgba(255,255,255,0.75)"}}>코멘트로 서로 조언해요</span>
+    </div>
+    {home&&<div style={{marginTop:14}}><DiaryCalendar dark list={list} ym={ym} setYm={setYm} pick={pick} setPick={setPick}/></div>}
+  </div>;
+}
+// 데이터
+//  전체 공개: club/diaries/<id> {uid,name,date,type,good,fix,refNote,thumbNow,thumbRef,noComment,at,editedAt,comments}
+//             사진 원본은 club/diaryPhotos/<id> {uid,now,ref} (목록을 가볍게, 일기를 열 때만 받아요)
+//  나만 보기: club/diaryMine/<uid>/<id> {...같은 칸, photoNow, photoRef} (본인만 읽고 써요)
+//  월간 리뷰 한마디: club/diaryNotes/<uid>/<YYYY-MM> {text,at} (본인만)
+const DIARY_TEXT_MAX=1000, DIARY_PHOTO_PX=900, DIARY_PHOTO_BYTES=220000, DIARY_THUMB_PX=200, DIARY_THUMB_BYTES=24000;
+const diaryRef=p=>FB.club.child(p);
+function useDiaries(){
+  const [d,setD]=useState(null);
+  useEffect(()=>{ if(!FB){ setD([]); return; }
+    const me=myUid(); let pub=null, mine=me?null:{};
+    const put=()=>{ if(pub===null||mine===null) return;
+      setD([...toList(pub).map(x=>({...x,vis:"all"})),...toList(mine).map(x=>({...x,vis:"me",uid:me}))].filter(x=>x&&x.uid&&x.date)
+        .sort((a,b)=>b.date<a.date?-1:b.date>a.date?1:(b.at||0)-(a.at||0))); };
+    const r1=diaryRef("diaries"), h1=s=>{ pub=s.val()||{}; put(); };
+    r1.on("value",h1,()=>{ pub={}; put(); });
+    const r2=me?diaryRef("diaryMine/"+me):null, h2=s=>{ mine=s.val()||{}; put(); };
+    if(r2) r2.on("value",h2,()=>{ mine={}; put(); });
+    return ()=>{ r1.off("value",h1); if(r2) r2.off("value",h2); }; },[]);
+  return d;
+}
+function useDiaryNotes(on){
+  const [n,setN]=useState(null);
+  useEffect(()=>{ const me=myUid(); if(!FB||!on||!me){ setN({}); return; }
+    const r=diaryRef("diaryNotes/"+me), h=s=>setN(s.val()||{}); r.on("value",h,()=>setN({})); return ()=>r.off("value",h); },[on]);
+  return n;
+}
+const canSeeDiary=d=>d.uid===myUid()||d.vis!=="me";
+// 자세 사진: 비율은 그대로 두고 긴 쪽을 px까지 줄여요. crop이면 3:4로 가운데를 잘라요 (목록 미리보기용)
+function shrinkDiaryPhoto(file,px,bytes,crop){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type)) return rej(new Error("사진 파일만 올릴 수 있어요"));
+    const img=new Image(), src=URL.createObjectURL(file);
+    img.onload=()=>{ URL.revokeObjectURL(src);
+      let sx=0,sy=0,sw=img.width,sh=img.height;
+      if(crop){ const r=3/4; if(sw/sh>r){ const w=sh*r; sx=(sw-w)/2; sw=w; } else { const h=sw/r; sy=(sh-h)/2; sh=h; } }
+      const k=Math.min(1,px/Math.max(sw,sh)), W=Math.max(1,Math.round(sw*k)), H=Math.max(1,Math.round(sh*k));
+      const c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+      g.fillStyle="#fff"; g.fillRect(0,0,W,H); g.imageSmoothingQuality="high"; g.drawImage(img,sx,sy,sw,sh,0,0,W,H);
+      let out="", q=0.85; while(q>=0.35){ out=c.toDataURL("image/jpeg",q); if(out.length<=bytes) break; q-=0.1; }
+      out.length<=bytes?res(out):rej(new Error("사진을 줄이지 못했어요. 다른 사진으로 해 주세요")); };
+    img.onerror=()=>{ URL.revokeObjectURL(src); rej(new Error("사진을 읽지 못했어요")); };
+    img.src=src;
+  });
+}
+// 저장: 공개 범위가 바뀌면 다른 자리로 옮겨요 (코멘트도 같이)
+function saveDiary(v,orig){
+  const me=myUid(), id=(orig&&orig.id)||newId(), pub=v.vis!=="me";
+  const rec={uid:me,name:ME,date:v.date,type:v.type,good:v.good.trim().slice(0,DIARY_TEXT_MAX),fix:v.fix.trim().slice(0,DIARY_TEXT_MAX),
+    refNote:v.refNote.trim().slice(0,200)||null,thumbNow:v.thumbNow||null,thumbRef:v.thumbRef||null,noComment:pub&&v.noComment?true:null,
+    at:(orig&&orig.at)||Date.now(),editedAt:orig?Date.now():null,comments:pub&&orig&&orig.comments?orig.comments:null};
+  const photos={now:v.photoNow||null,ref:v.photoRef||null};
+  const jobs=[];
+  if(pub){
+    jobs.push(diaryRef("diaries/"+id).set(rec));
+    jobs.push(diaryRef("diaryPhotos/"+id).set(photos.now||photos.ref?{uid:me,...photos}:null));
+    if(orig&&orig.vis==="me") jobs.push(diaryRef(`diaryMine/${me}/${id}`).remove());
+  } else {
+    jobs.push(diaryRef(`diaryMine/${me}/${id}`).set({...rec,photoNow:photos.now,photoRef:photos.ref}));
+    if(orig&&orig.vis!=="me") jobs.push(diaryRef("diaries/"+id).remove(),diaryRef("diaryPhotos/"+id).remove());
+  }
+  return Promise.all(jobs).then(()=>id);
+}
+function deleteDiary(d){
+  const me=myUid();
+  return d.vis==="me"?diaryRef(`diaryMine/${me}/${d.id}`).remove()
+    :Promise.all([diaryRef("diaryPhotos/"+d.id).remove(),diaryRef("diaries/"+d.id).remove()]);
+}
+// 알림에서 훈련일기 열기
+function openDiaryFromNoti(id){
+  const set=(k,v)=>{ SHARED[k]=v; };
+  set("memView","diary"); set("diaryOpen",id); set("diaryUser",null); set("diarySum",null); set("diaryReview",null);
+  try{ sessionStorage.setItem("sstc-members-view","diary"); }catch(e){}
+  SHARED_SUBS.forEach(g=>g());
+}
+function DiaryCard({d,onOpen,showName=true}){
+  const n=toList(d.comments).filter(c=>c&&c.text).length, thumbs=[d.thumbNow,d.thumbRef].filter(Boolean);
+  return(
+    <div role="button" tabIndex={0} onClick={()=>onOpen(d.id)} onKeyDown={e=>{if(e.key==="Enter")onOpen(d.id);}} style={{display:"block",width:"100%",textAlign:"left",background:"#fff",border:"none",borderRadius:20,padding:16,cursor:"pointer",fontFamily:FONT,boxSizing:"border-box"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        {showName&&<Avatar name={nickOf(d.uid)} photo={photoOf(d.uid)} size={34} radius={11} bg={d.uid===myUid()?BALL:BLUE_LIGHT} font={14} zoom={false}/>}
+        <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+          {showName&&<span style={{fontSize:15,fontWeight:800,color:INK}}>{curNick(d.uid,d.name)}</span>}
+          <span style={{fontSize:showName?12.5:15,fontWeight:showName?500:800,color:showName?"#6B7493":INK}}>{shortDay(d.date)}</span>
+          <span style={{fontSize:11,fontWeight:800,color:BLUE,background:BLUE_LIGHT,padding:"2px 7px",borderRadius:6}}>{DIARY_TYPE(d.type)}</span>
+          <VisTag v={d.vis}/>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:12,marginTop:10}}>
+        <div style={{flex:1,minWidth:0}}>
+          {d.fix?<p style={{margin:0,fontSize:14,color:INK,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}><b style={{color:"#C2610C",fontWeight:800}}>고칠 점 </b>{d.fix}</p>
+            :<p style={{margin:0,fontSize:14,color:INK,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}><b style={{color:"#12A15E",fontWeight:800}}>잘된 점 </b>{d.good}</p>}
+        </div>
+        {thumbs.length>0&&<div style={{display:"flex",gap:3,flexShrink:0}}>
+          {thumbs.map((p,i)=><img key={i} src={p} alt="" style={{width:44,height:58,objectFit:"cover",borderRadius:9,display:"block"}}/>)}
+        </div>}
+      </div>
+      {d.vis!=="me"&&<div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:n?BLUE:"#A3AAC2",fontWeight:700}}><Icon name="message" size={13} stroke={2.2}/>{d.noComment?"코멘트 닫음":`코멘트 ${n}`}</span>
+      </div>}
+    </div>);
+}
+function DiaryView(){
+  const all=useDiaries();
+  const [f]=useShared("diaryF","all");
+  const [user,setUser]=useShared("diaryUser",null);
+  const [openId,setOpenId]=useShared("diaryOpen",null);
+  const [sum,setSum]=useShared("diarySum",null);
+  const [form,setForm]=useShared("diaryForm",null);
+  const [review,setReview]=useShared("diaryReview",null);
+  const [ym]=useShared("diaryYm",()=>todayYmd().slice(0,7));
+  const [pick,setPick]=useShared("diaryPick",null);
+  const me=myUid();
+  if(!FB) return <Empty>훈련일기는 로그인한 회원만 쓸 수 있어요.</Empty>;
+  if(!all) return <Card><p style={{margin:0,fontSize:14,color:"#6B7493"}}>불러오는 중이에요…</p></Card>;
+  const vis=all.filter(canSeeDiary);
+  const go=fn=>v=>{ fn(v); try{window.scrollTo(0,0);}catch(e){} };
+  const formEl=form&&<DiaryForm initial={form.id?form:null} startDate={form.date} onClose={()=>setForm(null)} onSaved={id=>{ setForm(null); if(!form.id){ setUser(null); setSum(null); setReview(null); go(setOpenId)(id); } }}/>;
+  if(openId){ const d=all.find(x=>x.id===openId);
+    if(!d) return <><BackLink label="훈련일기" onClick={go(()=>setOpenId(null))}/><Empty>지워졌거나 볼 수 없는 일기예요.</Empty></>;
+    return <><DiaryDetail d={d} onBack={go(()=>setOpenId(null))} onEdit={()=>setForm(d)}/>{formEl}</>; }
+  if(review) return <MonthlyReview uid={review} list={vis.filter(x=>x.uid===review)} onBack={go(()=>setReview(null))} onOpen={go(setOpenId)}/>;
+  if(sum) return <FixNotesPage uid={sum} list={vis.filter(x=>x.uid===sum)} onBack={go(()=>setSum(null))} onOpen={go(setOpenId)}/>;
+  if(user){ const list=vis.filter(x=>x.uid===user), M=MEMBER_BY_UID[user]||{}, thisYm=todayYmd().slice(0,7);
+    return(<>
+      <BackLink label="훈련일기" onClick={go(()=>setUser(null))}/>
+      <Card style={{display:"flex",alignItems:"center",gap:14}}>
+        <Avatar name={nickOf(user)} photo={photoOf(user)} size={56} radius={18} bg={user===me?BALL:BLUE_LIGHT} font={22}/>
+        <div style={{flex:1,minWidth:0}}>
+          <p style={{margin:0,fontSize:19,fontWeight:900,color:INK,display:"flex",alignItems:"center",gap:6}}>{nickOf(user)}<span style={{fontSize:13,fontWeight:800,color:INK,background:"#EDF0F6",padding:"3px 8px",borderRadius:8}}>{M.ntrp||"-"}</span></p>
+          <p style={{margin:"4px 0 0",fontSize:13,color:"#6B7493"}}>훈련일기 <b style={{color:INK}}>{list.length}</b>편 · 이번 달 <b style={{color:INK}}>{list.filter(x=>x.date.slice(0,7)===thisYm).length}</b>편</p>
+        </div>
+        {user===me&&<button type="button" onClick={()=>setForm({})} style={{...btnSmall,display:"inline-flex",alignItems:"center",gap:4,fontWeight:800,fontSize:13}}><Icon name="pencil" size={13} stroke={2.4}/>쓰기</button>}
+      </Card>
+      {list.length===0?<Empty>{user===me?"아직 쓴 일기가 없어요.":"아직 볼 수 있는 일기가 없어요."}</Empty>:<>
+        <UserDiaryCal list={list} onOpen={go(setOpenId)}/>
+        <FixNotesCard list={list} onMore={go(()=>setSum(user))} onReview={go(()=>setReview(user))} title={user===me?"내 고칠 점 모음":`${nickOf(user)} 님 고칠 점 모음`}/>
+        <p style={{margin:"6px 4px 0",fontSize:14,fontWeight:800,color:INK}}>일기 <span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{list.length}편{user!==me?" · 전체 공개만":""}</span></p>
+        {list.map(x=><DiaryCard key={x.id} d={x} showName={false} onOpen={go(setOpenId)}/>)}
+      </>}
+      {formEl}
+    </>); }
+  const scoped=vis.filter(x=>f==="mine"?x.uid===me:true);
+  const mine=vis.filter(x=>x.uid===me);
+  const monthList=scoped.filter(x=>x.date.slice(0,7)===ym);
+  const dayList=pick?scoped.filter(x=>x.date===pick):[];
+  const card=x=><DiaryCard key={x.id} d={x} onOpen={go(setOpenId)}/>;
+  if(pick) return(<>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 4px"}}>
+      <p style={{margin:0,fontSize:17,fontWeight:900,color:INK}}>{dayTitle(pick)}</p>
+      <button type="button" onClick={()=>setPick(null)} style={{border:"none",background:"#E2E7F2",borderRadius:9,padding:"5px 10px",fontSize:12,fontWeight:700,color:"#4A5578",cursor:"pointer",fontFamily:FONT}}>이번 달 전체</button>
+    </div>
+    {dayList.map(card)}
+    {pick<=todayYmd()&&<button type="button" onClick={()=>setForm({date:pick})} style={{...btnPrimary,background:"#fff",color:BLUE,border:`1.5px dashed ${BLUE}`,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={16} stroke={2.4}/>이날 일기 쓰기</button>}
+    {formEl}
+  </>);
+  return(<>
+    <button type="button" onClick={()=>setForm({})} style={{...btnPrimary,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={17} stroke={2.4}/>오늘 훈련일기 쓰기</button>
+    {mine.length>0&&<FixNotesCard list={mine} onMore={go(()=>setSum(me))} onReview={go(()=>setReview(me))} title="내 고칠 점 모음"/>}
+    <p style={{margin:"6px 4px 0",fontSize:14,fontWeight:800,color:INK}}>{+ym.slice(5)}월 {f==="mine"?"내 일기":"훈련일기"} <span style={{fontSize:12,fontWeight:500,color:"#A3AAC2"}}>{monthList.length}편 · 최근 순</span></p>
+    {monthList.length===0&&<Empty>{f==="mine"?"이 달에 쓴 일기가 없어요.":"이 달에 올라온 일기가 없어요."}</Empty>}
+    {monthList.map(card)}
+    {formEl}
+  </>);
+}
+function DiaryDetail({d,onBack,onEdit}){
+  const me=myUid(), mine=d.uid===me;
+  const [,setUser]=useShared("diaryUser",null);
+  const [photos,setPhotos]=useState(d.vis==="me"?{now:d.photoNow,ref:d.photoRef}:null);
+  useEffect(()=>{ if(d.vis==="me"){ setPhotos({now:d.photoNow,ref:d.photoRef}); return; } if(!d.thumbNow&&!d.thumbRef){ setPhotos({}); return; }
+    let on=true; diaryRef("diaryPhotos/"+d.id).once("value").then(s=>{ if(on) setPhotos(s.val()||{}); }).catch(()=>on&&setPhotos({})); return ()=>{ on=false; }; },[d.id,d.vis,d.editedAt]);
+  const del=()=>{ if(!window.confirm("이 일기를 지울까요? 사진과 코멘트도 같이 지워져요.")) return; deleteDiary(d).then(onBack).catch(e=>alert(authMsg(e))); };
+  const photo=(src,thumb,label,tone)=>(
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{position:"relative",borderRadius:14,overflow:"hidden",background:"#E7ECF6",aspectRatio:"3 / 4"}}>
+        {(src||thumb)?<img src={src||thumb} alt={label} onClick={()=>src&&openBigPhoto(src)} style={{width:"100%",height:"100%",objectFit:"cover",display:"block",filter:src?"none":"blur(2px)"}}/>:<span style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#A3AAC2"}}>사진 없음</span>}
+        <span style={{position:"absolute",left:8,top:8,fontSize:11.5,fontWeight:800,color:tone==="now"?"#fff":INK,background:tone==="now"?"#E5484D":BALL,padding:"3px 8px",borderRadius:7}}>{label}</span>
+      </div>
+    </div>);
+  const hasPhoto=d.thumbNow||d.thumbRef||d.photoNow||d.photoRef;
+  return(<>
+    <BigPhoto/>
+    <BackLink label="훈련일기" onClick={onBack}/>
+    <Card>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <button type="button" onClick={()=>{ setUser(d.uid); onBack(); }} style={{border:"none",background:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,textAlign:"left",fontFamily:FONT}}>
+          <Avatar name={nickOf(d.uid)} photo={photoOf(d.uid)} size={40} radius={13} bg={mine?BALL:BLUE_LIGHT} font={16} zoom={false}/>
+          <span style={{minWidth:0}}>
+            <span style={{display:"block",fontSize:16,fontWeight:800,color:INK}}>{curNick(d.uid,d.name)} <span style={{fontSize:12,fontWeight:600,color:"#8A93B2"}}>일기 모아 보기 ›</span></span>
+            <span style={{display:"block",marginTop:2,fontSize:13,color:"#6B7493"}}>{fmtDate(d.date)}{d.editedAt?" · 수정됨":""}</span>
+          </span>
+        </button>
+        <span style={{fontSize:12,fontWeight:800,color:BLUE,background:BLUE_LIGHT,padding:"4px 9px",borderRadius:8}}>{DIARY_TYPE(d.type)}</span>
+        <VisTag v={d.vis}/>
+      </div>
+      {hasPhoto&&<>
+        <div style={{display:"flex",gap:8,marginTop:14}}>{photo(photos&&photos.now,d.thumbNow,"지금 내 자세","now")}{photo(photos&&photos.ref,d.thumbRef,"참고 자세","ref")}</div>
+        {d.refNote&&<p style={{margin:"8px 2px 0",fontSize:12,color:"#6B7493",display:"flex",gap:5,wordBreak:"break-all"}}><Icon name="image" size={12} stroke={2.2}/>참고: {d.refNote}</p>}
+      </>}
+      {!hasPhoto&&d.refNote&&<p style={{margin:"12px 2px 0",fontSize:12,color:"#6B7493",wordBreak:"break-all"}}>참고: {d.refNote}</p>}
+      <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:12}}>
+        {d.good&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#12A15E"}}>잘된 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.good}</p></div>}
+        {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p></div>}
+      </div>
+      {(mine||ME_ADMIN)&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",marginTop:12}}>
+        {mine&&<button type="button" onClick={onEdit} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}><Ic n="pencil" s={12}/> 수정</button>}
+        <button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>
+      </div>}
+    </Card>
+    {d.vis==="me"?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 나만 보는 일기예요</p>
+    :d.noComment?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 코멘트를 닫아 둔 일기예요</p>
+    :<CommentBox comments={d.comments} title="코멘트" isAdmin={mine||ME_ADMIN}
+      save={(cid,v)=>diaryRef(`diaries/${d.id}/comments/${cid}`).set(v)}
+      onAdded={t=>{ if(d.uid!==me) postFeed({type:"diaryComment",to:d.uid,diaryId:d.id,text:`${ME} 님이 내 훈련일기(${shortDay(d.date)})에 코멘트를 남겼어요: "${clip(t)}"`}); }}
+      where={`${curNick(d.uid,d.name)} 님 훈련일기`} link={{diaryId:d.id}}/>}
+  </>);
+}
+// 사진 크게 보기 (화면 전체, 누르면 닫혀요)
+let BIG_PHOTO_SET=null;
+const openBigPhoto=src=>{ if(BIG_PHOTO_SET) BIG_PHOTO_SET(src); };
+function BigPhoto(){
+  const [src,setSrc]=useState(null);
+  useEffect(()=>{ BIG_PHOTO_SET=setSrc; return ()=>{ BIG_PHOTO_SET=null; }; },[]);
+  if(!src) return null;
+  return ReactDOM.createPortal(<div onClick={()=>setSrc(null)} role="dialog" aria-label="사진 크게 보기" style={{position:"fixed",inset:0,zIndex:90,background:"rgba(5,10,30,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <img src={src} alt="" style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:12}}/>
+    <button type="button" aria-label="닫기" style={{position:"absolute",top:"max(16px, env(safe-area-inset-top))",right:16,width:40,height:40,borderRadius:"50%",border:"none",background:"rgba(255,255,255,0.16)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}><Icon name="x" size={20} stroke={2.2}/></button>
+  </div>,document.body);
+}
+function DiaryForm({initial,startDate,onClose,onSaved}){
+  const me=myUid();
+  const [v,setV]=useState(()=>({date:startDate||todayYmd(),type:"game",good:"",fix:"",vis:"all",noComment:false,refNote:"",photoNow:"",photoRef:"",thumbNow:"",thumbRef:"",
+    ...(initial?{date:initial.date,type:initial.type||"game",good:initial.good||"",fix:initial.fix||"",vis:initial.vis||"all",noComment:!!initial.noComment,refNote:initial.refNote||"",thumbNow:initial.thumbNow||"",thumbRef:initial.thumbRef||"",photoNow:initial.photoNow||"",photoRef:initial.photoRef||""}:{})}));
+  const [busy,setBusy]=useState(false), [loading,setLoading]=useState(0);
+  const set=(k,x)=>setV(o=>({...o,[k]:x}));
+  // 고칠 때: 공개 일기의 사진 원본을 받아 둬요 (그대로 다시 저장)
+  useEffect(()=>{ if(!initial||initial.vis==="me"||(!initial.thumbNow&&!initial.thumbRef)) return;
+    diaryRef("diaryPhotos/"+initial.id).once("value").then(s=>{ const p=s.val()||{}; setV(o=>({...o,photoNow:o.photoNow||p.now||"",photoRef:o.photoRef||p.ref||""})); }).catch(()=>{}); },[]);
+  const fileNow=useRef(null), fileRef=useRef(null);
+  const onPhoto=k=>e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return; setLoading(n=>n+1);
+    Promise.all([shrinkDiaryPhoto(f,DIARY_PHOTO_PX,DIARY_PHOTO_BYTES),shrinkDiaryPhoto(f,DIARY_THUMB_PX,DIARY_THUMB_BYTES,true)])
+      .then(([big,th])=>setV(o=>({...o,["photo"+k]:big,["thumb"+k]:th}))).catch(err=>alert(err.message)).finally(()=>setLoading(n=>n-1)); };
+  const clearPhoto=k=>setV(o=>({...o,["photo"+k]:"",["thumb"+k]:""}));
+  const ok=v.date&&v.date<=todayYmd()&&(v.good.trim()||v.fix.trim())&&!busy&&!loading;
+  const submit=()=>{ if(!ok) return; if(initial&&initial.vis!=="me"&&v.vis==="me"&&toList(initial.comments).length&&!window.confirm("나만 보기로 바꾸면 달린 코멘트는 지워져요. 바꿀까요?")) return;
+    setBusy(true); saveDiary(v,initial).then(id=>onSaved&&onSaved(id)).catch(e=>alert(authMsg(e))).finally(()=>setBusy(false)); };
+  const lab=t=><p style={{margin:"0 0 8px",fontSize:13.5,fontWeight:800,color:INK}}>{t}</p>;
+  const ta={width:"100%",boxSizing:"border-box",minHeight:74,padding:"12px 14px",borderRadius:14,border:"1.5px solid #E2E6F0",background:"#fff",fontSize:16,color:INK,fontFamily:FONT,lineHeight:1.5,resize:"none",outline:"none"};
+  const slot=(k,label,tone,ref)=>{ const src=v["photo"+k]||v["thumb"+k]; return(
+    <div style={{flex:1,minWidth:0,position:"relative"}}>
+      <button type="button" onClick={()=>ref.current&&ref.current.click()} style={{width:"100%",position:"relative",aspectRatio:"3 / 4",borderRadius:14,border:src?"none":"1.5px dashed #B9C3DD",background:src?"#000":"#fff",padding:0,cursor:"pointer",overflow:"hidden",fontFamily:FONT,display:"block"}}>
+        {src?<img src={src} alt={label} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<span style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"#8A93B2",fontSize:12.5,fontWeight:700}}><Icon name="camera" size={26} color="#A3AAC2" stroke={1.7}/>{tone==="now"?"내 사진·영상 캡처":"따라 할 사진"}</span>}
+        <span style={{position:"absolute",left:8,top:8,fontSize:11.5,fontWeight:800,color:tone==="now"?"#fff":INK,background:tone==="now"?"#E5484D":BALL,padding:"3px 8px",borderRadius:7}}>{label}</span>
+      </button>
+      {src&&<button type="button" aria-label={`${label} 빼기`} onClick={()=>clearPhoto(k)} style={{position:"absolute",right:6,top:6,width:28,height:28,borderRadius:"50%",border:"none",background:"rgba(11,30,91,0.7)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}><Icon name="x" size={14} stroke={2.6}/></button>}
+      <input ref={ref} type="file" accept="image/*" data-slot={"photo"+k} style={{display:"none"}} onChange={onPhoto(k)}/>
+    </div>); };
+  return(
+    <Sheet title={initial?"훈련일기 고치기":"훈련일기 쓰기"} onClose={onClose}>
+      <Card>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#6B7493",width:34}}>날짜</span>
+          <input type="date" value={v.date} max={todayYmd()} onChange={e=>set("date",e.target.value)} style={{flex:1,minWidth:0,height:44,padding:"0 12px",borderRadius:12,border:"1.5px solid #E2E6F0",fontSize:16,color:INK,fontFamily:FONT,background:"#fff"}}/>
+        </div>
+        <div style={{marginTop:14}}>{lab("훈련 종류")}<Pills value={v.type} options={DIARY_TYPES} onChange={x=>set("type",x)} label="훈련 종류"/></div>
+      </Card>
+      <Card>
+        {lab(<span style={{color:"#12A15E"}}>잘된 점</span>)}
+        <textarea value={v.good} maxLength={DIARY_TEXT_MAX} onChange={e=>set("good",e.target.value)} placeholder="예) 포핸드 크로스가 길게 잘 들어갔어요" style={ta}/>
+        <div style={{height:14}}/>
+        {lab(<span style={{color:"#C2610C"}}>고칠 점</span>)}
+        <textarea value={v.fix} maxLength={DIARY_TEXT_MAX} onChange={e=>set("fix",e.target.value)} placeholder="예) 백핸드 칠 때 공이 몸 옆에서 맞아요" style={ta}/>
+        <p style={{margin:"8px 0 0",fontSize:11.5,color:"#A3AAC2"}}>고칠 점은 '고칠 점 모음'과 월간 리뷰에 모여요</p>
+      </Card>
+      <Card>
+        {lab("자세 비교 사진 (선택)")}
+        <div style={{display:"flex",gap:8}}>{slot("Now","지금 내 자세","now",fileNow)}{slot("Ref","참고 자세","ref",fileRef)}</div>
+        {loading>0&&<p style={{margin:"8px 0 0",fontSize:12,color:"#6B7493"}}>사진을 줄이는 중이에요…</p>}
+        <input value={v.refNote} maxLength={200} onChange={e=>set("refNote",e.target.value)} placeholder="참고한 곳 (예: 레슨 코치님 시범, 유튜브 링크)" style={{marginTop:10,width:"100%",boxSizing:"border-box",height:44,padding:"0 12px",borderRadius:12,border:"1.5px solid #E2E6F0",fontSize:16,color:INK,fontFamily:FONT,outline:"none"}}/>
+      </Card>
+      <Card>
+        {lab("누가 볼 수 있나요?")}
+        <div style={{display:"flex",gap:6}}>
+          {DIARY_VIS.map(([k,l,ic])=>{ const on=v.vis===k; return <button key={k} type="button" onClick={()=>set("vis",k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:`1.5px solid ${on?BLUE:"#E2E6F0"}`,background:on?BLUE_LIGHT:"#fff",color:on?BLUE:INK,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><Icon name={ic} size={16} stroke={2.2}/>{l}</button>; })}
+        </div>
+        {v.vis==="all"?<label style={{display:"flex",alignItems:"center",gap:8,marginTop:12,fontSize:13.5,color:INK,cursor:"pointer"}}>
+          <input type="checkbox" checked={!v.noComment} onChange={e=>set("noComment",!e.target.checked)} style={{width:18,height:18,accentColor:BLUE}}/>
+          다른 회원 코멘트 받기 <span style={{fontSize:12,color:"#8A93B2"}}>(코멘트 달리면 알림)</span>
+        </label>:<p style={{margin:"10px 0 0",fontSize:12,color:"#6B7493"}}>나만 볼 수 있어요. 관리자도 볼 수 없어요.</p>}
+      </Card>
+      <button type="button" disabled={!ok} onClick={submit} style={{...btnPrimary,opacity:ok?1:0.5,cursor:ok?"pointer":"default"}}>{busy?"저장 중…":initial?"고친 내용 저장":"일기 저장"}</button>
+      {!(v.good.trim()||v.fix.trim())&&<p style={{margin:"-6px 0 0",fontSize:12,color:"#A3AAC2",textAlign:"center"}}>잘된 점이나 고칠 점 중 하나는 써 주세요</p>}
+    </Sheet>);
+}
+
 // ─── 파란 윗부분에 들어가는 탭별 내용 (회원 검색, 통계 요약, 관리 요약) ─────────
 // 소곤소곤: 파란 윗부분의 글 찾기 + 보기 고르기 (전체·내 글·댓글 단 글·익명)
 const BOARD_FILTERS=[["all","전체"],["mine","내 글"],["commented","댓글 단 글"],["anon","익명"]];
@@ -6515,6 +7042,7 @@ function MemberViewHead(){
   const [q,setQ]=useShared("memQ","");
   const [sort,setSortRaw]=useShared("memSort",memSortInit);
   if(view==="stats") return <StatsHead/>;
+  if(view==="diary") return <DiaryHead/>;
   if(view==="guild"){ const me=myUid(), mine=guildsOf(me), inv=guildList().filter(g=>g.invites&&g.invites[me]&&!inGuild(g,me)).length;
     return <div style={{position:"relative",marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
       <span style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>내가 속한 길드 <b style={{color:BALL}}>{mine.length}</b>개 · 여러 길드에 들어갈 수 있어요</span>
@@ -6532,7 +7060,7 @@ function MemberViewHead(){
         </div>);
 }
 // 회원 탭 보기: 회원 목록 / 길드 / 통계 (예전에 소곤소곤을 보던 기기는 회원 목록으로)
-const MEM_VIEWS=[["list","회원 목록"],["guild","길드"],["stats","통계"]];
+const MEM_VIEWS=[["list","회원 목록"],["guild","길드"],["diary","훈련일기"],["stats","통계"]];
 const memViewInit=()=>{ let v="list"; try{ v=sessionStorage.getItem("sstc-members-view")||"list"; }catch(e){} return MEM_VIEWS.some(x=>x[0]===v)?v:"list"; };
 // 회원 정렬 (손별은 뺐어요. 예전에 손별로 두었으면 이름순으로)
 const memSortInit=()=>{ let v="name"; try{ v=sessionStorage.getItem("sstc-members-sort")||"name"; }catch(e){} return MEMBER_SORTS.some(x=>x[0]===v)?v:"name"; };
@@ -6718,6 +7246,7 @@ function SplashScreen({onStart}) {
 }
 
 export default function App() {
+  useShared("memView",memViewInit);   // 훈련일기 달력 화면에선 코트 라인을 숨겨서, 보기가 바뀌면 다시 그려요
   const themeMode=useThemeMode();            // 화면 모드 (자동/라이트/다크)
   // screen: "login" | "forgot" | "signup" | "main"
   const [splash,setSplash]=useState(true);
@@ -6978,7 +7507,7 @@ export default function App() {
       {installTip&&!loginPopup.popup&&!help&&<InstallPopup onClose={()=>setInstallTip(false)} onGo={()=>{ setInstallTip(false); setHelp("app"); }}/>}
       {/* 파란 헤더 (하드코트): 단색 파랑 + 가운데 가로 풀코트 라인. 홈이 아닌 화면은 높이를 모두 같게 */}
       <div style={{background:GRAD,color:"#fff",padding:`max(26px, calc(env(safe-area-inset-top,0px) + 14px)) 20px ${isHome?100:46}px`,position:"relative",overflow:"hidden",boxSizing:"border-box",minHeight:isHome?0:HEADER_H}}>
-        {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&<CourtLines/>}
+        {!(tab==="booking"&&!curMeeting&&bookView!=="map")&&!(tab==="members"&&!curMeeting&&SHARED.memView==="diary"&&!SHARED.diaryUser&&!SHARED.diaryOpen&&!SHARED.diarySum&&!SHARED.diaryReview)&&<CourtLines/>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",position:"relative"}}>
           {curMeeting
             ?<button type="button" onClick={closeM} style={{...iconBtn,width:"auto",padding:"0 14px 0 8px",gap:2,fontSize:13,fontWeight:700}} aria-label="뒤로가기"><Icon name="back" size={20} stroke={2.4}/>{openMeeting.from==="home"?"홈":openMeeting.from==="members"?"회원":openMeeting.from==="map"?"지도":"목록"}</button>
@@ -7097,7 +7626,8 @@ export default function App() {
               </>}
       {noti&&<NotiSheet items={noti} isAdmin={adminOn} onClose={()=>setNoti(null)} onPick={n=>{
         setNoti(null);
-        if(n.postId){ if(openMeeting){setOpenMeeting(null);} setTab("board"); setBoardFocus(n.postId+"#"+Date.now()); }
+        if(n.diaryId){ if(openMeeting){setOpenMeeting(null);} setTab("members"); openDiaryFromNoti(n.diaryId); try{window.scrollTo(0,0);}catch(e){} }
+        else if(n.postId){ if(openMeeting){setOpenMeeting(null);} setTab("board"); setBoardFocus(n.postId+"#"+Date.now()); }
         else if(MEETING_NOTI.includes(n.type)&&n.meetingId) openM(+n.meetingId,"info","home");
         else if(n.type==="admin"&&n.action==="profile") setMyInfo("edit");
         else if(n.type==="notice"){ if(openMeeting){setOpenMeeting(null);} setTab("home"); setFocusNotice(n.noticeId+"#"+Date.now()); }
