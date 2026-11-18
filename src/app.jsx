@@ -6544,8 +6544,11 @@ function DiaryCalendar({list,ym,setYm,pick,setPick,dark,label="일기"}){
 }
 const dayTitle=iso=>{ const d=new Date(iso+"T00:00:00"); return `${d.getMonth()+1}월 ${d.getDate()}일 ${WEEK[d.getDay()]}요일`; };
 // 누적 리뷰: 일기를 쓸 때마다 고칠 점 글에서 테니스 낱말을 찾아 쌓아 세요 (AI 없음). 쓴 고칠 점 아래엔 받은 코멘트를 같이 모아요
-const REVIEW_WORDS=[["백핸드",["백핸드"]],["포핸드",["포핸드"]],["서브",["서브"]],["토스",["토스"]],["발리",["발리"]],["스매시",["스매시"]],["타점",["타점","몸 옆에서"]],["스텝",["스텝","첫 발","잔발"]],["어깨",["어깨"]],["손목",["손목"]],["무릎",["무릎"]],["팔로스루",["팔로스루"]],["서두름",["급해","급하","서둘"]],["더블 폴트",["더블"]],["준비 자세",["준비 자세"]],["집중",["집중"]]];
-const wordHits=(t,w)=>(REVIEW_WORDS.find(x=>x[0]===w)||[w,[w]])[1].some(k=>String(t||"").includes(k));
+const REVIEW_WORDS=[["백핸드",["백핸드"]],["포핸드",["포핸드"]],["서브",["서브"]],["리턴",["리턴","리시브"]],["토스",["토스"]],["발리",["발리"]],["스매시",["스매시"]],["타점",["타점","몸 옆에서"]],["스텝",["스텝","첫 발","잔발"]],["어깨",["어깨"]],["손목",["손목"]],["무릎",["무릎"]],["팔로스루",["팔로스루"]],["서두름",["급해","급하","서둘"]],["더블 폴트",["더블"]],["준비 자세",["준비 자세"]],["집중",["집중"]]];
+// 리턴 얘기 속 '서브'는 상대 서브라서 서브 문제로 세지 않아요 (내 서브라고 분명히 쓴 경우만 세요)
+const RETURN_CTX=/리턴|리시브/, MY_SERVE=/(내|제|나의|저의)\s*(첫\s*|퍼스트\s*|세컨드?\s*)?서브|서브\s*(토스|폼|동작|게임)|서브할|서브 넣|서브를 넣/;
+const wordHits=(t,w)=>{ t=String(t||""); if(w==="서브"&&t.includes("서브")&&RETURN_CTX.test(t)) return MY_SERVE.test(t);
+  return (REVIEW_WORDS.find(x=>x[0]===w)||[w,[w]])[1].some(k=>t.includes(k)); };
 function wordCount(list){ const c={}; list.forEach(d=>REVIEW_WORDS.forEach(([w])=>{ if(wordHits(d.fix,w)) (c[w]=c[w]||[]).push(d); })); return c; }
 function Marked({text,word}){
   if(!word) return <>{text}</>;
