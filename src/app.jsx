@@ -201,6 +201,7 @@ const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)
 // club/guilds/<gid> = {name, abbr(엠블럼 글자 1~2자), bg, fg, photo, leader, createdAt, createdBy, members/<uid>: true, invites/<uid>: {at, by}}
 // 엠블럼은 늘 같은 크기 정사각형이에요 (글자 또는 사진). 회원은 여러 길드에 들 수 있고 이름 옆엔 대표 길드(members/<uid>/mainGuild) 하나만 떠요.
 let GUILDS = {}, VIP = {}, ME_ADMIN = false;
+let ADMIN_MODE = false;   // 관리자이면서 관리자 모드일 때만 true (회원 모드면 false)
 const GUILD_BG=["#0B1E5B","#2152E6","#12B76A","#F59E0B","#E5484D","#D6336C","#7C3AED","#FFFFFF"];
 const GUILD_FG=["#D7F24A","#FFFFFF","#0B1E5B","#FFE066","#FF9EB5","#2152E6"];
 const GUILD_NAME_MAX=6, GUILD_INTRO_MAX=40, GUILD_ABBR_MAX=2, GUILD_PHOTO_PX=160, GUILD_PHOTO_BYTES=30000;
@@ -7002,16 +7003,16 @@ function DiaryDetail({d,onBack,onEdit}){
         {d.good&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#12A15E"}}>잘된 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.good}</p></div>}
         {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p></div>}
       </div>
-      {(mine||ME_ADMIN||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
+      {(mine||ADMIN_MODE||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
         {mine&&d.fix&&<button type="button" onClick={()=>{ setReview(d.uid); onBack(); }} style={{marginRight:"auto",background:"#F2FAD0",border:"none",borderRadius:9,padding:"5px 10px",fontSize:12.5,fontWeight:800,color:INK,cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4}}><Icon name="target" size={12} stroke={2.4}/>누적 리뷰에 더해졌어요 ›</button>}
         {mine&&<button type="button" onClick={onEdit} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}><Ic n="pencil" s={12}/> 수정</button>}
-        {(mine||ME_ADMIN)&&<button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>}
+        {(mine||ADMIN_MODE)&&<button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>}
         {d.vis!=="me"&&<ShareLinkButton url={shareUrl("diary",d.id)}/>}
       </div>}
     </Card>
     {d.vis==="me"?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 나만 보는 일기예요</p>
     :d.noComment?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 코멘트를 닫아 둔 일기예요</p>
-    :<CommentBox comments={d.comments} title="코멘트" isAdmin={mine||ME_ADMIN}
+    :<CommentBox comments={d.comments} title="코멘트" isAdmin={mine||ADMIN_MODE}
       save={(cid,v)=>diaryRef(`diaries/${d.id}/comments/${cid}`).set(v)}
       onAdded={t=>{ if(d.uid!==me) postFeed({type:"diaryComment",to:d.uid,diaryId:d.id,text:`${ME} 님이 내 훈련일기(${shortDay(d.date)})에 코멘트를 남겼어요: "${clip(t)}"`}); }}
       where={`${curNick(d.uid,d.name)} 님 훈련일기`} link={{diaryId:d.id}}/>}
@@ -7582,6 +7583,7 @@ export default function App() {
   const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",board:BOARD_NAME,admin:"관리"};
   // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
   const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
+  ADMIN_MODE=adminOn;
   const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
     if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
   const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"gear"}]:TABS;
