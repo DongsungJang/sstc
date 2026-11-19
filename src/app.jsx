@@ -6277,7 +6277,7 @@ function UpdateBanner(){
 // 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
 // marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
 /*HELP_DATA_START*/
-const HELP_VER="e0f09020";
+const HELP_VER="67fd9d9e";
 const HELP=[
   {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"참석 예정 모임이 없으면 '모임 둘러보기'를 눌러 예약 탭으로 가요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 참석할 가장 가까운 모임 (대기 중이면 주황)","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":197,"marks":[[3.2,23.4,46.3,70.1],[77.8,60.4,15.3,13.2],[79.4,5.6,16.4,13.7]],"caps":["옆으로 밀어서 다음 모임 보기","내 상태: ✓ 참석 예정 · 대기 n번 · 참석 가능","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":150,"marks":[[7.7,32,84.6,32.7]],"caps":["운영진 공지 · 누르면 펼쳐 보기 (중요 공지는 맨 위)"]}]},
   {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기, 새 모임, 새 댓글","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록 · 엠티 보라","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":259,"marks":[[6.7,18.5,86.6,27],[64,7.3,29.3,13.5],[3.2,53.3,93.5,43.2]],"caps":["새 댓글 달린 모임 · 누르면 그 모임으로","새 댓글 표시 한꺼번에 지우기","오늘 새로 올라온 모임 (자정에 사라져요)"]},{"img":"booking-3","w":402,"h":323,"marks":[[4.2,4,91.5,14.2],[42.1,0.3,10.6,-14.1],[17.7,66.9,37,9]],"caps":["번개 / 정기 / 엠티 바꾸기 (꽉 차면 '대기 n')","새로 올라온 모임은 NEW","비공개 번개: 초대받은 회원만 보여요 (+ 새 모임은 아래 '모임 만들기')"]}]},
@@ -6287,7 +6287,7 @@ const HELP=[
   {"id":"bracket","title":"대진표 · 스코어","icon":"ball","sub":"게임 편성과 점수 기록","tip":"6점 선승 · 5:5 무승부 · 참가자만 만들 수 있어요","blocks":[{"img":"bracket-1","w":402,"h":438,"marks":[[4.2,16.2,91.5,9.4],[7.7,63.7,84.6,24.2],[7.7,89.3,84.6,8.7]],"caps":["자동 편성 / 직접 작성","게임당 시간 고르기","코트 수 → 아래 '대진표 만들기'"]}]},
   {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 (이번 달 나 · 회원 평균)"]},{"img":"members-3","w":402,"h":501,"marks":[[62.7,2.2,28.8,7],[7.7,73.3,84.6,9],[7.7,83.4,84.6,11.2]],"caps":["참여 랭킹: 이번 달 / 전체 (끝난 모임만 세요)","5위 아래는 더보기","내 순위 · 아래엔 코트별 통계"]}]},
   {"id":"guild","title":"길드","icon":"shield","sub":"마음 맞는 회원끼리 작은 모임","go":"guild","tip":"길드는 우수회원이 만들 수 있어요. 여러 길드에 들어가도 돼요","blocks":[{"img":"guild-1","w":402,"h":554,"marks":[[8,39,84.1,20.1],[16.9,67.1,26.5,16.6],[3.2,88.1,93.5,10.3]],"caps":["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},{"img":"guild-2","w":402,"h":75,"marks":[[39.1,47.3,24.5,37.3]],"caps":["길드 모임은 그 길드원만 보고 참석해요"]}]},
-  {"id":"diary","title":"훈련일기","icon":"book","sub":"잘된 점 · 고칠 점, 자세 사진, 누적 리뷰","go":"diary","tip":"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)","blocks":[{"img":"diary-1","w":402,"h":593,"marks":[[49.8,12.8,22.8,7.4],[4.2,22.3,31.4,6.6],[4.2,57,14.4,7.9],[3.2,88.9,93.5,9.6]],"caps":["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},{"img":"diary-2","w":402,"h":633,"marks":[[8.2,1.7,83.6,12],[8,21,84.1,78.8],[8.2,73.1,83.6,26.7]],"caps":["레슨 · 게임 · 랠리 · 혼자 연습","잘된 점 · 고칠 점은 글로 편하게","지금 내 자세와 참고 자세 사진을 나란히"]},{"img":"diary-3","w":402,"h":161,"marks":[[8.2,26.4,84.6,73],[3.7,0.6,92.5,98.8]],"caps":["전체 공개 / 나만 보기","코멘트를 받을지 (달리면 알림)"]},{"img":"diary-4","w":402,"h":270,"marks":[[7.7,4.1,42,82.7],[50.2,4.1,42,82.7]],"caps":["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},{"img":"diary-4c","w":402,"h":250,"marks":[[18.2,19.2,74.1,37],[18.2,58.6,74.1,37]],"caps":["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},{"img":"diary-5","w":402,"h":280,"marks":[[50.2,79.8,41.8,16.1],[8,79.8,41.8,16.1]],"caps":["쓴 고칠 점을 날짜순으로 모아 보기","누적 리뷰: 일기를 쓸 때마다 쌓여요"]},{"img":"diary-6","w":402,"h":404,"marks":[[3.2,2.7,36.9,11.6],[3.2,15.8,93.5,19.8],[3.2,65.2,93.5,32.1]],"caps":["전체 누적 / 월별 (월별은 지난달과 비교)","나에게 한마디 (리뷰 맨 아래에서 써요)","가장 많이 나온 문제 · 코멘트에서 많이 들은 말"]},{"img":"diary-6b","w":402,"h":476,"marks":[[7.7,13.5,84.6,6.3],[7.7,67.3,84.6,6.3]],"caps":["내가 쓴 고칠 점에 많이 나온 말 (5개 넘으면 더보기)","회원들이 코멘트에서 많이 해 준 말 · 누르면 그 일기만"]},{"img":"diary-7","w":402,"h":314,"marks":[[20.1,22.5,72.1,22.4],[20.1,45.6,72.1,51]],"caps":["내가 쓴 고칠 점 (최근 순)","그 일기에 받은 코멘트가 바로 아래 쌓여요"]}]},
+  {"id":"diary","title":"훈련일기","icon":"book","sub":"잘된 점 · 고칠 점, 자세 사진, 누적 리뷰","go":"diary","tip":"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)","blocks":[{"img":"diary-1","w":402,"h":593,"marks":[[49.8,12.8,22.8,7.4],[4.2,22.3,31.4,6.6],[4.2,57,14.4,7.9],[3.2,88.9,93.5,9.6]],"caps":["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},{"img":"diary-2","w":402,"h":633,"marks":[[8.2,1.7,83.6,12],[8,21,84.1,78.8],[8.2,87.5,83.6,12.3]],"caps":["레슨 · 게임 · 랠리 · 혼자 연습","잘된 점 · 고칠 점은 글로 편하게","지금 내 자세와 참고 자세 사진을 나란히"]},{"img":"diary-2b","w":402,"h":290,"marks":[[8.2,43.1,83.6,56.2],[11.2,82.4,22.7,13.1]],"caps":["고칠 점을 쓰면 ‘기술 · 문제’ 칩을 미리 골라 줘요 · 틀리면 ✕로 빼요","+ 다른 문제: 기술 → 문제를 골라 더해요 (기술·문제는 회원이 추가·수정)"]},{"img":"diary-3","w":402,"h":161,"marks":[[8.2,26.4,84.6,73],[3.7,0.6,92.5,98.8]],"caps":["전체 공개 / 나만 보기","코멘트를 받을지 (달리면 알림)"]},{"img":"diary-4","w":402,"h":270,"marks":[[7.7,4.1,42,82.7],[50.2,4.1,42,82.7]],"caps":["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},{"img":"diary-4c","w":402,"h":250,"marks":[[18.2,19.2,74.1,37],[18.2,58.6,74.1,37]],"caps":["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},{"img":"diary-5","w":402,"h":280,"marks":[[50.2,79.8,41.8,16.1],[8,79.8,41.8,16.1]],"caps":["쓴 고칠 점을 날짜순으로 모아 보기","누적 리뷰: 일기를 쓸 때마다 쌓여요"]},{"img":"diary-6","w":402,"h":428,"marks":[[3.2,2.6,36.9,11],[3.2,15,93.5,18.7],[3.2,61.6,93.5,35.9]],"caps":["전체 누적 / 월별 (월별은 지난달과 비교)","나에게 한마디 (리뷰 맨 아래에서 써요)","가장 많이 나온 문제 · 코멘트에서 많이 들은 말"]},{"img":"diary-6b","w":402,"h":471,"marks":[[7.7,13.6,84.6,6.4],[7.7,66.9,84.6,6.4]],"caps":["내 고칠 점의 문제 칩을 쌓아 세요 (5개 넘으면 더보기)","회원들이 코멘트에서 많이 해 준 말 · 누르면 그 일기만"]},{"img":"diary-7","w":402,"h":314,"marks":[[20.1,22.5,72.1,22.4],[20.1,45.6,72.1,51]],"caps":["내가 쓴 고칠 점 (최근 순)","그 일기에 받은 코멘트가 바로 아래 쌓여요"]}]},
   {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5],[7.2,60.6,17.8,4.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요","내 글에 새 댓글 (아래 탭 위 말풍선에도 떠요)"]}]},
   {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
   {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임, 화면 모드","tip":"화면 모드는 이 폰에만 저장돼요. 닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":440,"marks":[[0.2,0.2,99.5,99.5],[28.1,75.2,64.2,13],[77.9,89.1,14.4,8.4]],"caps":["화면 모드: 자동(폰 설정) · 라이트 · 다크","사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
@@ -6589,8 +6589,158 @@ const wordHits=(t,w)=>{ t=String(t||""); if(w==="서브"&&t.includes("서브")&&
 function wordCount(list){ const c={}; list.forEach(d=>REVIEW_WORDS.forEach(([w])=>{ if(wordHits(d.fix,w)) (c[w]=c[w]||[]).push(d); })); return c; }
 function Marked({text,word}){
   if(!word) return <>{text}</>;
+  if(word.includes("|")){ const hit=new Set(chipSentences(text,word));
+    return <>{String(text).split(/((?<=[.!?。])\s+|\n+)/).map((p,i)=>hit.has(p)?<mark key={i} style={{background:"#F2FAD0",color:INK,fontWeight:700,padding:"0 2px",borderRadius:4}}>{p}</mark>:p)}</>; }
   const keys=(REVIEW_WORDS.find(x=>x[0]===word)||[word,[word]])[1]; const re=new RegExp("("+keys.map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")","g");
   return <>{String(text).split(re).map((p,i)=>keys.includes(p)?<mark key={i} style={{background:"#F2FAD0",color:INK,fontWeight:800,padding:"0 2px",borderRadius:4}}>{p}</mark>:p)}</>;
+}
+// ── 고칠 점 '문제 칩': 어떤 기술(s)에서 무슨 문제(p)가 났는지. 칩 id는 "기술id|문제id"
+//  기본 기술·문제는 이름이 곧 id, 회원이 더한 것은 club/diaryTags/<id> {kind:"s"|"p",name,group,uid,at} (id 앞에 "t:")
+//  일기에는 chipsOn(칩을 저장한 일기), chips(저장할 때 보인 칩), chipsAdd(직접 더한 칩), chipsOff(자동으로 잡혔지만 뺀 칩)를 저장해요
+const CHIP_ALL="공통";
+const CHIP_STROKES=[[CHIP_ALL,null],["포핸드",/포핸드|포핸/],["백핸드",/백핸드|백핸|원핸드|투핸드/],["서브",/서브|토스|더블 ?폴트/],["리턴",/리턴|리시브/],["발리",/발리|네트 ?플레이/],["스매시",/스매시|스매싱|오버헤드/],["로브",/로브|로빙/]];
+const CHIP_GROUPS=["몸 쓰기","타이밍·발","결과","마음·체력"];
+// [이름, 묶음, 찾는 말, 기술 없이 '공통'으로]
+const CHIP_PROBS=[
+  ["더블 폴트","결과",/더블 ?폴트|더블이/],
+  ["토스 흔들림","몸 쓰기",/토스/],
+  ["스플릿 스텝 늦음","타이밍·발",/스플릿|첫 ?발|잔발|발이 (안|늦)|스텝/,true],
+  ["타점 늦음","타이밍·발",/늦|몸 옆에서|뒤에서 맞|밀려/],
+  ["타점 빠름","타이밍·발",/타점이 (너무 )?(빨|앞)|일찍 맞/],
+  ["백스윙 큼","몸 쓰기",/뒤로 빼|백스윙이 (크|커)|테이크백이 (크|커)/],
+  ["팔로스루 짧음","몸 쓰기",/팔로스루|피니시|짧게 끝/],
+  ["하체를 안 씀","몸 쓰기",/무릎|하체|팔로만|다리를 안/],
+  ["손목","몸 쓰기",/손목/],
+  ["어깨 회전 부족","몸 쓰기",/어깨/],
+  ["네트에 걸림","결과",/네트에 걸|네트를 못|걸려/],
+  ["공이 뜸·길게","결과",/떠요|뜨|떴|길게|아웃|넘어가/],
+  ["방향이 빗나감","결과",/옆으로|방향|사이드/],
+  ["급해짐·긴장","마음·체력",/급해|급하|서둘|마음이 흔들|멘탈|긴장|떨려/,true],
+  ["지치면 무너짐","마음·체력",/지치|체력|힘들/,true],
+  ["집중력","마음·체력",/집중력|집중이 (안|깨|흐)|집중을 못|집중 못/,true],
+];
+let DIARY_TAGS={};
+function useDiaryTags(){
+  const [t,setT]=useState(DIARY_TAGS);
+  useEffect(()=>{ if(!FB) return; const r=diaryRef("diaryTags"), h=s=>{ DIARY_TAGS=s.val()||{}; setT(DIARY_TAGS); };
+    r.on("value",h,()=>{}); return ()=>r.off("value",h); },[]);
+  return t;
+}
+const tagList=kind=>Object.entries(DIARY_TAGS).filter(([,x])=>x&&x.kind===kind&&x.name).map(([id,x])=>({id:"t:"+id,name:x.name,group:x.group,uid:x.uid,at:x.at||0})).sort((a,b)=>a.at-b.at);
+const strokeName=id=>id&&id.startsWith("t:")?((DIARY_TAGS[id.slice(2)]||{}).name||null):(CHIP_STROKES.some(x=>x[0]===id)?id:null);
+const probName=id=>id&&id.startsWith("t:")?((DIARY_TAGS[id.slice(2)]||{}).name||null):(CHIP_PROBS.some(x=>x[0]===id)?id:null);
+const chipParts=c=>{ const [s,p]=String(c||"").split("|"); return {s,p,sn:strokeName(s),pn:probName(p)}; };
+const chipOk=c=>{ const x=chipParts(c); return !!(x.sn&&x.pn); };
+const chipText=c=>{ const x=chipParts(c); return x.s===CHIP_ALL?x.pn:`${x.sn} · ${x.pn}`; };
+const listOf=a=>Array.isArray(a)?a.filter(Boolean):a&&typeof a==="object"?Object.values(a).filter(Boolean):[];
+// 받침 있으면 a(이·은), 없으면 b(가·는)
+const josa=(w,a,b)=>{ const c=String(w||"").replace(/[^가-힣a-zA-Z0-9]+$/,"").slice(-1).charCodeAt(0); return c>=0xAC00&&c<=0xD7A3?((c-0xAC00)%28?a:b):a; };
+const CHIP_GOOD=/잘 ?(됐|되|맞|들어|걸렸)|좋았|괜찮았/, CHIP_BAD=/안 |못 |않/;
+const hasWord=(s,w)=>!!w&&s.replace(/\s/g,"").includes(String(w).replace(/\s/g,""));
+// 글에서 칩 찾기: 문장마다 기술(없으면 앞 문장 기술)과 문제를 짝지어요. 좋은 말 문장은 빼요
+function autoChips(text){
+  const out=[], cs=tagList("s"), cp=tagList("p"); let carry=null;
+  String(text||"").split(/(?<=[.!?。])\s+|\n+/).forEach(s=>{
+    if(!s.trim()||(CHIP_GOOD.test(s)&&!CHIP_BAD.test(s))) return;
+    const st=(cs.find(x=>hasWord(s,x.name))||{}).id||(CHIP_STROKES.find(([,re])=>re&&re.test(s))||[])[0];
+    if(st) carry=st;
+    const seen=new Set(), hits=CHIP_PROBS.filter(x=>x[2].test(s));
+    if(hits.some(h=>h[1]==="타이밍·발"&&h[0]!=="타점 늦음")&&!/맞|타점/.test(s)) seen.add("타점 늦음");
+    hits.forEach(([p,g,,all])=>{ if(seen.has(p)||seen.has(g)) return; seen.add(g); out.push(`${all?CHIP_ALL:(st||carry||CHIP_ALL)}|${p}`); });
+    cp.filter(x=>hasWord(s,x.name)).forEach(x=>out.push(`${st||carry||CHIP_ALL}|${x.id}`));
+  });
+  return [...new Set(out)];
+}
+// 일기의 칩: 저장된 칩이 있으면 그것, 없으면(예전 일기) 글에서 찾아요
+const chipsOf=d=>(d.chipsOn?listOf(d.chips):autoChips(d.fix)).filter(chipOk);
+function chipCount(list){ const c={}; list.forEach(d=>chipsOf(d).forEach(k=>(c[k]=c[k]||[]).push(d))); return c; }
+const chipSentences=(text,c)=>String(text||"").split(/(?<=[.!?。])\s+|\n+/).filter(s=>autoChips(s).some(x=>x.split("|")[1]===c.split("|")[1]));
+function ChipLabel({c,size=13}){
+  const x=chipParts(c), all=x.s===CHIP_ALL;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:5,minWidth:0}}>
+    <span style={{fontSize:size-2.5,fontWeight:800,color:all?"#4A5578":BLUE,background:all?"#F1F4FA":"#E8EEFF",borderRadius:5,padding:"1px 5px",whiteSpace:"nowrap",flexShrink:0}}>{x.sn||"?"}</span>
+    <span style={{fontSize:size,fontWeight:800,color:INK,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{x.pn||"?"}</span>
+  </span>;
+}
+const canEditTag=t=>t&&(t.uid===myUid()||ADMIN_MODE||ME_ADMIN);
+const TAG_NAME_MAX=12;
+function saveTag(kind,name,group,id){
+  name=String(name||"").trim().slice(0,TAG_NAME_MAX); if(!name) return Promise.reject(new Error("이름을 써 주세요"));
+  const base=kind==="s"?CHIP_STROKES.map(x=>x[0]):CHIP_PROBS.map(x=>x[0]);
+  if(base.some(b=>b.replace(/\s/g,"")===name.replace(/\s/g,""))||tagList(kind).some(t=>t.id!=="t:"+id&&t.name.replace(/\s/g,"")===name.replace(/\s/g,""))) return Promise.reject(new Error("이미 있는 이름이에요"));
+  if(id){ return diaryRef(`diaryTags/${id}`).update({name,group:kind==="p"?group:null}).then(()=>"t:"+id); }
+  const nid=newId(); return diaryRef(`diaryTags/${nid}`).set({kind,name,group:kind==="p"?group:null,uid:myUid(),at:Date.now()}).then(()=>"t:"+nid);
+}
+// 쓰기 화면의 '찾은 문제' 칸
+function ChipPicker({fix,added,off,setAdded,setOff}){
+  const auto=autoChips(fix).filter(chipOk);
+  const shown=[...new Set([...auto.filter(c=>!off.includes(c)),...added.filter(chipOk)])];
+  const offShown=auto.filter(c=>off.includes(c)&&!added.includes(c));
+  const [open,setOpen]=useState(false), [s,setS]=useState(null), [p,setP]=useState(null);
+  const [edit,setEdit]=useState(false), [form,setForm]=useState(null); // form: {kind,id?,name,group}
+  const [busy,setBusy]=useState(false);
+  const remove=c=>{ if(added.includes(c)) setAdded(added.filter(x=>x!==c)); if(auto.includes(c)) setOff([...new Set([...off,c])]); };
+  const restore=c=>setOff(off.filter(x=>x!==c));
+  const add=()=>{ if(!s||!p) return; const c=`${s}|${p}`; setOff(off.filter(x=>x!==c)); if(!shown.includes(c)) setAdded([...added,c]); setP(null); setOpen(false); };
+  const submitForm=()=>{ if(!form||busy) return; setBusy(true);
+    saveTag(form.kind,form.name,form.group||CHIP_GROUPS[0],form.id).then(id=>{ if(!form.id){ form.kind==="s"?setS(id):setP(id); } setForm(null); }).catch(e=>alert(e.message||authMsg(e))).finally(()=>setBusy(false)); };
+  const delTag=()=>{ if(!form||!form.id||busy) return; if(!window.confirm(`‘${form.name}’을 지울까요? 이미 저장된 일기에서도 이 칩은 안 보여요.`)) return;
+    setBusy(true); diaryRef(`diaryTags/${form.id}`).remove().then(()=>{ if(s==="t:"+form.id) setS(null); if(p==="t:"+form.id) setP(null); setForm(null); }).catch(e=>alert(authMsg(e))).finally(()=>setBusy(false)); };
+  const chipBtn=(c,isOff)=><span key={c} style={{display:"inline-flex",alignItems:"center",gap:4,height:32,padding:"0 4px 0 8px",borderRadius:10,background:isOff?"#F7F8FB":"#fff",border:`1.5px ${isOff?"dashed #D5DAE6":"solid #F7C77E"}`,opacity:isOff?0.75:1,maxWidth:"100%",boxSizing:"border-box"}}>
+    <span style={{textDecoration:isOff?"line-through":"none",display:"inline-flex",minWidth:0}}><ChipLabel c={c}/></span>
+    {isOff?<button type="button" onClick={()=>restore(c)} style={{border:"none",background:"none",color:BLUE,fontSize:11.5,fontWeight:800,cursor:"pointer",padding:"0 4px",fontFamily:FONT,whiteSpace:"nowrap"}}>되살리기</button>
+      :<button type="button" aria-label={`${chipText(c)} 빼기`} onClick={()=>remove(c)} style={{width:24,height:24,borderRadius:"50%",border:"none",background:"#F1F4FA",color:"#6B7493",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0,flexShrink:0}}><Icon name="x" size={12} stroke={2.6}/></button>}
+  </span>;
+  const pill=(id,name,on,onClick,mine,done)=><button key={id} type="button" onClick={onClick} aria-pressed={on} style={{height:32,padding:"0 11px",borderRadius:10,border:"none",background:on?(edit?"#FFF4E5":INK):done?"#F1F4FA":"#F3F5FA",boxShadow:edit&&mine?"inset 0 0 0 1.5px #F59E0B":"none",color:on?(edit?"#C2610C":"#fff"):done?"#A3AAC2":"#33406B",fontSize:13,fontWeight:on?800:700,cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4}}>{name}{edit&&mine&&<Icon name="pencil" size={11} stroke={2.4}/>}{done&&!edit?" ✓":""}</button>;
+  const addPill=(kind,group)=><button key={"add"+kind+(group||"")} type="button" onClick={()=>{ setEdit(false); setForm({kind,name:"",group}); }} style={{height:32,padding:"0 10px",borderRadius:10,border:`1.5px dashed #9DB4F5`,background:"#fff",color:BLUE,fontSize:12.5,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>+ 추가</button>;
+  const tapTag=(kind,t,pick)=>()=>{ if(edit){ if(canEditTag(t)) setForm({kind,id:t.id.slice(2),name:t.name,group:t.group||CHIP_GROUPS[0]}); return; } pick(); };
+  const inp={flex:1,minWidth:0,height:40,padding:"0 10px",borderRadius:10,border:"1.5px solid #E2E6F0",fontSize:16,color:INK,fontFamily:FONT,background:"#fff",boxSizing:"border-box"};
+  const formBox=form&&<div style={{marginTop:8,padding:10,borderRadius:12,background:"#F5F8FF"}}>
+    <p style={{margin:"0 0 6px",fontSize:12,fontWeight:800,color:BLUE}}>{form.id?"이름 바꾸기":form.kind==="s"?"기술 추가":"문제 추가"} <span style={{fontWeight:600,color:"#8A93B2"}}>· 모든 회원이 같이 써요</span></p>
+    {form.kind==="p"&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>{CHIP_GROUPS.map(g=><button key={g} type="button" onClick={()=>setForm({...form,group:g})} style={{height:28,padding:"0 9px",borderRadius:8,border:"none",background:(form.group||CHIP_GROUPS[0])===g?"#C2610C":"#fff",color:(form.group||CHIP_GROUPS[0])===g?"#fff":"#6B7493",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{g}</button>)}</div>}
+    <div style={{display:"flex",gap:6}}>
+      <input autoFocus value={form.name} maxLength={TAG_NAME_MAX} onChange={e=>setForm({...form,name:e.target.value})} onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); submitForm(); } }} placeholder={form.kind==="s"?"예) 슬라이스":"예) 그립이 돌아감"} style={inp}/>
+      <button type="button" disabled={busy||!form.name.trim()} onClick={submitForm} style={{height:40,padding:"0 12px",borderRadius:10,border:"none",background:BLUE,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT,opacity:busy||!form.name.trim()?0.5:1,whiteSpace:"nowrap"}}>{form.id?"저장":"추가"}</button>
+    </div>
+    <div style={{display:"flex",gap:12,marginTop:6}}>
+      {form.id&&<button type="button" onClick={delTag} style={{border:"none",background:"none",padding:0,fontSize:12,fontWeight:700,color:"#DC2626",cursor:"pointer",fontFamily:FONT}}>지우기</button>}
+      <button type="button" onClick={()=>setForm(null)} style={{marginLeft:"auto",border:"none",background:"none",padding:0,fontSize:12,fontWeight:700,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>취소</button>
+    </div>
+  </div>;
+  const cs=tagList("s"), cp=tagList("p"), hasMine=[...cs,...cp].some(canEditTag);
+  const sub=t=><p style={{margin:"12px 0 6px",fontSize:12,fontWeight:800,color:"#8A93B2"}}>{t}</p>;
+  return <div style={{marginTop:10,background:"#FFFAF2",border:"1px solid #FCE3BF",borderRadius:14,padding:"10px 11px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <span style={{fontSize:12.5,fontWeight:900,color:"#C2610C"}}>✦ 찾은 문제</span>
+      <span style={{marginLeft:"auto",fontSize:11,fontWeight:600,color:"#A07B4D"}}>{shown.length?"틀리면 눌러서 빼요":fix.trim()?"못 찾았어요 · 직접 더해 주세요":"고칠 점을 쓰면 찾아 드려요"}</span>
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>
+      {shown.map(c=>chipBtn(c,false))}{offShown.map(c=>chipBtn(c,true))}
+      <button type="button" aria-expanded={open} onClick={()=>{ setOpen(!open); setForm(null); setEdit(false); }} style={{height:32,padding:"0 11px",borderRadius:10,border:"1.5px dashed #9DB4F5",background:open?"#E8EEFF":"#fff",color:BLUE,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{open?"닫기":"+ 다른 문제"}</button>
+    </div>
+    {open&&<div style={{marginTop:10,background:"#fff",borderRadius:12,padding:"4px 10px 12px"}}>
+      <div style={{display:"flex",alignItems:"center"}}>{sub("① 어떤 기술에서?")}
+        {hasMine&&<button type="button" onClick={()=>{ setEdit(!edit); setForm(null); }} style={{marginLeft:"auto",border:"none",background:edit?"#FFF4E5":"none",color:edit?"#C2610C":"#8A93B2",borderRadius:8,padding:"4px 8px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{edit?"수정 끝":"수정"}</button>}
+      </div>
+      {edit&&<p style={{margin:"0 0 6px",fontSize:11.5,color:"#C2610C"}}>회원이 추가한 것 중 {ME_ADMIN?"":"내가 추가한 "}것을 눌러 이름을 바꾸거나 지워요</p>}
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {CHIP_STROKES.map(([id])=>pill(id,id,s===id,()=>!edit&&setS(id)))}
+        {cs.map(t=>pill(t.id,t.name,s===t.id,tapTag("s",t,()=>setS(t.id)),canEditTag(t)))}
+        {!edit&&addPill("s")}
+      </div>
+      {form&&form.kind==="s"&&formBox}
+      {sub("② 무슨 문제가?")}
+      {CHIP_GROUPS.map(g=>{ const done=id=>s&&shown.includes(`${s}|${id}`);
+        return <div key={g}><p style={{margin:"8px 0 5px",fontSize:11.5,fontWeight:800,color:"#C2610C"}}>{g}</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {CHIP_PROBS.filter(x=>x[1]===g).map(([id])=>pill(id,id,p===id,()=>!edit&&setP(id),false,done(id)))}
+          {cp.filter(t=>(t.group||CHIP_GROUPS[0])===g).map(t=>pill(t.id,t.name,p===t.id,tapTag("p",t,()=>setP(t.id)),canEditTag(t),done(t.id)))}
+          {!edit&&addPill("p",g)}
+        </div>
+        {form&&form.kind==="p"&&(form.group||CHIP_GROUPS[0])===g&&formBox}</div>; })}
+      {!edit&&<button type="button" disabled={!s||!p} onClick={add} style={{marginTop:12,width:"100%",height:44,borderRadius:12,border:"none",background:s&&p?BLUE:"#C9D3EE",color:"#fff",fontSize:14.5,fontWeight:900,cursor:s&&p?"pointer":"default",fontFamily:FONT}}>{s&&p?`‘${chipText(`${s}|${p}`)}’ 더하기`:!s?"기술을 먼저 골라 주세요":"문제를 골라 주세요"}</button>}
+    </div>}
+  </div>;
 }
 const DIARY_RECENT_DAYS=30;
 function CumulativeReview({uid,list,onBack,onOpen}){
@@ -6610,8 +6760,8 @@ function CumulativeReview({uid,list,onBack,onOpen}){
   const latest=all.find(d=>d.fix);
   const cut=(()=>{ const t=new Date(); t.setDate(t.getDate()-DIARY_RECENT_DAYS); return ymd(t); })();
   const recent=monthly?all:all.filter(d=>d.date>cut), older=monthly?full.filter(d=>d.date.slice(0,7)===prevYm):all.filter(d=>d.date<=cut);
-  const cc=wordCount(all), rc=wordCount(recent), oc=wordCount(older);
-  const rows=Object.keys(cc).map(w=>({w,n:cc[w].length,r:(rc[w]||[]).length,items:cc[w],now:!!(latest&&wordHits(latest.fix,w))})).sort((a,b)=>b.n-a.n||b.r-a.r);
+  const cc=chipCount(all), rc=chipCount(recent), oc=chipCount(older);
+  const rows=Object.keys(cc).map(w=>({w,n:cc[w].length,r:(rc[w]||[]).length,items:cc[w],now:!!(latest&&chipsOf(latest).includes(w))})).sort((a,b)=>b.n-a.n||b.r-a.r);
   const gone=older.length&&recent.length?Object.keys(oc).filter(w=>oc[w].length>=(monthly?1:2)&&!rc[w]).sort((a,b)=>oc[b].length-oc[a].length):[];
   const types=DIARY_TYPES.map(([k,l])=>({k,l,n:all.filter(d=>d.type===k).length})).filter(t=>t.n);
   const nCm=all.reduce((a,d)=>a+toList(d.comments).filter(c=>c&&c.text).length,0);
@@ -6621,11 +6771,11 @@ function CumulativeReview({uid,list,onBack,onOpen}){
   // 받은 코멘트에서 나온 말 (코멘트 하나를 한 번으로 세요)
   const cmAll=all.flatMap(d=>toList(d.comments).filter(c=>c&&c.text&&c.uid!==uid));
   const ccm={}; cmAll.forEach(c=>REVIEW_WORDS.forEach(([w])=>{ if(wordHits(c.text,w)) ccm[w]=(ccm[w]||0)+1; }));
-  const cmRows=Object.keys(ccm).map(w=>({w,n:ccm[w],mine:(cc[w]||[]).length})).sort((a,b)=>b.n-a.n||b.mine-a.mine);
+  const cmRows=Object.keys(ccm).map(w=>({w,n:ccm[w],mine:Object.keys(cc).filter(k=>chipText(k).includes(w)).length})).sort((a,b)=>b.n-a.n||b.mine-a.mine);
   const cmMax=Math.max(1,...cmRows.map(r=>r.n));
   const saved=(notes&&((notes.all&&notes.all.text)||(Object.keys(notes).filter(k=>/^\d{4}-\d{2}$/.test(k)).sort().map(k=>notes[k].text).filter(Boolean).pop())))||"";
   const cmHit=(d,w)=>toList(d.comments).some(c=>c&&c.text&&c.uid!==uid&&wordHits(c.text,w));
-  const shown=all.filter(d=>(d.fix||toList(d.comments).length)&&(!sel||(sel.src==="cm"?cmHit(d,sel.w):wordHits(d.fix,sel.w))));
+  const shown=all.filter(d=>(d.fix||toList(d.comments).length)&&(!sel||(sel.src==="cm"?cmHit(d,sel.w):chipsOf(d).includes(sel.w))));
   const pill=(t,bg,fg)=><span style={{fontSize:10.5,fontWeight:800,color:fg,background:bg,padding:"1px 6px",borderRadius:5,whiteSpace:"nowrap"}}>{t}</span>;
   return(<>
     <BackLink label={mine?"내 훈련일기":`${nickOf(uid)} 님 일기`} onClick={onBack}/>
@@ -6651,16 +6801,16 @@ function CumulativeReview({uid,list,onBack,onOpen}){
         <div key={a} style={{background:"#fff",borderRadius:16,padding:"12px 12px"}}><p style={{margin:0,fontSize:11.5,color:"#8A93B2",fontWeight:700}}>{a}</p><p style={{margin:"4px 0 0",fontSize:17,fontWeight:900,color:INK}}>{b}</p>{c&&<p style={{margin:"3px 0 0",fontSize:10.5,color:"#A3AAC2",lineHeight:1.4}}>{c}</p>}</div>)}
     </div>
     {top&&<div style={{background:"#F2FAD0",borderRadius:20,padding:"14px 16px",fontSize:14.5,color:INK,lineHeight:1.65}}>
-      {monthly?`${sm}월`:"지금까지"} 고칠 점에 <b style={{color:"#C2610C"}}>‘{top.w}’</b>이 <b>{top.n}번</b>으로 가장 많이 나왔어요{monthly?((oc[top.w]||[]).length?<>, 지난달보다 <b>{top.n>=(oc[top.w]||[]).length?`${top.n-(oc[top.w]||[]).length}번 늘었어요`:`${(oc[top.w]||[]).length-top.n}번 줄었어요`}</b></>:""):top.r?<>, 최근 {DIARY_RECENT_DAYS}일에도 <b>{top.r}번</b></>:""}.
-      {patterns[0]?<> <b>‘{patterns[0].w}’</b>은 {patterns[0].all?"":"주로 "}<b>{patterns[0].t}</b> 일기에서{patterns[0].all?"만":""} 나왔어요.</>:null}
-      {gone[0]?(monthly?<> 지난달 나온 <b style={{color:"#12A15E"}}>‘{gone[0]}’</b> 얘기는 이번 달엔 없어요.</>:<> 예전에 많던 <b style={{color:"#12A15E"}}>‘{gone[0]}’</b> 얘기는 최근엔 없어요.</>):null}
+      {monthly?`${sm}월`:"지금까지"} 고칠 점에 <b style={{color:"#C2610C"}}>‘{chipText(top.w)}’</b>{josa(chipText(top.w),"이","가")} <b>{top.n}번</b>으로 가장 많이 나왔어요{monthly?((oc[top.w]||[]).length?<>, 지난달보다 <b>{top.n>=(oc[top.w]||[]).length?`${top.n-(oc[top.w]||[]).length}번 늘었어요`:`${(oc[top.w]||[]).length-top.n}번 줄었어요`}</b></>:""):top.r?<>, 최근 {DIARY_RECENT_DAYS}일에도 <b>{top.r}번</b></>:""}.
+      {patterns[0]?<> <b>‘{chipText(patterns[0].w)}’</b>{josa(chipText(patterns[0].w),"은","는")} {patterns[0].all?"":"주로 "}<b>{patterns[0].t}</b> 일기에서{patterns[0].all?"만":""} 나왔어요.</>:null}
+      {gone[0]?(monthly?<> 지난달 나온 <b style={{color:"#12A15E"}}>‘{chipText(gone[0])}’</b> 얘기는 이번 달엔 없어요.</>:<> 예전에 많던 <b style={{color:"#12A15E"}}>‘{chipText(gone[0])}’</b> 얘기는 최근엔 없어요.</>):null}
       {cmRows[0]?<> 회원들은 코멘트에서 <b style={{color:BLUE}}>‘{cmRows[0].w}’</b> 얘기를 가장 많이 해 줬어요.</>:null}
     </div>}
     <Card>
-      <SectionTitle>반복해서 나온 말</SectionTitle>
+      <SectionTitle>반복되는 문제</SectionTitle>
       {(()=>{ const row=(r,src,mx,right,hot)=>{ const on=sel&&sel.w===r.w&&sel.src===src;
           return <button key={r.w} type="button" onClick={()=>setSel(on?null:{w:r.w,src})} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"5px 6px",margin:"0 -6px",boxSizing:"content-box",border:"none",borderRadius:10,background:on?(src==="cm"?"#E8EEFF":"#FFF4E5"):"none",cursor:"pointer",fontFamily:FONT,textAlign:"left"}}>
-            <span style={{width:64,fontSize:14,fontWeight:800,color:INK}}>{r.w}</span>
+            {src==="me"?<span style={{width:150,flexShrink:0,display:"flex",minWidth:0}}><ChipLabel c={r.w}/></span>:<span style={{width:64,fontSize:14,fontWeight:800,color:INK}}>{r.w}</span>}
             <span style={{flex:1,height:10,borderRadius:5,background:"#EEF1F7",overflow:"hidden"}}><span style={{display:"block",height:"100%",width:`${r.n/mx*100}%`,borderRadius:5,background:src==="cm"?(hot?BLUE:"#9DB4F5"):(hot?"#F59E0B":"#FBCB7A")}}/></span>
             <span style={{width:28,textAlign:"right",fontSize:13,fontWeight:800,color:INK}}>{r.n}번</span>
             <span style={{width:60,textAlign:"right"}}>{right}</span>
@@ -6669,7 +6819,7 @@ function CumulativeReview({uid,list,onBack,onOpen}){
         const head=(ic,bg,fg,t,sub)=><div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0 6px"}}><span style={{width:24,height:24,borderRadius:8,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name={ic} size={13} color={fg} stroke={2.4}/></span><span style={{fontSize:14,fontWeight:900,color:INK}}>{t}</span><span style={{fontSize:11.5,color:"#A3AAC2"}}>{sub}</span></div>;
         return <>
           {head("pencil","#FFF4E5","#C2610C",mine?"내가 쓴 고칠 점에서":"쓴 고칠 점에서","일기 편수")}
-          {rows.length===0?<p style={{margin:"0 0 4px",fontSize:13,color:"#A3AAC2"}}>고칠 점에서 찾은 테니스 낱말이 아직 없어요.</p>:
+          {rows.length===0?<p style={{margin:"0 0 4px",fontSize:13,color:"#A3AAC2"}}>고칠 점에서 찾은 문제가 아직 없어요.</p>:
           <div style={{display:"flex",flexDirection:"column",gap:4}}>{rows.slice(0,more.me?99:5).map(r=>row(r,"me",max,!monthly&&r.r===0?pill("요즘 없음","#E3F7EC","#12A15E"):null,r===top))}</div>}
           {moreBtn("me",rows.length)}
           <div style={{height:1,background:"#EEF1F7",margin:"14px 0 12px"}}/>
@@ -6677,19 +6827,19 @@ function CumulativeReview({uid,list,onBack,onOpen}){
           {cmRows.length===0?<p style={{margin:"0 0 4px",fontSize:13,color:"#A3AAC2"}}>{cmAll.length?"코멘트에서 찾은 테니스 낱말이 아직 없어요.":"아직 받은 코멘트가 없어요."}</p>:
           <div style={{display:"flex",flexDirection:"column",gap:4}}>{cmRows.slice(0,more.cm?99:5).map((r,i)=>row(r,"cm",cmMax,null,i===0))}</div>}
           {moreBtn("cm",cmRows.length)}
-          <p style={{margin:"10px 0 0",fontSize:11.5,color:"#A3AAC2",lineHeight:1.5}}>글에서 테니스 낱말을 찾아 쓸 때마다 쌓아 셌어요 · 낱말을 누르면 아래에서 그 일기만</p>
+          <p style={{margin:"10px 0 0",fontSize:11.5,color:"#A3AAC2",lineHeight:1.5}}>고칠 점은 문제 칩으로, 코멘트는 테니스 낱말로 쌓아 셌어요 · 누르면 아래에서 그 일기만</p>
         </>; })()}
     </Card>
     {patterns.length>0&&<Card>
       <SectionTitle>찾은 패턴</SectionTitle>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {patterns.map(p=><div key={p.w} style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{width:26,height:26,borderRadius:8,background:"#FFF4E5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="target" size={15} color="#C2610C" stroke={2.2}/></span><span style={{fontSize:14,color:INK,lineHeight:1.5}}><b>‘{p.w}’</b>은 {p.all?<><b>{p.t}</b> 일기에서만</>:<>주로 <b>{p.t}</b> 일기에서</>} 나와요 ({p.n}번)</span></div>)}
+        {patterns.map(p=><div key={p.w} style={{display:"flex",gap:10,alignItems:"flex-start"}}><span style={{width:26,height:26,borderRadius:8,background:"#FFF4E5",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="target" size={15} color="#C2610C" stroke={2.2}/></span><span style={{fontSize:14,color:INK,lineHeight:1.5}}><b>‘{chipText(p.w)}’</b>{josa(chipText(p.w),"은","는")} {p.all?<><b>{p.t}</b> 일기에서만</>:<>주로 <b>{p.t}</b> 일기에서</>} 나와요 ({p.n}번)</span></div>)}
       </div>
     </Card>}
     <Card>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
         <p style={{margin:0,flex:1,fontSize:16,fontWeight:900,color:INK}}>고칠 점과 받은 코멘트</p>
-        {sel?<button type="button" onClick={()=>setSel(null)} style={{border:"none",background:sel.src==="cm"?"#E8EEFF":"#FFF4E5",color:sel.src==="cm"?BLUE:"#C2610C",borderRadius:9,padding:"4px 9px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{sel.src==="cm"?"코멘트":"고칠 점"} ‘{sel.w}’만 ✕</button>
+        {sel?<button type="button" onClick={()=>setSel(null)} style={{border:"none",background:sel.src==="cm"?"#E8EEFF":"#FFF4E5",color:sel.src==="cm"?BLUE:"#C2610C",borderRadius:9,padding:"4px 9px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>{sel.src==="cm"?"코멘트":"고칠 점"} ‘{sel.src==="cm"?sel.w:chipText(sel.w)}’만 ✕</button>
           :<span style={{fontSize:12,color:"#8A93B2"}}>{shown.length}편</span>}
       </div>
       {shown.length===0&&<p style={{margin:"6px 0 0",fontSize:13,color:"#A3AAC2"}}>{monthly?"이 달에 쓴 고칠 점이 없어요.":"아직 쓴 고칠 점이 없어요."}</p>}
@@ -6799,8 +6949,9 @@ function DiaryHead(){
   </div>;
 }
 // 데이터
-//  전체 공개: club/diaries/<id> {uid,name,date,type,good,fix,refNote,thumbNow,thumbRef,noComment,at,editedAt,comments,likes/<uid>:true}
+//  전체 공개: club/diaries/<id> {uid,name,date,type,good,fix,refNote,thumbNow,thumbRef,noComment,chipsOn,chips,chipsAdd,chipsOff,at,editedAt,comments,likes/<uid>:true}
 //             사진 원본은 club/diaryPhotos/<id> {uid,now,ref} (목록을 가볍게, 일기를 열 때만 받아요)
+//  회원이 더한 기술·문제: club/diaryTags/<id> {kind,name,group,uid,at} (회원 누구나 더하고, 더한 사람·관리자가 고치고 지워요)
 //  나만 보기: club/diaryMine/<uid>/<id> {...같은 칸, photoNow, photoRef} (본인만 읽고 써요)
 //  누적 리뷰 한마디: club/diaryNotes/<uid>/all {text,at} (본인만, 예전 <YYYY-MM> 글도 읽어요)
 const DIARY_TEXT_MAX=1000, DIARY_PHOTO_PX=900, DIARY_PHOTO_BYTES=220000, DIARY_THUMB_PX=200, DIARY_THUMB_BYTES=24000;
@@ -6843,11 +6994,18 @@ function shrinkDiaryPhoto(file,px,bytes,crop){
     img.src=src;
   });
 }
+// 칩: 저장할 때 보인 칩(자동 - 뺀 것 + 더한 것). 뺀 칩은 글에 아직 있는 것만 남겨요
+function diaryChipFields(v){
+  const fix=v.fix.trim(), auto=autoChips(fix).filter(chipOk), add=listOf(v.chipsAdd).filter(chipOk), off=listOf(v.chipsOff).filter(c=>auto.includes(c)&&!add.includes(c));
+  const chips=[...new Set([...auto.filter(c=>!off.includes(c)),...add])].slice(0,20);
+  return {chipsOn:fix?true:null,chips:chips.length?chips:null,chipsAdd:add.length?add.slice(0,20):null,chipsOff:off.length?off:null};
+}
 // 저장: 공개 범위가 바뀌면 다른 자리로 옮겨요 (코멘트도 같이)
 function saveDiary(v,orig){
   const me=myUid(), id=(orig&&orig.id)||newId(), pub=v.vis!=="me";
   const rec={uid:me,name:ME,date:v.date,type:v.type,good:v.good.trim().slice(0,DIARY_TEXT_MAX),fix:v.fix.trim().slice(0,DIARY_TEXT_MAX),
     refNote:v.refNote.trim().slice(0,200)||null,thumbNow:v.thumbNow||null,thumbRef:v.thumbRef||null,noComment:pub&&v.noComment?true:null,
+    ...diaryChipFields(v),
     at:(orig&&orig.at)||Date.now(),editedAt:orig?Date.now():null,comments:pub&&orig&&orig.comments?orig.comments:null,likes:pub&&orig&&orig.likes?orig.likes:null};
   const photos={now:v.photoNow||null,ref:v.photoRef||null};
   const jobs=[];
@@ -6903,6 +7061,7 @@ function DiaryCard({d,onOpen,showName=true}){
 }
 function DiaryView(){
   const all=useDiaries();
+  useDiaryTags();
   const [f]=useShared("diaryF","all");
   const [user,setUser]=useShared("diaryUser",null);
   const [openId,setOpenId]=useShared("diaryOpen",null);
@@ -7002,7 +7161,8 @@ function DiaryDetail({d,onBack,onEdit}){
       {!hasPhoto&&d.refNote&&<p style={{margin:"12px 2px 0",fontSize:12,color:"#6B7493",wordBreak:"break-all"}}>참고: {d.refNote}</p>}
       <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:12}}>
         {d.good&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#12A15E"}}>잘된 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.good}</p></div>}
-        {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p></div>}
+        {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p>
+          {d.chipsOn&&chipsOf(d).length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{chipsOf(d).map(c=><span key={c} style={{display:"inline-flex",alignItems:"center",height:26,padding:"0 8px",borderRadius:8,background:"#FFF4E5"}}><ChipLabel c={c} size={12.5}/></span>)}</div>}</div>}
       </div>
       {(mine||ADMIN_MODE||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
         {d.vis!=="me"&&(()=>{ const lk=Object.keys(d.likes||{}).length, on=!!(d.likes&&d.likes[me]);
@@ -7037,7 +7197,9 @@ function BigPhoto(){
 function DiaryForm({initial,startDate,onClose,onSaved}){
   const me=myUid();
   const [v,setV]=useState(()=>({date:startDate||todayYmd(),type:"game",good:"",fix:"",vis:"all",noComment:false,refNote:"",photoNow:"",photoRef:"",thumbNow:"",thumbRef:"",
-    ...(initial?{date:initial.date,type:initial.type||"game",good:initial.good||"",fix:initial.fix||"",vis:initial.vis||"all",noComment:!!initial.noComment,refNote:initial.refNote||"",thumbNow:initial.thumbNow||"",thumbRef:initial.thumbRef||"",photoNow:initial.photoNow||"",photoRef:initial.photoRef||""}:{})}));
+    ...(initial?{date:initial.date,type:initial.type||"game",good:initial.good||"",fix:initial.fix||"",vis:initial.vis||"all",noComment:!!initial.noComment,refNote:initial.refNote||"",thumbNow:initial.thumbNow||"",thumbRef:initial.thumbRef||"",photoNow:initial.photoNow||"",photoRef:initial.photoRef||""}:{}),
+    chipsAdd:initial?listOf(initial.chipsAdd):[],chipsOff:initial?listOf(initial.chipsOff):[]}));
+  useDiaryTags();
   const [busy,setBusy]=useState(false), [loading,setLoading]=useState(0);
   const set=(k,x)=>setV(o=>({...o,[k]:x}));
   // 고칠 때: 공개 일기의 사진 원본을 받아 둬요 (그대로 다시 저장)
@@ -7077,7 +7239,8 @@ function DiaryForm({initial,startDate,onClose,onSaved}){
         <div style={{height:14}}/>
         {lab(<span style={{color:"#C2610C"}}>고칠 점</span>)}
         <textarea value={v.fix} maxLength={DIARY_TEXT_MAX} onChange={e=>set("fix",e.target.value)} placeholder="예) 백핸드 칠 때 공이 몸 옆에서 맞아요" style={ta}/>
-        <p style={{margin:"8px 0 0",fontSize:11.5,color:"#A3AAC2"}}>고칠 점은 '고칠 점 모음'과 누적 리뷰에 쌓여요</p>
+        <ChipPicker fix={v.fix} added={v.chipsAdd} off={v.chipsOff} setAdded={x=>set("chipsAdd",x)} setOff={x=>set("chipsOff",x)}/>
+        <p style={{margin:"8px 0 0",fontSize:11.5,color:"#A3AAC2"}}>고칠 점과 문제 칩은 '고칠 점 모음'과 누적 리뷰에 쌓여요</p>
       </Card>
       <Card>
         {lab("자세 비교 사진 (선택)")}
