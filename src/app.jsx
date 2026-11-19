@@ -201,6 +201,7 @@ const curNick=(uid,name)=>(uid&&MEMBER_BY_UID[uid]&&MEMBER_BY_UID[uid].nickname)
 // club/guilds/<gid> = {name, abbr(엠블럼 글자 1~2자), bg, fg, photo, leader, createdAt, createdBy, members/<uid>: true, invites/<uid>: {at, by}}
 // 엠블럼은 늘 같은 크기 정사각형이에요 (글자 또는 사진). 회원은 여러 길드에 들 수 있고 이름 옆엔 대표 길드(members/<uid>/mainGuild) 하나만 떠요.
 let GUILDS = {}, VIP = {}, ME_ADMIN = false;
+let ADMIN_MODE = false;   // 관리자이면서 관리자 모드일 때만 true (회원 모드면 false)
 const GUILD_BG=["#0B1E5B","#2152E6","#12B76A","#F59E0B","#E5484D","#D6336C","#7C3AED","#FFFFFF"];
 const GUILD_FG=["#D7F24A","#FFFFFF","#0B1E5B","#FFE066","#FF9EB5","#2152E6"];
 const GUILD_NAME_MAX=6, GUILD_INTRO_MAX=40, GUILD_ABBR_MAX=2, GUILD_PHOTO_PX=160, GUILD_PHOTO_BYTES=30000;
@@ -4825,7 +4826,7 @@ function CourtFeeSheet({value,onClose}){
     <p style={{margin:0,fontSize:11,color:"#A3AAC2",lineHeight:1.55}}>{editing?"고치면 앞으로 만드는 모임부터 바뀐 금액이 들어가요. 이미 만든 모임 코트비는 그대로예요.":"등록하면 다음부터 이 테니스장으로 번개 모임을 만들 때 자동으로 들어가요."}</p>
     {err&&<p style={{margin:0,fontSize:12.5,color:"#ef4444"}}>{err}</p>}
     <div style={{display:"flex",gap:8,marginTop:4}}>
-      {editing&&<button type="button" onClick={del} style={{padding:"14px 18px",borderRadius:16,border:"1.5px solid #F3C4C6",background:"#fff",color:"#E5484D",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>삭제</button>}
+      {editing&&<button type="button" onClick={del} style={{padding:"14px 18px",borderRadius:16,border:"1.5px solid #F3C4C6",background:"#fff",color:"#E5484D",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>삭제</button>}
       <button type="button" disabled={busy} onClick={save} style={{flex:1,padding:"14px 0",borderRadius:16,border:"none",background:GRAD,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:FONT,opacity:busy?0.6:1}}>{busy?"저장 중…":editing?"저장":"등록하기"}</button>
     </div>
   </Sheet>;
@@ -6798,7 +6799,7 @@ function DiaryHead(){
   </div>;
 }
 // 데이터
-//  전체 공개: club/diaries/<id> {uid,name,date,type,good,fix,refNote,thumbNow,thumbRef,noComment,at,editedAt,comments}
+//  전체 공개: club/diaries/<id> {uid,name,date,type,good,fix,refNote,thumbNow,thumbRef,noComment,at,editedAt,comments,likes/<uid>:true}
 //             사진 원본은 club/diaryPhotos/<id> {uid,now,ref} (목록을 가볍게, 일기를 열 때만 받아요)
 //  나만 보기: club/diaryMine/<uid>/<id> {...같은 칸, photoNow, photoRef} (본인만 읽고 써요)
 //  누적 리뷰 한마디: club/diaryNotes/<uid>/all {text,at} (본인만, 예전 <YYYY-MM> 글도 읽어요)
@@ -6847,7 +6848,7 @@ function saveDiary(v,orig){
   const me=myUid(), id=(orig&&orig.id)||newId(), pub=v.vis!=="me";
   const rec={uid:me,name:ME,date:v.date,type:v.type,good:v.good.trim().slice(0,DIARY_TEXT_MAX),fix:v.fix.trim().slice(0,DIARY_TEXT_MAX),
     refNote:v.refNote.trim().slice(0,200)||null,thumbNow:v.thumbNow||null,thumbRef:v.thumbRef||null,noComment:pub&&v.noComment?true:null,
-    at:(orig&&orig.at)||Date.now(),editedAt:orig?Date.now():null,comments:pub&&orig&&orig.comments?orig.comments:null};
+    at:(orig&&orig.at)||Date.now(),editedAt:orig?Date.now():null,comments:pub&&orig&&orig.comments?orig.comments:null,likes:pub&&orig&&orig.likes?orig.likes:null};
   const photos={now:v.photoNow||null,ref:v.photoRef||null};
   const jobs=[];
   if(pub){
@@ -6894,7 +6895,8 @@ function DiaryCard({d,onOpen,showName=true}){
           {thumbs.map((p,i)=><img key={i} src={p} alt="" style={{width:44,height:58,objectFit:"cover",borderRadius:9,display:"block"}}/>)}
         </div>}
       </div>
-      {d.vis!=="me"&&<div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
+      {d.vis!=="me"&&<div style={{display:"flex",justifyContent:"flex-end",gap:12,marginTop:10}}>
+        {(()=>{ const lk=Object.keys(d.likes||{}).length, on=!!(d.likes&&d.likes[myUid()]); return <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:lk?"#ef4444":"#A3AAC2",fontWeight:700}}><svg width="13" height="13" viewBox="0 0 24 24" fill={on?"#ef4444":"none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON_PATHS.heart[0]}/></svg>좋아요 {lk}</span>; })()}
         <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:n?BLUE:"#A3AAC2",fontWeight:700}}><Icon name="message" size={13} stroke={2.2}/>{d.noComment?"코멘트 닫음":`코멘트 ${n}`}</span>
       </div>}
     </div>);
@@ -7002,16 +7004,19 @@ function DiaryDetail({d,onBack,onEdit}){
         {d.good&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#12A15E"}}>잘된 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.good}</p></div>}
         {d.fix&&<div><p style={{margin:"0 0 4px",fontSize:12.5,fontWeight:800,color:"#C2610C"}}>고칠 점</p><p style={{margin:0,fontSize:14.5,color:INK,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{d.fix}</p></div>}
       </div>
-      {(mine||ME_ADMIN||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
-        {mine&&d.fix&&<button type="button" onClick={()=>{ setReview(d.uid); onBack(); }} style={{marginRight:"auto",background:"#F2FAD0",border:"none",borderRadius:9,padding:"5px 10px",fontSize:12.5,fontWeight:800,color:INK,cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4}}><Icon name="target" size={12} stroke={2.4}/>누적 리뷰에 더해졌어요 ›</button>}
-        {mine&&<button type="button" onClick={onEdit} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}><Ic n="pencil" s={12}/> 수정</button>}
-        {(mine||ME_ADMIN)&&<button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT}}>삭제</button>}
+      {(mine||ADMIN_MODE||d.vis!=="me")&&<div style={{display:"flex",gap:14,justifyContent:"flex-end",alignItems:"center",marginTop:12,paddingTop:10,borderTop:"1px solid #EEF1FA"}}>
+        {d.vis!=="me"&&(()=>{ const lk=Object.keys(d.likes||{}).length, on=!!(d.likes&&d.likes[me]);
+          return <button type="button" aria-pressed={on} aria-label={on?"좋아요 취소":"좋아요"} onClick={()=>diaryRef(`diaries/${d.id}/likes/${me}`).set(on?null:true).catch(e=>alert(authMsg(e)))} style={{marginRight:"auto",display:"inline-flex",alignItems:"center",gap:5,height:34,padding:"0 12px",borderRadius:10,border:"none",background:on?"#FDECEC":"#F1F4FA",color:on?"#ef4444":"#4A5578",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:FONT}}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill={on?"#ef4444":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON_PATHS.heart[0]}/></svg>{lk?lk:"좋아요"}</button>; })()}
+        {mine&&d.fix&&<button type="button" onClick={()=>{ setReview(d.uid); onBack(); }} style={{marginRight:d.vis!=="me"?0:"auto",background:"#F2FAD0",border:"none",borderRadius:9,padding:"5px 10px",fontSize:12.5,fontWeight:800,color:INK,cursor:"pointer",fontFamily:FONT,display:"inline-flex",alignItems:"center",gap:4,whiteSpace:"nowrap"}}><Icon name="target" size={12} stroke={2.4}/>누적 리뷰 ›</button>}
+        {mine&&<button type="button" onClick={onEdit} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}><Ic n="pencil" s={12}/> 수정</button>}
+        {(mine||ADMIN_MODE)&&<button type="button" onClick={del} style={{background:"none",border:"none",padding:0,fontSize:12.5,color:"#8A93B2",cursor:"pointer",fontFamily:FONT,whiteSpace:"nowrap"}}>삭제</button>}
         {d.vis!=="me"&&<ShareLinkButton url={shareUrl("diary",d.id)}/>}
       </div>}
     </Card>
     {d.vis==="me"?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 나만 보는 일기예요</p>
     :d.noComment?<p style={{margin:0,fontSize:13,color:"#8A93B2",textAlign:"center",background:"#EEF1FA",borderRadius:14,padding:"12px 0"}}><Ic n="lock" s={12}/> 코멘트를 닫아 둔 일기예요</p>
-    :<CommentBox comments={d.comments} title="코멘트" isAdmin={mine||ME_ADMIN}
+    :<CommentBox comments={d.comments} title="코멘트" isAdmin={mine||ADMIN_MODE}
       save={(cid,v)=>diaryRef(`diaries/${d.id}/comments/${cid}`).set(v)}
       onAdded={t=>{ if(d.uid!==me) postFeed({type:"diaryComment",to:d.uid,diaryId:d.id,text:`${ME} 님이 내 훈련일기(${shortDay(d.date)})에 코멘트를 남겼어요: "${clip(t)}"`}); }}
       where={`${curNick(d.uid,d.name)} 님 훈련일기`} link={{diaryId:d.id}}/>}
@@ -7582,6 +7587,7 @@ export default function App() {
   const tabTitles={home:"SSTC",booking:"모임 예약",members:"회원",board:BOARD_NAME,admin:"관리"};
   // 관리자 모드: 실제 관리자이면서 '회원 모드'로 바꾸지 않았을 때만 관리 기능이 보여요 (권한 자체는 그대로)
   const realAdmin=!!(account&&account.admin), adminOn=realAdmin&&!memberView;
+  ADMIN_MODE=adminOn;
   const toggleView=()=>{ const next=!memberView; setMemberView(next); try{ localStorage.setItem(LS.view,next?"member":"admin"); }catch(e){}
     if(next&&tab==="admin"){ setOpenMeeting(null); setTab("home"); } };
   const tabs=adminOn?[...TABS,{key:"admin",label:"관리",icon:"gear"}]:TABS;
