@@ -3471,6 +3471,46 @@ function shareText(text,title,what){
   if(navigator.share) return navigator.share({title,text}).catch(e=>{ if(!e||e.name!=="AbortError") copy(); });
   copy();
 }
+// 캘린더에 추가: 구글은 일정 추가 링크(키 필요 없음), 네이버·폰 기본 캘린더는 .ics 파일로 열어요. 한 번 넣는 방식이라 나중에 모임이 바뀌어도 따라 바뀌지 않아요
+function meetCalTimes(m){ const i=m.info, d1=i.date, d2=i.toDate&&i.toDate>i.date?i.toDate:i.date;
+  const e2=(d2===d1&&i.end&&i.start&&i.end<=i.start)?addDays(d1,1):d2;   // 자정 넘는 모임
+  return {s:d1+"T"+(i.start||"00:00"), e:e2+"T"+(i.end||i.start||"00:00")}; }
+const calLocal=t=>t.replace(/[-:]/g,"")+"00";
+const calUtc=t=>{ const d=new Date(t+":00+09:00"); return d.toISOString().replace(/[-:]/g,"").slice(0,15)+"Z"; };
+function meetCalTitle(m){ return `[SSTC] ${isMT(m)?"엠티":m.kind==="flash"?"번개 모임":"정기 모임"} · ${m.place||""}`.trim(); }
+function meetCalDesc(m){ return `SSTC 모임\n${location.origin+location.pathname}#meeting-${m.id}${m.desc?"\n\n"+m.desc:""}`; }
+function googleCalUrl(m){ const {s,e}=meetCalTimes(m);
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(meetCalTitle(m))+"&dates="+calLocal(s)+"/"+calLocal(e)+"&ctz=Asia/Seoul&details="+encodeURIComponent(meetCalDesc(m))+"&location="+encodeURIComponent([m.place,m.address].filter(Boolean).join(" "));
+}
+function meetIcs(m){ const {s,e}=meetCalTimes(m), esc=t=>String(t||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/([,;])/g,"\\$1");
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//SSTC//KO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT","UID:sstc-"+m.id+"@sstc","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",
+    "DTSTART:"+calUtc(s),"DTEND:"+calUtc(e),"SUMMARY:"+esc(meetCalTitle(m)),"LOCATION:"+esc([m.place,m.address].filter(Boolean).join(" ")),"DESCRIPTION:"+esc(meetCalDesc(m)),
+    "BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:"+esc(meetCalTitle(m)),"END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n"); }
+function openIcs(m){ const blob=new Blob([meetIcs(m)],{type:"text/calendar;charset=utf-8"}), url=URL.createObjectURL(blob);
+  // 아이폰은 download를 붙이면 '파일'로만 받아져요. 빼야 캘린더 추가 창이 떠요
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  const a=document.createElement("a"); a.href=url; if(!ios) a.download="sstc-"+m.info.date+".ics"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000); }
+function CalendarSheet({meeting,onClose}){
+  const m=meeting, mt=isMT(m), when=mt?`${shortDay(m.iso)} ${m.info.start} ~ ${shortDay(m.endIso)} ${m.info.end}`:`${m.date} ${m.time}`;
+  const row=(logo,bg,name,sub,on)=>(
+    <button type="button" onClick={()=>{ on(); onClose(); }} style={{display:"flex",alignItems:"center",gap:12,width:"100%",textAlign:"left",background:"#fff",border:"none",borderRadius:18,padding:"14px 14px",cursor:"pointer",fontFamily:FONT,boxShadow:"0 1px 2px rgba(16,24,64,0.05)"}}>
+      <span style={{width:42,height:42,borderRadius:12,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontWeight:900,fontSize:19,color:"#fff"}}>{logo}</span>
+      <span style={{flex:1,minWidth:0}}><span style={{display:"block",fontSize:15,fontWeight:700,color:INK}}>{name}</span><span style={{display:"block",fontSize:12,color:"#6B7493",marginTop:2,lineHeight:1.45}}>{sub}</span></span>
+      <span style={{color:"#A3AAC2",fontSize:18}}>›</span>
+    </button>);
+  return <Sheet title="캘린더에 추가" onClose={onClose}>
+    <div style={{background:"#fff",borderRadius:16,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+      <Icon name="calendar" size={18} color={BLUE}/>
+      <div style={{minWidth:0}}><p style={{margin:0,fontSize:14,fontWeight:700,color:INK}}>{meetCalTitle(m)}</p><p style={{margin:"2px 0 0",fontSize:12,color:"#6B7493"}}>{when}</p></div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {row(<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3" fill="#fff"/><rect x="3" y="4" width="18" height="5" rx="2" fill="#4285F4"/><text x="12" y="19" textAnchor="middle" fontSize="9" fontWeight="800" fill="#4285F4" fontFamily="Arial">31</text></svg>,"#E8F0FE","구글 캘린더","구글 캘린더가 열리면 '저장'만 누르세요",()=>window.open(googleCalUrl(m),"_blank"))}
+      {row("N","#03C75A","네이버 캘린더","일정 파일이 열리면 네이버 캘린더(또는 네이버와 연결한 캘린더)에 추가",()=>openIcs(m))}
+      {row(<Icon name="calendar" size={22} color="#fff"/>,"#FF3B30","휴대폰 기본 캘린더","아이폰 캘린더 · 삼성 캘린더",()=>openIcs(m))}
+    </div>
+    <p style={{margin:0,fontSize:11.5,color:"#8A93B2",lineHeight:1.6}}>한 번 넣는 방식이라, 나중에 모임 시간이나 장소가 바뀌면 캘린더는 따라 바뀌지 않아요. 2시간 전 알림이 같이 들어가요.</p>
+  </Sheet>;
+}
 function shareMeeting(m){ shareText(meetingShareText(m),"SSTC 모임 안내","안내문"); }
 function shareBracket(m,bracket,scores){ shareText(bracketShareText(m,bracket,scores),"SSTC 대진표","대진표"); }
 
@@ -3644,6 +3684,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   // 길드 모임에서 길드원이 아닌 참석자 (만든 사람이 초대했거나, 그사이 길드를 나간 회원)
   const isOut=v=>!!meeting.guildIds.length&&!v.isGuest&&!!v.key&&v.key!==meeting.createdByUid&&!inMeetGuild(meeting.info,v.key);
   const [inviteOpen,setInviteOpen]=useState(false);
+  const [calOpen,setCalOpen]=useState(false);
   const me0=myUid(), guildMeet=meeting.guildIds.length>0, imOut=guildMeet&&!!me0&&!isAdmin&&meeting.createdByUid!==me0&&!inMeetGuild(meeting.info,me0);
   const inviter=guildMeet&&mine&&mine.byUid?(curNick(mine.byUid,mine.by||"")||"모임 만든 사람"):"";
   const myConfirmIdx=confirmed.findIndex(v=>v.isMe), myWaitIdx=waitlist.findIndex(v=>v.isMe);
@@ -3750,9 +3791,11 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
         )}
       </Card>
       {inviteOpen&&<InviteSheet meeting={meeting} onClose={()=>setInviteOpen(false)}/>}
+      {calOpen&&<CalendarSheet meeting={meeting} onClose={()=>setCalOpen(false)}/>}
       {isMT(meeting)&&!gone&&<Carpool meeting={meeting} confirmed={confirmed} isPast={isPast}/>}
       <div style={{display:"flex",gap:8}}>
         <button type="button" onClick={()=>shareMeeting(meeting)} style={{...btnSecondary,flex:1,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="share" size={16} stroke={2}/>카톡으로 공유</button>
+        {!meeting.cancelled&&!isEnded(meeting.info)&&<button type="button" onClick={()=>setCalOpen(true)} style={{...btnSecondary,flex:1,padding:"12px 0",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="calendar" size={16} stroke={2}/>캘린더에 추가</button>}
         <ShareLinkButton url={location.origin+location.pathname+"#meeting-"+meeting.id} style={{width:48,height:"auto",borderRadius:14,background:"#fff",boxShadow:"inset 0 0 0 1.5px #E1E6F2"}}/>
       </div>
       {meeting.desc&&<Card><SectionTitle>모임 설명</SectionTitle><p style={{margin:0,fontSize:14,color:"#4A5578",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{meeting.desc}</p></Card>}
