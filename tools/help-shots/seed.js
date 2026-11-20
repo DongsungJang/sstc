@@ -80,6 +80,6 @@ module.exports={club:{members,approved,admins:{u1:true},nicknames,meetings,board
    if(vis==='me') mine[id]={...r,photoNow:photoNow||null,photoRef:photoRef||null};
    else { pub[id]=r; if(photoNow||photoRef) photos[id]={uid:r.uid,now:photoNow||null,ref:photoRef||null}; } });
  const diaryChips={u1:{k1:{s:'백핸드',p:'타점 늦음',at:1},k2:{s:'',p:'급해짐',at:2},k3:{s:'서브',p:'토스 흔들림',at:3},k4:{s:'',p:'스플릿 스텝 늦음',at:4},k5:{s:'포핸드',p:'팔로스루 짧음',at:5}},
-   u2:{a1:{s:'백핸드',p:'타점 늦음',at:1},a2:{s:'발리',p:'라켓 뒤로 뺌',at:2}},u3:{b1:{s:'백핸드',p:'타점 늦음',at:1},b2:{s:'포핸드',p:'손목 꺾임',at:2}},u4:{c1:{s:'',p:'타점이 늦어요',at:1}}};
+   u2:{a1:{s:'백핸드',p:'타점 늦음',at:1},a2:{s:'백발리',p:'라켓 뒤로 뺌',at:2}},u3:{b1:{s:'백핸드',p:'타점 늦음',at:1},b2:{s:'포핸드',p:'손목 꺾임',at:2}},u4:{c1:{s:'',p:'타점이 늦어요',at:1}}};
  Object.assign(module.exports.club,{diaryChips,diaries:pub,diaryPhotos:photos,diaryMine:{u1:mine},diaryNotes:{u1:{'2026-10':{text:'토스는 왼팔 끝까지 들고 있기. 11월엔 백핸드 준비를 빨리!',at:Date.now()}}}});
 })();

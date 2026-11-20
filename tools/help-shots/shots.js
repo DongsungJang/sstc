@@ -72,7 +72,7 @@ const HELP=[
     caps:["받은 초대 수락 · 거절 (아래 회원 탭 위에도 말풍선)","내 길드 · 누르면 길드원 · 모임 · 게시판","우수회원은 길드를 만들 수 있어요"]},
    {img:"guild-2",prep:steps(tab("예약"),role("tab",/번개/),scrollToText("마곡 레포츠센터",200)),crop:[["마곡 레포츠센터",2],["마곡 레포츠센터",2]],cropPad:[14,14],marks:[["길드 모임",1]],
     caps:["길드 모임은 그 길드원만 보고 참석해요"]}]},
- {id:"diary",title:"훈련일기",icon:"book",sub:"잘된 점 · 고칠 점, 자세 사진, 누적 리뷰",go:"diary",tip:"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)",blocks:[
+ {id:"diary",title:"훈련일기",icon:"book",sub:"잘된 점 · 고칠 점, 문제 칩, 자세 사진, 좋아요, 누적 리뷰",go:"diary",tip:"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)",blocks:[
    {img:"diary-1",prep:steps(reload,tab("회원"),role("tab","훈련일기")),crop:[[60],["오늘 훈련일기 쓰기",0,0,"button"]],cropPad:[0,12],marks:[["훈련일기",0,0,"button"],[["전체",0,0,"button"],["내 일기",0,0,"button"]],["15",0,0,"button"],["오늘 훈련일기 쓰기",0,0,"button"]],
     caps:["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},
    {img:"diary-2",prep:steps(click("오늘 훈련일기 쓰기"),async p=>{ await p.evaluate(()=>{ document.querySelectorAll("*").forEach(e=>{ if(e.scrollTop>0) e.scrollTop=0; }); }); await p.waitForTimeout(300); }),crop:[["훈련 종류",1],["따라 할 사진",1]],cropPad:[14,40],marks:[["훈련 종류",1],[["잘된 점",1],["고칠 점",1,1]],[["지금 내 자세",1],["참고 자세",1]]],
@@ -81,10 +81,16 @@ const HELP=[
        await p.evaluate(()=>{ const e=[...document.querySelectorAll("p")].find(e=>e.textContent.trim()==="내 칩 · 많이 쓴 순"); if(e) e.scrollIntoView({block:"center"}); }); await p.waitForTimeout(400); },
     crop:[["예) 백핸드 칠 때",0],["+ 새 칩",0,0,"button"]],cropPad:[40,16],marks:[[["타점 늦음",0,0,"button"],["급해짐",0,0,"button"]],["+ 새 칩",0,0,"button"]],
     caps:["내가 만든 칩을 눌러 붙여요 (숫자는 지금까지 붙인 횟수)","+ 새 칩: 기술(선택)과 문제를 직접 써서 만들어요 · 회원들이 쓰는 비슷한 칩도 보여 줘요"]},
+   {img:"diary-2c",prep:async p=>{ const d=p.getByRole("dialog"); await d.locator("button",{hasText:"+ 새 칩"}).click(); await p.waitForTimeout(200); await d.locator("button",{hasText:/^백발리$/}).click(); await d.getByPlaceholder("예) 타점 늦음").fill("라켓"); await p.waitForTimeout(300);
+       await p.evaluate(()=>{ const e=[...document.querySelectorAll("p")].find(e=>e.textContent.trim().startsWith("② 무슨 문제?")); if(e) e.scrollIntoView({block:"center"}); }); await p.waitForTimeout(400); },
+    crop:[["① 어떤 기술?",0],["칩 만들고 붙이기",0,0,"button"]],cropPad:[12,12],marks:[["① 어떤 기술?",1],["예) 타점 늦음",0,0,"input"],["회원들이 쓰는 비슷한 칩",1]],
+    caps:["기술은 골라도 되고 안 골라도 돼요 (목록에 없으면 + 직접)","문제는 짧게 직접 써요 (12자까지)","회원들이 쓰는 비슷한 칩 · 누르면 같은 이름으로 써요 (같은 문제를 같은 이름으로 모아야 잘 세어져요)"]},
    {img:"diary-3",prep:async p=>{ await p.evaluate(()=>{ const s=[...document.querySelectorAll("body *")].find(e=>e.textContent.trim()==="전체 공개"&&e.offsetParent!==null); if(s) s.scrollIntoView({block:"center"}); }); await p.waitForTimeout(400); },crop:[["누가 볼 수 있나요?"],["다른 회원 코멘트 받기"]],cropPad:[18,18],marks:[[["전체 공개",1],["나만 보기",1]],["다른 회원 코멘트 받기",1]],
     caps:["전체 공개 / 나만 보기","코멘트를 받을지 (달리면 알림)"]},
    {img:"diary-4",prep:steps(reload,tab("회원"),role("tab","훈련일기"),async p=>{ await p.getByText("백핸드 칠 때 공이 계속").last().click(); await p.waitForTimeout(900); },scrollToText("지금 내 자세",120)),crop:[["지금 내 자세",2],["참고: 레슨",0]],cropPad:[14,14],marks:[["지금 내 자세",2],["참고 자세",2]],
     caps:["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},
+   {img:"diary-4b",prep:scrollToText("고칠 점",200),crop:[["고칠 점",1,0],["좋아요",0,0,"button"]],cropPad:[14,14],marks:[["타점 늦음",4,0],["좋아요",0,0,"button"],["링크 복사",0,0,"button"]],
+    caps:["붙인 문제 칩","좋아요 (다시 누르면 취소)","링크 복사 · 카톡 등으로 공유 (전체 공개 일기만)"]},
    {img:"diary-4c",prep:async p=>{ await p.evaluate(()=>{ const e=[...document.querySelectorAll("span,p")].find(e=>/^코멘트 \d/.test(e.textContent.trim())&&e.offsetParent!==null); if(e) scrollTo(0,e.getBoundingClientRect().top+scrollY-120); }); await p.waitForTimeout(400); },crop:[["코멘트 2",1],["다음 주 새벽조",2]],cropPad:[14,14],marks:[["어깨를 먼저 돌려",2],["다음 주 새벽조",2]],
     caps:["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},
    {img:"diary-5",prep:steps(reload,tab("회원"),role("tab","훈련일기"),scrollToText("내 고칠 점 모음",40)),crop:[["내 고칠 점 모음",3],["고칠 점 모두 보기",1]],cropPad:[14,14],marks:[["고칠 점 모두 보기",0,0,"button"],["누적 리뷰",0,0,"button"]],
