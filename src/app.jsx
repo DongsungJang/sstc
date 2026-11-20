@@ -6596,7 +6596,7 @@ function Marked({text,word}){
 // ── 고칠 점 '문제 칩': 회원이 직접 만들어요 (미리 만든 목록·자동 추천 없음)
 //  내 칩: club/diaryChips/<uid>/<cid> {s:기술(없으면 ""),p:문제,at}. 정회원은 모두 읽어요(만들 때 비슷한 칩 추천용), 쓰기는 본인만
 //  일기에는 chips:[cid,...] (그 일기 주인의 칩). 리뷰·표시에서 칩 키는 "uid/cid"
-const CHIP_STROKES=["포핸드","백핸드","서브","리턴","발리","스매시","로브"];
+const CHIP_STROKES=["포핸드","백핸드","서브","리턴","발리","스매시","로브","슬라이스","스텝"];
 const CHIP_MAX=12, CHIP_REPEAT=3;
 let DIARY_CHIPS={}, DIARY_ALL=[];
 function useDiaryChips(){
@@ -6658,7 +6658,7 @@ function MyChipPicker({value,onChange}){
       {strokes.map(x=>pick(x,!own&&s===x,()=>{ setS(x); setOwn(false); }))}
       {pick("+ 직접",own,()=>{ setOwn(true); setS(""); },"own")}
     </div>
-    {own&&<input autoFocus value={s} maxLength={CHIP_MAX} onChange={e=>setS(e.target.value)} placeholder="예) 슬라이스" style={{...inp,marginTop:6}}/>}
+    {own&&<input autoFocus value={s} maxLength={CHIP_MAX} onChange={e=>setS(e.target.value)} placeholder="예) 드롭샷" style={{...inp,marginTop:6}}/>}
     {sub(<>② 무슨 문제? <span style={{fontWeight:600}}>(짧게, {CHIP_MAX}자까지)</span></>)}
     <input autoFocus={!own} value={p} maxLength={CHIP_MAX} onChange={e=>setP(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } }} placeholder="예) 타점 늦음" style={{...inp,borderColor:BLUE}}/>
     {!edit&&mineSame&&<p style={{margin:"6px 0 0",fontSize:12,color:"#33406B",background:"#F5F8FF",borderRadius:10,padding:"8px 9px"}}>이미 있는 내 칩이에요 · 누르면 그 칩을 붙여요</p>}
