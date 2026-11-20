@@ -6596,7 +6596,7 @@ function Marked({text,word}){
 // ── 고칠 점 '문제 칩': 회원이 직접 만들어요 (미리 만든 목록·자동 추천 없음)
 //  내 칩: club/diaryChips/<uid>/<cid> {s:기술(없으면 ""),p:문제,at}. 정회원은 모두 읽어요(만들 때 비슷한 칩 추천용), 쓰기는 본인만
 //  일기에는 chips:[cid,...] (그 일기 주인의 칩). 리뷰·표시에서 칩 키는 "uid/cid"
-const CHIP_STROKES=["포핸드","백핸드","서브","리턴","발리","스매시","로브","슬라이스","스텝"];
+const CHIP_STROKES=["포핸드","백핸드","서브","리턴","포발리","백발리","스매시","로브","슬라이스","스텝"];
 const CHIP_MAX=12, CHIP_REPEAT=3;
 let DIARY_CHIPS={}, DIARY_ALL=[];
 function useDiaryChips(){
