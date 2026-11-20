@@ -60,15 +60,15 @@ module.exports={club:{members,approved,admins:{u1:true},nicknames,meetings,board
  const at=iso=>Date.parse(iso+'T21:00:00+09:00');
  const c=(uid,text,iso,h=2,extra={})=>({uid,name:M[uid][0],text,at:at(iso)+h*3600e3,...extra});
  const d={
-  d1:{uid:'u1',date:'2026-11-15',type:'game',photoNow:img('bhNow'),photoRef:img('bhRef'),refNote:'레슨 코치님 시범 영상 캡처',
+  d1:{uid:'u1',chips:['k1','k2'],date:'2026-11-15',type:'game',photoNow:img('bhNow'),photoRef:img('bhRef'),refNote:'레슨 코치님 시범 영상 캡처',
     good:'포핸드 크로스는 길게 잘 들어갔어요. 첫 서브 확률도 괜찮았어요.',fix:'백핸드 칠 때 공이 계속 몸 옆에서 맞아요. 듀스 상황에서 마음이 급해서 더 심해졌어요.',
     comments:{a:c('u4','어깨를 먼저 돌려 놓고 공을 기다려 보세요. 저도 그거 고치는 데 한 달 걸렸어요','2026-11-16',10),b:c('u2','@동토리 다음 주 새벽조 랠리 때 백핸드만 10분 같이 쳐요!','2026-11-16',12,{mentions:{u1:true}})}},
-  d2:{uid:'u1',date:'2026-11-12',type:'lesson',vis:'me',good:'코치님이 준비 자세는 좋아졌대요.',fix:'백핸드 백스윙 때 어깨가 덜 돌아가서 타점이 늦어요. 왼손으로 라켓 목 잡고 돌리기 연습.'},
-  d3:{uid:'u1',date:'2026-11-07',type:'game',good:'발리 각도가 좋았어요.',fix:'스플릿 스텝을 늦게 해서 첫 발이 안 나가요. 지는 게임에서 서둘렀어요.',comments:{a:c('u3','상대가 라켓 들 때 뛰면 타이밍 맞아요','2026-11-08',1)}},
+  d2:{uid:'u1',chips:['k1'],date:'2026-11-12',type:'lesson',vis:'me',good:'코치님이 준비 자세는 좋아졌대요.',fix:'백핸드 백스윙 때 어깨가 덜 돌아가서 타점이 늦어요. 왼손으로 라켓 목 잡고 돌리기 연습.'},
+  d3:{uid:'u1',chips:['k4','k2'],date:'2026-11-07',type:'game',good:'발리 각도가 좋았어요.',fix:'스플릿 스텝을 늦게 해서 첫 발이 안 나가요. 지는 게임에서 서둘렀어요.',comments:{a:c('u3','상대가 라켓 들 때 뛰면 타이밍 맞아요','2026-11-08',1)}},
   d4:{uid:'u1',date:'2026-11-02',type:'solo',good:'벽치기 100개 쉬지 않고 했어요.',fix:'포핸드 팔로스루가 짧게 끝나요.'},
-  d5:{uid:'u1',date:'2026-10-25',type:'rally',good:'랠리가 길게 이어졌어요.',fix:'빠른 공이 백핸드로 오면 늦어요.'},
-  d6:{uid:'u1',date:'2026-10-15',type:'lesson',photoNow:img('svNow'),photoRef:img('svRef'),refNote:'유튜브 서브 토스 강의 2:10',good:'',fix:'토스가 머리 뒤로 가서 서브가 네트에 걸려요.'},
-  d7:{uid:'u1',date:'2026-10-08',type:'game',good:'',fix:'더블 폴트 3개. 토스부터 흔들려요. 스플릿 스텝도 늦었어요.'},
+  d5:{uid:'u1',chips:['k1'],date:'2026-10-25',type:'rally',good:'랠리가 길게 이어졌어요.',fix:'빠른 공이 백핸드로 오면 늦어요.'},
+  d6:{uid:'u1',chips:['k3'],date:'2026-10-15',type:'lesson',photoNow:img('svNow'),photoRef:img('svRef'),refNote:'유튜브 서브 토스 강의 2:10',good:'',fix:'토스가 머리 뒤로 가서 서브가 네트에 걸려요.'},
+  d7:{uid:'u1',chips:['k3','k4','k2'],date:'2026-10-08',type:'game',good:'',fix:'더블 폴트 3개. 토스부터 흔들려요. 스플릿 스텝도 늦었어요.'},
   e2:{uid:'u2',date:'2026-11-15',type:'game',good:'오늘 서브 게임 다 지켰어요.',fix:'발리할 때 라켓을 뒤로 빼서 공이 떠요.'},
   e3:{uid:'u4',date:'2026-11-14',type:'lesson',good:'세컨 서브 스핀이 걸리기 시작했어요.',fix:'서브할 때 무릎을 안 써서 힘이 팔로만 가요.'},
   e4:{uid:'u2',date:'2026-11-10',type:'rally',good:'새벽조 랠리 1시간.',fix:'지치면 스플릿 스텝을 까먹어요.'},
@@ -79,5 +79,7 @@ module.exports={club:{members,approved,admins:{u1:true},nicknames,meetings,board
    if(photoNow) r.thumbNow=photoNow; if(photoRef) r.thumbRef=photoRef;
    if(vis==='me') mine[id]={...r,photoNow:photoNow||null,photoRef:photoRef||null};
    else { pub[id]=r; if(photoNow||photoRef) photos[id]={uid:r.uid,now:photoNow||null,ref:photoRef||null}; } });
- Object.assign(module.exports.club,{diaries:pub,diaryPhotos:photos,diaryMine:{u1:mine},diaryNotes:{u1:{'2026-10':{text:'토스는 왼팔 끝까지 들고 있기. 11월엔 백핸드 준비를 빨리!',at:Date.now()}}}});
+ const diaryChips={u1:{k1:{s:'백핸드',p:'타점 늦음',at:1},k2:{s:'',p:'급해짐',at:2},k3:{s:'서브',p:'토스 흔들림',at:3},k4:{s:'',p:'스플릿 스텝 늦음',at:4},k5:{s:'포핸드',p:'팔로스루 짧음',at:5}},
+   u2:{a1:{s:'백핸드',p:'타점 늦음',at:1},a2:{s:'발리',p:'라켓 뒤로 뺌',at:2}},u3:{b1:{s:'백핸드',p:'타점 늦음',at:1},b2:{s:'포핸드',p:'손목 꺾임',at:2}},u4:{c1:{s:'',p:'타점이 늦어요',at:1}}};
+ Object.assign(module.exports.club,{diaryChips,diaries:pub,diaryPhotos:photos,diaryMine:{u1:mine},diaryNotes:{u1:{'2026-10':{text:'토스는 왼팔 끝까지 들고 있기. 11월엔 백핸드 준비를 빨리!',at:Date.now()}}}});
 })();
