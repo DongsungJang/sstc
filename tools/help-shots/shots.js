@@ -45,13 +45,15 @@ const HELP=[
  {id:"newmeet",title:"모임 만들기",icon:"plus",sub:"정기 · 번개 · 엠티, 공개 범위",go:"booking",tip:"코트비는 관리자가 등록한 코트면 날짜·시간에 맞춰 자동으로 채워져요",blocks:[
    {img:"newmeet-1",prep:steps(tab("예약"),role("button",/새 모임/),async p=>{ await p.getByText("번개 모임",{exact:true}).last().click(); await p.waitForTimeout(700); await p.evaluate(()=>{ document.querySelectorAll("*").forEach(e=>{ if(e.scrollTop>0) e.scrollTop=0; }); scrollTo(0,0); }); await p.waitForTimeout(300); }),crop:[[140],[606]],cropPad:[0,0],marks:[[["정기 모임",0,0,"button"],["엠티",0,0,"button"]],[["게임 모임",0,0,"button"],["훈련 모임",0,0,"button"]],["초대한 회원만",2]],
     caps:["정기 · 번개 · 엠티 고르기","번개는 게임 / 훈련","초대한 회원만 → 비공개 번개 (고른 회원만 보고 참석)"]}]},
- {id:"detail",title:"모임 상세",icon:"list",sub:"참석, 공유, 댓글은 여기서",tip:"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요",blocks:[
+ {id:"detail",title:"모임 상세",icon:"list",sub:"참석, 공유, 캘린더, 댓글은 여기서",tip:"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요",blocks:[
    {img:"detail-1",prep:steps(reload,tab("예약"),scrollToText("다가오는 번개 모임",110),click("항공대 에어코트")),crop:[["모임 정보",0,0,"button"],["참석 확정 · 2번째"]],marks:[[["모임 정보",0,0,"button"],["대진표 · 스코어",0,0,"button"]],[["코트비"],["1인",0]],[["참석 중",0,0,"button"],["불참",0,0,"button"]]],
     caps:["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},
-   {img:"detail-2",prep:scrollToText("늦게 오거나 일찍 가나요?",70),crop:[["늦게 오거나 일찍 가나요?",1],["카톡으로 공유",0,0,"button"]],marks:[["늦게 오거나 일찍 가나요?",1],["게스트 추가",0,0,"button"],["카톡으로 공유",0,0,"button"]],
-    caps:["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유"]},
+   {img:"detail-2",prep:scrollToText("늦게 오거나 일찍 가나요?",70),crop:[["늦게 오거나 일찍 가나요?",1],["카톡으로 공유",0,0,"button"]],marks:[["늦게 오거나 일찍 가나요?",1],["게스트 추가",0,0,"button"],["카톡으로 공유",0,0,"button"],["캘린더에 추가",0,0,"button"]],
+    caps:["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유","내 캘린더에 넣기 (아래 그림)"]},
    {img:"detail-3",prep:scrollToText("다른 회원 참석 등록",300),crop:[["댓글 2"],["무산 처리",0,0,"button"]],marks:[["주차는 정문",1],["회원 추가",0,0,"button"],["무산 처리",0,0,"button"]],
-    caps:["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]}]},
+    caps:["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]},
+   {img:"detail-4",prep:steps(scrollToText("카톡으로 공유",420),click("캘린더에 추가",{exact:true})),crop:[["캘린더에 추가",0,0,"p"],["2시간 전 알림",0]],cropPad:[16,16],marks:[["구글 캘린더",2],["네이버 캘린더",2],["휴대폰 기본 캘린더",2]],
+    caps:["구글 캘린더가 열리면 '저장'","네이버 캘린더에 추가 (아이폰은 네이버를 연결한 캘린더)","아이폰 · 삼성 기본 캘린더에 추가"]}]},
  {id:"mt",title:"엠티 · 카풀",icon:"users",sub:"1박 이상 모임과 같이 타고 가기",tip:"엠티는 참석 횟수·랭킹에 세지 않아요",blocks:[
    {img:"mt-1",prep:steps(reload,tab("예약"),role("tab",/엠티/),click("가평 테니스 펜션")),crop:[[60],["10명"]],cropPad:[0,14],marks:[["1박 2일",0,0,"span"],["11.21(토) 14:00 ~ 11.22(일) 12:00",1],["10명",1]],
     caps:["엠티 · 몇 박인지","시작 ~ 끝 날짜와 시간","인원은 게스트 포함 한 칸"]},
@@ -132,6 +134,8 @@ const HELP=[
     await p.route('**/react.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react.production.min.js')}));
     await p.route('**/react-dom.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react-dom.production.min.js')}));
   }
+  // 예시 모임 날짜(11.14 등)에 맞춰 시계를 고정해요. 안 그러면 지난 모임이 돼서 버튼이 달라져요
+  await p.clock.setFixedTime(new Date(process.env.SHOT_TIME||'2026-11-13T10:00:00+09:00'));
   await p.addInitScript(()=>{ try{ localStorage.setItem('sstc-admin-view','member'); localStorage.setItem('sstc-install-tip','never'); if(!localStorage.getItem('sstc-seen-u1')) localStorage.setItem('sstc-seen-u1',JSON.stringify({base:Date.now()-200*3600e3,t:{},i:{}})); }catch(e){} });
   await p.goto('file://'+path.join(ROOT,'index.html')); await p.waitForTimeout(2000);
   const st=p.getByText('시작하기'); if(await st.count()) await st.first().click(); await p.waitForTimeout(1500);
