@@ -2393,7 +2393,9 @@ const pushStore=t=>{ const me=myUid(); if(!t||!me) return Promise.reject(new Err
   const old=pushSaved();
   return FB.club.child("pushTokens/"+me+"/"+pushTokKey(t)).set({token:t,at:Date.now(),ua:navigator.userAgent.slice(0,120)})
     .then(()=>{ if(old&&old.t!==t&&old.uid===me) FB.club.child("pushTokens/"+me+"/"+pushTokKey(old.t)).remove().catch(()=>{}); lsSetJSON(PUSH_LS,{t,uid:me}); }); };
-const pushOn=()=>Notification.requestPermission().then(p=>{ if(p!=="granted"){ const e=new Error(p); e.code=p; throw e; } return pushToken(); }).then(pushStore);
+// 안드로이드 홈 화면 앱은 크롬이 '조용한 알림 요청'을 쓰면 허용 창이 안 보이고 기다리기만 해요 → 15초 지나면 설정 안내
+const askPerm=()=>pushPerm()==="granted"?Promise.resolve("granted"):withTimeout(Promise.resolve(Notification.requestPermission()),15000).catch(e=>{ if(e&&e.message==="timeout"){ const x=new Error("noprompt"); x.code="noprompt"; throw x; } throw e; });
+const pushOn=()=>askPerm().then(p=>{ if(p!=="granted"){ const e=new Error(p); e.code=p; throw e; } return pushToken(); }).then(pushStore);
 const pushOff=()=>{ const s=pushSaved(); lsSet(PUSH_LS,null);
   const rm=s&&s.uid&&s.uid===myUid()?FB.club.child("pushTokens/"+s.uid+"/"+pushTokKey(s.t)).remove().catch(()=>{}):Promise.resolve();
   return rm.then(()=>{ try{ return window.firebase.messaging().deleteToken().catch(()=>{}); }catch(e){} }); };
@@ -2415,7 +2417,7 @@ function PushToggle(){
   const [want,setWant]=useState(null);   // 누르는 순간 스위치를 바로 옮겨 보여 줘요
   const flip=()=>{ if(busy) return; setBusy(true); setWant(!on); setMsg("");
     (on?pushOff().then(()=>setOn(false)):pushOn().then(()=>{ setOn(true); setMsg("켜졌어요. 이제 폰으로 알려 드려요"); }))
-      .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":"켜지 못했어요. 잠시 후 다시 해 주세요"))
+      .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":e&&e.code==="noprompt"?(pushIsIOS()?"허용 창이 안 떠요. 아이폰 설정 → 알림 → SSTC에서 허용한 다음 다시 눌러 주세요":"허용 창이 안 떠요. 폰 설정 → 애플리케이션 → SSTC → 알림을 켠 다음, 앱을 다시 열고 눌러 주세요"):"켜지 못했어요. 잠시 후 다시 해 주세요"))
       .finally(()=>{ setBusy(false); setWant(null); }); };
   const shown=want==null?on:want;
   const note=!ok?(ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
