@@ -79,6 +79,21 @@
 - 관리자에게는 하단에 **관리** 탭이 생겨서 가입 승인, 승인 취소, 회원 정보를 볼 수 있어요.
 - 콘솔 → Authentication → 로그인 방법에서 **이메일/비밀번호**가 켜져 있어야 해요.
 
+## 푸시 알림 (새 모임 · 참석 · 불참)
+폰 알림은 세 가지만 가요. 나머지 알림은 지금처럼 앱 안 알림(종)에만 떠요.
+- 새 모임: 그 모임을 볼 수 있는 회원 (전체 공개는 정회원 전체, 길드 모임은 그 길드원, 비공개 번개는 초대한 회원). 만든 사람은 빼요.
+- 참석 · 불참: 그 모임을 만든 사람에게. 내가 만든 모임에 내가 누른 건 안 가요.
+- 내 정보 메뉴의 **푸시 알림 받기**를 켠 기기에만 가요. 아이폰은 홈 화면에 추가한 앱(iOS 16.4 이상)에서만 돼요.
+- 앱은 `club/pushQueue/<id>`에 한 줄 쓰고, 파이어베이스 함수(`functions/index.js`)가 `club/pushTokens/<uid>`의 기기로 보낸 뒤 그 줄을 지워요. 받는 기기 쪽은 `firebase-messaging-sw.js`.
+
+처음 한 번 설정:
+1. 파이어베이스 콘솔 → 왼쪽 아래 요금제 → **Blaze**로 업그레이드 (카드 등록. 모임 규모면 무료 한도 안이라 사실상 0원. 걱정되면 예산 알림 1,000원 정도 설정).
+2. 파이어베이스 콘솔 → 프로젝트 설정 → 서비스 계정 → **새 비공개 키 생성** → JSON 파일 받기.
+3. [구글 클라우드 IAM](https://console.cloud.google.com/iam-admin/iam?project=tennis-score-board-93960)에서 그 서비스 계정(`firebase-adminsdk-...`) 연필 → 역할 추가 → **편집자(Editor)** → 저장.
+4. GitHub 저장소 → Settings → Secrets and variables → Actions → New repository secret → 이름 `FIREBASE_SERVICE_ACCOUNT`, 값은 2번 JSON 파일 내용 전체.
+5. GitHub → Actions → **푸시 함수 배포** → Run workflow. (이후엔 `functions/`가 main에 바뀌어 올라올 때마다 저절로 배포돼요.) 처음엔 권한이 퍼지는 데 몇 분 걸려 실패할 수 있어요. 5분쯤 뒤 다시 돌리면 돼요.
+6. 아래 파이어베이스 규칙(`pushTokens`, `pushQueue` 포함)을 다시 붙여넣기.
+
 ## 파이어베이스 규칙
 콘솔 → Realtime Database → 규칙에 아래를 붙여넣고 게시해요. (스코어보드의 `results` 규칙도 같이 들어 있어요.)
 
@@ -109,6 +124,15 @@
       "feed": {
         ".read": "auth != null",
         "$id": { ".write": "auth != null && (!data.exists() || data.child('byUid').val() === auth.uid)" }
+      },
+      "pushTokens": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      },
+      "pushQueue": {
+        "$id": { ".write": "auth != null && !data.exists() && newData.child('byUid').val() === auth.uid && (root.child('club/approved/' + auth.uid).exists() || root.child('club/admins/' + auth.uid).exists())" }
       },
       "inbox": {
         ".read": "auth != null",
