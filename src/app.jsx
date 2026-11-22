@@ -3471,16 +3471,13 @@ function shareText(text,title,what){
   if(navigator.share) return navigator.share({title,text}).catch(e=>{ if(!e||e.name!=="AbortError") copy(); });
   copy();
 }
-// 캘린더에 추가: 구글은 일정 추가 링크(키 필요 없음), 네이버·폰 기본 캘린더는 .ics 파일로 열어요. 한 번 넣는 방식이라 나중에 모임이 바뀌어도 따라 바뀌지 않아요
+// 캘린더에 추가: 아이폰·안드로이드 기본 캘린더에 .ics 파일로 넣어요. 한 번 넣는 방식이라 나중에 모임이 바뀌어도 따라 바뀌지 않아요
 function meetCalTimes(m){ const i=m.info, d1=i.date, d2=i.toDate&&i.toDate>i.date?i.toDate:i.date;
   const e2=(d2===d1&&i.end&&i.start&&i.end<=i.start)?addDays(d1,1):d2;   // 자정 넘는 모임
   return {s:d1+"T"+(i.start||"00:00"), e:e2+"T"+(i.end||i.start||"00:00")}; }
 const calLocal=t=>t.replace(/[-:]/g,"")+"00";
 function meetCalTitle(m){ return `[SSTC] ${isMT(m)?"엠티":m.kind==="flash"?"번개 모임":"정기 모임"} · ${m.place||""}`.trim(); }
 function meetCalDesc(m){ return `SSTC 모임\n${location.origin+location.pathname}#meeting-${m.id}${m.desc?"\n\n"+m.desc:""}`; }
-function googleCalUrl(m){ const {s,e}=meetCalTimes(m);
-  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(meetCalTitle(m))+"&dates="+calLocal(s)+"/"+calLocal(e)+"&ctz=Asia/Seoul&details="+encodeURIComponent(meetCalDesc(m))+"&location="+encodeURIComponent([m.place,m.address].filter(Boolean).join(" "));
-}
 function meetIcs(m){ const {s,e}=meetCalTimes(m), esc=t=>String(t||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/([,;])/g,"\\$1");
   return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//SSTC//KO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VTIMEZONE","TZID:Asia/Seoul","BEGIN:STANDARD","DTSTART:19700101T000000","TZOFFSETFROM:+0900","TZOFFSETTO:+0900","TZNAME:KST","END:STANDARD","END:VTIMEZONE","BEGIN:VEVENT","UID:sstc-"+m.id+"@sstc","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",
     "DTSTART;TZID=Asia/Seoul:"+calLocal(s),"DTEND;TZID=Asia/Seoul:"+calLocal(e),"SUMMARY:"+esc(meetCalTitle(m)),"LOCATION:"+esc([m.place,m.address].filter(Boolean).join(" ")),"DESCRIPTION:"+esc(meetCalDesc(m)),
@@ -3504,9 +3501,9 @@ function CalendarSheet({meeting,onClose}){
       <div style={{minWidth:0}}><p style={{margin:0,fontSize:14,fontWeight:700,color:INK}}>{meetCalTitle(m)}</p><p style={{margin:"2px 0 0",fontSize:12,color:"#6B7493"}}>{when}</p></div>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      {row(<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3" fill="#fff"/><rect x="3" y="4" width="18" height="5" rx="2" fill="#4285F4"/><text x="12" y="19" textAnchor="middle" fontSize="9" fontWeight="800" fill="#4285F4" fontFamily="Arial">31</text></svg>,"#E8F0FE","구글 캘린더","구글 캘린더가 열리면 '저장'만 누르세요",()=>window.open(googleCalUrl(m),"_blank"))}
-      {row("N","#03C75A","네이버 캘린더",ios?"아이폰은 '기본 캘린더'로 들어가요. 네이버 계정을 연결하고 설정 → 앱 → 캘린더 → 기본 캘린더를 네이버로 (또는 추가 창 '캘린더'에서 네이버 선택)":"일정 파일이 열리면 네이버 캘린더 앱을 골라 추가",()=>openIcs(m))}
-      {row(<Icon name="calendar" size={22} color="#fff"/>,"#FF3B30","휴대폰 기본 캘린더",ios?"아이폰 설정의 기본 캘린더에 추가":"삼성 캘린더 등 기본 캘린더 앱에 추가",()=>openIcs(m))}
+      {(()=>{ const ip=row(<Icon name="calendar" size={22} color="#fff"/>,"#FF3B30","아이폰 캘린더","아이폰 기본 캘린더에 추가돼요"+(ios?" (지금 쓰는 폰)":""),()=>openIcs(m)),
+        an=row(<Icon name="calendar" size={22} color="#fff"/>,"#1A73E8","안드로이드 캘린더","삼성 캘린더 등 기본 캘린더에 추가돼요"+(/Android/i.test(navigator.userAgent)?" (지금 쓰는 폰)":""),()=>openIcs(m));
+        return ios?<>{ip}{an}</>:<>{an}{ip}</>; })()}
     </div>
     <p style={{margin:0,fontSize:11.5,color:"#8A93B2",lineHeight:1.6}}>한 번 넣는 방식이라, 나중에 모임 시간이나 장소가 바뀌면 캘린더는 따라 바뀌지 않아요. 2시간 전 알림이 같이 들어가요. 이미 넣은 모임을 다시 누르면 '이벤트 삭제'만 보이는데, 이미 저장돼 있다는 뜻이에요.</p>
   </Sheet>;
@@ -6320,12 +6317,12 @@ function UpdateBanner(){
 // 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
 // marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
 /*HELP_DATA_START*/
-const HELP_VER="dd153a38";
+const HELP_VER="b27ae248";
 const HELP=[
   {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"참석 예정 모임이 없으면 '모임 둘러보기'를 눌러 예약 탭으로 가요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 참석할 가장 가까운 모임 (대기 중이면 주황)","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":197,"marks":[[3.2,23.4,46.3,70.1],[77.8,60.4,15.3,13.2],[79.4,5.6,16.4,13.7]],"caps":["옆으로 밀어서 다음 모임 보기","내 상태: ✓ 참석 예정 · 대기 n번 · 참석 가능","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":150,"marks":[[7.7,32,84.6,32.7]],"caps":["운영진 공지 · 누르면 펼쳐 보기 (중요 공지는 맨 위)"]}]},
   {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기, 새 모임, 새 댓글","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록 · 엠티 보라","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":259,"marks":[[6.7,18.5,86.6,27],[64,7.3,29.3,13.5],[3.2,53.3,93.5,43.2]],"caps":["새 댓글 달린 모임 · 누르면 그 모임으로","새 댓글 표시 한꺼번에 지우기","오늘 새로 올라온 모임 (자정에 사라져요)"]},{"img":"booking-3","w":402,"h":323,"marks":[[4.2,4,91.5,14.2],[42.1,0.3,10.6,-14.1],[17.7,66.9,37,9]],"caps":["번개 / 정기 / 엠티 바꾸기 (꽉 차면 '대기 n')","새로 올라온 모임은 NEW","비공개 번개: 초대받은 회원만 보여요 (+ 새 모임은 아래 '모임 만들기')"]}]},
   {"id":"newmeet","title":"모임 만들기","icon":"plus","sub":"정기 · 번개 · 엠티, 공개 범위","go":"booking","tip":"코트비는 관리자가 등록한 코트면 날짜·시간에 맞춰 자동으로 채워져요","blocks":[{"img":"newmeet-1","w":402,"h":466,"marks":[[3.7,4.5,92,95.3],[3.7,27.8,92.5,10.3],[3.7,67.4,92.5,15.9]],"caps":["정기 · 번개 · 엠티 고르기","번개는 게임 / 훈련","초대한 회원만 → 비공개 번개 (고른 회원만 보고 참석)"]}]},
-  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 캘린더, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,39.6,14.6],[43.3,82.8,39.6,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유","내 캘린더에 넣기 (아래 그림)"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]},{"img":"detail-4","w":402,"h":455,"marks":[[3.7,30.5,92.5,16.7],[3.7,47.7,92.5,16.7],[3.7,64.8,92.5,16.7]],"caps":["구글 캘린더가 열리면 '저장'","네이버 캘린더에 추가 (아이폰은 설정 → 앱 → 캘린더 → 기본 캘린더를 네이버로)","아이폰 · 삼성 기본 캘린더에 추가"]}]},
+  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 캘린더, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,39.6,14.6],[43.3,82.8,39.6,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유","내 캘린더에 넣기 (아래 그림)"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]},{"img":"detail-4","w":402,"h":377,"marks":[[3.7,36.8,92.5,20.2],[3.7,57.5,92.5,20.2]],"caps":["안드로이드: 삼성 캘린더 등 기본 캘린더에 추가","아이폰: 기본 캘린더에 추가 (뜨는 창에서 '추가')"]}]},
   {"id":"mt","title":"엠티 · 카풀","icon":"users","sub":"1박 이상 모임과 같이 타고 가기","tip":"엠티는 참석 횟수·랭킹에 세지 않아요","blocks":[{"img":"mt-1","w":402,"h":509,"marks":[[4.2,3.7,26,6.1],[10.9,75,78.1,8.6],[7.7,86.2,84.6,13.6]],"caps":["엠티 · 몇 박인지","시작 ~ 끝 날짜와 시간","인원은 게스트 포함 한 칸"]},{"img":"mt-2","w":402,"h":275,"marks":[[68.2,7.6,24,8.4],[7.7,227.2,84.6,-127.6],[7.7,72.4,84.6,27.3]],"caps":["차 몇 대 · 남은 자리","운전하는 차 (출발 위치·시간) · 누르면 타기 / 내리기","차가 필요하면 '태워 주세요'"]}]},
   {"id":"bracket","title":"대진표 · 스코어","icon":"ball","sub":"게임 편성과 점수 기록","tip":"6점 선승 · 5:5 무승부 · 참가자만 만들 수 있어요","blocks":[{"img":"bracket-1","w":402,"h":438,"marks":[[4.2,16.2,91.5,9.4],[7.7,63.7,84.6,24.2],[7.7,89.3,84.6,8.7]],"caps":["자동 편성 / 직접 작성","게임당 시간 고르기","코트 수 → 아래 '대진표 만들기'"]}]},
   {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 (이번 달 나 · 회원 평균)"]},{"img":"members-3","w":402,"h":501,"marks":[[62.7,2.2,28.8,7],[7.7,73.3,84.6,9],[7.7,83.4,84.6,11.2]],"caps":["참여 랭킹: 이번 달 / 전체 (끝난 모임만 세요)","5위 아래는 더보기","내 순위 · 아래엔 코트별 통계"]}]},
