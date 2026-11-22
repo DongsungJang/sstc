@@ -2382,9 +2382,13 @@ const pushLib=()=>!!(typeof window!=="undefined"&&window.firebase&&window.fireba
 const pushSupported=()=>{ try{ return pushLib()&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window; }catch(e){ return false; } };
 const pushPerm=()=>{ try{ return Notification.permission; }catch(e){ return "default"; } };
 let PUSH_SW=null;
-const pushReg=()=>PUSH_SW||(PUSH_SW=navigator.serviceWorker.register("firebase-messaging-sw.js").catch(e=>{ PUSH_SW=null; throw e; }));
+// 서비스 워커가 '활성' 상태가 될 때까지 기다려요 (처음 켤 때 안 기다리면 토큰 받기가 멈추거나 실패해요)
+const swActive=reg=>reg.active?reg:new Promise(res=>{ const sw=reg.installing||reg.waiting; if(!sw) return res(reg);
+  const t=setTimeout(()=>res(reg),10000); sw.addEventListener("statechange",()=>{ if(sw.state==="activated"){ clearTimeout(t); res(reg); } }); });
+const pushReg=()=>PUSH_SW||(PUSH_SW=navigator.serviceWorker.register("firebase-messaging-sw.js").then(swActive).catch(e=>{ PUSH_SW=null; throw e; }));
+const withTimeout=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),ms))]);
 const pushSaved=()=>{ const v=lsGetJSON(PUSH_LS); return v&&v.t?v:null; };
-const pushToken=()=>pushReg().then(reg=>window.firebase.messaging().getToken({serviceWorkerRegistration:reg}));
+const pushToken=()=>withTimeout(pushReg().then(reg=>window.firebase.messaging().getToken({serviceWorkerRegistration:reg})),30000);
 const pushStore=t=>{ const me=myUid(); if(!t||!me) return Promise.reject(new Error("no token"));
   const old=pushSaved();
   return FB.club.child("pushTokens/"+me+"/"+pushTokKey(t)).set({token:t,at:Date.now(),ua:navigator.userAgent.slice(0,120)})
@@ -2408,20 +2412,22 @@ function PushToggle(){
   const [busy,setBusy]=useState(false), [msg,setMsg]=useState("");
   const ok=pushSupported(), ios=pushIsIOS()&&!isStandalone();
   const denied=ok&&pushPerm()==="denied";
-  const flip=()=>{ if(busy) return; setBusy(true); setMsg("");
+  const [want,setWant]=useState(null);   // 누르는 순간 스위치를 바로 옮겨 보여 줘요
+  const flip=()=>{ if(busy) return; setBusy(true); setWant(!on); setMsg("");
     (on?pushOff().then(()=>setOn(false)):pushOn().then(()=>{ setOn(true); setMsg("켜졌어요. 이제 폰으로 알려 드려요"); }))
       .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":"켜지 못했어요. 잠시 후 다시 해 주세요"))
-      .finally(()=>setBusy(false)); };
+      .finally(()=>{ setBusy(false); setWant(null); }); };
+  const shown=want==null?on:want;
   const note=!ok?(ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
     :denied?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요"
-    :msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
+    :busy?(want?"켜는 중이에요… 처음엔 몇 초 걸려요":"끄는 중이에요…"):msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
   return(
     <div style={{marginTop:14}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <p style={{margin:0,flex:1,fontSize:12,fontWeight:700,color:"#4A5578"}}>푸시 알림 받기 <span style={{fontWeight:500,color:"#8A93B2"}}>(이 기기)</span></p>
-        <button type="button" role="switch" aria-checked={on} aria-label="푸시 알림 받기" disabled={!ok||denied||busy} onClick={flip}
-          style={{width:46,height:28,flexShrink:0,borderRadius:99,border:"none",padding:3,cursor:!ok||denied?"default":"pointer",background:on?BLUE:"#D5DAE6",opacity:!ok||denied?0.5:busy?0.7:1,transition:"background .15s"}}>
-          <span style={{display:"block",width:22,height:22,borderRadius:99,background:"#fff",boxShadow:"0 1px 3px rgba(11,30,91,0.25)",transform:on?"translateX(18px)":"none",transition:"transform .15s"}}/>
+        <button type="button" role="switch" aria-checked={shown} aria-label="푸시 알림 받기" disabled={!ok||denied||busy} onClick={flip}
+          style={{width:46,height:28,flexShrink:0,borderRadius:99,border:"none",padding:3,cursor:!ok||denied?"default":"pointer",background:shown?BLUE:"#D5DAE6",opacity:!ok||denied?0.5:busy?0.7:1,transition:"background .15s"}}>
+          <span style={{display:"block",width:22,height:22,borderRadius:99,background:"#fff",boxShadow:"0 1px 3px rgba(11,30,91,0.25)",transform:shown?"translateX(18px)":"none",transition:"transform .15s"}}/>
         </button>
       </div>
       <p style={{margin:"5px 0 0",fontSize:11,color:"#8A93B2",lineHeight:1.5}}>{note}</p>
@@ -6385,7 +6391,7 @@ function UpdateBanner(){
 // 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
 // marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
 /*HELP_DATA_START*/
-const HELP_VER="b27ae248";
+const HELP_VER="6f78235b";
 const HELP=[
   {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"참석 예정 모임이 없으면 '모임 둘러보기'를 눌러 예약 탭으로 가요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 참석할 가장 가까운 모임 (대기 중이면 주황)","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":197,"marks":[[3.2,23.4,46.3,70.1],[77.8,60.4,15.3,13.2],[79.4,5.6,16.4,13.7]],"caps":["옆으로 밀어서 다음 모임 보기","내 상태: ✓ 참석 예정 · 대기 n번 · 참석 가능","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":150,"marks":[[7.7,32,84.6,32.7]],"caps":["운영진 공지 · 누르면 펼쳐 보기 (중요 공지는 맨 위)"]}]},
   {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기, 새 모임, 새 댓글","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록 · 엠티 보라","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":259,"marks":[[6.7,18.5,86.6,27],[64,7.3,29.3,13.5],[3.2,53.3,93.5,43.2]],"caps":["새 댓글 달린 모임 · 누르면 그 모임으로","새 댓글 표시 한꺼번에 지우기","오늘 새로 올라온 모임 (자정에 사라져요)"]},{"img":"booking-3","w":402,"h":323,"marks":[[4.2,4,91.5,14.2],[42.1,0.3,10.6,-14.1],[17.7,66.9,37,9]],"caps":["번개 / 정기 / 엠티 바꾸기 (꽉 차면 '대기 n')","새로 올라온 모임은 NEW","비공개 번개: 초대받은 회원만 보여요 (+ 새 모임은 아래 '모임 만들기')"]}]},
@@ -6398,7 +6404,8 @@ const HELP=[
   {"id":"diary","title":"훈련일기","icon":"book","sub":"잘된 점 · 고칠 점, 문제 칩, 자세 사진, 좋아요, 누적 리뷰","go":"diary","tip":"나만 보기로 쓴 일기는 나만 볼 수 있어요 (관리자도 못 봐요)","blocks":[{"img":"diary-1","w":402,"h":593,"marks":[[49.8,12.8,22.8,7.4],[4.2,22.3,31.4,6.6],[4.2,57,14.4,7.9],[3.2,88.9,93.5,9.6]],"caps":["회원 탭 → 훈련일기","모두의 일기 / 내 일기만","점 찍힌 날을 누르면 그날 일기 (공 색 점은 내 일기)","오늘 일기 쓰기 (지난 날은 달력에서 날짜를 눌러서)"]},{"img":"diary-2","w":402,"h":633,"marks":[[8.2,1.7,83.6,12],[8,21,84.1,78.8],[8.2,103.9,83.6,-4.1]],"caps":["레슨 · 게임 · 랠리 · 혼자 연습","잘된 점 · 고칠 점은 글로 편하게","지금 내 자세와 참고 자세 사진을 나란히"]},{"img":"diary-2b","w":402,"h":317,"marks":[[11.2,59.9,62.7,12],[50.1,83.9,16.8,12]],"caps":["내가 만든 칩을 눌러 붙여요 (숫자는 지금까지 붙인 횟수)","+ 새 칩: 기술(선택)과 문제를 직접 써서 만들어요 · 회원들이 쓰는 비슷한 칩도 보여 줘요"]},{"img":"diary-2c","w":402,"h":393,"marks":[[11.2,0.3,77.6,99.5],[13.9,42.5,72.1,12.2],[13.9,54.7,72.1,18.8]],"caps":["기술은 골라도 되고 안 골라도 돼요 (목록에 없으면 + 직접)","문제는 짧게 직접 써요 (12자까지)","회원들이 쓰는 비슷한 칩 · 누르면 같은 이름으로 써요 (같은 문제를 같은 이름으로 모아야 잘 세어져요)"]},{"img":"diary-3","w":402,"h":161,"marks":[[8.2,26.4,84.6,73],[3.7,0.6,92.5,98.8]],"caps":["전체 공개 / 나만 보기","코멘트를 받을지 (달리면 알림)"]},{"img":"diary-4","w":402,"h":270,"marks":[[7.7,4.1,42,82.7],[50.2,4.1,42,82.7]],"caps":["지금 내 자세 · 누르면 크게 보여요 (올릴 때 용량은 알아서 줄여요)","따라 할 참고 자세"]},{"img":"diary-4b","w":402,"h":188,"marks":[[7.7,46.9,84.6,17],[7.7,72.9,21.9,21.3],[82.3,72.9,10,21.3]],"caps":["붙인 문제 칩","좋아요 (다시 누르면 취소)","링크 복사 · 카톡 등으로 공유 (전체 공개 일기만)"]},{"img":"diary-4c","w":402,"h":250,"marks":[[18.2,19.2,74.1,37],[18.2,58.6,74.1,37]],"caps":["회원들이 남긴 조언","@닉네임으로 부르면 알림"]},{"img":"diary-5","w":402,"h":280,"marks":[[50.2,79.8,41.8,16.1],[8,79.8,41.8,16.1]],"caps":["쓴 고칠 점을 날짜순으로 모아 보기","누적 리뷰: 일기를 쓸 때마다 쌓여요"]},{"img":"diary-6","w":402,"h":428,"marks":[[3.2,2.6,36.9,11],[3.2,15,93.5,18.7],[3.2,61.6,93.5,35.9]],"caps":["전체 누적 / 월별 (월별은 지난달과 비교)","나에게 한마디 (리뷰 맨 아래에서 써요)","가장 많이 나온 문제 · 코멘트에서 많이 들은 말"]},{"img":"diary-6b","w":402,"h":423,"marks":[[7.7,15.2,84.6,7.1],[7.7,63.2,84.6,7.1]],"caps":["3번 이상 붙인 칩만 ‘반복’으로 보여 줘요 (한두 번은 접어 둬요)","회원들이 코멘트에서 많이 해 준 말 · 누르면 그 일기만"]},{"img":"diary-7","w":402,"h":314,"marks":[[20.1,22.5,72.1,22.4],[20.1,45.6,72.1,51]],"caps":["내가 쓴 고칠 점 (최근 순)","그 일기에 받은 코멘트가 바로 아래 쌓여요"]}]},
   {"id":"board","title":"소곤소곤","icon":"message","sub":"익명으로도 쓰는 게시판","go":"board","tip":"내 글은 고치거나 지울 수 있어요","blocks":[{"img":"board-1","w":402,"h":512,"marks":[[82.8,6.4,12.9,10.2],[14.2,20.7,78.1,5.5],[4.2,29.5,63.5,7.6],[3.2,43.8,93.5,24.5],[7.2,60.6,17.8,4.5]],"caps":["새 글 쓰기 (익명으로도)","글 내용으로 찾기","전체 · 내 글 · 익명 골라 보기","익명 글은 알림에도 이름이 안 남아요","내 글에 새 댓글 (아래 탭 위 말풍선에도 떠요)"]}]},
   {"id":"noti","title":"알림","icon":"bell","sub":"종 버튼에 모이는 소식","tip":"아래 탭의 빨간 +숫자는 그 탭에 새로 올라온 것이에요","blocks":[{"img":"noti-1","w":402,"h":406,"marks":[[3.7,15.6,92.5,22.6],[3.7,38.6,92.5,17.6],[3.7,56.7,92.5,22.6]],"caps":["내 모임에 누가 참석했을 때","내 글에 댓글이 달렸을 때","댓글에서 @로 불렸을 때 · 누르면 그 모임 · 글로"]}]},
-  {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임, 화면 모드","tip":"화면 모드는 이 폰에만 저장돼요. 닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":440,"marks":[[0.2,0.2,99.5,99.5],[28.1,75.2,64.2,13],[77.9,89.1,14.4,8.4]],"caps":["화면 모드: 자동(폰 설정) · 라이트 · 다크","사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
+  {"id":"me","title":"내 정보","icon":"user","sub":"사진, NTRP, 구력, 닉네임, 화면 모드","tip":"화면 모드는 이 폰에만 저장돼요. 닉네임은 한글 1~10자, 중복 확인 후 바꿀 수 있어요","blocks":[{"img":"me-1","w":402,"h":504,"marks":[[0.2,0.2,99.5,99.6],[28.1,78.3,64.2,11.3],[77.9,90.4,14.4,7.3]],"caps":["화면 모드: 자동(폰 설정) · 라이트 · 다크","사진 · NTRP · 구력 · 동네 고치기","로그아웃"]}]},
+  {"id":"push","title":"푸시 알림","icon":"bell","sub":"새 모임 · 참석 · 불참을 폰으로","tip":"지금은 아이폰만 돼요 (홈 화면에 추가한 SSTC 앱, iOS 16.4 이상). 안드로이드는 아직 안 돼요","blocks":[{"img":"push-1","w":402,"h":284,"marks":[[79.4,39.1,12.9,12]],"caps":["오른쪽 위 내 정보 → '푸시 알림 받기' 켜기 → 뜨는 창에서 '허용'"]},{"caps":["새 모임이 올라오면 (그 모임을 볼 수 있는 회원에게)","내가 만든 모임에 누가 참석 · 불참을 누르면","알림을 누르면 그 모임이 바로 열려요","폰마다 따로 켜요 · 로그아웃하면 그 폰은 꺼져요 · 나머지 알림은 앱 안 종에서 봐요"]}]},
   {"id":"app","title":"앱처럼 쓰기","icon":"phone","sub":"홈 화면에 추가와 업데이트","tip":"'새 버전이 있어요'가 뜨면 업데이트를 누르고, 그래도 그대로면 앱을 완전히 껐다 켜 주세요","blocks":[],"tabs":[{"key":"ios-chrome","label":"크롬","blocks":[{"img":"app-chrome-1","w":600,"h":287,"marks":[[76.7,9.1,6.7,15.5]],"caps":["주소창 오른쪽 공유 버튼 누르기"]},{"img":"app-chrome-2","w":600,"h":554,"marks":[[74.1,63.3,17.4,25.5]],"caps":["'더 보기' 누르기"]},{"img":"app-chrome-3","w":600,"h":646,"marks":[[4.1,63.6,92,12.1]],"caps":["'홈 화면에 추가' 누르기"]},{"img":"app-chrome-4","w":600,"h":450,"marks":[[80,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"ios-safari","label":"사파리","blocks":[{"img":"app-safari-1","w":600,"h":404,"marks":[[22.4,71.3,12.2,15.2]],"caps":["주소창 왼쪽 ☰ 버튼 누르기"]},{"img":"app-safari-2","w":600,"h":372,"marks":[[26.1,29.5,52.2,17]],"caps":["'공유' 누르기"]},{"img":"app-safari-3","w":600,"h":404,"marks":[[4.1,76.6,92,19.4]],"caps":["'홈 화면에 추가' 누르기 (안 보이면 '더 보기')"]},{"img":"app-safari-4","w":600,"h":450,"marks":[[80,4.9,16.5,15.9]],"caps":["오른쪽 위 '추가' 누르면 끝"]}],"os":"ios"},{"key":"and-chrome","os":"android","label":"크롬","blocks":[{"img":"app-and-chrome-1","w":600,"h":358,"marks":[[88.3,1.8,8.1,16.4]],"caps":["오른쪽 위 ⋮ 누르기"]},{"img":"app-and-chrome-2","w":600,"h":585,"marks":[[30.9,39.4,63.9,10.6]],"caps":["'설치 및 바로가기 만들기' 누르기"]},{"img":"app-and-chrome-3","w":600,"h":338,"marks":[[6,30.4,88.1,29.6]],"caps":["'설치' 누르기"]},{"img":"app-and-chrome-4","w":600,"h":377,"marks":[[75.8,74.1,14.1,14.7]],"caps":["앱 설치 창에서 '설치' 누르기"]},{"img":"app-and-chrome-5","w":600,"h":292,"marks":[[34.1,22.7,31.4,24.4]],"caps":["'SSTC 설치 중…'이 뜨면 끝, 홈 화면에 아이콘이 생겨요"]}]},{"key":"and-samsung","os":"android","label":"삼성 인터넷(기본)","blocks":[{"img":"app-and-samsung-1","w":600,"h":377,"marks":[[79.1,3.4,7.6,12.4]],"caps":["주소창 오른쪽 ↓ 버튼 누르기"]},{"img":"app-and-samsung-2","w":600,"h":253,"marks":[[50.9,60.3,40.1,28.2]],"caps":["'추가' 누르기"]},{"img":"app-and-samsung-3","w":600,"h":221,"marks":[[16.3,42.6,67.7,35.3]],"caps":["'앱스에 추가했어요'가 뜨면 끝"]}]}]},
   {"id":"admin","title":"관리자 기능","icon":"gear","sub":"관리자에게만 보여요","go":"admin","admin":true,"tip":"홈의 '관리자 모드' 버튼으로 회원 화면을 확인할 수 있어요","blocks":[{"img":"admin-1","w":402,"h":722,"marks":[[4.2,10.2,91.5,12],[7.7,57.2,84.6,11.1],[7.7,67.5,84.6,11.1],[7.7,88,84.6,11.1]],"caps":["새 가입자 승인","앱 열 때 뜨는 안내 창","정회원 · 우수회원 · 탈퇴 관리","길드 관리 (아래에 코트비 · 홈 배너)"]}]}
 ];

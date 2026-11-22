@@ -16,7 +16,7 @@ self.addEventListener("notificationclick", e => {
 self.window = self;   // firebase-config.js가 window.FIREBASE_CONFIG에 써요
 importScripts(
   "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-messaging-compat.min.js",
+  "vendor/firebase-messaging-compat-10.12.2.js",
   "firebase-config.js"
 );
 firebase.initializeApp(self.FIREBASE_CONFIG);
