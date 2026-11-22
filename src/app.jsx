@@ -1629,7 +1629,7 @@ function HomeTab({onGoBooking,onOpenMeeting,onCreate,notices=[],isAdmin,onWriteN
   const myVote=next&&next.rec&&next.rec.votes&&next.rec.votes[myVoteKey()];
   const myStatus=myVote&&myVote.status;
   const myGoing=next&&myStatus==="attend"?(going.find(g=>g.m.id===next.id)||{ok:true,label:"참석 확정"}):null;
-  const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).then(()=>{ if(status==="attend") notifyAttend(next,myStatus); else notifyUnattend(next,myVote); }).catch(e=>alert(authMsg(e)));
+  const vote=status=>saveMeetingPath("m"+next.id+"/votes/"+myVoteKey(),voteValue(status,myVote)).then(()=>{ pushVote(next,status,myStatus); if(status==="attend") notifyAttend(next,myStatus); else notifyUnattend(next,myVote); }).catch(e=>alert(authMsg(e)));
   const fill=next?Math.min(100,Math.round((next.attendees.length/Math.max(1,next.total))*100)):0;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
@@ -2361,6 +2361,72 @@ const notifyUnattend=(m,prevVote)=>{ if(!m||!prevVote||prevVote.status!=="attend
       if(ok.some(x=>!x)) return postFeed({type:"attendUndo",to:m.createdByUid,meetingId:m.id,text:""});
     });
   }); };
+// ─── 푸시 알림 (폰 알림) ─────────────────────────────────────────────────────
+// 새 모임 · 참석 · 불참 세 가지만 폰으로 보내요. 나머지 알림은 앱 안 알림(종)에만 떠요.
+// 앱은 club/pushQueue/<id>에 한 줄 쓰고, 파이어베이스 함수(functions/index.js)가 받는 사람 폰으로 보낸 뒤 지워요.
+// to: "all"(정회원 전체) 또는 {uid:true}. 쓴 사람은 빼요. 내 정보에서 '푸시 알림 받기'를 켠 기기(club/pushTokens/<uid>)에만 가요.
+const queuePush=(kind,to,meetingId,body)=>{ const me=myUid(); if(!FB||!me||!body) return;
+  const list=to==="all"?"all":Object.fromEntries([...new Set(to||[])].filter(u=>u&&u!==me).map(u=>[u,true]));
+  if(list!=="all"&&!Object.keys(list).length) return;
+  FB.club.child("pushQueue/"+newId()).set({kind,to:list,meetingId:meetingId?String(meetingId):null,body:String(body).slice(0,140),by:ME,byUid:me,at:Date.now()}).catch(()=>{}); };
+// 참석·불참을 누르면 모임 만든 사람에게 (내가 만든 모임이면 안 보내요)
+const pushVote=(m,status,prev)=>{ if(!m||!m.createdByUid||m.createdByUid===myUid()||status===prev) return;
+  const where=`${m.date} ${m.placeName||m.place}`;
+  if(status==="attend") queuePush("attend",[m.createdByUid],m.id,`${ME} 님이 ${where} 모임에 참석을 눌렀어요`);
+  else if(status==="absent") queuePush("absent",[m.createdByUid],m.id,`${ME} 님이 ${where} 모임에 불참을 눌렀어요`); };
+// 이 기기 푸시 켜기·끄기. 아이폰은 홈 화면에 추가한 앱(iOS 16.4 이상)에서만 돼요.
+const PUSH_LS="sstc-push";   // 이 기기에서 켠 토큰 {t, uid}
+const pushTokKey=t=>String(t).replace(/[.#$\[\]\/]/g,"_");
+const pushIsIOS=()=>{ try{ return /iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1); }catch(e){ return false; } };
+const pushLib=()=>!!(typeof window!=="undefined"&&window.firebase&&window.firebase.messaging&&FB);
+const pushSupported=()=>{ try{ return pushLib()&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window; }catch(e){ return false; } };
+const pushPerm=()=>{ try{ return Notification.permission; }catch(e){ return "default"; } };
+let PUSH_SW=null;
+const pushReg=()=>PUSH_SW||(PUSH_SW=navigator.serviceWorker.register("firebase-messaging-sw.js").catch(e=>{ PUSH_SW=null; throw e; }));
+const pushSaved=()=>{ const v=lsGetJSON(PUSH_LS); return v&&v.t?v:null; };
+const pushToken=()=>pushReg().then(reg=>window.firebase.messaging().getToken({serviceWorkerRegistration:reg}));
+const pushStore=t=>{ const me=myUid(); if(!t||!me) return Promise.reject(new Error("no token"));
+  const old=pushSaved();
+  return FB.club.child("pushTokens/"+me+"/"+pushTokKey(t)).set({token:t,at:Date.now(),ua:navigator.userAgent.slice(0,120)})
+    .then(()=>{ if(old&&old.t!==t&&old.uid===me) FB.club.child("pushTokens/"+me+"/"+pushTokKey(old.t)).remove().catch(()=>{}); lsSetJSON(PUSH_LS,{t,uid:me}); }); };
+const pushOn=()=>Notification.requestPermission().then(p=>{ if(p!=="granted"){ const e=new Error(p); e.code=p; throw e; } return pushToken(); }).then(pushStore);
+const pushOff=()=>{ const s=pushSaved(); lsSet(PUSH_LS,null);
+  const rm=s&&s.uid&&s.uid===myUid()?FB.club.child("pushTokens/"+s.uid+"/"+pushTokKey(s.t)).remove().catch(()=>{}):Promise.resolve();
+  return rm.then(()=>{ try{ return window.firebase.messaging().deleteToken().catch(()=>{}); }catch(e){} }); };
+// 앱을 열 때: 켜 둔 기기면 토큰을 새로 확인해 저장하고(바뀔 수 있어요), 앱을 보고 있을 때 온 푸시도 폰 알림으로 띄워요
+let PUSH_LISTEN=false;
+const pushRefresh=()=>{ const s=pushSaved(); if(!s||!pushSupported()) return;
+  if(pushPerm()!=="granted"){ lsSet(PUSH_LS,null); return; }
+  if(s.uid&&s.uid!==myUid()){ lsSet(PUSH_LS,null); return; }   // 다른 계정이 켠 기기
+  pushToken().then(pushStore).catch(()=>{});
+  if(PUSH_LISTEN) return; PUSH_LISTEN=true;
+  try{ window.firebase.messaging().onMessage(p=>{ const n=(p&&p.notification)||{}; const link=(p&&p.fcmOptions&&p.fcmOptions.link)||(p&&p.data&&p.data.link)||"";
+    pushReg().then(reg=>reg.showNotification(n.title||"SSTC",{body:n.body||"",icon:"icons/icon-192.png",tag:(p&&p.messageId)||undefined,data:{link}})).catch(()=>{}); }); }catch(e){} };
+// 내 정보 메뉴의 '푸시 알림 받기' 스위치
+function PushToggle(){
+  const [on,setOn]=useState(()=>!!pushSaved()&&pushPerm()==="granted");
+  const [busy,setBusy]=useState(false), [msg,setMsg]=useState("");
+  const ok=pushSupported(), ios=pushIsIOS()&&!isStandalone();
+  const denied=ok&&pushPerm()==="denied";
+  const flip=()=>{ if(busy) return; setBusy(true); setMsg("");
+    (on?pushOff().then(()=>setOn(false)):pushOn().then(()=>{ setOn(true); setMsg("켜졌어요. 이제 폰으로 알려 드려요"); }))
+      .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":"켜지 못했어요. 잠시 후 다시 해 주세요"))
+      .finally(()=>setBusy(false)); };
+  const note=!ok?(ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
+    :denied?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요"
+    :msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
+  return(
+    <div style={{marginTop:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <p style={{margin:0,flex:1,fontSize:12,fontWeight:700,color:"#4A5578"}}>푸시 알림 받기 <span style={{fontWeight:500,color:"#8A93B2"}}>(이 기기)</span></p>
+        <button type="button" role="switch" aria-checked={on} aria-label="푸시 알림 받기" disabled={!ok||denied||busy} onClick={flip}
+          style={{width:46,height:28,flexShrink:0,borderRadius:99,border:"none",padding:3,cursor:!ok||denied?"default":"pointer",background:on?BLUE:"#D5DAE6",opacity:!ok||denied?0.5:busy?0.7:1,transition:"background .15s"}}>
+          <span style={{display:"block",width:22,height:22,borderRadius:99,background:"#fff",boxShadow:"0 1px 3px rgba(11,30,91,0.25)",transform:on?"translateX(18px)":"none",transition:"transform .15s"}}/>
+        </button>
+      </div>
+      <p style={{margin:"5px 0 0",fontSize:11,color:"#8A93B2",lineHeight:1.5}}>{note}</p>
+    </div>);
+}
 const ago = t => { const m=Math.floor((Date.now()-t)/60000); if(m<1) return "방금"; if(m<60) return m+"분 전"; const h=Math.floor(m/60); if(h<24) return h+"시간 전";
   const d=Math.floor(h/24); if(d<7) return d+"일 전"; const x=new Date(t); return `${x.getMonth()+1}/${x.getDate()}`; };
 // 마지막 접속: club/lastSeen/<uid> 에 시각을 남겨요 (관리자만 읽을 수 있음)
@@ -3643,7 +3709,7 @@ function MeetingDetail({meeting,initialView="info",canManage,isAdmin,onEdit,onDe
   const total=confirmed.length;
   const votes0=(meeting.rec&&meeting.rec.votes)||{};
   const fill=Math.round((total/Math.max(1,meeting.total))*100), prio=meeting.kind!=="flash";
-  const setMyStatus=val=>{ const prev=myStatus; store.saveRsvp(voteValue(val,mine)); if(val==="attend") notifyAttend(meeting,prev); else notifyUnattend(meeting,mine); };
+  const setMyStatus=val=>{ const prev=myStatus; store.saveRsvp(voteValue(val,mine)); pushVote(meeting,val,prev); if(val==="attend") notifyAttend(meeting,prev); else notifyUnattend(meeting,mine); };
   const addGuest=()=>{const n=guestInput.trim();if(!n)return;store.saveRsvp({...voteValue("attend",mine),guests:[...guests,{name:n,at:nowAt()}]});setGuestInput("");setShowGuest(false);};
   const removeGuest=i=>store.saveRsvp({...voteValue("attend",mine),guests:guests.filter((_,idx)=>idx!==i)});
   // 무산 처리: 기록은 남기고 info.cancel 저장, 참석 누른 회원에게 알림
@@ -5134,7 +5200,8 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
       const sid=Date.now();
       const ser={...base,kind:"regular",startDate:f.date,every:+f.repeat,openRule:rule,endDate:f.endDate||"",active:true,createdBy:ME,createdByUid:uid,createdAt:sid};
       job=saveMeetingPath("series/s"+sid,ser).then(()=>ensureSeries({...RAW_MEETINGS,series:{...(RAW_MEETINGS.series||{}),["s"+sid]:ser}})).then(()=>{
-        postFeed({type:"meeting",meetingId:sid,text:`새 정기 모임: ${seriesText(ser).split(" · ")[0]} ${ser.start} · ${ser.place}`});
+        const st=`새 정기 모임: ${seriesText(ser).split(" · ")[0]} ${ser.start} · ${ser.place}`;
+        postFeed({type:"meeting",meetingId:sid,text:st}); queuePush("meeting","all",null,st);
         return sid;
       });
     }else{
@@ -5158,8 +5225,8 @@ function MeetingForm({initial,defaultKind,defaultGuild,onClose,onSaved}) {
         // 비공개 모임은 초대받은 회원에게만 알려요 (수정할 때는 새로 넣은 회원에게만)
         if(inv.length){ const before=editing?inviteUids(initial.info):[]; inviteNotify(info,id,inv.filter(u=>u!==uid&&!before.includes(u))); return id; }
         // 길드 모임은 선택된 길드원에게만 알려요 (전체 알림에 안 올라가요). 여러 길드에 속한 사람은 한 번만
-        if(!editing&&gds.length){ const to=new Set(); gds.forEach(g=>Object.keys(g.members||{}).forEach(u=>u!==uid&&to.add(u))); const nm=gds.map(g=>g.name).join("·"); to.forEach(u=>postFeed({type:"meeting",meetingId:id,to:u,text:`[${nm} 길드] ${text}`})); }
-        else if(!editing) postFeed({type:"meeting",meetingId:id,text});
+        if(!editing&&gds.length){ const to=new Set(); gds.forEach(g=>Object.keys(g.members||{}).forEach(u=>u!==uid&&to.add(u))); const nm=gds.map(g=>g.name).join("·"); to.forEach(u=>postFeed({type:"meeting",meetingId:id,to:u,text:`[${nm} 길드] ${text}`})); queuePush("meeting",[...to],id,`[${nm} 길드] ${text}`); }
+        else if(!editing){ postFeed({type:"meeting",meetingId:id,text}); queuePush("meeting","all",id,text); }
         return id;
       });
     }
@@ -6227,7 +6294,8 @@ function InviteTip({guilds,onGo,lift}){
 }
 // 길드 밖 회원이 길드 모임 공유 링크를 열었을 때
 // 비공개 모임 초대 추가·빼기 (만든 사람·관리자). 새로 넣은 회원에게 알림
-const inviteNotify=(info,id,uids)=>uids.forEach(u=>u&&u!==myUid()&&postFeed({type:"meeting",meetingId:id,to:u,text:`${ME}님이 비공개 ${info.kind==="flash"&&info.flashType==="mt"?"엠티":"번개"}에 초대했어요: ${shortDay(info.date)} ${info.start} · ${info.place}`}));
+const inviteNotify=(info,id,uids)=>{ const text=`${ME}님이 비공개 ${info.kind==="flash"&&info.flashType==="mt"?"엠티":"번개"}에 초대했어요: ${shortDay(info.date)} ${info.start} · ${info.place}`;
+  uids.forEach(u=>u&&u!==myUid()&&postFeed({type:"meeting",meetingId:id,to:u,text})); queuePush("meeting",uids,id,text); };
 function InviteSheet({meeting,onClose}){
   const inv=meeting.invite.filter(u=>u!==meeting.createdByUid), [err,setErr]=useState("");
   const clubM=useClubMembers();
@@ -7549,10 +7617,10 @@ export default function App() {
       if(loginExpired()){ lsSet(LS.until,null); FB.auth.signOut(); return; }   // 30일 넘게 안 열었으면 다시 로그인
       extendLogin();
       if(signingUp.current) return;   // 가입 중에는 가입 완료 화면을 먼저 보여줌
-      loadAccount(user).then(p=>{ if(p!=="withdrawn") setScreen("main"); });
+      loadAccount(user).then(p=>{ if(p!=="withdrawn"){ setScreen("main"); pushRefresh(); } });
     });
   },[]);
-  const logout=()=>{ ME_ADMIN=false; lsSet(LS.until,null); if(FB) FB.auth.signOut(); setScreen("login"); setTab("home"); setOpenMeeting(null); };
+  const logout=()=>{ ME_ADMIN=false; lsSet(LS.until,null); if(FB){ const out=()=>FB.auth.signOut(); pushSaved()?pushOff().then(out,out):out(); } setScreen("login"); setTab("home"); setOpenMeeting(null); };
   const submitSignup=async()=>{
     if(!FB){ setSignupDone(true); return; }
     setSignupErr(""); setSignupBusy(true); signingUp.current=true;
@@ -7877,6 +7945,7 @@ export default function App() {
                     </div>
                     <p style={{margin:"6px 0 0",fontSize:11,color:"#8A93B2"}}>자동은 폰 설정(다크 모드)을 따라가요</p>
                   </div>
+                  <PushToggle/>
                   <button type="button" role="menuitem" onClick={()=>go("edit")} style={{...btnPrimary,marginTop:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Icon name="pencil" size={16} stroke={2.2}/>내 정보 수정</button>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
                     <button type="button" role="menuitem" onClick={()=>go(true)} style={{background:"none",border:"none",padding:"6px 2px",fontSize:13,fontWeight:600,color:"#5E6A8E",cursor:"pointer",fontFamily:FONT}}>내 정보 보기</button>

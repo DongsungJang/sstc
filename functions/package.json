@@ -1,0 +1,11 @@
+{
+  "name": "sstc-functions",
+  "private": true,
+  "description": "SSTC 푸시 알림 보내기 (새 모임 · 참석 · 불참)",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

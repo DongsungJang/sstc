@@ -1,0 +1,27 @@
+# 푸시 알림 함수(functions/)를 파이어베이스에 올려요.
+# main에 functions/가 바뀌어 올라오면 저절로 돌고, Actions 탭에서 'Run workflow'로 직접 돌릴 수도 있어요.
+# 필요한 것: 저장소 Settings > Secrets and variables > Actions 에 FIREBASE_SERVICE_ACCOUNT (서비스 계정 키 JSON 전체)
+name: 푸시 함수 배포
+on:
+  push:
+    branches: [main]
+    paths: ["functions/**", "firebase.json", ".github/workflows/deploy-functions.yml"]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: functions
+      - name: 파이어베이스에 배포
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then echo "::error::FIREBASE_SERVICE_ACCOUNT 비밀값이 없어요. README의 '푸시 알림' 설정을 먼저 해 주세요."; exit 1; fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx -y firebase-tools@13 deploy --only functions --project tennis-score-board-93960 --force --non-interactive
