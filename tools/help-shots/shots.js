@@ -135,7 +135,7 @@ const HELP=[
   await p.route('**/firebase-app-compat.min.js',r=>r.fulfill({body:'window.__SEED='+JSON.stringify(seed)+';'+mock,contentType:'text/javascript'}));
   await p.route(/firebase-(database|auth)-compat\.min\.js/,r=>r.fulfill({body:'',contentType:'text/javascript'}));
   // 푸시: 가짜 메시징(켜진 상태로 보이게)
-  await p.route(/firebase-messaging-compat\.min\.js/,r=>r.fulfill({body:'window.firebase.messaging=()=>({getToken:()=>Promise.resolve("tok-u1"),deleteToken:()=>Promise.resolve(true),onMessage(){}});',contentType:'text/javascript'}));
+  await p.route(/firebase-messaging-compat/,r=>r.fulfill({body:'window.firebase.messaging=()=>({getToken:()=>Promise.resolve("tok-u1"),deleteToken:()=>Promise.resolve(true),onMessage(){}});',contentType:'text/javascript'}));
   if(process.env.REACT_DIR){
     await p.route('**/react.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react.production.min.js')}));
     await p.route('**/react-dom.production.min.js',r=>r.fulfill({path:path.join(process.env.REACT_DIR,'react-dom.production.min.js')}));

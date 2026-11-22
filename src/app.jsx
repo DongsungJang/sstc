@@ -2382,9 +2382,13 @@ const pushLib=()=>!!(typeof window!=="undefined"&&window.firebase&&window.fireba
 const pushSupported=()=>{ try{ return pushLib()&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window; }catch(e){ return false; } };
 const pushPerm=()=>{ try{ return Notification.permission; }catch(e){ return "default"; } };
 let PUSH_SW=null;
-const pushReg=()=>PUSH_SW||(PUSH_SW=navigator.serviceWorker.register("firebase-messaging-sw.js").catch(e=>{ PUSH_SW=null; throw e; }));
+// 서비스 워커가 '활성' 상태가 될 때까지 기다려요 (처음 켤 때 안 기다리면 토큰 받기가 멈추거나 실패해요)
+const swActive=reg=>reg.active?reg:new Promise(res=>{ const sw=reg.installing||reg.waiting; if(!sw) return res(reg);
+  const t=setTimeout(()=>res(reg),10000); sw.addEventListener("statechange",()=>{ if(sw.state==="activated"){ clearTimeout(t); res(reg); } }); });
+const pushReg=()=>PUSH_SW||(PUSH_SW=navigator.serviceWorker.register("firebase-messaging-sw.js").then(swActive).catch(e=>{ PUSH_SW=null; throw e; }));
+const withTimeout=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),ms))]);
 const pushSaved=()=>{ const v=lsGetJSON(PUSH_LS); return v&&v.t?v:null; };
-const pushToken=()=>pushReg().then(reg=>window.firebase.messaging().getToken({serviceWorkerRegistration:reg}));
+const pushToken=()=>withTimeout(pushReg().then(reg=>window.firebase.messaging().getToken({serviceWorkerRegistration:reg})),30000);
 const pushStore=t=>{ const me=myUid(); if(!t||!me) return Promise.reject(new Error("no token"));
   const old=pushSaved();
   return FB.club.child("pushTokens/"+me+"/"+pushTokKey(t)).set({token:t,at:Date.now(),ua:navigator.userAgent.slice(0,120)})
@@ -2408,20 +2412,22 @@ function PushToggle(){
   const [busy,setBusy]=useState(false), [msg,setMsg]=useState("");
   const ok=pushSupported(), ios=pushIsIOS()&&!isStandalone();
   const denied=ok&&pushPerm()==="denied";
-  const flip=()=>{ if(busy) return; setBusy(true); setMsg("");
+  const [want,setWant]=useState(null);   // 누르는 순간 스위치를 바로 옮겨 보여 줘요
+  const flip=()=>{ if(busy) return; setBusy(true); setWant(!on); setMsg("");
     (on?pushOff().then(()=>setOn(false)):pushOn().then(()=>{ setOn(true); setMsg("켜졌어요. 이제 폰으로 알려 드려요"); }))
       .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":"켜지 못했어요. 잠시 후 다시 해 주세요"))
-      .finally(()=>setBusy(false)); };
+      .finally(()=>{ setBusy(false); setWant(null); }); };
+  const shown=want==null?on:want;
   const note=!ok?(ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
     :denied?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요"
-    :msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
+    :busy?(want?"켜는 중이에요… 처음엔 몇 초 걸려요":"끄는 중이에요…"):msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
   return(
     <div style={{marginTop:14}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <p style={{margin:0,flex:1,fontSize:12,fontWeight:700,color:"#4A5578"}}>푸시 알림 받기 <span style={{fontWeight:500,color:"#8A93B2"}}>(이 기기)</span></p>
-        <button type="button" role="switch" aria-checked={on} aria-label="푸시 알림 받기" disabled={!ok||denied||busy} onClick={flip}
-          style={{width:46,height:28,flexShrink:0,borderRadius:99,border:"none",padding:3,cursor:!ok||denied?"default":"pointer",background:on?BLUE:"#D5DAE6",opacity:!ok||denied?0.5:busy?0.7:1,transition:"background .15s"}}>
-          <span style={{display:"block",width:22,height:22,borderRadius:99,background:"#fff",boxShadow:"0 1px 3px rgba(11,30,91,0.25)",transform:on?"translateX(18px)":"none",transition:"transform .15s"}}/>
+        <button type="button" role="switch" aria-checked={shown} aria-label="푸시 알림 받기" disabled={!ok||denied||busy} onClick={flip}
+          style={{width:46,height:28,flexShrink:0,borderRadius:99,border:"none",padding:3,cursor:!ok||denied?"default":"pointer",background:shown?BLUE:"#D5DAE6",opacity:!ok||denied?0.5:busy?0.7:1,transition:"background .15s"}}>
+          <span style={{display:"block",width:22,height:22,borderRadius:99,background:"#fff",boxShadow:"0 1px 3px rgba(11,30,91,0.25)",transform:shown?"translateX(18px)":"none",transition:"transform .15s"}}/>
         </button>
       </div>
       <p style={{margin:"5px 0 0",fontSize:11,color:"#8A93B2",lineHeight:1.5}}>{note}</p>
