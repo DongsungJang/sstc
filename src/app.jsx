@@ -2379,7 +2379,9 @@ const PUSH_LS="sstc-push";   // 이 기기에서 켠 토큰 {t, uid}
 const pushTokKey=t=>String(t).replace(/[.#$\[\]\/]/g,"_");
 const pushIsIOS=()=>{ try{ return /iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1); }catch(e){ return false; } };
 const pushLib=()=>!!(typeof window!=="undefined"&&window.firebase&&window.firebase.messaging&&FB);
-const pushSupported=()=>{ try{ return pushLib()&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window; }catch(e){ return false; } };
+// 안드로이드는 홈 화면 앱에서 허용 창이 안 떠서 지금은 막아 둬요 (아이폰만)
+const pushAndroid=()=>{ try{ return /Android/i.test(navigator.userAgent); }catch(e){ return false; } };
+const pushSupported=()=>{ try{ return !pushAndroid()&&pushLib()&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window; }catch(e){ return false; } };
 const pushPerm=()=>{ try{ return Notification.permission; }catch(e){ return "default"; } };
 let PUSH_SW=null;
 // 서비스 워커가 '활성' 상태가 될 때까지 기다려요 (처음 켤 때 안 기다리면 토큰 받기가 멈추거나 실패해요)
@@ -2420,7 +2422,7 @@ function PushToggle(){
       .catch(e=>setMsg(e&&(e.code==="denied"||e.message==="denied")?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요":e&&e.code==="default"?"알림 허용을 눌러야 켜져요":e&&e.code==="noprompt"?(pushIsIOS()?"허용 창이 안 떠요. 아이폰 설정 → 알림 → SSTC에서 허용한 다음 다시 눌러 주세요":"허용 창이 안 떠요. 폰 설정 → 애플리케이션 → SSTC → 알림을 켠 다음, 앱을 다시 열고 눌러 주세요"):"켜지 못했어요. 잠시 후 다시 해 주세요"))
       .finally(()=>{ setBusy(false); setWant(null); }); };
   const shown=want==null?on:want;
-  const note=!ok?(ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
+  const note=!ok?(pushAndroid()?"지금은 아이폰만 돼요. 안드로이드는 아직 푸시를 받을 수 없어요":ios?"아이폰은 홈 화면에 추가한 앱에서만 푸시를 받을 수 있어요 (사용 안내 > 앱처럼 쓰기)":"이 브라우저는 푸시 알림을 지원하지 않아요")
     :denied?"알림이 차단돼 있어요. 폰 설정에서 SSTC(또는 브라우저) 알림을 허용해 주세요"
     :busy?(want?"켜는 중이에요… 처음엔 몇 초 걸려요":"끄는 중이에요…"):msg||"새 모임, 내가 만든 모임의 참석·불참만 폰으로 알려 줘요";
   return(
