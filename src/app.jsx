@@ -2201,7 +2201,7 @@ const dbReady = (typeof window==="undefined") ? Promise.resolve(null)
 // 참석 전: "참석하기" / 참석 후: "참석 중" (체크) / 불참 후: "불참" (체크)
 // 예/아니요 확인 팝업 (가운데 카드). tone: 주황(wait) · 빨강(absent)
 function AskPop({icon,tone,title,sub,no="아니요",yes="예",onNo,onYes}){
-  const c=tone==="wait"?{bg:"#FFF1DE",fg:"#E07A0B",btn:"linear-gradient(135deg,#F59E0B,#E07A0B)"}:{bg:"#FDECEC",fg:"#E5484D",btn:"#E5484D"};
+  const c=tone==="wait"?{bg:"#FFF1DE",fg:"#E07A0B",btn:"linear-gradient(135deg,#F59E0B,#E07A0B)"}:tone==="info"?{bg:"#E8EEFF",fg:BLUE,btn:GRAD}:{bg:"#FDECEC",fg:"#E5484D",btn:"#E5484D"};
   const b=(t,on,primary)=><button type="button" onClick={on} style={{flex:1,padding:"13px 0",borderRadius:14,border:"none",background:primary?c.btn:"#EDF0F6",color:primary?"#fff":"#5E6A8E",fontSize:15,fontWeight:800,fontFamily:FONT,cursor:"pointer"}}>{t}</button>;
   return <div onClick={onNo} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(15,23,60,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
     <div role="dialog" aria-modal="true" aria-label={title} onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:320,background:"#fff",borderRadius:22,padding:"24px 20px 18px",textAlign:"center",fontFamily:FONT,boxShadow:"0 18px 50px rgba(11,30,91,0.3)"}}>
@@ -3565,8 +3565,9 @@ function openIcs(m){ const blob=new Blob([meetIcs(m)],{type:"text/calendar;chars
 function CalendarSheet({meeting,onClose}){
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   const m=meeting, mt=isMT(m), when=mt?`${shortDay(m.iso)} ${m.info.start} ~ ${shortDay(m.endIso)} ${m.info.end}`:`${m.date} ${m.time}`;
-  const row=(logo,bg,name,sub,on)=>(
-    <button type="button" onClick={()=>{ on(); onClose(); }} style={{display:"flex",alignItems:"center",gap:12,width:"100%",textAlign:"left",background:"#fff",border:"none",borderRadius:18,padding:"14px 14px",cursor:"pointer",fontFamily:FONT,boxShadow:"0 1px 2px rgba(16,24,64,0.05)"}}>
+  const [askDl,setAskDl]=useState(false);   // 안드로이드: 다운로드 창이 갑자기 떠서 당황하지 않게 먼저 안내
+  const row=(logo,bg,name,sub,on,keep)=>(
+    <button type="button" onClick={()=>{ on(); if(!keep) onClose(); }} style={{display:"flex",alignItems:"center",gap:12,width:"100%",textAlign:"left",background:"#fff",border:"none",borderRadius:18,padding:"14px 14px",cursor:"pointer",fontFamily:FONT,boxShadow:"0 1px 2px rgba(16,24,64,0.05)"}}>
       <span style={{width:42,height:42,borderRadius:12,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontWeight:900,fontSize:19,color:"#fff"}}>{logo}</span>
       <span style={{flex:1,minWidth:0}}><span style={{display:"block",fontSize:15,fontWeight:700,color:INK}}>{name}</span><span style={{display:"block",fontSize:12,color:"#6B7493",marginTop:2,lineHeight:1.45}}>{sub}</span></span>
       <span style={{color:"#A3AAC2",fontSize:18}}>›</span>
@@ -3578,10 +3579,11 @@ function CalendarSheet({meeting,onClose}){
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       {(()=>{ const ip=row(<Icon name="calendar" size={22} color="#fff"/>,"#FF3B30","아이폰 캘린더","아이폰 기본 캘린더에 추가돼요"+(ios?" (지금 쓰는 폰)":""),()=>openIcs(m)),
-        an=row(<Icon name="calendar" size={22} color="#fff"/>,"#1A73E8","안드로이드 캘린더","삼성 캘린더 등 기본 캘린더에 추가돼요"+(/Android/i.test(navigator.userAgent)?" (지금 쓰는 폰)":""),()=>openIcs(m));
+        an=row(<Icon name="calendar" size={22} color="#fff"/>,"#1A73E8","안드로이드 캘린더","삼성 캘린더 등 기본 캘린더에 추가돼요"+(/Android/i.test(navigator.userAgent)?" (지금 쓰는 폰)":""),()=>setAskDl(true),true);
         return ios?<>{ip}{an}</>:<>{an}{ip}</>; })()}
     </div>
     <p style={{margin:0,fontSize:11.5,color:"#8A93B2",lineHeight:1.6}}>한 번 넣는 방식이라, 나중에 모임 시간이나 장소가 바뀌면 캘린더는 따라 바뀌지 않아요. 2시간 전 알림이 같이 들어가요. 이미 넣은 모임을 다시 누르면 '이벤트 삭제'만 보이는데, 이미 저장돼 있다는 뜻이에요.</p>
+    {askDl&&<AskPop icon="calendar" tone="info" title={"일정 파일을 받을게요"} sub="안드로이드는 일정 파일을 내려받아서 캘린더에 넣어요. 다음 창에서 '다운로드'를 누르고, 받은 파일을 열면 삼성 캘린더 같은 기본 캘린더에 추가돼요." no="취소" yes="계속하기" onNo={()=>setAskDl(false)} onYes={()=>{ openIcs(m); setAskDl(false); onClose(); }}/>}
   </Sheet>;
 }
 function shareMeeting(m){ shareText(meetingShareText(m),"SSTC 모임 안내","안내문"); }
@@ -6395,12 +6397,12 @@ function UpdateBanner(){
 // 기능마다 실제 앱 화면을 잘라 둔 그림(help/<이름>.jpg)에 노란 테두리 + 번호, 아래엔 번호별 한 줄 설명.
 // marks: 그림 안 위치 [x, y, 너비, 높이] (그림 크기에 대한 %). 그림은 tools/help-shots 로 다시 찍을 수 있어요.
 /*HELP_DATA_START*/
-const HELP_VER="6f78235b";
+const HELP_VER="e10d91de";
 const HELP=[
   {"id":"home","title":"홈 화면","icon":"home","sub":"앱을 열면 처음 보이는 화면","go":"home","tip":"참석 예정 모임이 없으면 '모임 둘러보기'를 눌러 예약 탭으로 가요","blocks":[{"img":"home-1","w":402,"h":250,"marks":[[73.4,10.8,18.6,9.2],[8,65.2,84.1,22],[8,48.4,84.1,10.4]],"caps":["내가 참석할 가장 가까운 모임 (대기 중이면 주황)","여기서 바로 참석 · 불참","참석 인원 / 정원"]},{"img":"home-2","w":402,"h":197,"marks":[[3.2,23.4,46.3,70.1],[77.8,60.4,15.3,13.2],[79.4,5.6,16.4,13.7]],"caps":["옆으로 밀어서 다음 모임 보기","내 상태: ✓ 참석 예정 · 대기 n번 · 참석 가능","전체보기를 누르면 예약 탭으로"]},{"img":"home-3","w":402,"h":150,"marks":[[7.7,32,84.6,32.7]],"caps":["운영진 공지 · 누르면 펼쳐 보기 (중요 공지는 맨 위)"]}]},
   {"id":"booking","title":"모임 예약","icon":"calendar","sub":"모임 찾기, 새 모임, 새 댓글","go":"booking","tip":"달력 점 색: 정기 파랑 · 번개 게임 주황 · 번개 훈련 초록 · 엠티 보라","blocks":[{"img":"booking-1","w":402,"h":409,"marks":[[81.4,49.4,14.4,11.5],[59.2,8.8,35.8,9.5]],"caps":["점 찍힌 날을 누르면 그날 모임","목록 / 지도로 보기"]},{"img":"booking-2","w":402,"h":259,"marks":[[6.7,18.5,86.6,27],[64,7.3,29.3,13.5],[3.2,53.3,93.5,43.2]],"caps":["새 댓글 달린 모임 · 누르면 그 모임으로","새 댓글 표시 한꺼번에 지우기","오늘 새로 올라온 모임 (자정에 사라져요)"]},{"img":"booking-3","w":402,"h":323,"marks":[[4.2,4,91.5,14.2],[42.1,0.3,10.6,-14.1],[17.7,66.9,37,9]],"caps":["번개 / 정기 / 엠티 바꾸기 (꽉 차면 '대기 n')","새로 올라온 모임은 NEW","비공개 번개: 초대받은 회원만 보여요 (+ 새 모임은 아래 '모임 만들기')"]}]},
   {"id":"newmeet","title":"모임 만들기","icon":"plus","sub":"정기 · 번개 · 엠티, 공개 범위","go":"booking","tip":"코트비는 관리자가 등록한 코트면 날짜·시간에 맞춰 자동으로 채워져요","blocks":[{"img":"newmeet-1","w":402,"h":466,"marks":[[3.7,4.5,92,95.3],[3.7,27.8,92.5,10.3],[3.7,67.4,92.5,15.9]],"caps":["정기 · 번개 · 엠티 고르기","번개는 게임 / 훈련","초대한 회원만 → 비공개 번개 (고른 회원만 보고 참석)"]}]},
-  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 캘린더, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,39.6,14.6],[43.3,82.8,39.6,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유","내 캘린더에 넣기 (아래 그림)"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]},{"img":"detail-4","w":402,"h":377,"marks":[[3.7,36.8,92.5,20.2],[3.7,57.5,92.5,20.2]],"caps":["안드로이드: 삼성 캘린더 등 기본 캘린더에 추가","아이폰: 기본 캘린더에 추가 (뜨는 창에서 '추가')"]}]},
+  {"id":"detail","title":"모임 상세","icon":"list","sub":"참석, 공유, 캘린더, 댓글은 여기서","tip":"정기 모임은 이번 달 참석이 적은 회원이 먼저 확정돼요","blocks":[{"img":"detail-1","w":402,"h":570,"marks":[[4.2,1.6,91.5,8.1],[10.9,61.6,78.1,8.4],[7.7,84,84.6,9.6]],"caps":["모임 정보 / 대진표 탭","코트비 · 1인 금액은 자동","참석 · 불참 (꽉 차면 대기 신청)"]},{"img":"detail-2","w":402,"h":343,"marks":[[7.7,2.6,84.6,46.9],[65.2,54.5,23.9,9.6],[3.2,82.8,39.6,14.6],[43.3,82.8,39.6,14.6]],"caps":["늦게 오거나 일찍 가면 체크","게스트 데려오기","단톡방에 공유","내 캘린더에 넣기 (아래 그림)"]},{"img":"detail-3","w":402,"h":511,"marks":[[18.2,24.3,74.1,5.4],[70.2,50.1,22.1,6.8],[3.2,88.4,93.5,9.8]],"caps":["@닉네임으로 부르면 알림","단톡에서 온다는 회원 대신 넣기","비 오면 무산 처리 (삭제 아님)"]},{"img":"detail-4","w":402,"h":377,"marks":[[3.7,36.8,92.5,20.2],[3.7,57.5,92.5,20.2]],"caps":["안드로이드: 안내 창 뒤 일정 파일을 받아 기본 캘린더에 추가 (아래 그림)","아이폰: 기본 캘린더에 추가 (뜨는 창에서 '추가')"]},{"img":"detail-5","w":402,"h":274,"marks":[[50.2,74.3,39.6,19.3]],"caps":["안드로이드: '계속하기' → 다음 창에서 '다운로드' → 받은 파일 열면 삼성 캘린더 등에 추가"]}]},
   {"id":"mt","title":"엠티 · 카풀","icon":"users","sub":"1박 이상 모임과 같이 타고 가기","tip":"엠티는 참석 횟수·랭킹에 세지 않아요","blocks":[{"img":"mt-1","w":402,"h":509,"marks":[[4.2,3.7,26,6.1],[10.9,75,78.1,8.6],[7.7,86.2,84.6,13.6]],"caps":["엠티 · 몇 박인지","시작 ~ 끝 날짜와 시간","인원은 게스트 포함 한 칸"]},{"img":"mt-2","w":402,"h":275,"marks":[[68.2,7.6,24,8.4],[7.7,227.2,84.6,-127.6],[7.7,72.4,84.6,27.3]],"caps":["차 몇 대 · 남은 자리","운전하는 차 (출발 위치·시간) · 누르면 타기 / 내리기","차가 필요하면 '태워 주세요'"]}]},
   {"id":"bracket","title":"대진표 · 스코어","icon":"ball","sub":"게임 편성과 점수 기록","tip":"6점 선승 · 5:5 무승부 · 참가자만 만들 수 있어요","blocks":[{"img":"bracket-1","w":402,"h":438,"marks":[[4.2,16.2,91.5,9.4],[7.7,63.7,84.6,24.2],[7.7,89.3,84.6,8.7]],"caps":["자동 편성 / 직접 작성","게임당 시간 고르기","코트 수 → 아래 '대진표 만들기'"]}]},
   {"id":"members","title":"회원","icon":"users","sub":"회원 찾기와 내 통계","go":"members","tip":"회원 사진을 누르면 크게 보여요","blocks":[{"img":"members-1","w":402,"h":342,"marks":[[5.2,13.7,89.6,12.9],[14.2,33.9,78.1,8.2],[4.2,47.1,91.5,10.8],[21.1,81.6,71.1,14.6]],"caps":["회원 목록 / 길드 / 통계","닉네임 · 본명 · 동네로 찾기","정렬 바꾸기","누르면 자세히 (손 · 코트 · 갈 모임)"]},{"img":"members-2","w":402,"h":444,"marks":[[4.2,11.9,16.1,19.6],[7.7,66.7,84.6,7]],"caps":["내 누적 참석과 최근 6개월","나와 평균 비교 (이번 달 나 · 회원 평균)"]},{"img":"members-3","w":402,"h":501,"marks":[[62.7,2.2,28.8,7],[7.7,73.3,84.6,9],[7.7,83.4,84.6,11.2]],"caps":["참여 랭킹: 이번 달 / 전체 (끝난 모임만 세요)","5위 아래는 더보기","내 순위 · 아래엔 코트별 통계"]}]},
