@@ -3562,10 +3562,13 @@ function openIcs(m){ const blob=new Blob([meetIcs(m)],{type:"text/calendar;chars
   // 아이폰은 download를 붙이면 '파일'로만 받아져요. 빼야 캘린더 추가 창이 떠요
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   const a=document.createElement("a"); a.href=url; if(!ios) a.download="sstc-"+m.info.date+".ics"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000); }
-// 안드로이드: 브라우저가 .ics를 바로 못 열고 '파일 다운로드'로 받아서, 구글 캘린더 일정 추가 화면을 바로 열어요 (구글 캘린더 앱이 있으면 앱으로 열려요)
-function meetGcalUrl(m){ const {s,e}=meetCalTimes(m);
-  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(meetCalTitle(m))+"&dates="+calLocal(s)+"/"+calLocal(e)+"&ctz=Asia/Seoul&details="+encodeURIComponent(meetCalDesc(m))+"&location="+encodeURIComponent([m.place,m.address].filter(Boolean).join(" ")); }
-function openGcal(m){ const url=meetGcalUrl(m), w=window.open(url,"_blank"); if(w) w.opener=null; else location.href=url; }   // 새 창이 막히면 이 창에서 열기
+// 안드로이드: 브라우저가 .ics를 바로 못 열고 '파일 다운로드'로 받아서, 구글 캘린더로 넣어요.
+// render 주소는 앱 안 브라우저에 PC 화면으로 작게 떠서, 구글 캘린더 앱을 intent 주소로 바로 열고(event?action=TEMPLATE), 앱이 없으면 웹 주소로 넘어가요
+function meetGcalQuery(m){ const {s,e}=meetCalTimes(m);
+  return "action=TEMPLATE&text="+encodeURIComponent(meetCalTitle(m))+"&dates="+calLocal(s)+"/"+calLocal(e)+"&ctz=Asia/Seoul&details="+encodeURIComponent(meetCalDesc(m))+"&location="+encodeURIComponent([m.place,m.address].filter(Boolean).join(" ")); }
+function openGcal(m){ const q=meetGcalQuery(m), web="https://calendar.google.com/calendar/event?"+q;
+  if(/Android/i.test(navigator.userAgent)){ location.href="intent://calendar.google.com/calendar/event?"+q+"#Intent;scheme=https;package=com.google.android.calendar;S.browser_fallback_url="+encodeURIComponent(web)+";end"; return; }
+  const w=window.open(web,"_blank"); if(w) w.opener=null; else location.href=web; }   // 새 창이 막히면 이 창에서 열기
 function CalendarSheet({meeting,onClose}){
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   const m=meeting, mt=isMT(m), when=mt?`${shortDay(m.iso)} ${m.info.start} ~ ${shortDay(m.endIso)} ${m.info.end}`:`${m.date} ${m.time}`;
